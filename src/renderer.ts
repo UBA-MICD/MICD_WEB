@@ -50,6 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initKeyboardShortcuts();
   initSeriesNav();
   initResizeObserver();
+  initUploadPanel();
+  loadStudyExplorer();
 });
 
 // ── File Loading ─────────────────────────────────────────────────────────────
@@ -513,4 +515,145 @@ function initResizeObserver(): void {
     }
   });
   observer.observe(container);
+}
+
+// ── Upload Panel ─────────────────────────────────────────────────────────────
+
+const API_BASE = '/api';
+
+function initUploadPanel(): void {
+  const input = document.getElementById('upload-input') as HTMLInputElement | null;
+  if (!input) return;
+
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (file) uploadFile(file);
+    input.value = '';
+  });
+
+  const btn = document.getElementById('btn-upload-server');
+  btn?.addEventListener('click', () => input.click());
+
+  const refresh = document.getElementById('btn-refresh-studies');
+  refresh?.addEventListener('click', loadStudyExplorer);
+}
+
+async function uploadFile(file: File, force = false): Promise<void> {
+  const progressWrap = document.getElementById('upload-progress-wrap')!;
+  const progressBar  = document.getElementById('upload-progress-bar')!;
+  const uploadStatus = document.getElementById('upload-status')!;
+
+  progressWrap.classList.remove('hidden');
+  progressBar.style.width = '0%';
+  uploadStatus.textContent = '';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const url = `${API_BASE}/v1/studies/upload${force ? '?force=true' : ''}`;
+    xhr.open('POST', url);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        progressBar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      progressWrap.classList.add('hidden');
+
+      if (xhr.status === 201) {
+        uploadStatus.textContent = 'Estudio cargado correctamente.';
+        uploadStatus.className = 'upload-status upload-status--ok';
+        loadStudyExplorer();
+      } else if (xhr.status === 409) {
+        const body = JSON.parse(xhr.responseText);
+        showDuplicateDialog(file, body.message);
+      } else if (xhr.status === 413) {
+        uploadStatus.textContent = 'El archivo supera el límite de 500 MB.';
+        uploadStatus.className = 'upload-status upload-status--error';
+      } else {
+        const body = JSON.parse(xhr.responseText ?? '{}');
+        uploadStatus.textContent = body.error ?? 'Error al cargar el archivo.';
+        uploadStatus.className = 'upload-status upload-status--error';
+      }
+      resolve();
+    });
+
+    xhr.addEventListener('error', () => {
+      progressWrap.classList.add('hidden');
+      uploadStatus.textContent = 'Error de red al conectar con el servidor.';
+      uploadStatus.className = 'upload-status upload-status--error';
+      resolve();
+    });
+
+    xhr.send(formData);
+  });
+}
+
+function showDuplicateDialog(file: File, message: string): void {
+  const dialog = document.getElementById('duplicate-dialog')!;
+  const msg    = document.getElementById('duplicate-msg')!;
+  const btnYes = document.getElementById('duplicate-yes')!;
+  const btnNo  = document.getElementById('duplicate-no')!;
+
+  msg.textContent = message;
+  dialog.classList.remove('hidden');
+
+  const close = () => dialog.classList.add('hidden');
+
+  btnYes.onclick = async () => {
+    close();
+    await uploadFile(file, true);
+  };
+  btnNo.onclick = close;
+}
+
+// ── Study Explorer ────────────────────────────────────────────────────────────
+
+interface StudyRecord {
+  id: number;
+  orthanc_study_id: string;
+  patient_name: string;
+  study_date: string;
+  modality: string;
+  study_description: string;
+  uploaded_at: string;
+}
+
+async function loadStudyExplorer(): Promise<void> {
+  const list = document.getElementById('study-list');
+  if (!list) return;
+
+  list.innerHTML = '<li class="study-item study-item--loading">Cargando estudios…</li>';
+
+  try {
+    const res = await fetch(`${API_BASE}/v1/studies`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const studies: StudyRecord[] = await res.json();
+
+    if (studies.length === 0) {
+      list.innerHTML = '<li class="study-item study-item--empty">No hay estudios cargados.</li>';
+      return;
+    }
+
+    list.innerHTML = studies.map((s) => `
+      <li class="study-item" data-id="${s.orthanc_study_id}">
+        <div class="study-item__badge">${s.modality || '?'}</div>
+        <div class="study-item__info">
+          <span class="study-item__name">${s.patient_name || 'Paciente desconocido'}</span>
+          <span class="study-item__date">${formatDate(s.study_date)} · ${s.study_description || '—'}</span>
+        </div>
+      </li>
+    `).join('');
+  } catch {
+    list.innerHTML = '<li class="study-item study-item--error">Error al cargar estudios.</li>';
+  }
+}
+
+function formatDate(raw: string): string {
+  if (!raw || raw.length !== 8) return raw || '—';
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
 }

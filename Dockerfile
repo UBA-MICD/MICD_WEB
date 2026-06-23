@@ -3,26 +3,22 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies using root package.json
-COPY package*.json ./
-RUN npm ci
+COPY package.json ./
+RUN npm install
 
-# Copy all source files needed by Vite
-COPY vite.config.ts postcss.config.mjs tailwind.config.ts ./
-COPY tsconfig.renderer.json ./
+COPY tsconfig.json ./
 COPY src/ ./src/
 
-# Build only the renderer (React SPA)
-RUN npx vite build
+RUN npm run build
 
 # ── Stage 2: Runtime (Nginx) ──────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runtime
 
-# Remove default nginx static files
 RUN rm -rf /usr/share/nginx/html/*
 
-COPY --from=builder /app/dist/renderer /usr/share/nginx/html
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY src/index.html /usr/share/nginx/html/index.html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

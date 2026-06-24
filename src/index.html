@@ -211,7 +211,64 @@
           </svg>
         </button>
       </div>
+
+      <!-- Filters -->
+      <div class="explorer-filters">
+        <div class="explorer-search-row">
+          <svg class="explorer-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="10" cy="10" r="7"/><line x1="15" y1="15" x2="21" y2="21"/>
+          </svg>
+          <input
+            type="text"
+            id="search-studies"
+            class="explorer-search-input"
+            placeholder="Buscar paciente o ID…"
+            autocomplete="off"
+          />
+        </div>
+        <div class="explorer-filter-row">
+          <select id="filter-modality" class="explorer-select">
+            <option value="">Todas las modalidades</option>
+            <option value="CT">CT</option>
+            <option value="MR">MR</option>
+            <option value="CR">CR</option>
+            <option value="DX">DX (RX digital)</option>
+            <option value="US">US (Ecografía)</option>
+            <option value="NM">NM (Medicina nuclear)</option>
+            <option value="PT">PT (PET)</option>
+            <option value="MG">MG (Mamografía)</option>
+            <option value="XA">XA (Angiografía)</option>
+            <option value="OT">Otra</option>
+          </select>
+          <button class="icon-btn explorer-clear-btn" id="btn-clear-filters" title="Limpiar filtros">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="explorer-filter-row">
+          <input type="date" id="filter-date-from" class="explorer-date" title="Desde" />
+          <span class="explorer-date-sep">–</span>
+          <input type="date" id="filter-date-to" class="explorer-date" title="Hasta" />
+        </div>
+      </div>
+
       <ul id="study-list" class="study-list"></ul>
+
+      <!-- Pagination -->
+      <div class="explorer-pagination" id="explorer-pagination">
+        <button class="icon-btn" id="pagination-prev" title="Página anterior">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <span id="pagination-info" class="pagination-info">—</span>
+        <button class="icon-btn" id="pagination-next" title="Página siguiente">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 6 15 12 9 18"/>
+          </svg>
+        </button>
+      </div>
     </aside>
 
     <!-- Duplicate confirmation dialog -->

@@ -205,51 +205,66 @@
     <aside class="explorer-panel" id="explorer-panel">
       <div class="explorer-panel__header">
         <h2>Estudios en servidor</h2>
-        <button class="icon-btn" id="btn-refresh-studies" title="Recargar">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M3 12a9 9 0 1 1 3 7"/><path d="M3 22v-7h7"/>
-          </svg>
-        </button>
+        <div style="display:flex;gap:2px;align-items:center">
+          <button class="icon-btn" id="btn-refresh-studies" title="Recargar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 12a9 9 0 1 1 3 7"/><path d="M3 22v-7h7"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="btn-close-explorer" title="Cerrar panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Filters -->
       <div class="explorer-filters">
-        <div class="explorer-search-row">
-          <svg class="explorer-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <div class="filter-search">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="filter-search__icon">
             <circle cx="10" cy="10" r="7"/><line x1="15" y1="15" x2="21" y2="21"/>
           </svg>
           <input
             type="text"
             id="search-studies"
-            class="explorer-search-input"
+            class="filter-search__input"
             placeholder="Buscar paciente o ID…"
             autocomplete="off"
           />
-        </div>
-        <div class="explorer-filter-row">
-          <select id="filter-modality" class="explorer-select">
-            <option value="">Todas las modalidades</option>
-            <option value="CT">CT</option>
-            <option value="MR">MR</option>
-            <option value="CR">CR</option>
-            <option value="DX">DX (RX digital)</option>
-            <option value="US">US (Ecografía)</option>
-            <option value="NM">NM (Medicina nuclear)</option>
-            <option value="PT">PT (PET)</option>
-            <option value="MG">MG (Mamografía)</option>
-            <option value="XA">XA (Angiografía)</option>
-            <option value="OT">Otra</option>
-          </select>
-          <button class="icon-btn explorer-clear-btn" id="btn-clear-filters" title="Limpiar filtros">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <button class="filter-search__clear hidden" id="btn-clear-search" aria-label="Limpiar búsqueda">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
-        <div class="explorer-filter-row">
-          <input type="date" id="filter-date-from" class="explorer-date" title="Desde" />
-          <span class="explorer-date-sep">–</span>
-          <input type="date" id="filter-date-to" class="explorer-date" title="Hasta" />
+
+        <div class="filter-chips" id="filter-modality-chips" role="group" aria-label="Modalidad">
+          <button class="filter-chip filter-chip--active" data-modality="">Todas</button>
+          <button class="filter-chip" data-modality="CT">CT</button>
+          <button class="filter-chip" data-modality="MR">MR</button>
+          <button class="filter-chip" data-modality="DX">RX</button>
+          <button class="filter-chip" data-modality="CR">CR</button>
+          <button class="filter-chip" data-modality="US">US</button>
+          <button class="filter-chip" data-modality="NM">NM</button>
+          <button class="filter-chip" data-modality="PT">PET</button>
+          <button class="filter-chip" data-modality="MG">MG</button>
+          <button class="filter-chip" data-modality="XA">XA</button>
+        </div>
+
+        <div class="filter-dates">
+          <input type="date" id="filter-date-from" class="filter-date" title="Desde" />
+          <span class="filter-dates__sep">—</span>
+          <input type="date" id="filter-date-to" class="filter-date" title="Hasta" />
+        </div>
+
+        <div class="filter-clear-wrap hidden" id="filter-clear-wrap">
+          <button id="btn-clear-filters" class="filter-clear-btn">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Limpiar filtros
+          </button>
         </div>
       </div>
 
@@ -270,6 +285,14 @@
         </button>
       </div>
     </aside>
+
+    <!-- Reopen explorer button -->
+    <button id="btn-reopen-explorer" class="hidden" title="Abrir panel de estudios">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Estudios
+    </button>
 
     <!-- Duplicate confirmation dialog -->
     <div id="duplicate-dialog" class="dialog-overlay hidden">

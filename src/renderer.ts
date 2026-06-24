@@ -703,6 +703,11 @@ const explorerState = {
   dateTo: '',
 };
 
+function updateClearFiltersVisibility(): void {
+  const active = explorerState.search || explorerState.modality || explorerState.dateFrom || explorerState.dateTo;
+  $('filter-clear-wrap').classList.toggle('hidden', !active);
+}
+
 function initStudyExplorer(): void {
   // Click to view study
   const list = $('study-list');
@@ -716,21 +721,40 @@ function initStudyExplorer(): void {
     await loadStudyFromServer(studyId);
   });
 
-  // Debounced search
+  // Search with debounce + inline clear button
+  const searchInput = $('search-studies') as HTMLInputElement;
+  const searchClear = $('btn-clear-search');
   let searchTimer: ReturnType<typeof setTimeout>;
-  $('search-studies').addEventListener('input', (e) => {
+  searchInput.addEventListener('input', () => {
+    const val = searchInput.value;
+    searchClear.classList.toggle('hidden', val.length === 0);
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      explorerState.search = (e.target as HTMLInputElement).value.trim();
+      explorerState.search = val.trim();
       explorerState.page = 1;
+      updateClearFiltersVisibility();
       void loadStudyExplorer();
     }, 400);
   });
-
-  // Modality filter
-  $('filter-modality').addEventListener('change', (e) => {
-    explorerState.modality = (e.target as HTMLSelectElement).value;
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClear.classList.add('hidden');
+    explorerState.search = '';
     explorerState.page = 1;
+    updateClearFiltersVisibility();
+    void loadStudyExplorer();
+  });
+
+  // Modality chips
+  const chipsContainer = $('filter-modality-chips');
+  chipsContainer.addEventListener('click', (e) => {
+    const chip = (e.target as HTMLElement).closest<HTMLElement>('.filter-chip');
+    if (!chip) return;
+    chipsContainer.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('filter-chip--active'));
+    chip.classList.add('filter-chip--active');
+    explorerState.modality = chip.dataset.modality ?? '';
+    explorerState.page = 1;
+    updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
 
@@ -738,40 +762,55 @@ function initStudyExplorer(): void {
   $('filter-date-from').addEventListener('change', (e) => {
     explorerState.dateFrom = (e.target as HTMLInputElement).value;
     explorerState.page = 1;
+    updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
   $('filter-date-to').addEventListener('change', (e) => {
     explorerState.dateTo = (e.target as HTMLInputElement).value;
     explorerState.page = 1;
+    updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
 
-  // Clear filters
+  // Clear all filters
   $('btn-clear-filters').addEventListener('click', () => {
     explorerState.search   = '';
     explorerState.modality = '';
     explorerState.dateFrom = '';
     explorerState.dateTo   = '';
     explorerState.page     = 1;
-    ($('search-studies')    as HTMLInputElement).value = '';
-    ($('filter-modality')   as HTMLSelectElement).value = '';
-    ($('filter-date-from')  as HTMLInputElement).value = '';
-    ($('filter-date-to')    as HTMLInputElement).value = '';
+    searchInput.value = '';
+    searchClear.classList.add('hidden');
+    ($('filter-date-from') as HTMLInputElement).value = '';
+    ($('filter-date-to')   as HTMLInputElement).value = '';
+    chipsContainer.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('filter-chip--active'));
+    chipsContainer.querySelector<HTMLElement>('.filter-chip[data-modality=""]')?.classList.add('filter-chip--active');
+    updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
 
   // Pagination
   $('pagination-prev').addEventListener('click', () => {
-    if (explorerState.page > 1) {
-      explorerState.page--;
-      void loadStudyExplorer();
-    }
+    if (explorerState.page > 1) { explorerState.page--; void loadStudyExplorer(); }
   });
   $('pagination-next').addEventListener('click', () => {
-    if (explorerState.page < explorerState.totalPages) {
-      explorerState.page++;
-      void loadStudyExplorer();
-    }
+    if (explorerState.page < explorerState.totalPages) { explorerState.page++; void loadStudyExplorer(); }
+  });
+
+  // Close / reopen panel
+  const panel    = $('explorer-panel');
+  const shell    = document.querySelector<HTMLElement>('.app-shell')!;
+  const btnClose  = $('btn-close-explorer');
+  const btnReopen = $('btn-reopen-explorer');
+  btnClose.addEventListener('click', () => {
+    panel.classList.add('explorer-panel--closed');
+    shell.classList.add('explorer-closed');
+    btnReopen.classList.remove('hidden');
+  });
+  btnReopen.addEventListener('click', () => {
+    panel.classList.remove('explorer-panel--closed');
+    shell.classList.remove('explorer-closed');
+    btnReopen.classList.add('hidden');
   });
 }
 

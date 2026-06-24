@@ -1,8 +1,3 @@
-/**
- * renderer.ts — Renderer process entry point.
- * Orchestrates DICOM file loading, parsing, canvas rendering, and UI interaction.
- */
-
 import { parseDicomFile, calculateAutoWindowLevel } from './dicom-parser-util.js';
 import type { ParsedDicom, DicomMetadata } from './dicom-parser-util.js';
 import { renderDicom, createDefaultViewport, applyCanvasTransform, fitToContainer } from './dicom-renderer.js';
@@ -11,7 +6,7 @@ import type { ViewportState } from './dicom-renderer.js';
 // ── State ────────────────────────────────────────────────────────────────────
 
 interface AppState {
-  files: string[];
+  files: File[];
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
@@ -43,6 +38,7 @@ function $(id: string): HTMLElement {
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  initFileInputs();
   initToolbar();
   initViewportInteraction();
   initDropZone();
@@ -51,81 +47,127 @@ document.addEventListener('DOMContentLoaded', () => {
   initSeriesNav();
   initResizeObserver();
   initUploadPanel();
+  initStudyExplorer();
   loadStudyExplorer();
 });
 
-// ── File Loading ─────────────────────────────────────────────────────────────
+// ── Browser File Inputs ──────────────────────────────────────────────────────
 
-async function openFiles(): Promise<void> {
-  const result = await window.api.dicom.openFiles();
-  if (result.canceled || result.filePaths.length === 0) return;
-  state.files = result.filePaths.sort();
-  state.currentIndex = 0;
-  await loadCurrentFile();
+function initFileInputs(): void {
+  // Single/multi file picker
+  const filesInput = $('open-files-input') as HTMLInputElement;
+  filesInput.addEventListener('change', async () => {
+    if (!filesInput.files || filesInput.files.length === 0) return;
+    state.files = Array.from(filesInput.files).sort((a, b) => a.name.localeCompare(b.name));
+    state.currentIndex = 0;
+    await loadCurrentFile();
+    filesInput.value = '';
+  });
+
+  // Folder picker
+  const folderInput = $('open-folder-input') as HTMLInputElement;
+  folderInput.setAttribute('webkitdirectory', '');
+  folderInput.addEventListener('change', async () => {
+    if (!folderInput.files || folderInput.files.length === 0) return;
+    const dcmFiles = Array.from(folderInput.files)
+      .filter((f) => f.name.toLowerCase().endsWith('.dcm'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (dcmFiles.length === 0) {
+      showError('No se encontraron archivos .dcm en la carpeta seleccionada.');
+      return;
+    }
+    state.files = dcmFiles;
+    state.currentIndex = 0;
+    await loadCurrentFile();
+    folderInput.value = '';
+  });
 }
 
-async function openFolder(): Promise<void> {
-  const result = await window.api.dicom.openFolder();
-  if (result.canceled || result.filePaths.length === 0) return;
-  state.files = result.filePaths;
-  state.currentIndex = 0;
-  await loadCurrentFile();
+// ── File Loading ─────────────────────────────────────────────────────────────
+
+function openFiles(): void {
+  ($('open-files-input') as HTMLInputElement).click();
+}
+
+function openFolder(): void {
+  ($('open-folder-input') as HTMLInputElement).click();
 }
 
 async function loadCurrentFile(): Promise<void> {
   if (state.files.length === 0) return;
 
-  const filePath = state.files[state.currentIndex];
+  const file = state.files[state.currentIndex];
   showLoading(true);
 
   try {
-    const arrayBuffer = await window.api.dicom.readFile(filePath);
-    const parsed = parseDicomFile(arrayBuffer);
-    state.parsed = parsed;
-
-    if (!parsed.pixelData) {
-      showError('No pixel data found. The file may use compressed transfer syntax.');
-      return;
-    }
-
-    // Initialize viewport with DICOM window values or auto-calculate
-    if (parsed.metadata.windowWidth > 0) {
-      state.viewport = createDefaultViewport(parsed.metadata);
-    } else {
-      const auto = calculateAutoWindowLevel(
-        parsed.pixelData,
-        parsed.metadata.rescaleSlope,
-        parsed.metadata.rescaleIntercept,
-      );
-      state.viewport = {
-        windowCenter: auto.windowCenter,
-        windowWidth: auto.windowWidth,
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-      };
-    }
-
-    // Fit zoom to container
-    const container = $('viewport-container');
-    state.viewport.zoom = fitToContainer(
-      container.clientWidth,
-      container.clientHeight,
-      parsed.metadata.columns,
-      parsed.metadata.rows,
-    );
-
-    hideDropZone();
-    render();
-    updateMetadataPanel();
-    updateSeriesNav();
-    updateInfoOverlay();
-    updateFileName(filePath);
+    const arrayBuffer = await file.arrayBuffer();
+    await displayDicom(arrayBuffer, file.name);
   } catch (err: any) {
     showError(`Failed to load DICOM file: ${err.message || err}`);
   } finally {
     showLoading(false);
   }
+}
+
+async function loadStudyFromServer(studyId: string): Promise<void> {
+  showLoading(true);
+  state.files = [];
+  state.currentIndex = 0;
+
+  try {
+    const res = await fetch(`${API_BASE}/v1/studies/${studyId}/file`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const arrayBuffer = await res.arrayBuffer();
+    await displayDicom(arrayBuffer, studyId);
+  } catch (err: any) {
+    showError(`Error al cargar el estudio del servidor: ${err.message || err}`);
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function displayDicom(arrayBuffer: ArrayBuffer, name: string): Promise<void> {
+  const parsed = parseDicomFile(arrayBuffer);
+  state.parsed = parsed;
+
+  if (!parsed.pixelData) {
+    showError('No pixel data found. The file may use compressed transfer syntax.');
+    return;
+  }
+
+  if (parsed.metadata.windowWidth > 0) {
+    state.viewport = createDefaultViewport(parsed.metadata);
+  } else {
+    const auto = calculateAutoWindowLevel(
+      parsed.pixelData,
+      parsed.metadata.rescaleSlope,
+      parsed.metadata.rescaleIntercept,
+    );
+    state.viewport = {
+      windowCenter: auto.windowCenter,
+      windowWidth: auto.windowWidth,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+    };
+  }
+
+  const container = $('viewport-container');
+  state.viewport.zoom = fitToContainer(
+    container.clientWidth,
+    container.clientHeight,
+    parsed.metadata.columns,
+    parsed.metadata.rows,
+  );
+
+  hideDropZone();
+  render();
+  updateMetadataPanel();
+  updateSeriesNav();
+  updateInfoOverlay();
+
+  $('topbar-title').textContent = name;
+  $('topbar-title').title = name;
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
@@ -205,7 +247,6 @@ function updateToolbarUI(): void {
   document.querySelectorAll('.toolbar__tool').forEach((el) => el.classList.remove('active'));
   $(`tool-${state.activeTool}`).classList.add('active');
 
-  // Update cursor
   const viewport = $('viewport-container');
   viewport.className = 'viewport-container';
   viewport.classList.add(`cursor-${state.activeTool}`);
@@ -234,12 +275,10 @@ function initViewportInteraction(): void {
 
     switch (state.activeTool) {
       case 'wl':
-        // Horizontal = window width, Vertical = window center
         state.viewport.windowWidth = Math.max(1, state.viewport.windowWidth + dx * 2);
         state.viewport.windowCenter += dy * 2;
         break;
       case 'zoom':
-        // Vertical drag = zoom
         state.viewport.zoom = Math.max(0.1, Math.min(10, state.viewport.zoom * (1 - dy * 0.005)));
         break;
       case 'pan':
@@ -255,7 +294,6 @@ function initViewportInteraction(): void {
     state.isDragging = false;
   });
 
-  // Scroll wheel zoom
   container.addEventListener('wheel', (e: WheelEvent) => {
     if (!state.parsed) return;
     e.preventDefault();
@@ -271,7 +309,6 @@ function initDropZone(): void {
   const dropZone = $('drop-zone');
   const container = $('viewport-container');
 
-  // Prevent defaults on the whole document
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
     document.addEventListener(eventName, (e) => {
       e.preventDefault();
@@ -284,7 +321,6 @@ function initDropZone(): void {
   });
 
   dropZone.addEventListener('dragleave', (e: DragEvent) => {
-    // Only remove highlight if leaving the drop zone entirely
     const related = e.relatedTarget as HTMLElement | null;
     if (!related || !dropZone.contains(related)) {
       dropZone.classList.remove('drag-over');
@@ -296,23 +332,21 @@ function initDropZone(): void {
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
 
-    // Use the file paths — Electron gives us the path property
-    const paths: string[] = [];
+    const dcmFiles: File[] = [];
     for (let i = 0; i < files.length; i++) {
-      const file = files[i] as any;
-      if (file.path) {
-        paths.push(file.path);
+      const file = files[i];
+      if (file.name.toLowerCase().endsWith('.dcm')) {
+        dcmFiles.push(file);
       }
     }
 
-    if (paths.length > 0) {
-      state.files = paths.sort();
+    if (dcmFiles.length > 0) {
+      state.files = dcmFiles.sort((a, b) => a.name.localeCompare(b.name));
       state.currentIndex = 0;
       await loadCurrentFile();
     }
   });
 
-  // Drop zone open button
   $('drop-zone-open').addEventListener('click', openFiles);
 }
 
@@ -366,17 +400,17 @@ function updateMetadataPanel(): void {
     ['Patient ID', m.patientId],
     ['Birth Date', m.patientBirthDate],
     ['Sex', m.patientSex],
-    ['', ''], // separator
+    ['', ''],
     ['Study Date', m.studyDate],
     ['Study Description', m.studyDescription],
     ['Accession #', m.accessionNumber],
     ['Referring Physician', m.referringPhysician],
-    ['', ''], // separator
+    ['', ''],
     ['Modality', m.modality],
     ['Series', m.seriesDescription],
     ['Series #', m.seriesNumber],
     ['Instance #', m.instanceNumber],
-    ['', ''], // separator
+    ['', ''],
     ['Dimensions', `${m.columns} × ${m.rows}`],
     ['Bits Allocated', String(m.bitsAllocated)],
     ['Bits Stored', String(m.bitsStored)],
@@ -404,46 +438,22 @@ function updateMetadataPanel(): void {
   });
 }
 
-// ── Info Overlay (HUD on viewport corners) ───────────────────────────────────
+// ── Info Overlay ─────────────────────────────────────────────────────────────
 
 function updateInfoOverlay(): void {
   if (!state.parsed) return;
   const m = state.parsed.metadata;
 
-  // Top-left: patient info
-  $('overlay-tl').innerHTML = [
-    m.patientName,
-    m.patientId,
-  ].filter(Boolean).join('<br>');
-
-  // Top-right: study info
-  $('overlay-tr').innerHTML = [
-    m.studyDate,
-    m.modality,
-    m.studyDescription,
-  ].filter(Boolean).join('<br>');
-
-  // Bottom-left: W/L and zoom
+  $('overlay-tl').innerHTML = [m.patientName, m.patientId].filter(Boolean).join('<br>');
+  $('overlay-tr').innerHTML = [m.studyDate, m.modality, m.studyDescription].filter(Boolean).join('<br>');
   $('overlay-bl').innerHTML = [
     `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
     `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
   ].join('<br>');
-
-  // Bottom-right: image info
-  $('overlay-br').innerHTML = [
-    `${m.columns} × ${m.rows}`,
-    `${m.bitsStored}bit`,
-  ].join('<br>');
+  $('overlay-br').innerHTML = [`${m.columns} × ${m.rows}`, `${m.bitsStored}bit`].join('<br>');
 }
 
 // ── UI Helpers ───────────────────────────────────────────────────────────────
-
-function updateFileName(filePath: string): void {
-  const parts = filePath.split(/[/\\]/);
-  const fileName = parts[parts.length - 1] || filePath;
-  $('topbar-title').textContent = fileName;
-  $('topbar-title').title = filePath;
-}
 
 function showLoading(show: boolean): void {
   $('loading-indicator').classList.toggle('hidden', !show);
@@ -463,9 +473,10 @@ function escapeHtml(str: string): string {
   return div.innerHTML;
 }
 
-// ── Menu Events ──────────────────────────────────────────────────────────────
+// ── Menu Events (Electron only) ──────────────────────────────────────────────
 
 function initMenuListeners(): void {
+  if (!window.api) return;
   window.api.on('menu:open-files', () => void openFiles());
   window.api.on('menu:open-folder', () => void openFolder());
 }
@@ -474,7 +485,6 @@ function initMenuListeners(): void {
 
 function initKeyboardShortcuts(): void {
   document.addEventListener('keydown', async (e: KeyboardEvent) => {
-    // Arrow keys for series navigation
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       if (state.currentIndex > 0) {
         state.currentIndex--;
@@ -487,7 +497,6 @@ function initKeyboardShortcuts(): void {
       }
     }
 
-    // Tool shortcuts
     if (e.key === 'w' || e.key === 'W') {
       state.activeTool = 'wl';
       updateToolbarUI();
@@ -510,9 +519,7 @@ function initKeyboardShortcuts(): void {
 function initResizeObserver(): void {
   const container = $('viewport-container');
   const observer = new ResizeObserver(() => {
-    if (state.parsed) {
-      render();
-    }
+    if (state.parsed) render();
   });
   observer.observe(container);
 }
@@ -522,30 +529,42 @@ function initResizeObserver(): void {
 const API_BASE = '/api';
 
 function initUploadPanel(): void {
-  const input = document.getElementById('upload-input') as HTMLInputElement | null;
-  if (!input) return;
-
+  // Single file upload
+  const input = $('upload-input') as HTMLInputElement;
   input.addEventListener('change', () => {
     const file = input.files?.[0];
-    if (file) uploadFile(file);
+    if (file) void uploadFile(file);
     input.value = '';
   });
+  $('btn-upload-server')?.addEventListener('click', () => input.click());
 
-  const btn = document.getElementById('btn-upload-server');
-  btn?.addEventListener('click', () => input.click());
+  // Folder upload
+  const folderInput = $('upload-folder-input') as HTMLInputElement;
+  folderInput.setAttribute('webkitdirectory', '');
+  folderInput.setAttribute('multiple', '');
+  folderInput.addEventListener('change', async () => {
+    const files = Array.from(folderInput.files ?? []).filter((f) =>
+      f.name.toLowerCase().endsWith('.dcm'),
+    );
+    if (files.length === 0) {
+      showUploadStatus('No se encontraron archivos .dcm en la carpeta.', 'error');
+      return;
+    }
+    await uploadFolderFiles(files);
+    folderInput.value = '';
+  });
+  $('btn-upload-folder')?.addEventListener('click', () => folderInput.click());
 
-  const refresh = document.getElementById('btn-refresh-studies');
-  refresh?.addEventListener('click', loadStudyExplorer);
+  $('btn-refresh-studies')?.addEventListener('click', loadStudyExplorer);
 }
 
 async function uploadFile(file: File, force = false): Promise<void> {
-  const progressWrap = document.getElementById('upload-progress-wrap')!;
-  const progressBar  = document.getElementById('upload-progress-bar')!;
-  const uploadStatus = document.getElementById('upload-status')!;
+  const progressWrap = $('upload-progress-wrap');
+  const progressBar  = $('upload-progress-bar');
 
   progressWrap.classList.remove('hidden');
   progressBar.style.width = '0%';
-  uploadStatus.textContent = '';
+  showUploadStatus('', '');
 
   const formData = new FormData();
   formData.append('file', file);
@@ -565,27 +584,23 @@ async function uploadFile(file: File, force = false): Promise<void> {
       progressWrap.classList.add('hidden');
 
       if (xhr.status === 201) {
-        uploadStatus.textContent = 'Estudio cargado correctamente.';
-        uploadStatus.className = 'upload-status upload-status--ok';
+        showUploadStatus('Estudio cargado correctamente.', 'ok');
         loadStudyExplorer();
       } else if (xhr.status === 409) {
         const body = JSON.parse(xhr.responseText);
         showDuplicateDialog(file, body.message);
       } else if (xhr.status === 413) {
-        uploadStatus.textContent = 'El archivo supera el límite de 500 MB.';
-        uploadStatus.className = 'upload-status upload-status--error';
+        showUploadStatus('El archivo supera el límite de 500 MB.', 'error');
       } else {
         const body = JSON.parse(xhr.responseText ?? '{}');
-        uploadStatus.textContent = body.error ?? 'Error al cargar el archivo.';
-        uploadStatus.className = 'upload-status upload-status--error';
+        showUploadStatus(body.error ?? 'Error al cargar el archivo.', 'error');
       }
       resolve();
     });
 
     xhr.addEventListener('error', () => {
       progressWrap.classList.add('hidden');
-      uploadStatus.textContent = 'Error de red al conectar con el servidor.';
-      uploadStatus.className = 'upload-status upload-status--error';
+      showUploadStatus('Error de red al conectar con el servidor.', 'error');
       resolve();
     });
 
@@ -593,21 +608,66 @@ async function uploadFile(file: File, force = false): Promise<void> {
   });
 }
 
+async function uploadFileSilent(file: File): Promise<'ok' | 'duplicate' | 'error'> {
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch(`${API_BASE}/v1/studies/upload`, { method: 'POST', body: formData });
+    if (res.status === 201) return 'ok';
+    if (res.status === 409) return 'duplicate';
+    return 'error';
+  } catch {
+    return 'error';
+  }
+}
+
+async function uploadFolderFiles(files: File[]): Promise<void> {
+  const progressWrap = $('upload-progress-wrap');
+  const progressBar  = $('upload-progress-bar');
+  progressWrap.classList.remove('hidden');
+
+  let ok = 0;
+  let duplicates = 0;
+  let errors = 0;
+
+  for (let i = 0; i < files.length; i++) {
+    showUploadStatus(`Subiendo ${i + 1} de ${files.length}: ${files[i].name}`, '');
+    progressBar.style.width = `${Math.round((i / files.length) * 100)}%`;
+
+    const result = await uploadFileSilent(files[i]);
+    if (result === 'ok') ok++;
+    else if (result === 'duplicate') duplicates++;
+    else errors++;
+  }
+
+  progressBar.style.width = '100%';
+  progressWrap.classList.add('hidden');
+
+  const parts = [`${ok} de ${files.length} subidos`];
+  if (duplicates > 0) parts.push(`${duplicates} ya existían (omitidos)`);
+  if (errors > 0) parts.push(`${errors} errores`);
+
+  showUploadStatus(parts.join(' · '), errors > 0 ? 'error' : 'ok');
+  loadStudyExplorer();
+}
+
+function showUploadStatus(text: string, type: '' | 'ok' | 'error'): void {
+  const el = $('upload-status');
+  el.textContent = text;
+  el.className = type ? `upload-status upload-status--${type}` : 'upload-status';
+}
+
 function showDuplicateDialog(file: File, message: string): void {
-  const dialog = document.getElementById('duplicate-dialog')!;
-  const msg    = document.getElementById('duplicate-msg')!;
-  const btnYes = document.getElementById('duplicate-yes')!;
-  const btnNo  = document.getElementById('duplicate-no')!;
+  const dialog = $('duplicate-dialog');
+  const msg    = $('duplicate-msg');
+  const btnYes = $('duplicate-yes');
+  const btnNo  = $('duplicate-no');
 
   msg.textContent = message;
   dialog.classList.remove('hidden');
 
   const close = () => dialog.classList.add('hidden');
-
-  btnYes.onclick = async () => {
-    close();
-    await uploadFile(file, true);
-  };
+  btnYes.onclick = async () => { close(); await uploadFile(file, true); };
   btnNo.onclick = close;
 }
 
@@ -623,10 +683,23 @@ interface StudyRecord {
   uploaded_at: string;
 }
 
-async function loadStudyExplorer(): Promise<void> {
-  const list = document.getElementById('study-list');
-  if (!list) return;
+function initStudyExplorer(): void {
+  const list = $('study-list');
+  list.addEventListener('click', async (e) => {
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.study-item[data-id]');
+    if (!item) return;
+    const studyId = item.dataset.id;
+    if (!studyId) return;
 
+    list.querySelectorAll('.study-item').forEach((el) => el.classList.remove('study-item--active'));
+    item.classList.add('study-item--active');
+
+    await loadStudyFromServer(studyId);
+  });
+}
+
+async function loadStudyExplorer(): Promise<void> {
+  const list = $('study-list');
   list.innerHTML = '<li class="study-item study-item--loading">Cargando estudios…</li>';
 
   try {
@@ -640,11 +713,11 @@ async function loadStudyExplorer(): Promise<void> {
     }
 
     list.innerHTML = studies.map((s) => `
-      <li class="study-item" data-id="${s.orthanc_study_id}">
-        <div class="study-item__badge">${s.modality || '?'}</div>
+      <li class="study-item" data-id="${escapeHtml(s.orthanc_study_id)}" title="Click para visualizar" style="cursor:pointer">
+        <div class="study-item__badge">${escapeHtml(s.modality || '?')}</div>
         <div class="study-item__info">
-          <span class="study-item__name">${s.patient_name || 'Paciente desconocido'}</span>
-          <span class="study-item__date">${formatDate(s.study_date)} · ${s.study_description || '—'}</span>
+          <span class="study-item__name">${escapeHtml(s.patient_name || 'Paciente desconocido')}</span>
+          <span class="study-item__date">${formatDate(s.study_date)} · ${escapeHtml(s.study_description || '—')}</span>
         </div>
       </li>
     `).join('');

@@ -115,7 +115,7 @@ async function loadStudyFromServer(studyId: string): Promise<void> {
   state.currentIndex = 0;
 
   try {
-    const res = await fetch(`${API_BASE}/v1/studies/${studyId}/file`);
+    const res = await fetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/file`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const arrayBuffer = await res.arrayBuffer();
     await displayDicom(arrayBuffer, studyId);
@@ -471,6 +471,11 @@ function escapeHtml(str: string): string {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// escapeHtml does not encode double-quotes; use this for HTML attribute values.
+function escapeAttr(str: string): string {
+  return escapeHtml(str).replace(/"/g, '&quot;');
 }
 
 // ── Menu Events (Electron only) ──────────────────────────────────────────────
@@ -829,8 +834,9 @@ async function loadStudyExplorer(): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: StudiesResponse = await res.json();
 
-    explorerState.totalPages = data.totalPages || 1;
-    updatePaginationUI(data.page, data.totalPages, data.total);
+    const totalPages = data.totalPages || 1;
+    explorerState.totalPages = totalPages;
+    updatePaginationUI(data.page, totalPages, data.total);
 
     if (data.studies.length === 0) {
       list.innerHTML = `
@@ -847,7 +853,7 @@ async function loadStudyExplorer(): Promise<void> {
     }
 
     list.innerHTML = data.studies.map((s) => {
-      const sid       = escapeHtml(s.orthanc_study_id);
+      const encodedId = encodeURIComponent(s.orthanc_study_id);
       const modality  = escapeHtml(s.modality || '?');
       const name      = escapeHtml(s.patient_name || 'Paciente desconocido');
       const date      = formatDate(s.study_date);
@@ -856,10 +862,10 @@ async function loadStudyExplorer(): Promise<void> {
       const imgLabel  = count === 1 ? '1 imagen' : `${count} imágenes`;
 
       return `
-        <li class="study-item" data-id="${sid}" title="Click para visualizar">
+        <li class="study-item" data-id="${escapeAttr(s.orthanc_study_id)}" title="Click para visualizar">
           <div class="study-item__thumb">
             <img
-              src="${API_BASE}/v1/studies/${sid}/thumbnail"
+              src="${API_BASE}/v1/studies/${encodedId}/thumbnail"
               alt="${modality}"
               loading="lazy"
               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
@@ -878,6 +884,8 @@ async function loadStudyExplorer(): Promise<void> {
     }).join('');
   } catch {
     list.innerHTML = '<li class="study-item study-item--error">Error al cargar estudios.</li>';
+    explorerState.page = 1;
+    explorerState.totalPages = 1;
     updatePaginationUI(1, 1, 0);
   }
 }

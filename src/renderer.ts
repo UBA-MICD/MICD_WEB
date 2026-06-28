@@ -2,11 +2,18 @@ import { parseDicomFile, calculateAutoWindowLevel } from './dicom-parser-util.js
 import type { ParsedDicom, DicomMetadata } from './dicom-parser-util.js';
 import { renderDicom, createDefaultViewport, applyCanvasTransform, fitToContainer } from './dicom-renderer.js';
 import type { ViewportState } from './dicom-renderer.js';
+import { collectDicomFiles } from './folder-files.js';
 
 // ── State ────────────────────────────────────────────────────────────────────
 
 interface AppState {
+  /** Where the current series comes from: local disk files or a server study. */
+  source: 'local' | 'server';
   files: File[];
+  /** Orthanc study id when source === 'server'. */
+  serverStudyId: string | null;
+  /** Ordered Orthanc instance ids when source === 'server'. */
+  serverInstances: string[];
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
@@ -18,7 +25,10 @@ interface AppState {
 }
 
 const state: AppState = {
+  source: 'local',
   files: [],
+  serverStudyId: null,
+  serverInstances: [],
   currentIndex: 0,
   parsed: null,
   viewport: { windowCenter: 0, windowWidth: 0, zoom: 1, panX: 0, panY: 0 },
@@ -28,6 +38,20 @@ const state: AppState = {
   lastMouseY: 0,
   isMetadataOpen: false,
 };
+
+/** Number of images in the current series, regardless of source. */
+function itemCount(): number {
+  return state.source === 'server' ? state.serverInstances.length : state.files.length;
+}
+
+/** Load the image at state.currentIndex from whichever source is active. */
+async function loadCurrent(): Promise<void> {
+  if (state.source === 'server') {
+    await loadCurrentServerInstance();
+  } else {
+    await loadCurrentFile();
+  }
+}
 
 // ── DOM References ───────────────────────────────────────────────────────────
 
@@ -58,22 +82,20 @@ function initFileInputs(): void {
   const filesInput = $('open-files-input') as HTMLInputElement;
   filesInput.addEventListener('change', async () => {
     if (!filesInput.files || filesInput.files.length === 0) return;
-    state.files = Array.from(filesInput.files).sort((a, b) => a.name.localeCompare(b.name));
+    state.files = collectDicomFiles(Array.from(filesInput.files));
     state.currentIndex = 0;
     await loadCurrentFile();
     filesInput.value = '';
   });
 
-  // Folder picker
+  // Folder picker — loads every DICOM image in the folder so you can walk through them
   const folderInput = $('open-folder-input') as HTMLInputElement;
   folderInput.setAttribute('webkitdirectory', '');
   folderInput.addEventListener('change', async () => {
     if (!folderInput.files || folderInput.files.length === 0) return;
-    const dcmFiles = Array.from(folderInput.files)
-      .filter((f) => f.name.toLowerCase().endsWith('.dcm'))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const dcmFiles = collectDicomFiles(Array.from(folderInput.files));
     if (dcmFiles.length === 0) {
-      showError('No se encontraron archivos .dcm en la carpeta seleccionada.');
+      showError('No se encontraron archivos DICOM en la carpeta seleccionada.');
       return;
     }
     state.files = dcmFiles;
@@ -81,6 +103,9 @@ function initFileInputs(): void {
     await loadCurrentFile();
     folderInput.value = '';
   });
+
+  // "Abrir carpeta" button → opens the folder picker (webkitdirectory)
+  $('btn-open-folder')?.addEventListener('click', openFolder);
 }
 
 // ── File Loading ─────────────────────────────────────────────────────────────
@@ -95,6 +120,7 @@ function openFolder(): void {
 
 async function loadCurrentFile(): Promise<void> {
   if (state.files.length === 0) return;
+  state.source = 'local';
 
   const file = state.files[state.currentIndex];
   showLoading(true);
@@ -109,16 +135,45 @@ async function loadCurrentFile(): Promise<void> {
   }
 }
 
+async function loadCurrentServerInstance(): Promise<void> {
+  if (!state.serverStudyId || state.serverInstances.length === 0) return;
+
+  const studyId = state.serverStudyId;
+  const instanceId = state.serverInstances[state.currentIndex];
+  showLoading(true);
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instanceId)}/file`,
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const arrayBuffer = await res.arrayBuffer();
+    await displayDicom(arrayBuffer, studyId);
+  } catch (err: any) {
+    showError(`Error al cargar la imagen del servidor: ${err.message || err}`);
+  } finally {
+    showLoading(false);
+  }
+}
+
 async function loadStudyFromServer(studyId: string): Promise<void> {
   showLoading(true);
+  state.source = 'server';
+  state.serverStudyId = studyId;
+  state.serverInstances = [];
   state.files = [];
   state.currentIndex = 0;
 
   try {
-    const res = await fetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/file`);
+    const res = await fetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const arrayBuffer = await res.arrayBuffer();
-    await displayDicom(arrayBuffer, studyId);
+    const data = (await res.json()) as { instances: Array<{ instanceId: string }> };
+    state.serverInstances = (data.instances ?? []).map((i) => i.instanceId);
+    if (state.serverInstances.length === 0) {
+      showError('El estudio no tiene imágenes.');
+      return;
+    }
+    await loadCurrentServerInstance();
   } catch (err: any) {
     showError(`Error al cargar el estudio del servidor: ${err.message || err}`);
   } finally {
@@ -364,29 +419,30 @@ function initSeriesNav(): void {
   $('nav-prev').addEventListener('click', async () => {
     if (state.currentIndex > 0) {
       state.currentIndex--;
-      await loadCurrentFile();
+      await loadCurrent();
     }
   });
 
   $('nav-next').addEventListener('click', async () => {
-    if (state.currentIndex < state.files.length - 1) {
+    if (state.currentIndex < itemCount() - 1) {
       state.currentIndex++;
-      await loadCurrentFile();
+      await loadCurrent();
     }
   });
 }
 
 function updateSeriesNav(): void {
   const nav = $('series-nav');
-  if (state.files.length <= 1) {
+  const count = itemCount();
+  if (count <= 1) {
     nav.classList.add('hidden');
     return;
   }
   nav.classList.remove('hidden');
 
   ($('nav-prev') as HTMLButtonElement).disabled = state.currentIndex === 0;
-  ($('nav-next') as HTMLButtonElement).disabled = state.currentIndex === state.files.length - 1;
-  $('nav-counter').textContent = `${state.currentIndex + 1} / ${state.files.length}`;
+  ($('nav-next') as HTMLButtonElement).disabled = state.currentIndex === count - 1;
+  $('nav-counter').textContent = `${state.currentIndex + 1} / ${count}`;
 }
 
 // ── Metadata Panel ───────────────────────────────────────────────────────────
@@ -493,12 +549,12 @@ function initKeyboardShortcuts(): void {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       if (state.currentIndex > 0) {
         state.currentIndex--;
-        await loadCurrentFile();
+        await loadCurrent();
       }
     } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      if (state.currentIndex < state.files.length - 1) {
+      if (state.currentIndex < itemCount() - 1) {
         state.currentIndex++;
-        await loadCurrentFile();
+        await loadCurrent();
       }
     }
 
@@ -548,11 +604,9 @@ function initUploadPanel(): void {
   folderInput.setAttribute('webkitdirectory', '');
   folderInput.setAttribute('multiple', '');
   folderInput.addEventListener('change', async () => {
-    const files = Array.from(folderInput.files ?? []).filter((f) =>
-      f.name.toLowerCase().endsWith('.dcm'),
-    );
+    const files = collectDicomFiles(Array.from(folderInput.files ?? []));
     if (files.length === 0) {
-      showUploadStatus('No se encontraron archivos .dcm en la carpeta.', 'error');
+      showUploadStatus('No se encontraron archivos DICOM en la carpeta.', 'error');
       return;
     }
     await uploadFolderFiles(files);

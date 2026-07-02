@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.git/
+.DS_Store
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
+# Not needed inside the image
+Makefile
+docker-compose.yml

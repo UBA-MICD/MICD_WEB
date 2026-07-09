@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Tighten CSP: no inline scripts, only local resources + fonts + dicom-parser CDN -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:"
+    />
+    <title>MICD — DICOM Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar__logo">
+          <div class="logo-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="12" y1="3" x2="12" y2="7" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="3" y1="12" x2="7" y2="12" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="17" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <span class="logo-text">MICD</span>
+        </div>
+
+        <!-- Toolbar (vertical) -->
+        <nav class="sidebar__tools">
+          <button class="toolbar__tool active" id="tool-wl" title="Window / Level (W)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" opacity="0.3"/>
+            </svg>
+            <span>W/L</span>
+          </button>
+          <button class="toolbar__tool" id="tool-zoom" title="Zoom (Z)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="10" cy="10" r="7"/>
+              <line x1="15" y1="15" x2="21" y2="21"/>
+              <line x1="7" y1="10" x2="13" y2="10"/>
+              <line x1="10" y1="7" x2="10" y2="13"/>
+            </svg>
+            <span>Zoom</span>
+          </button>
+          <button class="toolbar__tool" id="tool-pan" title="Pan (P)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2l0 20M2 12l20 0M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/>
+            </svg>
+            <span>Pan</span>
+          </button>
+
+          <div class="tool-divider"></div>
+
+          <button class="toolbar__tool" id="tool-reset" title="Reset View (R)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12a9 9 0 1 1 3 7"/>
+              <path d="M3 22v-7h7"/>
+            </svg>
+            <span>Reset</span>
+          </button>
+          <button class="toolbar__tool" id="tool-metadata" title="Metadata Panel (M)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="7" y1="8" x2="17" y2="8"/>
+              <line x1="7" y1="12" x2="17" y2="12"/>
+              <line x1="7" y1="16" x2="13" y2="16"/>
+            </svg>
+            <span>Tags</span>
+          </button>
+        </nav>
+
+        <div class="sidebar__footer">
+          <!-- Hidden inputs for local file viewing -->
+          <input type="file" id="open-files-input" multiple accept=".dcm" class="hidden" />
+          <input type="file" id="open-folder-input" class="hidden" />
+
+          <button class="btn btn--accent btn--full" id="btn-open">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Abrir archivo
+          </button>
+
+          <button class="btn btn--secondary btn--full" id="btn-open-folder">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            Abrir carpeta
+          </button>
+
+          <!-- Upload to server -->
+          <input type="file" id="upload-input" accept=".dcm" class="hidden" />
+          <button class="btn btn--secondary btn--full" id="btn-upload-server">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 16 12 12 8 16"/>
+              <line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+            Cargar al servidor
+          </button>
+
+          <!-- Upload folder to server -->
+          <input type="file" id="upload-folder-input" class="hidden" />
+          <button class="btn btn--secondary btn--full" id="btn-upload-folder">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <polyline points="12 11 12 17"/>
+              <polyline points="9 14 12 11 15 14"/>
+            </svg>
+            Cargar carpeta
+          </button>
+
+          <!-- Progress bar -->
+          <div id="upload-progress-wrap" class="upload-progress hidden">
+            <div id="upload-progress-bar" class="upload-progress__bar"></div>
+          </div>
+          <span id="upload-status" class="upload-status"></span>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Topbar -->
+        <header class="topbar">
+          <h1 class="topbar__title" id="topbar-title">DICOM Viewer</h1>
+          <div class="topbar__actions">
+            <!-- Series navigation -->
+            <div class="series-nav hidden" id="series-nav">
+              <button class="nav-btn" id="nav-prev" title="Previous (←)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+              <span class="nav-counter" id="nav-counter">1 / 1</span>
+              <button class="nav-btn" id="nav-next" title="Next (→)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 6 15 12 9 18"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Viewport -->
+        <div class="viewport-wrapper">
+          <div class="viewport-container cursor-wl" id="viewport-container">
+            <canvas id="dicom-canvas"></canvas>
+
+            <!-- Info overlays (HUD) -->
+            <div class="overlay overlay--tl" id="overlay-tl"></div>
+            <div class="overlay overlay--tr" id="overlay-tr"></div>
+            <div class="overlay overlay--bl" id="overlay-bl"></div>
+            <div class="overlay overlay--br" id="overlay-br"></div>
+
+            <!-- Drop zone -->
+            <div class="drop-zone" id="drop-zone">
+              <div class="drop-zone__content">
+                <div class="drop-zone__icon">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <rect x="3" y="3" width="18" height="18" rx="3"/>
+                    <circle cx="12" cy="12" r="4"/>
+                    <line x1="12" y1="3" x2="12" y2="8" stroke-dasharray="2 2"/>
+                    <line x1="12" y1="16" x2="12" y2="21" stroke-dasharray="2 2"/>
+                    <line x1="3" y1="12" x2="8" y2="12" stroke-dasharray="2 2"/>
+                    <line x1="16" y1="12" x2="21" y2="12" stroke-dasharray="2 2"/>
+                  </svg>
+                </div>
+                <h2>Abrir archivo DICOM</h2>
+                <p>Arrastrá y soltá archivos .dcm aquí, o</p>
+                <button class="btn btn--accent" id="drop-zone-open">Seleccionar archivos</button>
+                <p style="margin-top:0.75rem;font-size:0.8rem;opacity:0.6">También podés hacer click en un estudio del panel derecho para visualizarlo desde el servidor.</p>
+              </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div class="loading-indicator hidden" id="loading-indicator">
+              <div class="spinner"></div>
+              <span>Loading DICOM…</span>
+            </div>
+
+            <!-- Error message -->
+            <div class="error-message hidden" id="error-message"></div>
+          </div>
+
+          <!-- Metadata panel (slide-out) -->
+          <aside class="metadata-panel" id="metadata-panel">
+            <div class="metadata-header">
+              <h2>DICOM Tags</h2>
+            </div>
+            <div class="metadata-body">
+              <table class="metadata-table">
+                <tbody id="metadata-tbody"></tbody>
+              </table>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <!-- Study Explorer panel -->
+    <aside class="explorer-panel" id="explorer-panel">
+      <div class="explorer-panel__header">
+        <h2>Estudios en servidor</h2>
+        <div style="display:flex;gap:2px;align-items:center">
+          <button class="icon-btn" id="btn-refresh-studies" title="Recargar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 12a9 9 0 1 1 3 7"/><path d="M3 22v-7h7"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="btn-close-explorer" title="Cerrar panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="explorer-filters">
+        <div class="filter-search">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="filter-search__icon">
+            <circle cx="10" cy="10" r="7"/><line x1="15" y1="15" x2="21" y2="21"/>
+          </svg>
+          <input
+            type="text"
+            id="search-studies"
+            class="filter-search__input"
+            placeholder="Buscar paciente o ID…"
+            autocomplete="off"
+          />
+          <button class="filter-search__clear hidden" id="btn-clear-search" aria-label="Limpiar búsqueda">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="filter-chips" id="filter-modality-chips" role="group" aria-label="Modalidad">
+          <button class="filter-chip filter-chip--active" data-modality="">Todas</button>
+          <button class="filter-chip" data-modality="CT">CT</button>
+          <button class="filter-chip" data-modality="MR">MR</button>
+          <button class="filter-chip" data-modality="DX">RX</button>
+          <button class="filter-chip" data-modality="CR">CR</button>
+          <button class="filter-chip" data-modality="US">US</button>
+          <button class="filter-chip" data-modality="NM">NM</button>
+          <button class="filter-chip" data-modality="PT">PET</button>
+          <button class="filter-chip" data-modality="MG">MG</button>
+          <button class="filter-chip" data-modality="XA">XA</button>
+        </div>
+
+        <div class="filter-dates">
+          <input type="date" id="filter-date-from" class="filter-date" title="Desde" />
+          <span class="filter-dates__sep">—</span>
+          <input type="date" id="filter-date-to" class="filter-date" title="Hasta" />
+        </div>
+
+        <div class="filter-clear-wrap hidden" id="filter-clear-wrap">
+          <button id="btn-clear-filters" class="filter-clear-btn">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
+      <ul id="study-list" class="study-list"></ul>
+
+      <!-- Pagination -->
+      <div class="explorer-pagination" id="explorer-pagination">
+        <button class="icon-btn" id="pagination-prev" title="Página anterior">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <span id="pagination-info" class="pagination-info">—</span>
+        <button class="icon-btn" id="pagination-next" title="Página siguiente">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 6 15 12 9 18"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Reopen explorer button -->
+    <button id="btn-reopen-explorer" class="hidden" title="Abrir panel de estudios">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Estudios
+    </button>
+
+    <!-- Duplicate confirmation dialog -->
+    <div id="duplicate-dialog" class="dialog-overlay hidden">
+      <div class="dialog">
+        <h3 class="dialog__title">Estudio duplicado</h3>
+        <p id="duplicate-msg" class="dialog__msg"></p>
+        <div class="dialog__actions">
+          <button class="btn btn--danger" id="duplicate-yes">Reemplazar</button>
+          <button class="btn btn--secondary" id="duplicate-no">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- dicom-parser UMD bundle (loaded before our modules) -->
+    <script src="./dicomParser.min.js"></script>
+    <!-- Compiled renderer script (output of tsc) -->
+    <script src="./renderer.js" type="module"></script>
+  </body>
+</html>

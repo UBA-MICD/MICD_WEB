@@ -1,0 +1,19 @@
+services:
+
+  # ── Frontend (SPA → Nginx) ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: micd-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+
+# Joins the network created by the MICD_BACKEND stack so nginx can proxy
+# /api/* to backend:3000. Start the backend stack first.
+networks:
+  default:
+    name: micd
+    external: true

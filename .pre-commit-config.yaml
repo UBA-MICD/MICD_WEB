@@ -1,0 +1,46 @@
+repos:
+  # Standard hooks provided by pre-commit
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  # Format code using Prettier for HTML, TS, CSS, JSON, Markdown
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [ts, tsx, javascript, css, html, json, markdown]
+
+  # Static analysis for TypeScript files using ESLint
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v10.6.0
+    hooks:
+      - id: eslint
+        additional_dependencies:
+          - eslint@8.56.0
+          - typescript@5.3.3
+          - '@typescript-eslint/parser@6.19.0'
+          - '@typescript-eslint/eslint-plugin@6.19.0'
+        types: [ts, tsx]
+
+  # English spell checker to maintain consistency across the codebase
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v10.0.1
+    hooks:
+      - id: cspell
+        types_or: [ts, tsx, javascript, html, css, markdown]
+
+  # Run frontend unit tests on push stage
+  - repo: local
+    hooks:
+      - id: test-frontend
+        name: Run Frontend Unit Tests
+        entry: npm test
+        language: system
+        pass_filenames: false
+        stages: [push]

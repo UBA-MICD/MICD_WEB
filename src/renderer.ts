@@ -3,6 +3,7 @@ import type { ParsedDicom, DicomMetadata } from './dicom-parser-util.js';
 import { renderDicom, createDefaultViewport, applyCanvasTransform, fitToContainer } from './dicom-renderer.js';
 import type { ViewportState } from './dicom-renderer.js';
 import { collectDicomFiles } from './folder-files.js';
+import { login, logout, refreshAccessToken, getAccessToken, authFetch } from './auth.js';
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,27 @@ function $(id: string): HTMLElement {
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  void initApp();
+});
+
+async function initApp(): Promise<void> {
+  initLoginForm();
+  $('btn-logout').addEventListener('click', async () => {
+    await logout();
+    showLoginScreen();
+  });
+
+  const authenticated = await refreshAccessToken();
+  if (!authenticated) {
+    showLoginScreen();
+    return;
+  }
+  startApp();
+}
+
+/** Runs once, after a successful login (silent refresh or interactive). */
+function startApp(): void {
+  hideLoginScreen();
   initFileInputs();
   initToolbar();
   initViewportInteraction();
@@ -73,7 +95,40 @@ document.addEventListener('DOMContentLoaded', () => {
   initUploadPanel();
   initStudyExplorer();
   loadStudyExplorer();
-});
+}
+
+function showLoginScreen(): void {
+  $('login-screen').classList.remove('hidden');
+}
+
+function hideLoginScreen(): void {
+  $('login-screen').classList.add('hidden');
+}
+
+function initLoginForm(): void {
+  const form = $('login-form') as HTMLFormElement;
+  const errorEl = $('login-error');
+  const submitBtn = $('login-submit') as HTMLButtonElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.classList.add('hidden');
+    submitBtn.disabled = true;
+
+    const email = ($('login-email') as HTMLInputElement).value;
+    const password = ($('login-password') as HTMLInputElement).value;
+    const result = await login(email, password);
+
+    submitBtn.disabled = false;
+    if (!result.ok) {
+      errorEl.textContent = result.error;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    (form as HTMLFormElement).reset();
+    startApp();
+  });
+}
 
 // ── Browser File Inputs ──────────────────────────────────────────────────────
 
@@ -143,7 +198,7 @@ async function loadCurrentServerInstance(): Promise<void> {
   showLoading(true);
 
   try {
-    const res = await fetch(
+    const res = await authFetch(
       `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instanceId)}/file`,
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -165,7 +220,7 @@ async function loadStudyFromServer(studyId: string): Promise<void> {
   state.currentIndex = 0;
 
   try {
-    const res = await fetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`);
+    const res = await authFetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as { instances: Array<{ instanceId: string }> };
     state.serverInstances = (data.instances ?? []).map((i) => i.instanceId);
@@ -632,6 +687,8 @@ async function uploadFile(file: File, force = false): Promise<void> {
     const xhr = new XMLHttpRequest();
     const url = `${API_BASE}/v1/studies/upload${force ? '?force=true' : ''}`;
     xhr.open('POST', url);
+    const token = getAccessToken();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable) {
@@ -671,7 +728,7 @@ async function uploadFileSilent(file: File): Promise<'ok' | 'duplicate' | 'error
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch(`${API_BASE}/v1/studies/upload`, { method: 'POST', body: formData });
+    const res = await authFetch(`${API_BASE}/v1/studies/upload`, { method: 'POST', body: formData });
     if (res.status === 201) return 'ok';
     if (res.status === 409) return 'duplicate';
     return 'error';
@@ -884,7 +941,7 @@ async function loadStudyExplorer(): Promise<void> {
   if (explorerState.search)    params.set('search',    explorerState.search);
 
   try {
-    const res = await fetch(`${API_BASE}/v1/studies?${params}`);
+    const res = await authFetch(`${API_BASE}/v1/studies?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: StudiesResponse = await res.json();
 
@@ -918,13 +975,8 @@ async function loadStudyExplorer(): Promise<void> {
       return `
         <li class="study-item" data-id="${escapeAttr(s.orthanc_study_id)}" title="Click para visualizar">
           <div class="study-item__thumb">
-            <img
-              src="${API_BASE}/v1/studies/${encodedId}/thumbnail"
-              alt="${modality}"
-              loading="lazy"
-              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-            />
-            <div class="study-item__thumb-fallback" style="display:none">${modality}</div>
+            <img data-thumb-id="${escapeAttr(s.orthanc_study_id)}" alt="${modality}" style="display:none" />
+            <div class="study-item__thumb-fallback">${modality}</div>
           </div>
           <div class="study-item__info">
             <span class="study-item__name">${name}</span>
@@ -936,12 +988,33 @@ async function loadStudyExplorer(): Promise<void> {
           </div>
         </li>`;
     }).join('');
+    loadThumbnails(list);
   } catch {
     list.innerHTML = '<li class="study-item study-item--error">Error al cargar estudios.</li>';
     explorerState.page = 1;
     explorerState.totalPages = 1;
     updatePaginationUI(1, 1, 0);
   }
+}
+
+/**
+ * Thumbnails are a protected endpoint, so a plain <img src> can't carry the
+ * bearer token — fetch each one and swap in a blob URL instead.
+ */
+function loadThumbnails(list: HTMLElement): void {
+  list.querySelectorAll<HTMLImageElement>('img[data-thumb-id]').forEach(async (img) => {
+    const studyId = img.dataset.thumbId!;
+    try {
+      const res = await authFetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/thumbnail`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      img.src = URL.createObjectURL(blob);
+      img.style.display = '';
+      img.nextElementSibling?.setAttribute('style', 'display:none');
+    } catch {
+      // leave the fallback badge visible (img stays display:none)
+    }
+  });
 }
 
 function updatePaginationUI(page: number, totalPages: number, total: number): void {

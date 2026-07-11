@@ -126,6 +126,15 @@
             <div id="upload-progress-bar" class="upload-progress__bar"></div>
           </div>
           <span id="upload-status" class="upload-status"></span>
+
+          <button class="btn btn--secondary btn--full" id="btn-logout">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
@@ -300,6 +309,25 @@
       </svg>
       Estudios
     </button>
+
+    <!-- Login screen -->
+    <div id="login-screen" class="dialog-overlay hidden">
+      <form class="dialog" id="login-form">
+        <h3 class="dialog__title">Iniciar sesión</h3>
+        <label class="login-field">
+          <span>Email</span>
+          <input type="email" id="login-email" required autocomplete="username" />
+        </label>
+        <label class="login-field">
+          <span>Contraseña</span>
+          <input type="password" id="login-password" required autocomplete="current-password" />
+        </label>
+        <p id="login-error" class="login-error hidden"></p>
+        <div class="dialog__actions">
+          <button type="submit" class="btn btn--accent" id="login-submit">Ingresar</button>
+        </div>
+      </form>
+    </div>
 
     <!-- Duplicate confirmation dialog -->
     <div id="duplicate-dialog" class="dialog-overlay hidden">

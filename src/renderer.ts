@@ -1,15 +1,35 @@
-import { parseDicomFile, calculateAutoWindowLevel } from './dicom-parser-util.js';
-import type { ParsedDicom, DicomMetadata } from './dicom-parser-util.js';
-import { renderDicom, createDefaultViewport, applyCanvasTransform, fitToContainer } from './dicom-renderer.js';
-import type { ViewportState } from './dicom-renderer.js';
-import { collectDicomFiles } from './folder-files.js';
-import { login, logout, refreshAccessToken, getAccessToken, authFetch } from './auth.js';
+import {
+  parseDicomFile,
+  calculateAutoWindowLevel,
+} from "./dicom-parser-util.js";
+import type { ParsedDicom, DicomMetadata } from "./dicom-parser-util.js";
+import {
+  renderDicom,
+  createDefaultViewport,
+  applyCanvasTransform,
+  fitToContainer,
+} from "./dicom-renderer.js";
+import type { ViewportState } from "./dicom-renderer.js";
+import { collectDicomFiles } from "./folder-files.js";
+import {
+  login,
+  logout,
+  refreshAccessToken,
+  getAccessToken,
+  getCurrentUser,
+  isAuthenticated,
+  authFetch,
+  ensureAuthenticated,
+  setLoginPrompt,
+  onAuthChange,
+  API_BASE,
+} from "./auth.js";
 
 // ── State ────────────────────────────────────────────────────────────────────
 
 interface AppState {
   /** Where the current series comes from: local disk files or a server study. */
-  source: 'local' | 'server';
+  source: "local" | "server";
   files: File[];
   /** Orthanc study id when source === 'server'. */
   serverStudyId: string | null;
@@ -18,7 +38,7 @@ interface AppState {
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
-  activeTool: 'wl' | 'zoom' | 'pan';
+  activeTool: "wl" | "zoom" | "pan";
   isDragging: boolean;
   lastMouseX: number;
   lastMouseY: number;
@@ -26,14 +46,14 @@ interface AppState {
 }
 
 const state: AppState = {
-  source: 'local',
+  source: "local",
   files: [],
   serverStudyId: null,
   serverInstances: [],
   currentIndex: 0,
   parsed: null,
   viewport: { windowCenter: 0, windowWidth: 0, zoom: 1, panX: 0, panY: 0 },
-  activeTool: 'wl',
+  activeTool: "wl",
   isDragging: false,
   lastMouseX: 0,
   lastMouseY: 0,
@@ -42,12 +62,14 @@ const state: AppState = {
 
 /** Number of images in the current series, regardless of source. */
 function itemCount(): number {
-  return state.source === 'server' ? state.serverInstances.length : state.files.length;
+  return state.source === "server"
+    ? state.serverInstances.length
+    : state.files.length;
 }
 
 /** Load the image at state.currentIndex from whichever source is active. */
 async function loadCurrent(): Promise<void> {
-  if (state.source === 'server') {
+  if (state.source === "server") {
     await loadCurrentServerInstance();
   } else {
     await loadCurrentFile();
@@ -62,28 +84,31 @@ function $(id: string): HTMLElement {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   void initApp();
 });
 
 async function initApp(): Promise<void> {
-  initLoginForm();
-  $('btn-logout').addEventListener('click', async () => {
-    await logout();
-    showLoginScreen();
-  });
+  setLoginPrompt(promptLogin);
+  initLoginDialog();
+  onAuthChange(() => updateAuthUI());
+  $("btn-logout").addEventListener("click", () => void onLogout());
+  $("btn-login").addEventListener("click", () => void loadStudyExplorer());
 
-  const authenticated = await refreshAccessToken();
-  if (!authenticated) {
-    showLoginScreen();
-    return;
-  }
+  // Local viewing works without a session — always start the app.
   startApp();
+
+  // Silent session restore from the stored refresh token; never a popup here.
+  const restored = await refreshAccessToken();
+  updateAuthUI();
+  if (restored) {
+    void loadStudyExplorer();
+  } else {
+    renderLoggedOutExplorer();
+  }
 }
 
-/** Runs once, after a successful login (silent refresh or interactive). */
 function startApp(): void {
-  hideLoginScreen();
   initFileInputs();
   initToolbar();
   initViewportInteraction();
@@ -94,39 +119,93 @@ function startApp(): void {
   initResizeObserver();
   initUploadPanel();
   initStudyExplorer();
-  loadStudyExplorer();
 }
 
-function showLoginScreen(): void {
-  $('login-screen').classList.remove('hidden');
+async function onLogout(): Promise<void> {
+  await logout(); // onAuthChange → updateAuthUI()
+  renderLoggedOutExplorer();
+  // Don't leave server-fetched pixels on screen without a session.
+  if (state.source === "server") resetViewerToDropZone();
 }
 
-function hideLoginScreen(): void {
-  $('login-screen').classList.add('hidden');
+function resetViewerToDropZone(): void {
+  state.source = "local";
+  state.files = [];
+  state.serverStudyId = null;
+  state.serverInstances = [];
+  state.currentIndex = 0;
+  state.parsed = null;
+  $("series-nav").classList.add("hidden");
+  $("topbar-title").textContent = "DICOM Viewer";
+  $("topbar-title").title = "";
+  showDropZone();
 }
 
-function initLoginForm(): void {
-  const form = $('login-form') as HTMLFormElement;
-  const errorEl = $('login-error');
-  const submitBtn = $('login-submit') as HTMLButtonElement;
+function updateAuthUI(): void {
+  const authed = isAuthenticated();
+  $("btn-login").classList.toggle("hidden", authed);
+  $("btn-logout").classList.toggle("hidden", !authed);
+  $("session-email").textContent =
+    getCurrentUser()?.email ?? (authed ? "Sesión activa" : "");
+  $("session-email").classList.toggle("hidden", !authed);
+}
 
-  form.addEventListener('submit', async (e) => {
+// ── Login dialog (promise-based popup, injected into auth.ts) ────────────────
+
+let loginResolve: ((ok: boolean) => void) | null = null;
+let loginInFlight = false;
+
+/** Shows the login dialog; resolves true on login, false on cancel/Escape. */
+function promptLogin(): Promise<boolean> {
+  ($("login-form") as HTMLFormElement).reset();
+  $("login-error").classList.add("hidden");
+  $("login-screen").classList.remove("hidden");
+  ($("login-email") as HTMLInputElement).focus();
+  return new Promise<boolean>((resolve) => {
+    loginResolve = resolve;
+  });
+}
+
+function closeLoginDialog(ok: boolean): void {
+  $("login-screen").classList.add("hidden");
+  loginResolve?.(ok);
+  loginResolve = null;
+}
+
+function initLoginDialog(): void {
+  const form = $("login-form") as HTMLFormElement;
+  const errorEl = $("login-error");
+  const submitBtn = $("login-submit") as HTMLButtonElement;
+  const cancelBtn = $("login-cancel") as HTMLButtonElement;
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    errorEl.classList.add('hidden');
+    errorEl.classList.add("hidden");
     submitBtn.disabled = true;
+    cancelBtn.disabled = true; // don't let cancel race an in-flight login
+    loginInFlight = true;
 
-    const email = ($('login-email') as HTMLInputElement).value;
-    const password = ($('login-password') as HTMLInputElement).value;
+    const email = ($("login-email") as HTMLInputElement).value;
+    const password = ($("login-password") as HTMLInputElement).value;
     const result = await login(email, password);
 
+    loginInFlight = false;
     submitBtn.disabled = false;
+    cancelBtn.disabled = false;
     if (!result.ok) {
       errorEl.textContent = result.error;
-      errorEl.classList.remove('hidden');
+      errorEl.classList.remove("hidden");
       return;
     }
-    (form as HTMLFormElement).reset();
-    startApp();
+    form.reset();
+    closeLoginDialog(true);
+  });
+
+  cancelBtn.addEventListener("click", () => closeLoginDialog(false));
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if ($("login-screen").classList.contains("hidden") || loginInFlight) return;
+    closeLoginDialog(false);
   });
 }
 
@@ -134,48 +213,48 @@ function initLoginForm(): void {
 
 function initFileInputs(): void {
   // Single/multi file picker
-  const filesInput = $('open-files-input') as HTMLInputElement;
-  filesInput.addEventListener('change', async () => {
+  const filesInput = $("open-files-input") as HTMLInputElement;
+  filesInput.addEventListener("change", async () => {
     if (!filesInput.files || filesInput.files.length === 0) return;
     state.files = collectDicomFiles(Array.from(filesInput.files));
     state.currentIndex = 0;
     await loadCurrentFile();
-    filesInput.value = '';
+    filesInput.value = "";
   });
 
   // Folder picker — loads every DICOM image in the folder so you can walk through them
-  const folderInput = $('open-folder-input') as HTMLInputElement;
-  folderInput.setAttribute('webkitdirectory', '');
-  folderInput.addEventListener('change', async () => {
+  const folderInput = $("open-folder-input") as HTMLInputElement;
+  folderInput.setAttribute("webkitdirectory", "");
+  folderInput.addEventListener("change", async () => {
     if (!folderInput.files || folderInput.files.length === 0) return;
     const dcmFiles = collectDicomFiles(Array.from(folderInput.files));
     if (dcmFiles.length === 0) {
-      showError('No se encontraron archivos DICOM en la carpeta seleccionada.');
+      showError("No se encontraron archivos DICOM en la carpeta seleccionada.");
       return;
     }
     state.files = dcmFiles;
     state.currentIndex = 0;
     await loadCurrentFile();
-    folderInput.value = '';
+    folderInput.value = "";
   });
 
   // "Abrir carpeta" button → opens the folder picker (webkitdirectory)
-  $('btn-open-folder')?.addEventListener('click', openFolder);
+  $("btn-open-folder")?.addEventListener("click", openFolder);
 }
 
 // ── File Loading ─────────────────────────────────────────────────────────────
 
 function openFiles(): void {
-  ($('open-files-input') as HTMLInputElement).click();
+  ($("open-files-input") as HTMLInputElement).click();
 }
 
 function openFolder(): void {
-  ($('open-folder-input') as HTMLInputElement).click();
+  ($("open-folder-input") as HTMLInputElement).click();
 }
 
 async function loadCurrentFile(): Promise<void> {
   if (state.files.length === 0) return;
-  state.source = 'local';
+  state.source = "local";
 
   const file = state.files[state.currentIndex];
   showLoading(true);
@@ -213,19 +292,23 @@ async function loadCurrentServerInstance(): Promise<void> {
 
 async function loadStudyFromServer(studyId: string): Promise<void> {
   showLoading(true);
-  state.source = 'server';
+  state.source = "server";
   state.serverStudyId = studyId;
   state.serverInstances = [];
   state.files = [];
   state.currentIndex = 0;
 
   try {
-    const res = await authFetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`);
+    const res = await authFetch(
+      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`,
+    );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as { instances: Array<{ instanceId: string }> };
+    const data = (await res.json()) as {
+      instances: Array<{ instanceId: string }>;
+    };
     state.serverInstances = (data.instances ?? []).map((i) => i.instanceId);
     if (state.serverInstances.length === 0) {
-      showError('El estudio no tiene imágenes.');
+      showError("El estudio no tiene imágenes.");
       return;
     }
     await loadCurrentServerInstance();
@@ -236,12 +319,17 @@ async function loadStudyFromServer(studyId: string): Promise<void> {
   }
 }
 
-async function displayDicom(arrayBuffer: ArrayBuffer, name: string): Promise<void> {
+async function displayDicom(
+  arrayBuffer: ArrayBuffer,
+  name: string,
+): Promise<void> {
   const parsed = parseDicomFile(arrayBuffer);
   state.parsed = parsed;
 
   if (!parsed.pixelData) {
-    showError('No pixel data found. The file may use compressed transfer syntax.');
+    showError(
+      "No pixel data found. The file may use compressed transfer syntax.",
+    );
     return;
   }
 
@@ -262,7 +350,7 @@ async function displayDicom(arrayBuffer: ArrayBuffer, name: string): Promise<voi
     };
   }
 
-  const container = $('viewport-container');
+  const container = $("viewport-container");
   state.viewport.zoom = fitToContainer(
     container.clientWidth,
     container.clientHeight,
@@ -276,8 +364,8 @@ async function displayDicom(arrayBuffer: ArrayBuffer, name: string): Promise<voi
   updateSeriesNav();
   updateInfoOverlay();
 
-  $('topbar-title').textContent = name;
-  $('topbar-title').title = name;
+  $("topbar-title").textContent = name;
+  $("topbar-title").title = name;
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
@@ -285,7 +373,7 @@ async function displayDicom(arrayBuffer: ArrayBuffer, name: string): Promise<voi
 function render(): void {
   if (!state.parsed?.pixelData) return;
 
-  const canvas = $('dicom-canvas') as HTMLCanvasElement;
+  const canvas = $("dicom-canvas") as HTMLCanvasElement;
   renderDicom({
     canvas,
     pixelData: state.parsed.pixelData,
@@ -294,7 +382,7 @@ function render(): void {
   });
 
   applyCanvasTransform(
-    $('viewport-container') as HTMLCanvasElement,
+    $("viewport-container") as HTMLCanvasElement,
     canvas,
     state.viewport,
   );
@@ -305,18 +393,18 @@ function render(): void {
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
 function initToolbar(): void {
-  const tools = ['wl', 'zoom', 'pan'] as const;
+  const tools = ["wl", "zoom", "pan"] as const;
   tools.forEach((tool) => {
     const btn = $(`tool-${tool}`);
-    btn.addEventListener('click', () => {
+    btn.addEventListener("click", () => {
       state.activeTool = tool;
       updateToolbarUI();
     });
   });
 
-  $('tool-reset').addEventListener('click', () => {
+  $("tool-reset").addEventListener("click", () => {
     if (!state.parsed) return;
-    const container = $('viewport-container');
+    const container = $("viewport-container");
     if (state.parsed.metadata.windowWidth > 0) {
       state.viewport = createDefaultViewport(state.parsed.metadata);
     } else if (state.parsed.pixelData) {
@@ -342,32 +430,34 @@ function initToolbar(): void {
     render();
   });
 
-  $('tool-metadata').addEventListener('click', () => {
+  $("tool-metadata").addEventListener("click", () => {
     state.isMetadataOpen = !state.isMetadataOpen;
-    $('metadata-panel').classList.toggle('open', state.isMetadataOpen);
-    $('tool-metadata').classList.toggle('active', state.isMetadataOpen);
+    $("metadata-panel").classList.toggle("open", state.isMetadataOpen);
+    $("tool-metadata").classList.toggle("active", state.isMetadataOpen);
   });
 
-  $('btn-open').addEventListener('click', openFiles);
+  $("btn-open").addEventListener("click", openFiles);
 
   updateToolbarUI();
 }
 
 function updateToolbarUI(): void {
-  document.querySelectorAll('.toolbar__tool').forEach((el) => el.classList.remove('active'));
-  $(`tool-${state.activeTool}`).classList.add('active');
+  document
+    .querySelectorAll(".toolbar__tool")
+    .forEach((el) => el.classList.remove("active"));
+  $(`tool-${state.activeTool}`).classList.add("active");
 
-  const viewport = $('viewport-container');
-  viewport.className = 'viewport-container';
+  const viewport = $("viewport-container");
+  viewport.className = "viewport-container";
   viewport.classList.add(`cursor-${state.activeTool}`);
 }
 
 // ── Viewport Mouse Interaction ───────────────────────────────────────────────
 
 function initViewportInteraction(): void {
-  const container = $('viewport-container');
+  const container = $("viewport-container");
 
-  container.addEventListener('mousedown', (e: MouseEvent) => {
+  container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
@@ -375,7 +465,7 @@ function initViewportInteraction(): void {
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', (e: MouseEvent) => {
+  document.addEventListener("mousemove", (e: MouseEvent) => {
     if (!state.isDragging || !state.parsed) return;
 
     const dx = e.clientX - state.lastMouseX;
@@ -384,14 +474,20 @@ function initViewportInteraction(): void {
     state.lastMouseY = e.clientY;
 
     switch (state.activeTool) {
-      case 'wl':
-        state.viewport.windowWidth = Math.max(1, state.viewport.windowWidth + dx * 2);
+      case "wl":
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
         state.viewport.windowCenter += dy * 2;
         break;
-      case 'zoom':
-        state.viewport.zoom = Math.max(0.1, Math.min(10, state.viewport.zoom * (1 - dy * 0.005)));
+      case "zoom":
+        state.viewport.zoom = Math.max(
+          0.1,
+          Math.min(10, state.viewport.zoom * (1 - dy * 0.005)),
+        );
         break;
-      case 'pan':
+      case "pan":
         state.viewport.panX += dx;
         state.viewport.panY += dy;
         break;
@@ -400,52 +496,59 @@ function initViewportInteraction(): void {
     render();
   });
 
-  document.addEventListener('mouseup', () => {
+  document.addEventListener("mouseup", () => {
     state.isDragging = false;
   });
 
-  container.addEventListener('wheel', (e: WheelEvent) => {
-    if (!state.parsed) return;
-    e.preventDefault();
-    const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
-    state.viewport.zoom = Math.max(0.1, Math.min(10, state.viewport.zoom * zoomFactor));
-    render();
-  }, { passive: false });
+  container.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if (!state.parsed) return;
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
+      state.viewport.zoom = Math.max(
+        0.1,
+        Math.min(10, state.viewport.zoom * zoomFactor),
+      );
+      render();
+    },
+    { passive: false },
+  );
 }
 
 // ── Drop Zone ────────────────────────────────────────────────────────────────
 
 function initDropZone(): void {
-  const dropZone = $('drop-zone');
-  const container = $('viewport-container');
+  const dropZone = $("drop-zone");
+  const container = $("viewport-container");
 
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
+  ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
     document.addEventListener(eventName, (e) => {
       e.preventDefault();
       e.stopPropagation();
     });
   });
 
-  container.addEventListener('dragenter', () => {
-    dropZone.classList.add('drag-over');
+  container.addEventListener("dragenter", () => {
+    dropZone.classList.add("drag-over");
   });
 
-  dropZone.addEventListener('dragleave', (e: DragEvent) => {
+  dropZone.addEventListener("dragleave", (e: DragEvent) => {
     const related = e.relatedTarget as HTMLElement | null;
     if (!related || !dropZone.contains(related)) {
-      dropZone.classList.remove('drag-over');
+      dropZone.classList.remove("drag-over");
     }
   });
 
-  dropZone.addEventListener('drop', async (e: DragEvent) => {
-    dropZone.classList.remove('drag-over');
+  dropZone.addEventListener("drop", async (e: DragEvent) => {
+    dropZone.classList.remove("drag-over");
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
 
     const dcmFiles: File[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.name.toLowerCase().endsWith('.dcm')) {
+      if (file.name.toLowerCase().endsWith(".dcm")) {
         dcmFiles.push(file);
       }
     }
@@ -457,28 +560,28 @@ function initDropZone(): void {
     }
   });
 
-  $('drop-zone-open').addEventListener('click', openFiles);
+  $("drop-zone-open").addEventListener("click", openFiles);
 }
 
 function hideDropZone(): void {
-  $('drop-zone').classList.add('hidden');
+  $("drop-zone").classList.add("hidden");
 }
 
 function showDropZone(): void {
-  $('drop-zone').classList.remove('hidden');
+  $("drop-zone").classList.remove("hidden");
 }
 
 // ── Series Navigation ────────────────────────────────────────────────────────
 
 function initSeriesNav(): void {
-  $('nav-prev').addEventListener('click', async () => {
+  $("nav-prev").addEventListener("click", async () => {
     if (state.currentIndex > 0) {
       state.currentIndex--;
       await loadCurrent();
     }
   });
 
-  $('nav-next').addEventListener('click', async () => {
+  $("nav-next").addEventListener("click", async () => {
     if (state.currentIndex < itemCount() - 1) {
       state.currentIndex++;
       await loadCurrent();
@@ -487,17 +590,18 @@ function initSeriesNav(): void {
 }
 
 function updateSeriesNav(): void {
-  const nav = $('series-nav');
+  const nav = $("series-nav");
   const count = itemCount();
   if (count <= 1) {
-    nav.classList.add('hidden');
+    nav.classList.add("hidden");
     return;
   }
-  nav.classList.remove('hidden');
+  nav.classList.remove("hidden");
 
-  ($('nav-prev') as HTMLButtonElement).disabled = state.currentIndex === 0;
-  ($('nav-next') as HTMLButtonElement).disabled = state.currentIndex === count - 1;
-  $('nav-counter').textContent = `${state.currentIndex + 1} / ${count}`;
+  ($("nav-prev") as HTMLButtonElement).disabled = state.currentIndex === 0;
+  ($("nav-next") as HTMLButtonElement).disabled =
+    state.currentIndex === count - 1;
+  $("nav-counter").textContent = `${state.currentIndex + 1} / ${count}`;
 }
 
 // ── Metadata Panel ───────────────────────────────────────────────────────────
@@ -507,44 +611,44 @@ function updateMetadataPanel(): void {
   const m = state.parsed.metadata;
 
   const rows = [
-    ['Patient Name', m.patientName],
-    ['Patient ID', m.patientId],
-    ['Birth Date', m.patientBirthDate],
-    ['Sex', m.patientSex],
-    ['', ''],
-    ['Study Date', m.studyDate],
-    ['Study Description', m.studyDescription],
-    ['Accession #', m.accessionNumber],
-    ['Referring Physician', m.referringPhysician],
-    ['', ''],
-    ['Modality', m.modality],
-    ['Series', m.seriesDescription],
-    ['Series #', m.seriesNumber],
-    ['Instance #', m.instanceNumber],
-    ['', ''],
-    ['Dimensions', `${m.columns} × ${m.rows}`],
-    ['Bits Allocated', String(m.bitsAllocated)],
-    ['Bits Stored', String(m.bitsStored)],
-    ['Photometric', m.photometricInterpretation],
-    ['Pixel Repr.', m.pixelRepresentation === 0 ? 'Unsigned' : 'Signed'],
-    ['Rescale Slope', String(m.rescaleSlope)],
-    ['Rescale Intercept', String(m.rescaleIntercept)],
-    ['Transfer Syntax', m.transferSyntaxUid],
+    ["Patient Name", m.patientName],
+    ["Patient ID", m.patientId],
+    ["Birth Date", m.patientBirthDate],
+    ["Sex", m.patientSex],
+    ["", ""],
+    ["Study Date", m.studyDate],
+    ["Study Description", m.studyDescription],
+    ["Accession #", m.accessionNumber],
+    ["Referring Physician", m.referringPhysician],
+    ["", ""],
+    ["Modality", m.modality],
+    ["Series", m.seriesDescription],
+    ["Series #", m.seriesNumber],
+    ["Instance #", m.instanceNumber],
+    ["", ""],
+    ["Dimensions", `${m.columns} × ${m.rows}`],
+    ["Bits Allocated", String(m.bitsAllocated)],
+    ["Bits Stored", String(m.bitsStored)],
+    ["Photometric", m.photometricInterpretation],
+    ["Pixel Repr.", m.pixelRepresentation === 0 ? "Unsigned" : "Signed"],
+    ["Rescale Slope", String(m.rescaleSlope)],
+    ["Rescale Intercept", String(m.rescaleIntercept)],
+    ["Transfer Syntax", m.transferSyntaxUid],
   ];
 
-  const tbody = $('metadata-tbody');
-  tbody.innerHTML = '';
+  const tbody = $("metadata-tbody");
+  tbody.innerHTML = "";
 
   rows.forEach(([label, value]) => {
-    if (label === '' && value === '') {
-      const tr = document.createElement('tr');
-      tr.className = 'metadata-separator';
+    if (label === "" && value === "") {
+      const tr = document.createElement("tr");
+      tr.className = "metadata-separator";
       tr.innerHTML = '<td colspan="2"><hr /></td>';
       tbody.appendChild(tr);
       return;
     }
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="meta-key">${escapeHtml(label)}</td><td class="meta-val">${escapeHtml(value || '—')}</td>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="meta-key">${escapeHtml(label)}</td><td class="meta-val">${escapeHtml(value || "—")}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -555,77 +659,94 @@ function updateInfoOverlay(): void {
   if (!state.parsed) return;
   const m = state.parsed.metadata;
 
-  $('overlay-tl').innerHTML = [m.patientName, m.patientId].filter(Boolean).join('<br>');
-  $('overlay-tr').innerHTML = [m.studyDate, m.modality, m.studyDescription].filter(Boolean).join('<br>');
-  $('overlay-bl').innerHTML = [
+  $("overlay-tl").innerHTML = [m.patientName, m.patientId]
+    .filter(Boolean)
+    .join("<br>");
+  $("overlay-tr").innerHTML = [m.studyDate, m.modality, m.studyDescription]
+    .filter(Boolean)
+    .join("<br>");
+  $("overlay-bl").innerHTML = [
     `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
     `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
-  ].join('<br>');
-  $('overlay-br').innerHTML = [`${m.columns} × ${m.rows}`, `${m.bitsStored}bit`].join('<br>');
+  ].join("<br>");
+  $("overlay-br").innerHTML = [
+    `${m.columns} × ${m.rows}`,
+    `${m.bitsStored}bit`,
+  ].join("<br>");
 }
 
 // ── UI Helpers ───────────────────────────────────────────────────────────────
 
 function showLoading(show: boolean): void {
-  $('loading-indicator').classList.toggle('hidden', !show);
+  $("loading-indicator").classList.toggle("hidden", !show);
 }
 
 function showError(message: string): void {
   showLoading(false);
-  const el = $('error-message');
+  const el = $("error-message");
   el.textContent = message;
-  el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 5000);
+  el.classList.remove("hidden");
+  setTimeout(() => el.classList.add("hidden"), 5000);
 }
 
 function escapeHtml(str: string): string {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
 }
 
 // escapeHtml does not encode double-quotes; use this for HTML attribute values.
 function escapeAttr(str: string): string {
-  return escapeHtml(str).replace(/"/g, '&quot;');
+  return escapeHtml(str).replace(/"/g, "&quot;");
 }
 
 // ── Menu Events (Electron only) ──────────────────────────────────────────────
 
 function initMenuListeners(): void {
   if (!window.api) return;
-  window.api.on('menu:open-files', () => void openFiles());
-  window.api.on('menu:open-folder', () => void openFolder());
+  window.api.on("menu:open-files", () => void openFiles());
+  window.api.on("menu:open-folder", () => void openFolder());
 }
 
 // ── Keyboard Shortcuts ───────────────────────────────────────────────────────
 
 function initKeyboardShortcuts(): void {
-  document.addEventListener('keydown', async (e: KeyboardEvent) => {
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+  document.addEventListener("keydown", async (e: KeyboardEvent) => {
+    // Ignore keystrokes while typing (login dialog, search box, date filters).
+    const target = e.target as HTMLElement;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
       if (state.currentIndex > 0) {
         state.currentIndex--;
         await loadCurrent();
       }
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
       if (state.currentIndex < itemCount() - 1) {
         state.currentIndex++;
         await loadCurrent();
       }
     }
 
-    if (e.key === 'w' || e.key === 'W') {
-      state.activeTool = 'wl';
+    if (e.key === "w" || e.key === "W") {
+      state.activeTool = "wl";
       updateToolbarUI();
-    } else if (e.key === 'z' || e.key === 'Z') {
-      state.activeTool = 'zoom';
+    } else if (e.key === "z" || e.key === "Z") {
+      state.activeTool = "zoom";
       updateToolbarUI();
-    } else if (e.key === 'p' || e.key === 'P') {
-      state.activeTool = 'pan';
+    } else if (e.key === "p" || e.key === "P") {
+      state.activeTool = "pan";
       updateToolbarUI();
-    } else if (e.key === 'r' || e.key === 'R') {
-      $('tool-reset').click();
-    } else if (e.key === 'm' || e.key === 'M') {
-      $('tool-metadata').click();
+    } else if (e.key === "r" || e.key === "R") {
+      $("tool-reset").click();
+    } else if (e.key === "m" || e.key === "M") {
+      $("tool-metadata").click();
     }
   });
 }
@@ -633,7 +754,7 @@ function initKeyboardShortcuts(): void {
 // ── Resize Observer ──────────────────────────────────────────────────────────
 
 function initResizeObserver(): void {
-  const container = $('viewport-container');
+  const container = $("viewport-container");
   const observer = new ResizeObserver(() => {
     if (state.parsed) render();
   });
@@ -642,81 +763,116 @@ function initResizeObserver(): void {
 
 // ── Upload Panel ─────────────────────────────────────────────────────────────
 
-const API_BASE = '/api';
-
 function initUploadPanel(): void {
   // Single file upload
-  const input = $('upload-input') as HTMLInputElement;
-  input.addEventListener('change', () => {
+  const input = $("upload-input") as HTMLInputElement;
+  input.addEventListener("change", () => {
     const file = input.files?.[0];
     if (file) void uploadFile(file);
-    input.value = '';
+    input.value = "";
   });
-  $('btn-upload-server')?.addEventListener('click', () => input.click());
+  $("btn-upload-server")?.addEventListener("click", async () => {
+    if (await ensureAuthenticated()) input.click();
+  });
 
   // Folder upload
-  const folderInput = $('upload-folder-input') as HTMLInputElement;
-  folderInput.setAttribute('webkitdirectory', '');
-  folderInput.setAttribute('multiple', '');
-  folderInput.addEventListener('change', async () => {
+  const folderInput = $("upload-folder-input") as HTMLInputElement;
+  folderInput.setAttribute("webkitdirectory", "");
+  folderInput.setAttribute("multiple", "");
+  folderInput.addEventListener("change", async () => {
     const files = collectDicomFiles(Array.from(folderInput.files ?? []));
     if (files.length === 0) {
-      showUploadStatus('No se encontraron archivos DICOM en la carpeta.', 'error');
+      showUploadStatus(
+        "No se encontraron archivos DICOM en la carpeta.",
+        "error",
+      );
       return;
     }
     await uploadFolderFiles(files);
-    folderInput.value = '';
+    folderInput.value = "";
   });
-  $('btn-upload-folder')?.addEventListener('click', () => folderInput.click());
+  $("btn-upload-folder")?.addEventListener("click", async () => {
+    if (await ensureAuthenticated()) folderInput.click();
+  });
 
-  $('btn-refresh-studies')?.addEventListener('click', loadStudyExplorer);
+  $("btn-refresh-studies")?.addEventListener("click", loadStudyExplorer);
 }
 
-async function uploadFile(file: File, force = false): Promise<void> {
-  const progressWrap = $('upload-progress-wrap');
-  const progressBar  = $('upload-progress-bar');
+async function uploadFile(
+  file: File,
+  force = false,
+  isRetry = false,
+): Promise<void> {
+  // Uploads never leave the browser without a valid session.
+  if (!(await ensureAuthenticated())) {
+    showUploadStatus("Necesitás iniciar sesión para subir estudios.", "error");
+    return;
+  }
 
-  progressWrap.classList.remove('hidden');
-  progressBar.style.width = '0%';
-  showUploadStatus('', '');
+  const progressWrap = $("upload-progress-wrap");
+  const progressBar = $("upload-progress-bar");
+
+  progressWrap.classList.remove("hidden");
+  progressBar.style.width = "0%";
+  showUploadStatus("", "");
 
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    const url = `${API_BASE}/v1/studies/upload${force ? '?force=true' : ''}`;
-    xhr.open('POST', url);
+    const url = `${API_BASE}/v1/studies/upload${force ? "?force=true" : ""}`;
+    xhr.open("POST", url);
     const token = getAccessToken();
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
-    xhr.upload.addEventListener('progress', (e) => {
+    xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
         progressBar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
       }
     });
 
-    xhr.addEventListener('load', () => {
-      progressWrap.classList.add('hidden');
+    xhr.addEventListener("load", () => {
+      progressWrap.classList.add("hidden");
 
       if (xhr.status === 201) {
-        showUploadStatus('Estudio cargado correctamente.', 'ok');
+        showUploadStatus("Estudio cargado correctamente.", "ok");
         loadStudyExplorer();
+      } else if (xhr.status === 401 && !isRetry) {
+        // Access token expired mid-session: refresh first (the in-memory token
+        // is stale, so ensureAuthenticated alone would short-circuit on it),
+        // fall back to the login popup, then retry the upload once.
+        void (async () => {
+          const ok =
+            (await refreshAccessToken()) || (await ensureAuthenticated());
+          if (ok) {
+            await uploadFile(file, force, true);
+          } else {
+            showUploadStatus(
+              "Sesión expirada. Iniciá sesión para subir estudios.",
+              "error",
+            );
+          }
+          resolve();
+        })();
+        return;
+      } else if (xhr.status === 401) {
+        showUploadStatus("No autorizado. Iniciá sesión de nuevo.", "error");
       } else if (xhr.status === 409) {
         const body = JSON.parse(xhr.responseText);
         showDuplicateDialog(file, body.message);
       } else if (xhr.status === 413) {
-        showUploadStatus('El archivo supera el límite de 500 MB.', 'error');
+        showUploadStatus("El archivo supera el límite de 500 MB.", "error");
       } else {
-        const body = JSON.parse(xhr.responseText ?? '{}');
-        showUploadStatus(body.error ?? 'Error al cargar el archivo.', 'error');
+        const body = JSON.parse(xhr.responseText ?? "{}");
+        showUploadStatus(body.error ?? "Error al cargar el archivo.", "error");
       }
       resolve();
     });
 
-    xhr.addEventListener('error', () => {
-      progressWrap.classList.add('hidden');
-      showUploadStatus('Error de red al conectar con el servidor.', 'error');
+    xhr.addEventListener("error", () => {
+      progressWrap.classList.add("hidden");
+      showUploadStatus("Error de red al conectar con el servidor.", "error");
       resolve();
     });
 
@@ -724,66 +880,79 @@ async function uploadFile(file: File, force = false): Promise<void> {
   });
 }
 
-async function uploadFileSilent(file: File): Promise<'ok' | 'duplicate' | 'error'> {
+async function uploadFileSilent(
+  file: File,
+): Promise<"ok" | "duplicate" | "error"> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
   try {
-    const res = await authFetch(`${API_BASE}/v1/studies/upload`, { method: 'POST', body: formData });
-    if (res.status === 201) return 'ok';
-    if (res.status === 409) return 'duplicate';
-    return 'error';
+    const res = await authFetch(`${API_BASE}/v1/studies/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    if (res.status === 201) return "ok";
+    if (res.status === 409) return "duplicate";
+    return "error";
   } catch {
-    return 'error';
+    return "error";
   }
 }
 
 async function uploadFolderFiles(files: File[]): Promise<void> {
-  const progressWrap = $('upload-progress-wrap');
-  const progressBar  = $('upload-progress-bar');
-  progressWrap.classList.remove('hidden');
+  const progressWrap = $("upload-progress-wrap");
+  const progressBar = $("upload-progress-bar");
+  progressWrap.classList.remove("hidden");
 
   let ok = 0;
   let duplicates = 0;
   let errors = 0;
 
   for (let i = 0; i < files.length; i++) {
-    showUploadStatus(`Subiendo ${i + 1} de ${files.length}: ${files[i].name}`, '');
+    showUploadStatus(
+      `Subiendo ${i + 1} de ${files.length}: ${files[i].name}`,
+      "",
+    );
     progressBar.style.width = `${Math.round((i / files.length) * 100)}%`;
 
     const result = await uploadFileSilent(files[i]);
-    if (result === 'ok') ok++;
-    else if (result === 'duplicate') duplicates++;
+    if (result === "ok") ok++;
+    else if (result === "duplicate") duplicates++;
     else errors++;
   }
 
-  progressBar.style.width = '100%';
-  progressWrap.classList.add('hidden');
+  progressBar.style.width = "100%";
+  progressWrap.classList.add("hidden");
 
   const parts = [`${ok} de ${files.length} subidos`];
   if (duplicates > 0) parts.push(`${duplicates} ya existían (omitidos)`);
   if (errors > 0) parts.push(`${errors} errores`);
 
-  showUploadStatus(parts.join(' · '), errors > 0 ? 'error' : 'ok');
+  showUploadStatus(parts.join(" · "), errors > 0 ? "error" : "ok");
   loadStudyExplorer();
 }
 
-function showUploadStatus(text: string, type: '' | 'ok' | 'error'): void {
-  const el = $('upload-status');
+function showUploadStatus(text: string, type: "" | "ok" | "error"): void {
+  const el = $("upload-status");
   el.textContent = text;
-  el.className = type ? `upload-status upload-status--${type}` : 'upload-status';
+  el.className = type
+    ? `upload-status upload-status--${type}`
+    : "upload-status";
 }
 
 function showDuplicateDialog(file: File, message: string): void {
-  const dialog = $('duplicate-dialog');
-  const msg    = $('duplicate-msg');
-  const btnYes = $('duplicate-yes');
-  const btnNo  = $('duplicate-no');
+  const dialog = $("duplicate-dialog");
+  const msg = $("duplicate-msg");
+  const btnYes = $("duplicate-yes");
+  const btnNo = $("duplicate-no");
 
   msg.textContent = message;
-  dialog.classList.remove('hidden');
+  dialog.classList.remove("hidden");
 
-  const close = () => dialog.classList.add('hidden');
-  btnYes.onclick = async () => { close(); await uploadFile(file, true); };
+  const close = () => dialog.classList.add("hidden");
+  btnYes.onclick = async () => {
+    close();
+    await uploadFile(file, true);
+  };
   btnNo.onclick = close;
 }
 
@@ -813,37 +982,50 @@ interface StudiesResponse {
 const explorerState = {
   page: 1,
   totalPages: 1,
-  search: '',
-  modality: '',
-  dateFrom: '',
-  dateTo: '',
+  search: "",
+  modality: "",
+  dateFrom: "",
+  dateTo: "",
 };
 
 function updateClearFiltersVisibility(): void {
-  const active = explorerState.search || explorerState.modality || explorerState.dateFrom || explorerState.dateTo;
-  $('filter-clear-wrap').classList.toggle('hidden', !active);
+  const active =
+    explorerState.search ||
+    explorerState.modality ||
+    explorerState.dateFrom ||
+    explorerState.dateTo;
+  $("filter-clear-wrap").classList.toggle("hidden", !active);
 }
 
 function initStudyExplorer(): void {
   // Click to view study
-  const list = $('study-list');
-  list.addEventListener('click', async (e) => {
-    const item = (e.target as HTMLElement).closest<HTMLElement>('.study-item[data-id]');
+  const list = $("study-list");
+  list.addEventListener("click", async (e) => {
+    // Login button inside the logged-out placeholder — the gate pops the dialog.
+    if ((e.target as HTMLElement).closest("#study-list-login")) {
+      void loadStudyExplorer();
+      return;
+    }
+    const item = (e.target as HTMLElement).closest<HTMLElement>(
+      ".study-item[data-id]",
+    );
     if (!item) return;
     const studyId = item.dataset.id;
     if (!studyId) return;
-    list.querySelectorAll('.study-item').forEach((el) => el.classList.remove('study-item--active'));
-    item.classList.add('study-item--active');
+    list
+      .querySelectorAll(".study-item")
+      .forEach((el) => el.classList.remove("study-item--active"));
+    item.classList.add("study-item--active");
     await loadStudyFromServer(studyId);
   });
 
   // Search with debounce + inline clear button
-  const searchInput = $('search-studies') as HTMLInputElement;
-  const searchClear = $('btn-clear-search');
+  const searchInput = $("search-studies") as HTMLInputElement;
+  const searchClear = $("btn-clear-search");
   let searchTimer: ReturnType<typeof setTimeout>;
-  searchInput.addEventListener('input', () => {
+  searchInput.addEventListener("input", () => {
     const val = searchInput.value;
-    searchClear.classList.toggle('hidden', val.length === 0);
+    searchClear.classList.toggle("hidden", val.length === 0);
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       explorerState.search = val.trim();
@@ -852,36 +1034,38 @@ function initStudyExplorer(): void {
       void loadStudyExplorer();
     }, 400);
   });
-  searchClear.addEventListener('click', () => {
-    searchInput.value = '';
-    searchClear.classList.add('hidden');
-    explorerState.search = '';
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    searchClear.classList.add("hidden");
+    explorerState.search = "";
     explorerState.page = 1;
     updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
 
   // Modality chips
-  const chipsContainer = $('filter-modality-chips');
-  chipsContainer.addEventListener('click', (e) => {
-    const chip = (e.target as HTMLElement).closest<HTMLElement>('.filter-chip');
+  const chipsContainer = $("filter-modality-chips");
+  chipsContainer.addEventListener("click", (e) => {
+    const chip = (e.target as HTMLElement).closest<HTMLElement>(".filter-chip");
     if (!chip) return;
-    chipsContainer.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('filter-chip--active'));
-    chip.classList.add('filter-chip--active');
-    explorerState.modality = chip.dataset.modality ?? '';
+    chipsContainer
+      .querySelectorAll(".filter-chip")
+      .forEach((c) => c.classList.remove("filter-chip--active"));
+    chip.classList.add("filter-chip--active");
+    explorerState.modality = chip.dataset.modality ?? "";
     explorerState.page = 1;
     updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
 
   // Date filters
-  $('filter-date-from').addEventListener('change', (e) => {
+  $("filter-date-from").addEventListener("change", (e) => {
     explorerState.dateFrom = (e.target as HTMLInputElement).value;
     explorerState.page = 1;
     updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
-  $('filter-date-to').addEventListener('change', (e) => {
+  $("filter-date-to").addEventListener("change", (e) => {
     explorerState.dateTo = (e.target as HTMLInputElement).value;
     explorerState.page = 1;
     updateClearFiltersVisibility();
@@ -889,56 +1073,78 @@ function initStudyExplorer(): void {
   });
 
   // Clear all filters
-  $('btn-clear-filters').addEventListener('click', () => {
-    explorerState.search   = '';
-    explorerState.modality = '';
-    explorerState.dateFrom = '';
-    explorerState.dateTo   = '';
-    explorerState.page     = 1;
-    searchInput.value = '';
-    searchClear.classList.add('hidden');
-    ($('filter-date-from') as HTMLInputElement).value = '';
-    ($('filter-date-to')   as HTMLInputElement).value = '';
-    chipsContainer.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('filter-chip--active'));
-    chipsContainer.querySelector<HTMLElement>('.filter-chip[data-modality=""]')?.classList.add('filter-chip--active');
+  $("btn-clear-filters").addEventListener("click", () => {
+    explorerState.search = "";
+    explorerState.modality = "";
+    explorerState.dateFrom = "";
+    explorerState.dateTo = "";
+    explorerState.page = 1;
+    searchInput.value = "";
+    searchClear.classList.add("hidden");
+    ($("filter-date-from") as HTMLInputElement).value = "";
+    ($("filter-date-to") as HTMLInputElement).value = "";
+    chipsContainer
+      .querySelectorAll(".filter-chip")
+      .forEach((c) => c.classList.remove("filter-chip--active"));
+    chipsContainer
+      .querySelector<HTMLElement>('.filter-chip[data-modality=""]')
+      ?.classList.add("filter-chip--active");
     updateClearFiltersVisibility();
     void loadStudyExplorer();
   });
 
   // Pagination
-  $('pagination-prev').addEventListener('click', () => {
-    if (explorerState.page > 1) { explorerState.page--; void loadStudyExplorer(); }
+  $("pagination-prev").addEventListener("click", () => {
+    if (explorerState.page > 1) {
+      explorerState.page--;
+      void loadStudyExplorer();
+    }
   });
-  $('pagination-next').addEventListener('click', () => {
-    if (explorerState.page < explorerState.totalPages) { explorerState.page++; void loadStudyExplorer(); }
+  $("pagination-next").addEventListener("click", () => {
+    if (explorerState.page < explorerState.totalPages) {
+      explorerState.page++;
+      void loadStudyExplorer();
+    }
   });
 
   // Close / reopen panel
-  const panel    = $('explorer-panel');
-  const shell    = document.querySelector<HTMLElement>('.app-shell')!;
-  const btnClose  = $('btn-close-explorer');
-  const btnReopen = $('btn-reopen-explorer');
-  btnClose.addEventListener('click', () => {
-    panel.classList.add('explorer-panel--closed');
-    shell.classList.add('explorer-closed');
-    btnReopen.classList.remove('hidden');
+  const panel = $("explorer-panel");
+  const shell = document.querySelector<HTMLElement>(".app-shell")!;
+  const btnClose = $("btn-close-explorer");
+  const btnReopen = $("btn-reopen-explorer");
+  btnClose.addEventListener("click", () => {
+    panel.classList.add("explorer-panel--closed");
+    shell.classList.add("explorer-closed");
+    btnReopen.classList.remove("hidden");
   });
-  btnReopen.addEventListener('click', () => {
-    panel.classList.remove('explorer-panel--closed');
-    shell.classList.remove('explorer-closed');
-    btnReopen.classList.add('hidden');
+  btnReopen.addEventListener("click", () => {
+    panel.classList.remove("explorer-panel--closed");
+    shell.classList.remove("explorer-closed");
+    btnReopen.classList.add("hidden");
   });
 }
 
 async function loadStudyExplorer(): Promise<void> {
-  const list = $('study-list');
-  list.innerHTML = '<li class="study-item study-item--loading">Cargando estudios…</li>';
+  // Every server-bound explorer action funnels through here: no session → popup.
+  if (!(await ensureAuthenticated())) {
+    renderLoggedOutExplorer();
+    return;
+  }
 
-  const params = new URLSearchParams({ page: String(explorerState.page), limit: '20' });
-  if (explorerState.modality) params.set('modality', explorerState.modality);
-  if (explorerState.dateFrom)  params.set('date_from', explorerState.dateFrom.replace(/-/g, ''));
-  if (explorerState.dateTo)    params.set('date_to',   explorerState.dateTo.replace(/-/g, ''));
-  if (explorerState.search)    params.set('search',    explorerState.search);
+  const list = $("study-list");
+  list.innerHTML =
+    '<li class="study-item study-item--loading">Cargando estudios…</li>';
+
+  const params = new URLSearchParams({
+    page: String(explorerState.page),
+    limit: "20",
+  });
+  if (explorerState.modality) params.set("modality", explorerState.modality);
+  if (explorerState.dateFrom)
+    params.set("date_from", explorerState.dateFrom.replace(/-/g, ""));
+  if (explorerState.dateTo)
+    params.set("date_to", explorerState.dateTo.replace(/-/g, ""));
+  if (explorerState.search) params.set("search", explorerState.search);
 
   try {
     const res = await authFetch(`${API_BASE}/v1/studies?${params}`);
@@ -957,22 +1163,23 @@ async function loadStudyExplorer(): Promise<void> {
               <rect x="3" y="3" width="18" height="18" rx="3"/>
               <circle cx="12" cy="12" r="4"/>
             </svg>
-            <p>No hay estudios${explorerState.search || explorerState.modality || explorerState.dateFrom || explorerState.dateTo ? ' con esos filtros' : ' cargados'}.</p>
+            <p>No hay estudios${explorerState.search || explorerState.modality || explorerState.dateFrom || explorerState.dateTo ? " con esos filtros" : " cargados"}.</p>
           </div>
         </li>`;
       return;
     }
 
-    list.innerHTML = data.studies.map((s) => {
-      const encodedId = encodeURIComponent(s.orthanc_study_id);
-      const modality  = escapeHtml(s.modality || '?');
-      const name      = escapeHtml(s.patient_name || 'Paciente desconocido');
-      const date      = formatDate(s.study_date);
-      const desc      = escapeHtml(s.study_description || '—');
-      const count     = Number(s.num_instances);
-      const imgLabel  = count === 1 ? '1 imagen' : `${count} imágenes`;
+    list.innerHTML = data.studies
+      .map((s) => {
+        const encodedId = encodeURIComponent(s.orthanc_study_id);
+        const modality = escapeHtml(s.modality || "?");
+        const name = escapeHtml(s.patient_name || "Paciente desconocido");
+        const date = formatDate(s.study_date);
+        const desc = escapeHtml(s.study_description || "—");
+        const count = Number(s.num_instances);
+        const imgLabel = count === 1 ? "1 imagen" : `${count} imágenes`;
 
-      return `
+        return `
         <li class="study-item" data-id="${escapeAttr(s.orthanc_study_id)}" title="Click para visualizar">
           <div class="study-item__thumb">
             <img data-thumb-id="${escapeAttr(s.orthanc_study_id)}" alt="${modality}" style="display:none" />
@@ -987,47 +1194,81 @@ async function loadStudyExplorer(): Promise<void> {
             </span>
           </div>
         </li>`;
-    }).join('');
+      })
+      .join("");
     loadThumbnails(list);
   } catch {
-    list.innerHTML = '<li class="study-item study-item--error">Error al cargar estudios.</li>';
+    list.innerHTML =
+      '<li class="study-item study-item--error">Error al cargar estudios.</li>';
     explorerState.page = 1;
     explorerState.totalPages = 1;
     updatePaginationUI(1, 1, 0);
   }
 }
 
+/** What the explorer shows without a session: a prompt instead of studies. */
+function renderLoggedOutExplorer(): void {
+  $("study-list").innerHTML = `
+    <li class="study-item study-item--empty">
+      <div class="empty-state">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+          <rect x="3" y="11" width="18" height="10" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <p>Iniciá sesión para ver los estudios del servidor.</p>
+        <button class="btn btn--accent" id="study-list-login">Iniciar sesión</button>
+      </div>
+    </li>`;
+  explorerState.page = 1;
+  explorerState.totalPages = 1;
+  updatePaginationUI(1, 1, 0);
+}
+
+let thumbUrls: string[] = [];
+
 /**
  * Thumbnails are a protected endpoint, so a plain <img src> can't carry the
  * bearer token — fetch each one and swap in a blob URL instead.
  */
 function loadThumbnails(list: HTMLElement): void {
-  list.querySelectorAll<HTMLImageElement>('img[data-thumb-id]').forEach(async (img) => {
-    const studyId = img.dataset.thumbId!;
-    try {
-      const res = await authFetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/thumbnail`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      img.src = URL.createObjectURL(blob);
-      img.style.display = '';
-      img.nextElementSibling?.setAttribute('style', 'display:none');
-    } catch {
-      // leave the fallback badge visible (img stays display:none)
-    }
-  });
+  thumbUrls.forEach((url) => URL.revokeObjectURL(url));
+  thumbUrls = [];
+  list
+    .querySelectorAll<HTMLImageElement>("img[data-thumb-id]")
+    .forEach(async (img) => {
+      const studyId = img.dataset.thumbId!;
+      try {
+        const res = await authFetch(
+          `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/thumbnail`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        thumbUrls.push(url);
+        img.src = url;
+        img.style.display = "";
+        img.nextElementSibling?.setAttribute("style", "display:none");
+      } catch {
+        // leave the fallback badge visible (img stays display:none)
+      }
+    });
 }
 
-function updatePaginationUI(page: number, totalPages: number, total: number): void {
-  const info    = $('pagination-info');
-  const btnPrev = $('pagination-prev') as HTMLButtonElement;
-  const btnNext = $('pagination-next') as HTMLButtonElement;
+function updatePaginationUI(
+  page: number,
+  totalPages: number,
+  total: number,
+): void {
+  const info = $("pagination-info");
+  const btnPrev = $("pagination-prev") as HTMLButtonElement;
+  const btnNext = $("pagination-next") as HTMLButtonElement;
 
-  info.textContent    = total > 0 ? `${page} / ${totalPages}` : '—';
-  btnPrev.disabled    = page <= 1;
-  btnNext.disabled    = page >= totalPages;
+  info.textContent = total > 0 ? `${page} / ${totalPages}` : "—";
+  btnPrev.disabled = page <= 1;
+  btnNext.disabled = page >= totalPages;
 }
 
 function formatDate(raw: string): string {
-  if (!raw || raw.length !== 8) return raw || '—';
+  if (!raw || raw.length !== 8) return raw || "—";
   return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
 }

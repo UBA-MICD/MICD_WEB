@@ -16,7 +16,7 @@ export interface FolderFile {
 }
 
 // Files that live next to DICOM data but are never images themselves.
-const JUNK_NAMES = new Set(['dicomdir', 'thumbs.db']);
+const JUNK_NAMES = new Set(["dicomdir", "thumbs.db"]);
 
 /** The path we sort/inspect by — relative path inside the folder when available. */
 function pathOf(file: FolderFile): string {
@@ -36,10 +36,10 @@ function isDicomCandidate(path: string): boolean {
   const lower = base.toLowerCase();
 
   // Hidden / OS metadata files (.DS_Store, ._foo, …) are never DICOM images.
-  if (base.startsWith('.')) return false;
+  if (base.startsWith(".")) return false;
   if (JUNK_NAMES.has(lower)) return false;
 
-  if (lower.endsWith('.dcm')) return true;
+  if (lower.endsWith(".dcm")) return true;
 
   // Many PACS exports name slices with no extension (IM000001, I10, …).
   // Treat "no extension" as a DICOM candidate; reject other extensions
@@ -52,10 +52,15 @@ function isDicomCandidate(path: string): boolean {
  * Filter a selection down to DICOM images, ordered for sequential viewing.
  * Pure: never mutates the input.
  */
-export function collectDicomFiles<T extends FolderFile>(files: readonly T[]): T[] {
+export function collectDicomFiles<T extends FolderFile>(
+  files: readonly T[],
+): T[] {
   return files
     .filter((file) => isDicomCandidate(pathOf(file)))
     .sort((a, b) =>
-      pathOf(a).localeCompare(pathOf(b), undefined, { numeric: true, sensitivity: 'base' }),
+      pathOf(a).localeCompare(pathOf(b), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
     );
 }

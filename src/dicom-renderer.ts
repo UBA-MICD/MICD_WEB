@@ -4,7 +4,7 @@
  * different photometric interpretations.
  */
 
-import type { DicomMetadata } from './dicom-parser-util.js';
+import type { DicomMetadata } from "./dicom-parser-util.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,10 +27,17 @@ export interface RenderParams {
 
 export function renderDicom(params: RenderParams): void {
   const { canvas, pixelData, metadata, viewport } = params;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const { rows, columns, photometricInterpretation, samplesPerPixel, rescaleSlope, rescaleIntercept } = metadata;
+  const {
+    rows,
+    columns,
+    photometricInterpretation,
+    samplesPerPixel,
+    rescaleSlope,
+    rescaleIntercept,
+  } = metadata;
   const { windowCenter, windowWidth, zoom, panX, panY } = viewport;
 
   if (rows === 0 || columns === 0) return;
@@ -44,13 +51,23 @@ export function renderDicom(params: RenderParams): void {
   const imageData = ctx.createImageData(columns, rows);
   const output = imageData.data;
 
-  const isMonochrome1 = photometricInterpretation === 'MONOCHROME1';
-  const isRgb = photometricInterpretation === 'RGB' && samplesPerPixel === 3;
+  const isMonochrome1 = photometricInterpretation === "MONOCHROME1";
+  const isRgb = photometricInterpretation === "RGB" && samplesPerPixel === 3;
 
   if (isRgb) {
     renderRgb(pixelData, output, columns, rows);
   } else {
-    renderMonochrome(pixelData, output, columns, rows, windowCenter, windowWidth, rescaleSlope, rescaleIntercept, isMonochrome1);
+    renderMonochrome(
+      pixelData,
+      output,
+      columns,
+      rows,
+      windowCenter,
+      windowWidth,
+      rescaleSlope,
+      rescaleIntercept,
+      isMonochrome1,
+    );
   }
 
   // Clear and apply transforms
@@ -100,10 +117,10 @@ function renderMonochrome(
     }
 
     const idx = i * 4;
-    output[idx] = intensity;       // R
-    output[idx + 1] = intensity;   // G
-    output[idx + 2] = intensity;   // B
-    output[idx + 3] = 255;         // A
+    output[idx] = intensity; // R
+    output[idx + 1] = intensity; // G
+    output[idx + 2] = intensity; // B
+    output[idx + 3] = 255; // A
   }
 }
 
@@ -119,10 +136,10 @@ function renderRgb(
   for (let i = 0; i < totalPixels; i++) {
     const srcIdx = i * 3;
     const dstIdx = i * 4;
-    output[dstIdx] = pixelData[srcIdx];         // R
+    output[dstIdx] = pixelData[srcIdx]; // R
     output[dstIdx + 1] = pixelData[srcIdx + 1]; // G
     output[dstIdx + 2] = pixelData[srcIdx + 2]; // B
-    output[dstIdx + 3] = 255;                   // A
+    output[dstIdx + 3] = 255; // A
   }
 }
 

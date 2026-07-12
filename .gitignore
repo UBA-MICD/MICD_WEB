@@ -33,3 +33,7 @@ desktop.ini
 
 # ── Docker local overrides ────────────────────────────────────────────────────
 docker-compose.override.yml
+
+# ── Coverage / Temp ───────────────────────────────────────────────────────────
+coverage/
+dist-test/

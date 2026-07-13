@@ -648,6 +648,9 @@
       </div>
     </div>
 
+    <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
+         must run before auth.ts's module-load-time resolveApiOrigin() call. -->
+    <script>window.MICD_API_ORIGIN = "";</script>
     <!-- dicom-parser UMD bundle (loaded before our modules) -->
     <script src="./dicomParser.min.js"></script>
     <!-- Compiled renderer script (output of tsc) -->

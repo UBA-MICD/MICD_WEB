@@ -4,10 +4,9 @@
 // /api and /auth to the backend — set `window.MICD_API_ORIGIN = ""` before this
 // module loads to use that same-origin path (any absolute origin also works).
 function resolveApiOrigin(): string {
-  // const override = (globalThis as { MICD_API_ORIGIN?: string }).MICD_API_ORIGIN;
-  // const raw = typeof override === "string" ? override : "http://localhost:3000";
-  // return raw.replace(/\/+$/, ""); // strip trailing slash — callers add their own
-  return "http://localhost:3000";
+  const override = (globalThis as { MICD_API_ORIGIN?: string }).MICD_API_ORIGIN;
+  const raw = typeof override === "string" ? override : "http://localhost:3000";
+  return raw.replace(/\/+$/, ""); // strip trailing slash — callers add their own
 }
 
 export const API_ORIGIN = resolveApiOrigin();
@@ -87,7 +86,7 @@ export async function login(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/auth/login`, {
+    res = await fetch(`${API_ORIGIN}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -115,7 +114,7 @@ export async function logout(): Promise<void> {
   const refreshToken = localStorage.getItem(REFRESH_KEY);
   if (refreshToken) {
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      await fetch(`${API_ORIGIN}/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -150,7 +149,7 @@ async function doRefresh(): Promise<boolean> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/auth/refresh`, {
+    res = await fetch(`${API_ORIGIN}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),

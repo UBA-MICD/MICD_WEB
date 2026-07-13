@@ -8,7 +8,7 @@ MICD web client — the browser-based DICOM viewer/study explorer. Plain TypeScr
 
 ## Critical networking requirement
 
-This frontend never talks to Postgres/Orthanc directly — every `/api/*` and `/auth/*` call is same-origin and proxied by nginx to `http://backend:3000` (see `nginx.conf`). In Docker, this container joins an **external** network named `micd` that is created by the `backend` repo's `docker-compose.yml` — **the backend stack must be started first** (`make up` in `../backend`), or `docker compose up` here will fail with the network not existing.
+This frontend never talks to Postgres/Orthanc directly — it only calls the backend's `/api/*` and `/auth/*` endpoints. The origin those calls target is resolved once in `src/auth.ts` (`API_ORIGIN`, re-used by `renderer.ts` via the exported `API_BASE`): it defaults to `http://localhost:3000` for local dev (page opened directly or served without nginx). For the Docker/nginx deployment, where the page is served same-origin and nginx reverse-proxies `/api` and `/auth` to `http://backend:3000` (see `nginx.conf`), set `window.MICD_API_ORIGIN = ""` before `auth.ts` loads to use the same-origin path. In Docker, this container joins an **external** network named `micd` that is created by the `backend` repo's `docker-compose.yml` — **the backend stack must be started first** (`make up` in `../backend`), or `docker compose up` here will fail with the network not existing.
 
 ## Commands
 

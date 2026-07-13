@@ -21,8 +21,16 @@ import {
   isAuthenticated,
   getAccessToken,
   getCurrentUser,
+  API_ORIGIN,
   type AuthUser,
 } from './auth.ts';
+
+// auth.ts prefixes its own /auth/* calls with the configured API origin
+// (default http://localhost:3000). The /api/* URLs below are passed straight
+// into authFetch by the caller, so they stay exactly as written.
+const AUTH_LOGIN = `${API_ORIGIN}/auth/login`;
+const AUTH_REFRESH = `${API_ORIGIN}/auth/refresh`;
+const AUTH_LOGOUT = `${API_ORIGIN}/auth/logout`;
 
 // ── Global stubs ──────────────────────────────────────────────────────────────
 
@@ -67,8 +75,8 @@ function jwt(payload: Record<string, unknown>): string {
   return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc(payload)}.sig`;
 }
 
-const adminUser: AuthUser = { id: 1, email: 'admin@micd.local', role: 'admin' };
-const adminToken = jwt({ sub: adminUser.id, email: adminUser.email, role: adminUser.role });
+const adminUser: AuthUser = { id: 1, email: 'admin@micd.local' };
+const adminToken = jwt({ sub: adminUser.id, email: adminUser.email });
 
 function bearerOf(call: FetchCall): string | undefined {
   return (call.init?.headers as Record<string, string> | undefined)?.Authorization;
@@ -76,7 +84,7 @@ function bearerOf(call: FetchCall): string | undefined {
 
 /** Seeds a live session the same way the login dialog does. */
 async function loginAsAdmin(accessToken = adminToken, refreshToken = 'refresh-1'): Promise<void> {
-  respondBy({ '/auth/login': () => json({ accessToken, refreshToken, user: adminUser }) });
+  respondBy({ [AUTH_LOGIN]: () => json({ accessToken, refreshToken, user: adminUser }) });
   const result = await login(adminUser.email, 'secret');
   assert.deepEqual(result, { ok: true });
 }
@@ -106,7 +114,7 @@ test('login success stores the session and notifies listeners', async () => {
 });
 
 test('login 429 reports the rate-limit message and keeps no session', async () => {
-  respondBy({ '/auth/login': () => json({ error: 'rate limited' }, 429) });
+  respondBy({ [AUTH_LOGIN]: () => json({ error: 'rate limited' }, 429) });
   const result = await login('a@b.c', 'pw');
   assert.equal(result.ok, false);
   assert.match((result as { error: string }).error, /Demasiados intentos/);
@@ -114,7 +122,7 @@ test('login 429 reports the rate-limit message and keeps no session', async () =
 });
 
 test('login with bad credentials reports the credentials message', async () => {
-  respondBy({ '/auth/login': () => json({ error: 'nope' }, 401) });
+  respondBy({ [AUTH_LOGIN]: () => json({ error: 'nope' }, 401) });
   const result = await login('a@b.c', 'pw');
   assert.equal(result.ok, false);
   assert.match((result as { error: string }).error, /incorrectos/);
@@ -140,7 +148,7 @@ test('refresh with no stored token returns false without any request', async () 
 
 test('refresh success rotates the stored token and decodes the user from the JWT', async () => {
   store.set(REFRESH_KEY, 'refresh-1');
-  respondBy({ '/auth/refresh': () => json({ accessToken: adminToken, refreshToken: 'refresh-2' }) });
+  respondBy({ [AUTH_REFRESH]: () => json({ accessToken: adminToken, refreshToken: 'refresh-2' }) });
 
   assert.equal(await refreshAccessToken(), true);
   assert.equal(store.get(REFRESH_KEY), 'refresh-2');
@@ -151,7 +159,7 @@ test('refresh success rotates the stored token and decodes the user from the JWT
 
 test('refresh rejected by the server clears the whole session', async () => {
   await loginAsAdmin();
-  respondBy({ '/auth/refresh': () => json({ error: 'revoked' }, 401) });
+  respondBy({ [AUTH_REFRESH]: () => json({ error: 'revoked' }, 401) });
 
   assert.equal(await refreshAccessToken(), false);
   assert.equal(isAuthenticated(), false);
@@ -176,7 +184,7 @@ test('concurrent refreshes are single-flight (rotation makes parallel refreshes 
   release(json({ accessToken: adminToken, refreshToken: 'refresh-2' }));
 
   assert.deepEqual(await Promise.all(results), [true, true, true]);
-  assert.equal(fetchCalls.filter((c) => c.url === '/auth/refresh').length, 1);
+  assert.equal(fetchCalls.filter((c) => c.url === AUTH_REFRESH).length, 1);
 });
 
 // ── authFetch ─────────────────────────────────────────────────────────────────
@@ -192,13 +200,13 @@ test('authFetch attaches the bearer token', async () => {
 
 test('authFetch on 401 refreshes and retries with the new token', async () => {
   await loginAsAdmin();
-  const newToken = jwt({ sub: adminUser.id, email: adminUser.email, role: adminUser.role, iat: 2 });
+  const newToken = jwt({ sub: adminUser.id, email: adminUser.email, iat: 2 });
   respondBy({
     '/api/x': (init) =>
       (init?.headers as Record<string, string>).Authorization === `Bearer ${newToken}`
         ? json({ ok: true })
         : json({ error: 'expired' }, 401),
-    '/auth/refresh': () => json({ accessToken: newToken, refreshToken: 'refresh-2' }),
+    [AUTH_REFRESH]: () => json({ accessToken: newToken, refreshToken: 'refresh-2' }),
   });
 
   const res = await authFetch('/api/x');
@@ -215,7 +223,7 @@ test('authFetch on 401 + dead refresh + cancelled login returns the original 401
   });
   respondBy({
     '/api/x': () => json({ error: 'expired' }, 401),
-    '/auth/refresh': () => json({ error: 'revoked' }, 401),
+    [AUTH_REFRESH]: () => json({ error: 'revoked' }, 401),
   });
 
   const res = await authFetch('/api/x');
@@ -225,14 +233,14 @@ test('authFetch on 401 + dead refresh + cancelled login returns the original 401
 
 test('authFetch on 401 + dead refresh + interactive login retries with the new session', async () => {
   await loginAsAdmin();
-  const newToken = jwt({ sub: adminUser.id, email: adminUser.email, role: adminUser.role, iat: 3 });
+  const newToken = jwt({ sub: adminUser.id, email: adminUser.email, iat: 3 });
   respondBy({
     '/api/x': (init) =>
       (init?.headers as Record<string, string>).Authorization === `Bearer ${newToken}`
         ? json({ ok: true })
         : json({ error: 'expired' }, 401),
-    '/auth/refresh': () => json({ error: 'revoked' }, 401),
-    '/auth/login': () => json({ accessToken: newToken, refreshToken: 'refresh-2', user: adminUser }),
+    [AUTH_REFRESH]: () => json({ error: 'revoked' }, 401),
+    [AUTH_LOGIN]: () => json({ accessToken: newToken, refreshToken: 'refresh-2', user: adminUser }),
   });
   setLoginPrompt(async () => (await login(adminUser.email, 'secret')).ok);
 
@@ -284,6 +292,6 @@ test('logout posts the refresh token and clears the session even if the network 
   assert.equal(store.has(REFRESH_KEY), false);
 
   const call = fetchCalls.at(-1)!;
-  assert.equal(call.url, '/auth/logout');
+  assert.equal(call.url, AUTH_LOGOUT);
   assert.deepEqual(JSON.parse(String(call.init?.body)), { refreshToken: 'refresh-1' });
 });

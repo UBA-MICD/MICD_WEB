@@ -1,10 +1,23 @@
-const API_BASE = "/api";
+// Origin the backend API + auth endpoints live on. Default: the backend's own
+// port, for local dev (page opened directly / served without nginx). In the
+// Docker/nginx deployment the page is served same-origin and nginx proxies
+// /api and /auth to the backend — set `window.MICD_API_ORIGIN = ""` before this
+// module loads to use that same-origin path (any absolute origin also works).
+function resolveApiOrigin(): string {
+  // const override = (globalThis as { MICD_API_ORIGIN?: string }).MICD_API_ORIGIN;
+  // const raw = typeof override === "string" ? override : "http://localhost:3000";
+  // return raw.replace(/\/+$/, ""); // strip trailing slash — callers add their own
+  return "http://localhost:3000";
+}
+
+export const API_ORIGIN = resolveApiOrigin();
+
+const API_BASE = `${API_ORIGIN}/api`;
 const REFRESH_KEY = "micd_refresh_token";
 
 export interface AuthUser {
   id: number;
   email: string;
-  role: "admin" | "user";
 }
 
 let accessToken: string | null = null;
@@ -37,7 +50,7 @@ export function isAuthenticated(): boolean {
 }
 
 /**
- * Recovers the user from the access token's JWT claims (sub/email/role).
+ * Recovers the user from the access token's JWT claims (sub/email).
  * Needed after /auth/refresh, whose response carries no user object.
  */
 function decodeUserFromToken(token: string): AuthUser | null {
@@ -46,7 +59,7 @@ function decodeUserFromToken(token: string): AuthUser | null {
     const claims = JSON.parse(atob(base64));
     if (typeof claims.sub !== "number" || typeof claims.email !== "string")
       return null;
-    return { id: claims.sub, email: claims.email, role: claims.role };
+    return { id: claims.sub, email: claims.email };
   } catch {
     return null;
   }
@@ -74,7 +87,7 @@ export async function login(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   let res: Response;
   try {
-    res = await fetch("/auth/login", {
+    res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -102,7 +115,7 @@ export async function logout(): Promise<void> {
   const refreshToken = localStorage.getItem(REFRESH_KEY);
   if (refreshToken) {
     try {
-      await fetch("/auth/logout", {
+      await fetch(`${API_BASE}/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -137,7 +150,7 @@ async function doRefresh(): Promise<boolean> {
 
   let res: Response;
   try {
-    res = await fetch("/auth/refresh", {
+    res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),

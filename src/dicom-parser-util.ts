@@ -77,9 +77,9 @@ export function parseDicomFile(arrayBuffer: ArrayBuffer): ParsedDicom {
 
 function safeString(dataSet: any, tag: string): string {
   try {
-    return dataSet.string(tag) ?? '';
+    return dataSet.string(tag) ?? "";
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -105,58 +105,58 @@ function extractMetadata(dataSet: any): DicomMetadata {
   // Parse window center/width — they can be multi-valued (backslash-separated)
   let windowCenter = 0;
   let windowWidth = 0;
-  const wcStr = safeString(dataSet, 'x00281050');
-  const wwStr = safeString(dataSet, 'x00281051');
+  const wcStr = safeString(dataSet, "x00281050");
+  const wwStr = safeString(dataSet, "x00281051");
   if (wcStr) {
-    const parts = wcStr.split('\\');
+    const parts = wcStr.split("\\");
     windowCenter = parseFloat(parts[0]) || 0;
   }
   if (wwStr) {
-    const parts = wwStr.split('\\');
+    const parts = wwStr.split("\\");
     windowWidth = parseFloat(parts[0]) || 0;
   }
 
   return {
     // Patient
-    patientName: formatPatientName(safeString(dataSet, 'x00100010')),
-    patientId: safeString(dataSet, 'x00100020'),
-    patientBirthDate: formatDicomDate(safeString(dataSet, 'x00100030')),
-    patientSex: safeString(dataSet, 'x00100040'),
+    patientName: formatPatientName(safeString(dataSet, "x00100010")),
+    patientId: safeString(dataSet, "x00100020"),
+    patientBirthDate: formatDicomDate(safeString(dataSet, "x00100030")),
+    patientSex: safeString(dataSet, "x00100040"),
 
     // Study
-    studyDate: formatDicomDate(safeString(dataSet, 'x00080020')),
-    studyDescription: safeString(dataSet, 'x00081030'),
-    studyInstanceUid: safeString(dataSet, 'x0020000d'),
-    accessionNumber: safeString(dataSet, 'x00080050'),
-    referringPhysician: formatPatientName(safeString(dataSet, 'x00080090')),
+    studyDate: formatDicomDate(safeString(dataSet, "x00080020")),
+    studyDescription: safeString(dataSet, "x00081030"),
+    studyInstanceUid: safeString(dataSet, "x0020000d"),
+    accessionNumber: safeString(dataSet, "x00080050"),
+    referringPhysician: formatPatientName(safeString(dataSet, "x00080090")),
 
     // Series
-    seriesDescription: safeString(dataSet, 'x0008103e'),
-    seriesNumber: safeString(dataSet, 'x00200011'),
-    modality: safeString(dataSet, 'x00080060'),
+    seriesDescription: safeString(dataSet, "x0008103e"),
+    seriesNumber: safeString(dataSet, "x00200011"),
+    modality: safeString(dataSet, "x00080060"),
 
     // Instance
-    instanceNumber: safeString(dataSet, 'x00200013'),
-    sopClassUid: safeString(dataSet, 'x00080016'),
+    instanceNumber: safeString(dataSet, "x00200013"),
+    sopClassUid: safeString(dataSet, "x00080016"),
 
     // Image
-    rows: safeUint16(dataSet, 'x00280010'),
-    columns: safeUint16(dataSet, 'x00280011'),
-    bitsAllocated: safeUint16(dataSet, 'x00280100'),
-    bitsStored: safeUint16(dataSet, 'x00280101'),
-    highBit: safeUint16(dataSet, 'x00280102'),
-    pixelRepresentation: safeUint16(dataSet, 'x00280103'),
-    samplesPerPixel: safeUint16(dataSet, 'x00280002', 1),
-    photometricInterpretation: safeString(dataSet, 'x00280004'),
-    rescaleIntercept: safeFloat(dataSet, 'x00281052', 0),
-    rescaleSlope: safeFloat(dataSet, 'x00281053', 1),
+    rows: safeUint16(dataSet, "x00280010"),
+    columns: safeUint16(dataSet, "x00280011"),
+    bitsAllocated: safeUint16(dataSet, "x00280100"),
+    bitsStored: safeUint16(dataSet, "x00280101"),
+    highBit: safeUint16(dataSet, "x00280102"),
+    pixelRepresentation: safeUint16(dataSet, "x00280103"),
+    samplesPerPixel: safeUint16(dataSet, "x00280002", 1),
+    photometricInterpretation: safeString(dataSet, "x00280004"),
+    rescaleIntercept: safeFloat(dataSet, "x00281052", 0),
+    rescaleSlope: safeFloat(dataSet, "x00281053", 1),
 
     // Window
     windowCenter,
     windowWidth,
 
     // Transfer
-    transferSyntaxUid: safeString(dataSet, 'x00020010'),
+    transferSyntaxUid: safeString(dataSet, "x00020010"),
   };
 }
 
@@ -172,7 +172,7 @@ function extractPixelData(
   const offset = pixelDataElement.dataOffset;
   const length = pixelDataElement.length;
 
-  if (length <= 0 || length === 0xFFFFFFFF) {
+  if (length <= 0 || length === 0xffffffff) {
     // Encapsulated / compressed pixel data — not supported in this simple viewer
     return null;
   }
@@ -199,9 +199,9 @@ function extractPixelData(
 // ── Formatting Helpers ───────────────────────────────────────────────────────
 
 function formatPatientName(name: string): string {
-  if (!name) return '';
+  if (!name) return "";
   // DICOM patient names use ^ as separator: Last^First^Middle^Prefix^Suffix
-  return name.replace(/\^/g, ', ').replace(/,\s*$/, '');
+  return name.replace(/\^/g, ", ").replace(/,\s*$/, "");
 }
 
 function formatDicomDate(dateStr: string): string {

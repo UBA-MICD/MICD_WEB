@@ -2,13 +2,13 @@
 
 Este repositorio contiene la interfaz de usuario (Single Page Application) del sistema **MICD** para la exploración y visualización de estudios médicos DICOM.
 
-Está construido con **TypeScript y Vanilla HTML5/CSS3** (empaquetado por Vite), y se sirve en producción mediante **Nginx**, el cual también gestiona el redireccionamiento de la API REST hacia el backend.
+Está construido con **TypeScript y Vanilla HTML5/CSS3** (sin framework ni bundler: `tsc` compila `src/*.ts` directamente a módulos ES), y se sirve en producción mediante **Nginx**, el cual también gestiona el redireccionamiento de la API REST (`/api/*`) y de autenticación (`/auth/*`) hacia el backend.
 
 ---
 
 ## Requisito Crítico de Red (Leer antes de arrancar)
 
-El frontend **no se comunica directamente con el PACS ni con la base de datos**. Todas las llamadas a `/api/*` se delegan a través de un proxy inverso configurado en Nginx hacia `http://backend:3000`.
+El frontend **no se comunica directamente con el PACS ni con la base de datos**. Todas las llamadas a `/api/*` y `/auth/*` se delegan a través de un proxy inverso configurado en Nginx hacia `http://backend:3000`.
 
 Para que esto funcione en contenedores:
 
@@ -26,12 +26,13 @@ MICD_WEB/
 │   ├── index.html              # Estructura base del visor web
 │   ├── styles.css              # Estilos del visualizador y sistema de diseño
 │   ├── renderer.ts             # Punto de entrada de lógica del visor y explorador
+│   ├── auth.ts                 # Sesión JWT: login, refresh, authFetch y gate de login
 │   ├── dicom-parser-util.ts    # Utilidad para parseo local de archivos DICOM
 │   ├── dicom-renderer.ts       # Procesamiento de Canvas, coordenadas y ajustes visuales
 │   ├── folder-files.ts         # Filtrado y ordenado lógico de imágenes locales
 │   └── *.test.ts               # Pruebas unitarias del cliente (node:test)
-├── Dockerfile                  # Compilación Vite + Servidor Nginx (multi-stage)
-├── nginx.conf                  # Proxy inverso /api -> backend:3000 y fallback de SPA
+├── Dockerfile                  # Compilación tsc + Servidor Nginx (multi-stage)
+├── nginx.conf                  # Proxy inverso /api y /auth -> backend:3000 y fallback de SPA
 ├── docker-compose.yml          # Definición del contenedor frontend (Red externa: micd)
 ├── Makefile                    # Comandos rápidos para despliegue y validación
 ├── .env.example                # Define el puerto público del frontend (FRONTEND_PORT)
@@ -72,6 +73,18 @@ Puedes validar que el frontend esté respondiendo y se esté comunicando correct
 ```bash
 make check
 ```
+
+---
+
+## Autenticación
+
+El visor local es público, pero **toda operación contra el servidor exige un JWT**:
+
+- **Visualización local sin login:** abrir un archivo o carpeta DICOM del disco (parseo y render en el navegador) no requiere sesión.
+- **Operaciones del servidor protegidas:** listar/buscar estudios, miniaturas, descarga de imágenes y subida de estudios envían siempre `Authorization: Bearer <token>`. El backend rechaza con `401` cualquier request sin token válido.
+- **Popup de login perezoso:** la sesión no bloquea la app. Al intentar la primera operación del servidor (o si el token expira a mitad de sesión), aparece el diálogo de login. Cancelarlo devuelve al estado público sin romper el visor local.
+- **Tokens:** el _access token_ (15 min) vive solo en memoria (nunca se persiste); el _refresh token_ (7 días) se guarda en `localStorage` y **rota en cada refresh** (un solo uso). Al recargar la página la sesión se restaura silenciosamente con el refresh token.
+- **Rate limit:** `/auth/login` limita a 5 intentos fallidos por IP cada 15 minutos (`429`); el diálogo muestra el aviso correspondiente.
 
 ---
 

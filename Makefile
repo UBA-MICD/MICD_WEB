@@ -1,5 +1,10 @@
 .PHONY: help install hooks up down build logs ps restart check test pre-commit clean
 
+# docker compose reads .env by itself; make does not — load it so `make check`
+# probes the same published port the container actually uses.
+-include .env
+export FRONTEND_PORT
+
 # ── Default ───────────────────────────────────────────────────────────────────
 help:
 	@echo ""

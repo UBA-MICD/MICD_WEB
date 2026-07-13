@@ -24,6 +24,7 @@ import {
   onAuthChange,
   API_BASE,
 } from "./auth.js";
+import { initZenodo, openPublishDialog } from "./zenodo-ui.js";
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ function startApp(): void {
   initResizeObserver();
   initUploadPanel();
   initStudyExplorer();
+  initZenodo();
 }
 
 async function onLogout(): Promise<void> {
@@ -998,7 +1000,7 @@ function updateClearFiltersVisibility(): void {
 }
 
 function initStudyExplorer(): void {
-  // Click to view study
+  // Click to view study (or publish to Zenodo)
   const list = $("study-list");
   list.addEventListener("click", async (e) => {
     // Login button inside the logged-out placeholder — the gate pops the dialog.
@@ -1006,6 +1008,19 @@ function initStudyExplorer(): void {
       void loadStudyExplorer();
       return;
     }
+
+    // Zenodo publish button — open publish dialog, don't navigate to study.
+    const zenodoBtn = (e.target as HTMLElement).closest<HTMLElement>(
+      ".study-item__zenodo-btn",
+    );
+    if (zenodoBtn) {
+      e.stopPropagation();
+      const studyId = zenodoBtn.dataset.zenodoId ?? "";
+      const label = zenodoBtn.dataset.zenodoLabel ?? studyId;
+      openPublishDialog(studyId, label);
+      return;
+    }
+
     const item = (e.target as HTMLElement).closest<HTMLElement>(
       ".study-item[data-id]",
     );
@@ -1192,6 +1207,17 @@ async function loadStudyExplorer(): Promise<void> {
               <span class="study-item__badge">${modality}</span>
               ${imgLabel} · Disponible
             </span>
+            <button
+              class="study-item__zenodo-btn"
+              data-zenodo-id="${escapeAttr(s.orthanc_study_id)}"
+              data-zenodo-label="${escapeAttr(`${name} — ${date}`)}"
+              title="Publicar en Zenodo"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 15a4 4 0 0 0 4 4h10a4 4 0 0 0 0-8H6.5a2.5 2.5 0 0 1 0-5H17" />
+              </svg>
+              Publicar en Zenodo
+            </button>
           </div>
         </li>`;
       })

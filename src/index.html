@@ -256,6 +256,21 @@
           </div>
           <span id="upload-status" class="upload-status"></span>
 
+          <!-- Zenodo -->
+          <button class="btn btn--secondary btn--full" id="btn-zenodo">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 15a4 4 0 0 0 4 4h10a4 4 0 0 0 0-8H6.5a2.5 2.5 0 0 1 0-5H17" />
+            </svg>
+            Zenodo
+          </button>
+
           <!-- Session (login/logout) — logged-out is the default render state -->
           <span id="session-email" class="session-email hidden"></span>
           <button class="btn btn--secondary btn--full" id="btn-login">
@@ -646,6 +661,143 @@
           <button class="btn btn--secondary" id="duplicate-no">Cancelar</button>
         </div>
       </div>
+    </div>
+
+    <!-- Zenodo main modal -->
+    <div id="zenodo-modal" class="dialog-overlay hidden">
+      <div class="zenodo-panel">
+        <div class="zenodo-panel__header">
+          <h3 class="zenodo-panel__title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 15a4 4 0 0 0 4 4h10a4 4 0 0 0 0-8H6.5a2.5 2.5 0 0 1 0-5H17" />
+            </svg>
+            Zenodo
+          </h3>
+          <button class="icon-btn" id="zenodo-modal-close" title="Cerrar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="zenodo-tabs-bar">
+          <button class="zenodo-tab zenodo-tab--active" id="zenodo-tab-search">Buscar e importar</button>
+          <button class="zenodo-tab" id="zenodo-tab-config">Configuración</button>
+        </div>
+
+        <!-- Search tab -->
+        <div id="zenodo-content-search" class="zenodo-tab-content">
+          <div class="zenodo-search-form">
+            <div class="zenodo-search-row">
+              <div class="filter-search zenodo-search-input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="filter-search__icon">
+                  <circle cx="10" cy="10" r="7" /><line x1="15" y1="15" x2="21" y2="21" />
+                </svg>
+                <input type="text" id="zenodo-search-input" class="filter-search__input" placeholder="Buscar en Zenodo…" autocomplete="off" />
+              </div>
+              <select id="zenodo-search-env" class="zenodo-select">
+                <option value="sandbox">Sandbox</option>
+                <option value="production">Producción</option>
+              </select>
+            </div>
+            <div class="zenodo-search-row zenodo-search-row--filters">
+              <input type="text" id="zenodo-search-filetype" class="zenodo-input-sm" placeholder="Tipo de archivo (ej: dcm)" />
+              <input type="date" id="zenodo-search-date-from" class="filter-date" title="Desde" />
+              <span class="filter-dates__sep">—</span>
+              <input type="date" id="zenodo-search-date-to" class="filter-date" title="Hasta" />
+              <button class="btn btn--accent btn--sm" id="zenodo-search-btn">Buscar</button>
+            </div>
+          </div>
+
+          <div id="zenodo-search-results" class="zenodo-results">
+            <p class="zenodo-empty">Ingresá un término de búsqueda y presioná Buscar.</p>
+          </div>
+
+          <div class="zenodo-search-pagination">
+            <button class="icon-btn" id="zenodo-search-prev" disabled>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <span id="zenodo-search-pagination-info" class="pagination-info">—</span>
+            <button class="icon-btn" id="zenodo-search-next" disabled>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Config tab -->
+        <div id="zenodo-content-config" class="zenodo-tab-content hidden">
+          <p class="zenodo-loading">Cargando…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zenodo import dialog (file selector for a specific record) -->
+    <div id="zenodo-import-dialog" class="dialog-overlay hidden">
+      <div class="dialog zenodo-import-dialog-inner">
+        <h3 class="dialog__title">Importar desde Zenodo</h3>
+        <div id="zenodo-import-dialog-body">
+          <p class="zenodo-loading">Cargando…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zenodo publish dialog -->
+    <div id="zenodo-publish-dialog" class="dialog-overlay hidden">
+      <form class="dialog zenodo-publish-form-inner" id="zenodo-publish-form">
+        <h3 class="dialog__title">Publicar estudio en Zenodo</h3>
+        <p class="dialog__msg">Estudio: <strong id="zenodo-publish-study-label">—</strong></p>
+        <input type="hidden" id="zenodo-publish-study-id" />
+
+        <div class="zenodo-publish-fields">
+          <label class="login-field">
+            <span>Entorno</span>
+            <select id="zenodo-publish-env" class="zenodo-select">
+              <option value="sandbox">Sandbox</option>
+              <option value="production">Producción</option>
+            </select>
+          </label>
+          <label class="login-field">
+            <span>Título <span class="zenodo-required">*</span></span>
+            <input type="text" id="zenodo-publish-title" required placeholder="Ej: CT Pulmonar Anonimizado" />
+          </label>
+          <label class="login-field">
+            <span>Descripción <span class="zenodo-required">*</span></span>
+            <textarea id="zenodo-publish-desc" required rows="3" placeholder="Descripción del dataset…" class="zenodo-textarea"></textarea>
+          </label>
+          <label class="login-field">
+            <span>Autor <span class="zenodo-required">*</span></span>
+            <input type="text" id="zenodo-publish-author" required placeholder="Apellido, Nombre" />
+          </label>
+          <label class="login-field">
+            <span>Institución</span>
+            <input type="text" id="zenodo-publish-affiliation" placeholder="Ej: UBA" />
+          </label>
+          <label class="login-field">
+            <span>ORCID</span>
+            <input type="text" id="zenodo-publish-orcid" placeholder="0000-0000-0000-0000" />
+          </label>
+          <label class="login-field">
+            <span>Palabras clave</span>
+            <input type="text" id="zenodo-publish-keywords" placeholder="CT, DICOM, pulmón (separadas por coma)" />
+          </label>
+          <label class="login-field">
+            <span>Licencia</span>
+            <select id="zenodo-publish-license" class="zenodo-select">
+              <option value="cc-by-4.0">CC BY 4.0</option>
+              <option value="cc-by-nc-4.0">CC BY-NC 4.0</option>
+              <option value="cc0-1.0">CC0 1.0</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="zenodo-publish-result" class="zenodo-import-result hidden"></div>
+
+        <div class="dialog__actions">
+          <button type="button" class="btn btn--secondary" id="zenodo-publish-cancel">Cancelar</button>
+          <button type="submit" class="btn btn--accent" id="zenodo-publish-submit">Publicar</button>
+        </div>
+      </form>
     </div>
 
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —

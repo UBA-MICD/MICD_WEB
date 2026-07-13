@@ -1,0 +1,26 @@
+codecov:
+  require_ci_to_pass: yes
+
+coverage:
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 0%
+    patch:
+      default:
+        target: 70%
+
+ignore:
+  - "node_modules"
+  - "dist"
+  - "src/**/*.test.ts"
+  - ".github"
+  - "Dockerfile"
+  - "docker-compose.yml"
+  - "nginx.conf"
+  - "Makefile"
+  - "*.json"
+  - "*.md"
+  - "*.yml"
+  - "*.yaml"

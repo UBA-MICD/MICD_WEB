@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/UBA-MICD/MICD_WEB/graph/badge.svg?token=5K24EKCRXT)](https://codecov.io/gh/UBA-MICD/MICD_WEB)
+
 # MICD Frontend Web Client
 
 Este repositorio contiene la interfaz de usuario (Single Page Application) del sistema **MICD** para la exploración y visualización de estudios médicos DICOM.

@@ -1,16 +1,16 @@
 import {
   parseDicomFile,
   calculateAutoWindowLevel,
-} from "./dicom-parser-util.js";
-import type { ParsedDicom, DicomMetadata } from "./dicom-parser-util.js";
+} from "./dicom/dicom-parser-util.js";
+import type { ParsedDicom, DicomMetadata } from "./dicom/dicom-parser-util.js";
 import {
   renderDicom,
   createDefaultViewport,
   applyCanvasTransform,
   fitToContainer,
-} from "./dicom-renderer.js";
-import type { ViewportState } from "./dicom-renderer.js";
-import { collectDicomFiles } from "./folder-files.js";
+} from "./dicom/dicom-renderer.js";
+import type { ViewportState } from "./dicom/dicom-renderer.js";
+import { collectDicomFiles } from "./shared/folder-files.js";
 import {
   login,
   logout,
@@ -23,7 +23,7 @@ import {
   setLoginPrompt,
   onAuthChange,
   API_BASE,
-} from "./auth.js";
+} from "./auth/auth.js";
 
 // ── State ────────────────────────────────────────────────────────────────────
 

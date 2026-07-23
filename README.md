@@ -4,7 +4,7 @@
 
 Este repositorio contiene la interfaz de usuario (Single Page Application) del sistema **MICD** para la exploración y visualización de estudios médicos DICOM.
 
-Está construido con **TypeScript y Vanilla HTML5/CSS3** (sin framework ni bundler: `tsc` compila `src/*.ts` directamente a módulos ES), y se sirve en producción mediante **Nginx**, el cual también gestiona el redireccionamiento de la API REST (`/api/*`) y de autenticación (`/auth/*`) hacia el backend.
+Está construido con **TypeScript y Vanilla HTML5/CSS3** (sin framework ni bundler: `tsc` compila `src/**/*.ts` directamente a módulos ES), y se sirve en producción mediante **Nginx**, el cual también gestiona el redireccionamiento de la API REST (`/api/*`) y de autenticación (`/auth/*`) hacia el backend.
 
 ---
 
@@ -27,12 +27,26 @@ MICD_WEB/
 ├── src/
 │   ├── index.html              # Estructura base del visor web
 │   ├── styles.css              # Estilos del visualizador y sistema de diseño
-│   ├── renderer.ts             # Punto de entrada de lógica del visor y explorador
-│   ├── auth.ts                 # Sesión JWT: login, refresh, authFetch y gate de login
-│   ├── dicom-parser-util.ts    # Utilidad para parseo local de archivos DICOM
-│   ├── dicom-renderer.ts       # Procesamiento de Canvas, coordenadas y ajustes visuales
-│   ├── folder-files.ts         # Filtrado y ordenado lógico de imágenes locales
-│   └── *.test.ts               # Pruebas unitarias del cliente (node:test)
+│   ├── main.ts                 # Punto de entrada: bootstrap y wiring de features
+│   ├── auth/
+│   │   ├── auth.ts             # Sesión JWT: login, refresh, authFetch y gate de login
+│   │   └── login-dialog.ts     # Popup de login y estado de sesión en la barra lateral
+│   ├── dicom/
+│   │   ├── dicom-parser-util.ts # Utilidad para parseo local de archivos DICOM
+│   │   └── dicom-renderer.ts   # Procesamiento de Canvas, coordenadas y ajustes visuales
+│   ├── viewer/
+│   │   ├── state.ts            # Estado compartido del visor (serie, viewport, herramienta)
+│   │   ├── loading.ts          # Apertura local (archivos/carpeta/drop) y carga desde servidor
+│   │   ├── rendering.ts        # Render de canvas, panel de metadata y overlays
+│   │   └── interaction.ts      # Toolbar, mouse, teclado, navegación de serie
+│   ├── upload/
+│   │   └── upload.ts           # Panel de subida (progreso XHR, carpetas, duplicados)
+│   ├── explorer/
+│   │   └── explorer.ts         # Explorador de estudios del servidor (filtros, paginado)
+│   ├── shared/
+│   │   ├── dom.ts              # Helpers de DOM ($, escapes, loading/error)
+│   │   └── folder-files.ts     # Filtrado y ordenado lógico de imágenes locales
+│   └── **/*.test.ts            # Pruebas unitarias del cliente (node:test)
 ├── Dockerfile                  # Compilación tsc + Servidor Nginx (multi-stage)
 ├── nginx.conf                  # Proxy inverso /api y /auth -> backend:3000 y fallback de SPA
 ├── docker-compose.yml          # Definición del contenedor frontend (Red externa: micd)

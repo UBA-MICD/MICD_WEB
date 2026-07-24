@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Tighten CSP: no inline scripts, only local resources + fonts + dicom-parser CDN -->
+    <!-- Tighten CSP: no inline scripts, only local resources + fonts.
+         blob: is required for study thumbnails, which are fetched with an
+         Authorization header and shown via URL.createObjectURL. -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:"
@@ -27,76 +29,117 @@
       aria-live="polite"
     ></div>
 
+    <!-- Topbar spans the full window, above both the rail and the panels. -->
+    <header class="topbar">
+      <div class="topbar__brand">
+        <span class="logo-tile" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <rect
+              x="3"
+              y="3"
+              width="18"
+              height="18"
+              rx="3"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="5"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <line
+              x1="12"
+              y1="3"
+              x2="12"
+              y2="7"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <line
+              x1="12"
+              y1="17"
+              x2="12"
+              y2="21"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <line
+              x1="3"
+              y1="12"
+              x2="7"
+              y2="12"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <line
+              x1="17"
+              y1="12"
+              x2="21"
+              y2="12"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+          </svg>
+        </span>
+        <span class="logo-text">MICD</span>
+        <h1 class="topbar__title" id="topbar-title">DICOM Viewer</h1>
+      </div>
+
+      <div class="topbar__actions">
+        <!-- Series navigation -->
+        <div class="series-nav hidden" id="series-nav">
+          <button class="nav-btn" id="nav-prev" title="Anterior (PageUp)">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span class="nav-counter" id="nav-counter">1 / 1</span>
+          <button class="nav-btn" id="nav-next" title="Siguiente (PageDown)">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
     <div class="app-shell">
       <!-- Sidebar -->
       <aside class="sidebar">
-        <div class="sidebar__logo">
-          <div class="logo-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <rect
-                x="3"
-                y="3"
-                width="18"
-                height="18"
-                rx="3"
-                stroke="currentColor"
-                stroke-width="1.5"
-              />
-              <circle
-                cx="12"
-                cy="12"
-                r="5"
-                stroke="currentColor"
-                stroke-width="1.5"
-              />
-              <line
-                x1="12"
-                y1="3"
-                x2="12"
-                y2="7"
-                stroke="currentColor"
-                stroke-width="1.5"
-              />
-              <line
-                x1="12"
-                y1="17"
-                x2="12"
-                y2="21"
-                stroke="currentColor"
-                stroke-width="1.5"
-              />
-              <line
-                x1="3"
-                y1="12"
-                x2="7"
-                y2="12"
-                stroke="currentColor"
-                stroke-width="1.5"
-              />
-              <line
-                x1="17"
-                y1="12"
-                x2="21"
-                y2="12"
-                stroke="currentColor"
-                stroke-width="1.5"
-              />
-            </svg>
-          </div>
-          <span class="logo-text">MICD</span>
-        </div>
-
-        <!-- Toolbar (vertical) -->
-        <nav class="sidebar__tools">
+        <!-- One tab stop; the arrow keys move between tools (WCAG toolbar). -->
+        <div
+          class="sidebar__tools"
+          id="viewer-toolbar"
+          role="toolbar"
+          aria-label="Herramientas de visualización"
+          aria-orientation="vertical"
+        >
           <button
             class="toolbar__tool active"
             id="tool-wl"
-            title="Window / Level (W)"
+            title="Brillo / contraste (W)"
             aria-pressed="true"
           >
             <svg
-              width="18"
-              height="18"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -118,8 +161,8 @@
             aria-pressed="false"
           >
             <svg
-              width="18"
-              height="18"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -135,12 +178,12 @@
           <button
             class="toolbar__tool"
             id="tool-pan"
-            title="Pan (P)"
+            title="Desplazar (P)"
             aria-pressed="false"
           >
             <svg
-              width="18"
-              height="18"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -152,13 +195,10 @@
             </svg>
             <span>Pan</span>
           </button>
-
-          <div class="tool-divider"></div>
-
-          <button class="toolbar__tool" id="tool-reset" title="Reset View (R)">
+          <button class="toolbar__tool" id="tool-reset" title="Restablecer (R)">
             <svg
-              width="18"
-              height="18"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -172,13 +212,13 @@
           <button
             class="toolbar__tool"
             id="tool-metadata"
-            title="Metadata Panel (M)"
+            title="Etiquetas DICOM (M)"
             aria-expanded="false"
             aria-controls="metadata-panel"
           >
             <svg
-              width="18"
-              height="18"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -191,7 +231,7 @@
             </svg>
             <span>Tags</span>
           </button>
-        </nav>
+        </div>
 
         <div class="sidebar__footer">
           <!-- Hidden inputs for local file viewing -->
@@ -204,76 +244,26 @@
           />
           <input type="file" id="open-folder-input" class="hidden" />
 
+          <!-- Local viewing: free, and the app's primary action. -->
           <button class="btn btn--accent btn--full" id="btn-open">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
             Abrir archivo
           </button>
-
-          <button class="btn btn--secondary btn--full" id="btn-open-folder">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-              />
-            </svg>
+          <button class="btn-link btn--full" id="btn-open-folder">
             Abrir carpeta
           </button>
 
-          <!-- Upload to server -->
+          <div class="tool-divider"></div>
+
+          <!-- Everything server-bound lives behind this one step. -->
+          <button class="btn btn--outline btn--full" id="btn-server">
+            Servidor
+          </button>
+
+          <!-- Upload plumbing. The pickers are driven from the Servidor
+               screen's Cargar tab; the inputs stay here because upload.ts
+               binds to them at init. -->
           <input type="file" id="upload-input" accept=".dcm" class="hidden" />
-          <button class="btn btn--secondary btn--full" id="btn-upload-server">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="16 16 12 12 8 16" />
-              <line x1="12" y1="12" x2="12" y2="21" />
-              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-            </svg>
-            Cargar al servidor
-          </button>
-
-          <!-- Upload folder to server -->
           <input type="file" id="upload-folder-input" class="hidden" />
-          <button class="btn btn--secondary btn--full" id="btn-upload-folder">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-              />
-              <polyline points="12 11 12 17" />
-              <polyline points="9 14 12 11 15 14" />
-            </svg>
-            Cargar carpeta
-          </button>
-
-          <!-- Progress bar -->
           <div
             id="upload-progress-wrap"
             class="upload-progress hidden"
@@ -292,78 +282,33 @@
             aria-live="polite"
           ></span>
 
-          <!-- Session (login/logout) — logged-out is the default render state -->
-          <span id="session-email" class="session-email hidden"></span>
-          <button class="btn btn--secondary btn--full" id="btn-login">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
+          <div class="tool-divider"></div>
+
+          <!-- Session. Logged-out is the default render state; updateAuthUI()
+               is the only thing that repaints it. -->
+          <div class="session hidden" id="session-block">
+            <span class="session__avatar" id="session-avatar" aria-hidden="true"
+              >··</span
             >
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <polyline points="10 17 15 12 10 7" />
-              <line x1="15" y1="12" x2="3" y2="12" />
-            </svg>
-            Iniciar sesión
-          </button>
-          <button class="btn btn--secondary btn--full hidden" id="btn-logout">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
+            <div class="session__info">
+              <span class="session__email" id="session-email"></span>
+              <span class="session__status" id="session-status">
+                <span class="session__dot" aria-hidden="true"></span>
+                <span id="session-expiry">Sesión activa</span>
+              </span>
+            </div>
+          </div>
+          <button class="btn btn--session btn--full hidden" id="btn-logout">
             Cerrar sesión
+          </button>
+          <button class="btn btn--outline btn--full" id="btn-login">
+            Iniciar sesión
           </button>
         </div>
       </aside>
 
       <!-- Main Content -->
       <main class="main-content" id="main-content" tabindex="-1">
-        <!-- Topbar -->
-        <header class="topbar">
-          <h1 class="topbar__title" id="topbar-title">DICOM Viewer</h1>
-          <div class="topbar__actions">
-            <!-- Series navigation -->
-            <div class="series-nav hidden" id="series-nav">
-              <button class="nav-btn" id="nav-prev" title="Previous (←)">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-              <span class="nav-counter" id="nav-counter">1 / 1</span>
-              <button class="nav-btn" id="nav-next" title="Next (→)">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                >
-                  <polyline points="9 6 15 12 9 18" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </header>
-
         <!-- Viewport -->
         <div class="viewport-wrapper">
           <div class="viewport-container cursor-wl" id="viewport-container">
@@ -424,9 +369,9 @@
                 <button class="btn btn--accent" id="drop-zone-open">
                   Seleccionar archivos
                 </button>
-                <p style="margin-top: 0.75rem; font-size: 0.8rem; opacity: 0.6">
-                  También podés hacer click en un estudio del panel derecho para
-                  visualizarlo desde el servidor.
+                <p class="drop-zone__note">
+                  Ver archivos locales no requiere iniciar sesión. Usá
+                  <strong>Servidor</strong> para buscar o subir estudios.
                 </p>
               </div>
             </div>
@@ -438,7 +383,7 @@
               role="status"
             >
               <div class="spinner"></div>
-              <span>Loading DICOM…</span>
+              <span>Cargando DICOM…</span>
             </div>
 
             <!-- Error message -->
@@ -452,7 +397,7 @@
           <!-- Metadata panel (slide-out) -->
           <aside class="metadata-panel" id="metadata-panel">
             <div class="metadata-header">
-              <h2>DICOM Tags</h2>
+              <h2>Etiquetas DICOM</h2>
             </div>
             <div class="metadata-body">
               <table class="metadata-table">
@@ -462,13 +407,11 @@
           </aside>
         </div>
       </main>
-    </div>
 
-    <!-- Study Explorer panel -->
-    <aside class="explorer-panel" id="explorer-panel">
-      <div class="explorer-panel__header">
-        <h2>Estudios en servidor</h2>
-        <div style="display: flex; gap: 2px; align-items: center">
+      <!-- Study Explorer panel -->
+      <aside class="explorer-panel" id="explorer-panel">
+        <div class="explorer-panel__header">
+          <h2>Estudios en servidor</h2>
           <button class="icon-btn" id="btn-refresh-studies" title="Recargar">
             <svg
               width="14"
@@ -482,10 +425,143 @@
               <path d="M3 22v-7h7" />
             </svg>
           </button>
-          <button class="icon-btn" id="btn-close-explorer" title="Cerrar panel">
+        </div>
+
+        <!-- Filters -->
+        <div class="explorer-filters">
+          <div class="filter-search">
             <svg
-              width="14"
-              height="14"
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              class="filter-search__icon"
+            >
+              <circle cx="10" cy="10" r="7" />
+              <line x1="15" y1="15" x2="21" y2="21" />
+            </svg>
+            <label class="sr-only" for="search-studies"
+              >Buscar paciente o ID</label
+            >
+            <input
+              type="text"
+              id="search-studies"
+              class="filter-search__input"
+              placeholder="Buscar paciente o ID"
+              autocomplete="off"
+            />
+            <button
+              class="filter-search__clear hidden"
+              id="btn-clear-search"
+              aria-label="Limpiar búsqueda"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            class="filter-chips"
+            id="filter-modality-chips"
+            role="group"
+            aria-label="Modalidad"
+          >
+            <button
+              class="filter-chip filter-chip--active"
+              data-modality=""
+              aria-pressed="true"
+            >
+              Todas
+            </button>
+            <button class="filter-chip" data-modality="CT" aria-pressed="false">
+              CT
+            </button>
+            <button class="filter-chip" data-modality="MR" aria-pressed="false">
+              MR
+            </button>
+            <button class="filter-chip" data-modality="DX" aria-pressed="false">
+              RX
+            </button>
+            <button class="filter-chip" data-modality="CR" aria-pressed="false">
+              CR
+            </button>
+            <button class="filter-chip" data-modality="US" aria-pressed="false">
+              US
+            </button>
+            <button class="filter-chip" data-modality="NM" aria-pressed="false">
+              NM
+            </button>
+            <button class="filter-chip" data-modality="PT" aria-pressed="false">
+              PET
+            </button>
+            <button class="filter-chip" data-modality="MG" aria-pressed="false">
+              MG
+            </button>
+            <button class="filter-chip" data-modality="XA" aria-pressed="false">
+              XA
+            </button>
+          </div>
+
+          <div class="filter-dates">
+            <label class="sr-only" for="filter-date-from">Desde</label>
+            <input
+              type="date"
+              id="filter-date-from"
+              class="filter-date"
+              title="Desde"
+            />
+            <label class="sr-only" for="filter-date-to">Hasta</label>
+            <input
+              type="date"
+              id="filter-date-to"
+              class="filter-date"
+              title="Hasta"
+            />
+          </div>
+
+          <div class="filter-clear-wrap hidden" id="filter-clear-wrap">
+            <button id="btn-clear-filters" class="filter-clear-btn">
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+
+        <ul id="study-list" class="study-list"></ul>
+
+        <!-- Pagination -->
+        <div class="explorer-pagination" id="explorer-pagination">
+          <button class="icon-btn" id="pagination-prev" title="Página anterior">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span id="pagination-info" class="pagination-info">—</span>
+          <button
+            class="icon-btn"
+            id="pagination-next"
+            title="Página siguiente"
+          >
+            <svg
+              width="13"
+              height="13"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -495,180 +571,15 @@
             </svg>
           </button>
         </div>
-      </div>
 
-      <!-- Filters -->
-      <div class="explorer-filters">
-        <div class="filter-search">
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            class="filter-search__icon"
+        <!-- Session state lives here rather than behind a modal. -->
+        <div class="explorer-footer" id="explorer-footer">
+          <span id="explorer-session-line"
+            >Sin sesión · solo lectura local</span
           >
-            <circle cx="10" cy="10" r="7" />
-            <line x1="15" y1="15" x2="21" y2="21" />
-          </svg>
-          <label class="sr-only" for="search-studies"
-            >Buscar paciente o ID</label
-          >
-          <input
-            type="text"
-            id="search-studies"
-            class="filter-search__input"
-            placeholder="Buscar paciente o ID…"
-            autocomplete="off"
-          />
-          <button
-            class="filter-search__clear hidden"
-            id="btn-clear-search"
-            aria-label="Limpiar búsqueda"
-          >
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
         </div>
-
-        <div
-          class="filter-chips"
-          id="filter-modality-chips"
-          role="group"
-          aria-label="Modalidad"
-        >
-          <button
-            class="filter-chip filter-chip--active"
-            data-modality=""
-            aria-pressed="true"
-          >
-            Todas
-          </button>
-          <button class="filter-chip" data-modality="CT" aria-pressed="false">
-            CT
-          </button>
-          <button class="filter-chip" data-modality="MR" aria-pressed="false">
-            MR
-          </button>
-          <button class="filter-chip" data-modality="DX" aria-pressed="false">
-            RX
-          </button>
-          <button class="filter-chip" data-modality="CR" aria-pressed="false">
-            CR
-          </button>
-          <button class="filter-chip" data-modality="US" aria-pressed="false">
-            US
-          </button>
-          <button class="filter-chip" data-modality="NM" aria-pressed="false">
-            NM
-          </button>
-          <button class="filter-chip" data-modality="PT" aria-pressed="false">
-            PET
-          </button>
-          <button class="filter-chip" data-modality="MG" aria-pressed="false">
-            MG
-          </button>
-          <button class="filter-chip" data-modality="XA" aria-pressed="false">
-            XA
-          </button>
-        </div>
-
-        <div class="filter-dates">
-          <label class="sr-only" for="filter-date-from">Desde</label>
-          <input
-            type="date"
-            id="filter-date-from"
-            class="filter-date"
-            title="Desde"
-          />
-          <span class="filter-dates__sep" aria-hidden="true">—</span>
-          <label class="sr-only" for="filter-date-to">Hasta</label>
-          <input
-            type="date"
-            id="filter-date-to"
-            class="filter-date"
-            title="Hasta"
-          />
-        </div>
-
-        <div class="filter-clear-wrap hidden" id="filter-clear-wrap">
-          <button id="btn-clear-filters" class="filter-clear-btn">
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            Limpiar filtros
-          </button>
-        </div>
-      </div>
-
-      <ul id="study-list" class="study-list"></ul>
-
-      <!-- Pagination -->
-      <div class="explorer-pagination" id="explorer-pagination">
-        <button class="icon-btn" id="pagination-prev" title="Página anterior">
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-          >
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <span id="pagination-info" class="pagination-info">—</span>
-        <button class="icon-btn" id="pagination-next" title="Página siguiente">
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-          >
-            <polyline points="9 6 15 12 9 18" />
-          </svg>
-        </button>
-      </div>
-    </aside>
-
-    <!-- Reopen explorer button -->
-    <button
-      id="btn-reopen-explorer"
-      class="hidden"
-      title="Abrir panel de estudios"
-    >
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.5"
-      >
-        <polyline points="15 18 9 12 15 6" />
-      </svg>
-      Estudios
-    </button>
+      </aside>
+    </div>
 
     <!-- Login screen — escalation only: a session that died mid-operation. -->
     <div id="login-screen" class="dialog-overlay hidden">

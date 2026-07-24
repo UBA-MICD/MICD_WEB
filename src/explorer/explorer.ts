@@ -74,8 +74,8 @@ export function initStudyExplorer(): void {
     if (!studyId) return;
     list
       .querySelectorAll(".study-item")
-      .forEach((el) => el.classList.remove("study-item--active"));
-    item.classList.add("study-item--active");
+      .forEach((el) => el.removeAttribute("aria-current"));
+    item.setAttribute("aria-current", "true");
     await loadStudyFromServer(studyId);
   });
 
@@ -161,22 +161,6 @@ export function initStudyExplorer(): void {
       void loadStudyExplorer();
     }
   });
-
-  // Close / reopen panel
-  const panel = $("explorer-panel");
-  const shell = document.querySelector<HTMLElement>(".app-shell")!;
-  const btnClose = $("btn-close-explorer");
-  const btnReopen = $("btn-reopen-explorer");
-  btnClose.addEventListener("click", () => {
-    panel.classList.add("explorer-panel--closed");
-    shell.classList.add("explorer-closed");
-    btnReopen.classList.remove("hidden");
-  });
-  btnReopen.addEventListener("click", () => {
-    panel.classList.remove("explorer-panel--closed");
-    shell.classList.remove("explorer-closed");
-    btnReopen.classList.add("hidden");
-  });
 }
 
 export async function loadStudyExplorer(): Promise<void> {
@@ -235,19 +219,21 @@ export async function loadStudyExplorer(): Promise<void> {
         const imgLabel = count === 1 ? "1 imagen" : `${count} imágenes`;
 
         return `
-        <li class="study-item" data-id="${escapeAttr(s.orthanc_study_id)}" title="Click para visualizar">
-          <div class="study-item__thumb">
-            <img data-thumb-id="${escapeAttr(s.orthanc_study_id)}" alt="${modality}" style="display:none" />
-            <div class="study-item__thumb-fallback">${modality}</div>
-          </div>
-          <div class="study-item__info">
-            <span class="study-item__name">${name}</span>
-            <span class="study-item__date">${date} · ${desc}</span>
-            <span class="study-item__meta">
-              <span class="study-item__badge">${modality}</span>
-              ${imgLabel} · Disponible
+        <li>
+          <button type="button" class="study-item" data-id="${escapeAttr(s.orthanc_study_id)}">
+            <span class="study-item__thumb">
+              <img data-thumb-id="${escapeAttr(s.orthanc_study_id)}" alt="" style="display:none" />
+              <span class="study-item__thumb-fallback">${modality}</span>
             </span>
-          </div>
+            <span class="study-item__info">
+              <span class="study-item__name">${name}</span>
+              <span class="study-item__date">${date} · ${desc}</span>
+              <span class="study-item__meta">
+                <span class="study-item__badge">${modality}</span>
+                ${imgLabel}
+              </span>
+            </span>
+          </button>
         </li>`;
       })
       .join("");
@@ -270,7 +256,10 @@ export function renderLoggedOutExplorer(): void {
           <rect x="3" y="11" width="18" height="10" rx="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        <p>Iniciá sesión para ver los estudios del servidor.</p>
+        <p>
+          Iniciá sesión para ver los estudios del servidor.<br />
+          Abrir archivos locales no requiere sesión.
+        </p>
         <button class="btn btn--accent" id="study-list-login">Iniciar sesión</button>
       </div>
     </li>`;

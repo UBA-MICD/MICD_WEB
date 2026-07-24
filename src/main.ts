@@ -30,6 +30,7 @@ import {
   renderLoggedOutExplorer,
 } from "./explorer/explorer.js";
 import { $ } from "./shared/dom.js";
+import { initRovingTabindex } from "./shared/roving.js";
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,8 @@ async function initApp(): Promise<void> {
   onAuthChange(() => updateAuthUI());
   $("btn-logout").addEventListener("click", () => void onLogout());
   $("btn-login").addEventListener("click", () => void loadStudyExplorer());
+  // Single entry point for everything server-bound.
+  $("btn-server").addEventListener("click", () => void loadStudyExplorer());
 
   // Local viewing works without a session — always start the app.
   startApp();
@@ -68,6 +71,9 @@ function startApp(): void {
   initResizeObserver();
   initUploadPanel();
   initStudyExplorer();
+  // The rail is one tab stop, with the arrow keys moving between tools, so
+  // reaching the viewport does not mean tabbing through every tool.
+  initRovingTabindex($("viewer-toolbar"), ".toolbar__tool", "vertical");
 }
 
 async function onLogout(): Promise<void> {

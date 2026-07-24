@@ -1,63 +1,61 @@
-import { login, isAuthenticated, getCurrentUser } from "./auth.js";
+import { isAuthenticated, getCurrentUser } from "./auth.js";
+import { mountLoginForm } from "./login-form.js";
+import { openDialog, closeDialog, isDialogOpen } from "../shared/dialog.js";
 import { $ } from "../shared/dom.js";
 
 // ── Login dialog (promise-based popup, injected into auth.ts) ────────────────
+//
+// This is the escalation path only: it appears when a session dies in the
+// middle of a server operation. Focus handling, Escape and the Tab trap belong
+// to shared/dialog.ts; the form's submit behaviour belongs to login-form.ts.
 
 let loginResolve: ((ok: boolean) => void) | null = null;
-let loginInFlight = false;
+let form: ReturnType<typeof mountLoginForm> | null = null;
 
 /** Shows the login dialog; resolves true on login, false on cancel/Escape. */
 export function promptLogin(): Promise<boolean> {
-  ($("login-form") as HTMLFormElement).reset();
-  $("login-error").classList.add("hidden");
-  $("login-screen").classList.remove("hidden");
-  ($("login-email") as HTMLInputElement).focus();
+  const overlay = $("login-screen");
+  form?.reset();
+  openDialog(overlay);
+  form?.focusFirstField();
   return new Promise<boolean>((resolve) => {
     loginResolve = resolve;
   });
 }
 
-function closeLoginDialog(ok: boolean): void {
-  $("login-screen").classList.add("hidden");
-  loginResolve?.(ok);
+function settle(ok: boolean): void {
+  const resolve = loginResolve;
   loginResolve = null;
+  resolve?.(ok);
 }
 
 export function initLoginDialog(): void {
-  const form = $("login-form") as HTMLFormElement;
-  const errorEl = $("login-error");
-  const submitBtn = $("login-submit") as HTMLButtonElement;
-  const cancelBtn = $("login-cancel") as HTMLButtonElement;
+  const overlay = $("login-screen");
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    errorEl.classList.add("hidden");
-    submitBtn.disabled = true;
-    cancelBtn.disabled = true; // don't let cancel race an in-flight login
-    loginInFlight = true;
-
-    const email = ($("login-email") as HTMLInputElement).value;
-    const password = ($("login-password") as HTMLInputElement).value;
-    const result = await login(email, password);
-
-    loginInFlight = false;
-    submitBtn.disabled = false;
-    cancelBtn.disabled = false;
-    if (!result.ok) {
-      errorEl.textContent = result.error;
-      errorEl.classList.remove("hidden");
-      return;
-    }
-    form.reset();
-    closeLoginDialog(true);
+  form = mountLoginForm($("login-form") as HTMLFormElement, {
+    onSuccess: () => {
+      settle(true);
+      closeDialog(overlay);
+    },
+    // While a login is in flight the dialog must not be dismissable, or the
+    // caller would get `false` and then a session would appear anyway.
+    onBusyChange: (busy) => {
+      overlay.dataset.dialogBusy = String(busy);
+    },
   });
 
-  cancelBtn.addEventListener("click", () => closeLoginDialog(false));
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    if ($("login-screen").classList.contains("hidden") || loginInFlight) return;
-    closeLoginDialog(false);
-  });
+  ($("login-cancel") as HTMLButtonElement).addEventListener("click", () =>
+    closeDialog(overlay),
+  );
+
+  // Every close path — cancel, Escape, or a programmatic close — funnels
+  // through the dialog's close event, so a pending promise is never orphaned.
+  overlay.addEventListener("dialog:close", () => settle(false));
+}
+
+/** True while the escalation dialog is on screen. */
+export function isLoginDialogOpen(): boolean {
+  return isDialogOpen($("login-screen"));
 }
 
 // ── Session UI (sidebar login/logout state) ──────────────────────────────────

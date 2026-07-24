@@ -121,12 +121,45 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   user-select: none;
+  /* Column flex so the status banner takes its height off the top instead of
+     pushing the 100vh shell past the bottom of the window. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Status banner ────────────────────────────────────────────────────────── */
+/* Sits above every screen and pushes the layout down rather than covering the
+   topbar, so it can't hide the controls it is reporting on. */
+.app-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.app-banner--success {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.app-banner--error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.app-banner::before {
+  content: "✓";
+  font-size: 14px;
+}
+.app-banner--error::before {
+  content: "!";
 }
 
 /* ── App Shell ────────────────────────────────────────────────────────────── */
 .app-shell {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   padding-right: 320px;
   transition: padding-right 0.2s ease;
 }

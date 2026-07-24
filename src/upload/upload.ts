@@ -8,7 +8,7 @@ import {
 import { collectDicomFiles } from "../shared/folder-files.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { openDialog, closeDialog } from "../shared/dialog.js";
-import { loadStudyExplorer } from "../explorer/explorer.js";
+import { loadStudyExplorer, markStudyAsNew } from "../explorer/explorer.js";
 
 // ── Upload (Cargar tab) ──────────────────────────────────────────────────────
 //
@@ -41,6 +41,27 @@ let queue = { done: 0, total: 0 };
 
 export function getLastUploadedStudyId(): string | null {
   return uploadedStudyIds[uploadedStudyIds.length - 1] ?? null;
+}
+
+export interface UploadSummary {
+  ok: number;
+  duplicates: number;
+  errors: number;
+  total: number;
+  cancelled: boolean;
+  /** The study to reopen, when exactly one thing clearly succeeded. */
+  studyId: string | null;
+}
+
+let completeListener: ((summary: UploadSummary) => void) | null = null;
+
+/**
+ * Notified once a queue drains. The owning screen decides what to do with the
+ * result — upload.ts must not reach into navigation itself, or it and the
+ * server screen would import each other.
+ */
+export function onUploadComplete(cb: (summary: UploadSummary) => void): void {
+  completeListener = cb;
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -153,6 +174,14 @@ async function startUpload(files: File[]): Promise<void> {
 
   if (cancelled) {
     showUploadStatus("Carga cancelada.", "error");
+    completeListener?.({
+      ok,
+      duplicates,
+      errors,
+      total: files.length,
+      cancelled: true,
+      studyId: null,
+    });
     return;
   }
 
@@ -162,7 +191,15 @@ async function startUpload(files: File[]): Promise<void> {
   showUploadStatus(parts.join(" · "), errors > 0 ? "error" : "ok");
   setAggregatePercent(100);
 
-  void loadStudyExplorer();
+  await loadStudyExplorer();
+  completeListener?.({
+    ok,
+    duplicates,
+    errors,
+    total: files.length,
+    cancelled: false,
+    studyId: getLastUploadedStudyId(),
+  });
 }
 
 export function cancelUpload(): void {
@@ -288,7 +325,10 @@ function rememberUploadedStudy(responseText: string): void {
   try {
     const body = JSON.parse(responseText);
     const id = body?.study?.orthanc_study_id;
-    if (typeof id === "string" && id) uploadedStudyIds.push(id);
+    if (typeof id === "string" && id) {
+      uploadedStudyIds.push(id);
+      markStudyAsNew(id);
+    }
   } catch {
     // A 201 without a parseable body still counts as a success; we just
     // can't reopen the study automatically.

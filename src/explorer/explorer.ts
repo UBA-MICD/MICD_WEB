@@ -63,6 +63,12 @@ const explorerState = {
 };
 
 const views: ExplorerView[] = [];
+/**
+ * Studies uploaded during this session, badged "Nuevo" so the thing you just
+ * added is findable in a list you did not sort. Client-side only and
+ * deliberately not persisted: "new" means "new to you, just now".
+ */
+const newStudyIds = new Set<string>();
 let selectedStudyId: string | null = null;
 let selectionListener: ((id: string | null) => void) | null = null;
 let activateListener: ((id: string) => void) | null = null;
@@ -103,6 +109,11 @@ function setSelected(id: string | null): void {
 
 export function clearSelection(): void {
   setSelected(null);
+}
+
+/** Flags a study as freshly uploaded; cleared on reload. */
+export function markStudyAsNew(studyId: string): void {
+  newStudyIds.add(studyId);
 }
 
 // ── View registration ────────────────────────────────────────────────────────
@@ -392,7 +403,10 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
   const count = Number(s.num_instances);
   const imgLabel = count === 1 ? "1 imagen" : `${count} imágenes`;
 
-  const body = `
+  const isNew = newStudyIds.has(s.orthanc_study_id);
+  const newBadge = isNew ? '<span class="study-item__new">Nuevo</span>' : "";
+
+  const body = `${newBadge}
     <span class="study-item__thumb">
       <img data-thumb-id="${id}" alt="" style="display:none" />
       <span class="study-item__thumb-fallback">${modality}</span>

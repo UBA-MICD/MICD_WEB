@@ -1412,6 +1412,21 @@ body {
   background: var(--accent-soft);
 }
 
+/* Marks the study you just uploaded, so it is findable in a list you did not
+   sort. Text, not just colour. */
+.study-item__new {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .study-item__badge {
   display: inline-block;
   font-size: 9px;

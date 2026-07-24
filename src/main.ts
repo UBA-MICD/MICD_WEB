@@ -4,7 +4,7 @@ import {
   setLoginPrompt,
   onAuthChange,
 } from "./auth/auth.js";
-import { updateAuthUI } from "./auth/session-ui.js";
+import { updateAuthUI, initActivityHistory } from "./auth/session-ui.js";
 import {
   initServerScreen,
   openServerScreen,
@@ -79,6 +79,7 @@ function startApp(): void {
   initUploadPanel();
   initStudyExplorer();
   initServerScreen();
+  initActivityHistory();
   // The rail is one tab stop, with the arrow keys moving between tools, so
   // reaching the viewport does not mean tabbing through every tool.
   initRovingTabindex($("viewer-toolbar"), ".toolbar__tool", "vertical");

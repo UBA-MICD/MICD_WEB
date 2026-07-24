@@ -21,6 +21,7 @@ import {
   isAuthenticated,
   getAccessToken,
   getCurrentUser,
+  getSessionExpiresAt,
   API_ORIGIN,
   type AuthUser,
 } from "./auth.ts";
@@ -330,4 +331,55 @@ test("logout posts the refresh token and clears the session even if the network 
   assert.deepEqual(JSON.parse(String(call.init?.body)), {
     refreshToken: "refresh-1",
   });
+});
+
+// ── session expiry (drives the countdown in the UI) ──────────────────────────
+
+test("login records the access token's exp claim in epoch ms", async () => {
+  const expSeconds = Math.floor(Date.now() / 1000) + 900; // the backend's 15m
+  await loginAsAdmin(
+    jwt({ sub: adminUser.id, email: adminUser.email, exp: expSeconds }),
+  );
+  assert.equal(getSessionExpiresAt(), expSeconds * 1000);
+});
+
+test("a token with no exp claim reports no expiry rather than 0", () => {
+  // adminToken carries sub/email only. Treating a missing exp as 0 would show
+  // a permanently expired session.
+  assert.equal(getSessionExpiresAt(), null);
+});
+
+test("refresh replaces the expiry with the new token's", async () => {
+  await loginAsAdmin(
+    jwt({ sub: adminUser.id, email: adminUser.email, exp: 1000 }),
+  );
+  assert.equal(getSessionExpiresAt(), 1_000_000);
+
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({
+        accessToken: jwt({
+          sub: adminUser.id,
+          email: adminUser.email,
+          exp: 2000,
+        }),
+        refreshToken: "refresh-2",
+      }),
+  });
+  assert.equal(await refreshAccessToken(), true);
+  assert.equal(getSessionExpiresAt(), 2_000_000);
+});
+
+test("logout clears the expiry along with the session", async () => {
+  await loginAsAdmin(
+    jwt({ sub: adminUser.id, email: adminUser.email, exp: 1000 }),
+  );
+  await logout();
+  assert.equal(getSessionExpiresAt(), null);
+});
+
+test("a malformed token yields no expiry instead of throwing", async () => {
+  await loginAsAdmin("not-a-jwt");
+  assert.equal(getSessionExpiresAt(), null);
+  assert.equal(isAuthenticated(), true);
 });

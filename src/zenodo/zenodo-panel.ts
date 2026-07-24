@@ -68,6 +68,11 @@ const state = {
 export function initZenodoPanel(): void {
   $("btn-open-zenodo").addEventListener("click", openPanel);
   $("btn-close-zenodo").addEventListener("click", closePanel);
+  // Starts closed in the markup; make the DOM state say so too.
+  setPanelOpen(false);
+  $("zenodo-panel").addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape") closePanel();
+  });
 
   // Tab switching
   document.querySelectorAll<HTMLElement>(".z-tab").forEach((tab) => {
@@ -109,35 +114,64 @@ export function initZenodoPanel(): void {
 
   // Pagination
   $("z-prev").addEventListener("click", () => {
-    if (state.page > 1) { state.page--; void loadSearch(); }
+    if (state.page > 1) {
+      state.page--;
+      void loadSearch();
+    }
   });
   $("z-next").addEventListener("click", () => {
-    if (state.page < state.totalPages) { state.page++; void loadSearch(); }
+    if (state.page < state.totalPages) {
+      state.page++;
+      void loadSearch();
+    }
   });
 
   // Import click delegation
   $("z-results").addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-import-id]");
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-import-id]",
+    );
     if (btn) void importRecord(Number(btn.dataset.importId), btn);
   });
 }
 
 function openPanel(): void {
-  $("zenodo-panel").classList.remove("zenodo-panel--closed");
+  setPanelOpen(true);
   if (state.tab === "config") void loadConfig();
 }
 
 function closePanel(): void {
-  $("zenodo-panel").classList.add("zenodo-panel--closed");
+  setPanelOpen(false);
+  // Send focus back to the control that opened the panel, rather than leaving
+  // it on a button that is now hidden.
+  $("btn-open-zenodo").focus();
+}
+
+/**
+ * The panel is a disclosure, so the rail button's aria-expanded has to follow
+ * it. `inert` matters too: the closed panel is only translated off-screen, so
+ * without it a keyboard user could tab into a panel they cannot see.
+ */
+function setPanelOpen(open: boolean): void {
+  const panel = $("zenodo-panel");
+  panel.classList.toggle("zenodo-panel--closed", !open);
+  panel.inert = !open;
+  $("btn-open-zenodo").setAttribute("aria-expanded", String(open));
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 
 function switchTab(tab: Tab): void {
   state.tab = tab;
-  document.querySelectorAll(".z-tab").forEach((t) => t.classList.remove("z-tab--active"));
-  document.querySelector<HTMLElement>(`.z-tab[data-tab="${tab}"]`)?.classList.add("z-tab--active");
-  document.querySelectorAll(".z-tab-panel").forEach((p) => p.classList.add("hidden"));
+  document
+    .querySelectorAll(".z-tab")
+    .forEach((t) => t.classList.remove("z-tab--active"));
+  document
+    .querySelector<HTMLElement>(`.z-tab[data-tab="${tab}"]`)
+    ?.classList.add("z-tab--active");
+  document
+    .querySelectorAll(".z-tab-panel")
+    .forEach((p) => p.classList.add("hidden"));
   $(`z-tab-${tab}`).classList.remove("hidden");
   if (tab === "config") void loadConfig();
   if (tab === "publish") renderPublishTab();
@@ -176,11 +210,19 @@ async function loadSearch(): Promise<void> {
     state.totalPages = pages;
     setPaginationUI(state.page, pages, total);
 
-    results.innerHTML = total === 0
-      ? emptyState("Sin resultados", "Probá términos más generales o quitá filtros")
-      : data.records.map(recordCard).join("");
+    results.innerHTML =
+      total === 0
+        ? emptyState(
+            "Sin resultados",
+            "Probá términos más generales o quitá filtros",
+          )
+        : data.records.map(recordCard).join("");
   } catch {
-    results.innerHTML = emptyState("Error al buscar", "Verificá la conexión con Zenodo", true);
+    results.innerHTML = emptyState(
+      "Error al buscar",
+      "Verificá la conexión con Zenodo",
+      true,
+    );
   }
 }
 
@@ -210,7 +252,10 @@ function recordCard(r: ZenodoRecord): string {
     </div>`;
 }
 
-async function importRecord(recordId: number, btn: HTMLButtonElement): Promise<void> {
+async function importRecord(
+  recordId: number,
+  btn: HTMLButtonElement,
+): Promise<void> {
   if (!(await ensureAuthenticated())) return;
 
   const origLabel = btn.textContent ?? "Importar";
@@ -231,7 +276,10 @@ async function importRecord(recordId: number, btn: HTMLButtonElement): Promise<v
 
     if (files.length === 0) {
       btn.textContent = "Sin archivos";
-      setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 2000);
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = origLabel;
+      }, 2000);
       return;
     }
 
@@ -249,7 +297,10 @@ async function importRecord(recordId: number, btn: HTMLButtonElement): Promise<v
     if (!res.ok) {
       const msg = data.error ?? `Error ${res.status}`;
       btn.textContent = msg.length > 18 ? "Error" : msg;
-      setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 2500);
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = origLabel;
+      }, 2500);
       return;
     }
 
@@ -263,11 +314,18 @@ async function importRecord(recordId: number, btn: HTMLButtonElement): Promise<v
     }, 3000);
   } catch {
     btn.textContent = "Error";
-    setTimeout(() => { btn.disabled = false; btn.textContent = origLabel; }, 2000);
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }, 2000);
   }
 }
 
-function setPaginationUI(page: number, totalPages: number, total: number): void {
+function setPaginationUI(
+  page: number,
+  totalPages: number,
+  total: number,
+): void {
   $("z-pagination-info").textContent =
     total > 0 ? `${page} / ${totalPages}  ·  ${total} resultados` : "—";
   ($("z-prev") as HTMLButtonElement).disabled = page <= 1;
@@ -290,14 +348,26 @@ async function loadConfig(): Promise<void> {
       authFetch(`${API_BASE}/v1/zenodo/config/sync`),
     ]);
 
-    const status: ConfigStatus = statusRes.ok ? await statusRes.json() : defaultStatus();
+    const status: ConfigStatus = statusRes.ok
+      ? await statusRes.json()
+      : defaultStatus();
     const qS: QuotaResponse | null = qSRes.ok ? await qSRes.json() : null;
     const qP: QuotaResponse | null = qPRes.ok ? await qPRes.json() : null;
-    const sync: SyncConfig = syncRes.ok ? await syncRes.json() : { interval_hours: 24, last_run_at: null, valid_intervals: [6, 12, 24, 168] };
+    const sync: SyncConfig = syncRes.ok
+      ? await syncRes.json()
+      : {
+          interval_hours: 24,
+          last_run_at: null,
+          valid_intervals: [6, 12, 24, 168],
+        };
 
     renderConfig(container, status, qS, qP, sync);
   } catch {
-    container.innerHTML = emptyState("Error al cargar config", "Intentá de nuevo", true);
+    container.innerHTML = emptyState(
+      "Error al cargar config",
+      "Intentá de nuevo",
+      true,
+    );
   }
 }
 
@@ -315,24 +385,41 @@ function renderConfig(
 
   // Token save/delete
   (["sandbox", "production"] as const).forEach((env) => {
-    container.querySelector(`#z-${env}-save`)?.addEventListener("click", () => void saveToken(env));
-    container.querySelector(`#z-${env}-delete`)?.addEventListener("click", () => void deleteToken(env));
+    container
+      .querySelector(`#z-${env}-save`)
+      ?.addEventListener("click", () => void saveToken(env));
+    container
+      .querySelector(`#z-${env}-delete`)
+      ?.addEventListener("click", () => void deleteToken(env));
   });
 
   // Sync
-  container.querySelector("#z-sync-intervals")?.addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-hours]");
-    if (!btn) return;
-    const hours = btn.dataset.hours === "null" ? null : Number(btn.dataset.hours);
-    void setSyncInterval(hours);
-  });
-  container.querySelector("#btn-z-sync-now")?.addEventListener("click", () => void runSyncNow());
+  container
+    .querySelector("#z-sync-intervals")
+    ?.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>(
+        "[data-hours]",
+      );
+      if (!btn) return;
+      const hours =
+        btn.dataset.hours === "null" ? null : Number(btn.dataset.hours);
+      void setSyncInterval(hours);
+    });
+  container
+    .querySelector("#btn-z-sync-now")
+    ?.addEventListener("click", () => void runSyncNow());
 }
 
-function envCard(env: "sandbox" | "production", info: EnvStatus, quota: QuotaResponse | null): string {
+function envCard(
+  env: "sandbox" | "production",
+  info: EnvStatus,
+  quota: QuotaResponse | null,
+): string {
   const label = env === "sandbox" ? "Sandbox" : "Producción";
   const dotClass = info.configured ? "z-dot--on" : "z-dot--off";
-  const statusText = info.configured ? `Conectado · ${info.hint ?? ""}` : "No configurado";
+  const statusText = info.configured
+    ? `Conectado · ${info.hint ?? ""}`
+    : "No configurado";
 
   return `
     <div class="z-env-card">
@@ -348,9 +435,11 @@ function envCard(env: "sandbox" | "production", info: EnvStatus, quota: QuotaRes
         <input type="password" class="z-token-input" id="z-${env}-token"
           placeholder="Token de Zenodo…" autocomplete="off" />
         <button class="btn btn--accent btn--sm" id="z-${env}-save">Guardar</button>
-        ${info.configured
-          ? `<button class="btn btn--danger btn--sm" id="z-${env}-delete">✕</button>`
-          : ""}
+        ${
+          info.configured
+            ? `<button class="btn btn--danger btn--sm" id="z-${env}-delete">✕</button>`
+            : ""
+        }
       </div>
     </div>`;
 }
@@ -367,11 +456,16 @@ function quotaBar(q: QuotaResponse): string {
 
 function syncCard(sync: SyncConfig): string {
   const lastRun = sync.last_run_at
-    ? new Date(sync.last_run_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+    ? new Date(sync.last_run_at).toLocaleString("es-AR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
     : "Nunca";
   const intervals = [
-    { label: "6h", value: 6 }, { label: "12h", value: 12 },
-    { label: "24h", value: 24 }, { label: "Semanal", value: 168 },
+    { label: "6h", value: 6 },
+    { label: "12h", value: 12 },
+    { label: "24h", value: 24 },
+    { label: "Semanal", value: 168 },
     { label: "Desactivado", value: null },
   ];
 
@@ -380,17 +474,25 @@ function syncCard(sync: SyncConfig): string {
       <div class="z-section-label">Sincronización</div>
       <p class="z-sync-meta">Último run: ${escapeHtml(lastRun)}</p>
       <div class="z-sync-intervals" id="z-sync-intervals">
-        ${intervals.map(({ label, value }) => `
+        ${intervals
+          .map(
+            ({ label, value }) => `
           <button class="filter-chip ${sync.interval_hours === value ? "filter-chip--active" : ""}"
-            data-hours="${value ?? "null"}">${label}</button>`).join("")}
+            data-hours="${value ?? "null"}">${label}</button>`,
+          )
+          .join("")}
       </div>
       <button class="btn btn--secondary btn--sm btn--full" id="btn-z-sync-now">Sincronizar ahora</button>
     </div>`;
 }
 
 async function saveToken(env: "sandbox" | "production"): Promise<void> {
-  const input = document.getElementById(`z-${env}-token`) as HTMLInputElement | null;
-  const btn = document.getElementById(`z-${env}-save`) as HTMLButtonElement | null;
+  const input = document.getElementById(
+    `z-${env}-token`,
+  ) as HTMLInputElement | null;
+  const btn = document.getElementById(
+    `z-${env}-save`,
+  ) as HTMLButtonElement | null;
   if (!input || !btn) return;
   const token = input.value.trim();
   if (!token) return;
@@ -408,16 +510,22 @@ async function saveToken(env: "sandbox" | "production"): Promise<void> {
   } catch {
     btn.disabled = false;
     btn.textContent = "Error";
-    setTimeout(() => { btn.textContent = "Guardar"; }, 2000);
+    setTimeout(() => {
+      btn.textContent = "Guardar";
+    }, 2000);
   }
 }
 
 async function deleteToken(env: "sandbox" | "production"): Promise<void> {
-  const btn = document.getElementById(`z-${env}-delete`) as HTMLButtonElement | null;
+  const btn = document.getElementById(
+    `z-${env}-delete`,
+  ) as HTMLButtonElement | null;
   if (!btn) return;
   btn.disabled = true;
   try {
-    await authFetch(`${API_BASE}/v1/zenodo/config/${env}`, { method: "DELETE" });
+    await authFetch(`${API_BASE}/v1/zenodo/config/${env}`, {
+      method: "DELETE",
+    });
     void loadConfig();
   } catch {
     btn.disabled = false;
@@ -434,19 +542,29 @@ async function setSyncInterval(hours: number | null): Promise<void> {
 }
 
 async function runSyncNow(): Promise<void> {
-  const btn = document.getElementById("btn-z-sync-now") as HTMLButtonElement | null;
+  const btn = document.getElementById(
+    "btn-z-sync-now",
+  ) as HTMLButtonElement | null;
   if (!btn) return;
   btn.disabled = true;
   btn.textContent = "Sincronizando…";
   try {
-    const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/run`, { method: "POST" });
+    const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/run`, {
+      method: "POST",
+    });
     const data = await res.json();
     btn.textContent = `✓ ${data.records_checked ?? 0} chequeados`;
-    setTimeout(() => { btn.disabled = false; btn.textContent = "Sincronizar ahora"; void loadConfig(); }, 2500);
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = "Sincronizar ahora";
+      void loadConfig();
+    }, 2500);
   } catch {
     btn.disabled = false;
     btn.textContent = "Error";
-    setTimeout(() => { btn.textContent = "Sincronizar ahora"; }, 2000);
+    setTimeout(() => {
+      btn.textContent = "Sincronizar ahora";
+    }, 2000);
   }
 }
 
@@ -454,9 +572,16 @@ async function runSyncNow(): Promise<void> {
 
 function renderPublishTab(): void {
   const container = $("z-publish-content");
-  const active = document.querySelector<HTMLElement>(".study-item--active[data-id]");
+  // The loaded study is marked with aria-current, not a .study-item--active
+  // class: the explorer keys its styling off the ARIA attribute so the visual
+  // and programmatic state cannot drift apart. Both explorer views mark the
+  // same study, so the first match is the right one either way.
+  const active = document.querySelector<HTMLElement>(
+    '.study-item[aria-current="true"][data-id]',
+  );
   const studyId = active?.dataset.id ?? null;
-  const studyName = active?.querySelector(".study-item__name")?.textContent ?? studyId;
+  const studyName =
+    active?.querySelector(".study-item__name")?.textContent ?? studyId;
 
   if (!studyId) {
     container.innerHTML = `
@@ -469,7 +594,9 @@ function renderPublishTab(): void {
         <span>Cerrá este panel, hacé click en un estudio del explorador y volvé a Publicar</span>
         <button class="btn btn--secondary btn--sm" id="btn-z-close-for-study">Cerrar panel</button>
       </div>`;
-    document.getElementById("btn-z-close-for-study")?.addEventListener("click", closePanel);
+    document
+      .getElementById("btn-z-close-for-study")
+      ?.addEventListener("click", closePanel);
     return;
   }
 
@@ -540,7 +667,11 @@ async function publishStudy(studyId: string): Promise<void> {
 
   const btn = document.getElementById("btn-z-publish") as HTMLButtonElement;
   const feedback = document.getElementById("z-pub-feedback") as HTMLElement;
-  const get = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null)?.value ?? "";
+  const get = (id: string) =>
+    (
+      document.getElementById(id) as
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null
+    )?.value ?? "";
 
   btn.disabled = true;
   btn.textContent = "Publicando…";
@@ -552,14 +683,30 @@ async function publishStudy(studyId: string): Promise<void> {
   const keywordsRaw = get("z-pub-keywords").trim();
   const license = get("z-pub-license");
   const environment = get("z-pub-env");
-  const authors = authorsRaw.split(";").map((a) => ({ name: a.trim() })).filter((a) => a.name);
-  const keywords = keywordsRaw ? keywordsRaw.split(",").map((k) => k.trim()).filter(Boolean) : [];
+  const authors = authorsRaw
+    .split(";")
+    .map((a) => ({ name: a.trim() }))
+    .filter((a) => a.name);
+  const keywords = keywordsRaw
+    ? keywordsRaw
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean)
+    : [];
 
   try {
     const res = await authFetch(`${API_BASE}/v1/zenodo/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orthanc_study_id: studyId, environment, title, description, authors, keywords, license }),
+      body: JSON.stringify({
+        orthanc_study_id: studyId,
+        environment,
+        title,
+        description,
+        authors,
+        keywords,
+        license,
+      }),
     });
     const data = await res.json();
 
@@ -572,7 +719,9 @@ async function publishStudy(studyId: string): Promise<void> {
         no_credentials: " Configurá un token en la pestaña Config.",
         study_not_found: " El estudio no se encontró en la base de datos.",
       };
-      fbEl.textContent = (data.error ?? `Error ${res.status}`) + (codeHints[data.code ?? ""] ?? "");
+      fbEl.textContent =
+        (data.error ?? `Error ${res.status}`) +
+        (codeHints[data.code ?? ""] ?? "");
       fbEl.className = "z-pub-feedback z-pub-feedback--error";
     } else {
       fbEl.innerHTML = `✓ Publicado · DOI: <code>${escapeHtml(data.doi ?? "—")}</code> · ${data.files_uploaded ?? 0} archivo(s)`;
@@ -593,21 +742,27 @@ async function publishStudy(studyId: string): Promise<void> {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function skeleton(): string {
-  return Array.from({ length: 3 }).map(() => `
+  return Array.from({ length: 3 })
+    .map(
+      () => `
     <div class="z-skeleton-card">
       <div class="z-skeleton z-skeleton--lg"></div>
       <div class="z-skeleton z-skeleton--md"></div>
       <div class="z-skeleton z-skeleton--sm"></div>
-    </div>`).join("");
+    </div>`,
+    )
+    .join("");
 }
 
 function emptyState(title: string, subtitle: string, isError = false): string {
   return `
     <div class="z-empty-state${isError ? " z-empty-state--error" : ""}">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-        ${isError
-          ? `<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>`
-          : `<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`}
+        ${
+          isError
+            ? `<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>`
+            : `<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`
+        }
       </svg>
       <p>${escapeHtml(title)}</p>
       <span>${escapeHtml(subtitle)}</span>
@@ -623,6 +778,10 @@ function formatBytes(bytes: number): string {
 }
 
 function defaultStatus(): ConfigStatus {
-  const empty: EnvStatus = { configured: false, hint: null, last_updated: null };
+  const empty: EnvStatus = {
+    configured: false,
+    hint: null,
+    last_updated: null,
+  };
   return { sandbox: empty, production: empty };
 }

@@ -4,11 +4,12 @@ import {
   setLoginPrompt,
   onAuthChange,
 } from "./auth/auth.js";
+import { updateAuthUI, initActivityHistory } from "./auth/session-ui.js";
 import {
-  promptLogin,
-  initLoginDialog,
-  updateAuthUI,
-} from "./auth/login-dialog.js";
+  initServerScreen,
+  openServerScreen,
+  promptLoginOnServerScreen,
+} from "./server-screen/server-screen.js";
 import { state } from "./viewer/state.js";
 import {
   initFileInputs,
@@ -31,6 +32,7 @@ import {
 } from "./explorer/explorer.js";
 import { initZenodoPanel } from "./zenodo/zenodo-panel.js";
 import { $ } from "./shared/dom.js";
+import { initRovingTabindex } from "./shared/roving.js";
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -39,11 +41,19 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function initApp(): Promise<void> {
-  setLoginPrompt(promptLogin);
-  initLoginDialog();
+  // One login surface in the app: the server screen's auth card. A session
+  // that dies mid-operation brings the user here rather than throwing a modal
+  // over the image they are reading.
+  setLoginPrompt(promptLoginOnServerScreen);
   onAuthChange(() => updateAuthUI());
   $("btn-logout").addEventListener("click", () => void onLogout());
-  $("btn-login").addEventListener("click", () => void loadStudyExplorer());
+  $("btn-login").addEventListener("click", (e) =>
+    openServerScreen("buscar", e.currentTarget as HTMLElement),
+  );
+  // Single entry point for everything server-bound.
+  $("btn-server").addEventListener("click", (e) =>
+    openServerScreen("buscar", e.currentTarget as HTMLElement),
+  );
 
   // Local viewing works without a session — always start the app.
   startApp();
@@ -69,7 +79,13 @@ function startApp(): void {
   initResizeObserver();
   initUploadPanel();
   initStudyExplorer();
+  initServerScreen();
+  initActivityHistory();
   initZenodoPanel();
+  // Last: the rail is one tab stop, with the arrow keys moving between tools,
+  // so reaching the viewport does not mean tabbing through every tool. It
+  // reads the tool buttons at init, so it runs after they are all wired.
+  initRovingTabindex($("viewer-toolbar"), ".toolbar__tool", "vertical");
 }
 
 async function onLogout(): Promise<void> {

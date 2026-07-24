@@ -36,6 +36,8 @@ export function resetViewerToDropZone(): void {
   $("series-nav").classList.add("hidden");
   $("topbar-title").textContent = "DICOM Viewer";
   $("topbar-title").title = "";
+  // Otherwise the canvas keeps describing the study that is no longer shown.
+  $("dicom-canvas").setAttribute("aria-label", "Sin imagen cargada");
   showDropZone();
 }
 

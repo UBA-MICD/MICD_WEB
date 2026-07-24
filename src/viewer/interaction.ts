@@ -4,6 +4,7 @@ import {
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
 import { $ } from "../shared/dom.js";
+import { anyDialogOpen } from "../shared/dialog.js";
 import { state, itemCount } from "./state.js";
 import { render } from "./rendering.js";
 import { loadCurrent, openFiles, openFolder } from "./loading.js";
@@ -173,6 +174,12 @@ export function initMenuListeners(): void {
 
 export function initKeyboardShortcuts(): void {
   document.addEventListener("keydown", async (e: KeyboardEvent) => {
+    // A modal owns the keyboard while it is up. The page behind it is inert,
+    // but this listener is on `document` and still sees every key — without
+    // this guard, "m" inside the duplicate-upload dialog would toggle the
+    // metadata panel hidden behind it.
+    if (anyDialogOpen()) return;
+
     // Ignore keystrokes while typing (login dialog, search box, date filters).
     const target = e.target as HTMLElement;
     if (

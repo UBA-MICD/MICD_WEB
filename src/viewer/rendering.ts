@@ -96,18 +96,51 @@ export function updateInfoOverlay(): void {
   if (!state.parsed) return;
   const m = state.parsed.metadata;
 
-  $("overlay-tl").innerHTML = [m.patientName, m.patientId]
-    .filter(Boolean)
-    .join("<br>");
-  $("overlay-tr").innerHTML = [m.studyDate, m.modality, m.studyDescription]
-    .filter(Boolean)
-    .join("<br>");
-  $("overlay-bl").innerHTML = [
+  // Every value here comes out of the DICOM file, i.e. untrusted input, and
+  // goes into innerHTML. It was interpolated raw before, so a crafted study
+  // could inject markup — and the CSP allows 'unsafe-inline' scripts.
+  const lines = (parts: (string | number)[]): string =>
+    parts
+      .filter((part) => part !== "" && part !== null && part !== undefined)
+      .map((part) => escapeHtml(String(part)))
+      .join("<br>");
+
+  $("overlay-tl").innerHTML = lines([m.patientName, m.patientId]);
+  $("overlay-tr").innerHTML = lines([
+    m.studyDate,
+    m.modality,
+    m.studyDescription,
+  ]);
+  $("overlay-bl").innerHTML = lines([
     `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
     `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
-  ].join("<br>");
-  $("overlay-br").innerHTML = [
+  ]);
+  $("overlay-br").innerHTML = lines([
     `${m.columns} × ${m.rows}`,
     `${m.bitsStored}bit`,
-  ].join("<br>");
+  ]);
+
+  updateCanvasLabel();
+}
+
+/**
+ * The canvas is the whole point of the app and was an unlabelled black box to
+ * assistive tech. Describe what is on it, refreshed whenever the overlay is.
+ */
+function updateCanvasLabel(): void {
+  if (!state.parsed) return;
+  const m = state.parsed.metadata;
+  const count = itemCount();
+
+  const parts = [
+    "Imagen DICOM",
+    m.patientName && `paciente ${m.patientName}`,
+    m.modality,
+    m.studyDate,
+    m.studyDescription,
+    count > 1 && `imagen ${state.currentIndex + 1} de ${count}`,
+    `${m.columns} por ${m.rows} píxeles`,
+  ].filter(Boolean);
+
+  $("dicom-canvas").setAttribute("aria-label", parts.join(", "));
 }

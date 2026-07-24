@@ -120,6 +120,8 @@ body {
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  /* Keeps drags from selecting chrome, without making DICOM values
+     unselectable: the metadata table and overlays opt back in below. */
   user-select: none;
   /* Column flex so the status banner takes its height off the top instead of
      pushing the 100vh shell past the bottom of the window. */
@@ -852,6 +854,7 @@ body {
 /* ── Info Overlays (HUD) ──────────────────────────────────────────────────── */
 .overlay {
   position: absolute;
+  user-select: text;
   font-size: 11px;
   font-family: var(--font-mono);
   color: rgba(255, 255, 255, 0.7);
@@ -1082,6 +1085,8 @@ body {
 .metadata-table {
   width: 100%;
   border-collapse: collapse;
+  /* Tag values exist to be read and copied out. */
+  user-select: text;
 }
 
 .metadata-table tr {

@@ -5,6 +5,7 @@ import {
 } from "../dicom/dicom-renderer.js";
 import { $ } from "../shared/dom.js";
 import { anyDialogOpen } from "../shared/dialog.js";
+import { currentScreen } from "../shared/screen.js";
 import { state, itemCount } from "./state.js";
 import { render } from "./rendering.js";
 import { loadCurrent, openFiles, openFolder } from "./loading.js";
@@ -172,6 +173,56 @@ export function initMenuListeners(): void {
 
 // ── Keyboard Shortcuts ───────────────────────────────────────────────────────
 
+/**
+ * How far one arrow press moves each tool. Shift multiplies by COARSE so the
+ * same keys cover both a nudge and a sweep.
+ */
+const STEP = { window: 20, zoom: 1.1, pan: 10 };
+const COARSE = 5;
+
+/**
+ * Adjusts the active tool from the keyboard. Window/level, zoom and pan were
+ * mouse-drag only, which made the app's core interaction unusable without a
+ * pointer — a WCAG 2.1.1 failure. Returns true if the key was handled.
+ */
+function adjustActiveTool(e: KeyboardEvent): boolean {
+  if (!state.parsed) return false;
+
+  const fast = e.shiftKey ? COARSE : 1;
+  const horizontal =
+    e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+  const vertical = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+  if (horizontal === 0 && vertical === 0) return false;
+
+  switch (state.activeTool) {
+    case "wl":
+      state.viewport.windowWidth = Math.max(
+        1,
+        state.viewport.windowWidth + horizontal * STEP.window * fast,
+      );
+      state.viewport.windowCenter += vertical * STEP.window * fast;
+      break;
+    case "zoom": {
+      // Right/Up zoom in, Left/Down zoom out — the same sense as the
+      // mouse-drag mapping.
+      const direction = horizontal !== 0 ? horizontal : -vertical;
+      const factor = STEP.zoom ** (direction * fast);
+      state.viewport.zoom = Math.max(
+        0.1,
+        Math.min(10, state.viewport.zoom * factor),
+      );
+      break;
+    }
+    case "pan":
+      state.viewport.panX += horizontal * STEP.pan * fast;
+      state.viewport.panY += vertical * STEP.pan * fast;
+      break;
+  }
+
+  render();
+  return true;
+}
+
 export function initKeyboardShortcuts(): void {
   document.addEventListener("keydown", async (e: KeyboardEvent) => {
     // A modal owns the keyboard while it is up. The page behind it is inert,
@@ -179,8 +230,14 @@ export function initKeyboardShortcuts(): void {
     // this guard, "m" inside the duplicate-upload dialog would toggle the
     // metadata panel hidden behind it.
     if (anyDialogOpen()) return;
+    // Same reasoning for the server screen: the viewer is inert, but this
+    // listener still fires.
+    if (currentScreen() !== "viewer") return;
+    // A composite widget (the tool rail, a listbox) that already consumed the
+    // key has called preventDefault; don't act on it a second time.
+    if (e.defaultPrevented) return;
 
-    // Ignore keystrokes while typing (login dialog, search box, date filters).
+    // Ignore keystrokes while typing (search box, date filters, login card).
     const target = e.target as HTMLElement;
     if (
       target instanceof HTMLInputElement ||
@@ -190,16 +247,28 @@ export function initKeyboardShortcuts(): void {
       return;
     }
 
-    if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    // Arrows drive the active tool; series navigation moves to PageUp/PageDown
+    // so both are reachable without a pointer.
+    if (adjustActiveTool(e)) {
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "PageUp") {
+      e.preventDefault();
       if (state.currentIndex > 0) {
         state.currentIndex--;
         await loadCurrent();
       }
-    } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      return;
+    }
+    if (e.key === "PageDown") {
+      e.preventDefault();
       if (state.currentIndex < itemCount() - 1) {
         state.currentIndex++;
         await loadCurrent();
       }
+      return;
     }
 
     if (e.key === "w" || e.key === "W") {

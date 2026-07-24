@@ -299,7 +299,13 @@
           <!-- Viewport -->
           <div class="viewport-wrapper">
             <div class="viewport-container cursor-wl" id="viewport-container">
-              <canvas id="dicom-canvas"></canvas>
+              <!-- role="img" + a label written from the DICOM metadata; this
+                 was an unlabelled black box to assistive tech. -->
+              <canvas
+                id="dicom-canvas"
+                role="img"
+                aria-label="Sin imagen cargada"
+              ></canvas>
 
               <!-- Info overlays (HUD) -->
               <div class="overlay overlay--tl" id="overlay-tl"></div>
@@ -359,6 +365,13 @@
                   <p class="drop-zone__note">
                     Ver archivos locales no requiere iniciar sesión. Usá
                     <strong>Servidor</strong> para buscar o subir estudios.
+                  </p>
+                  <p class="drop-zone__shortcuts">
+                    <kbd>W</kbd> <kbd>Z</kbd> <kbd>P</kbd> eligen la herramienta
+                    · <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> la
+                    ajustan (<kbd>Shift</kbd> para saltos grandes) ·
+                    <kbd>Re Pág</kbd><kbd>Av Pág</kbd> cambian de imagen ·
+                    <kbd>R</kbd> restablece · <kbd>M</kbd> muestra las etiquetas
                   </p>
                 </div>
               </div>

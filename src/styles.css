@@ -422,6 +422,43 @@ body {
   color: var(--text-muted);
 }
 
+/* ── Activity history ─────────────────────────────────────────────────────── */
+.dialog--wide {
+  width: min(560px, 92vw);
+}
+.activity-body {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.activity-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 12px 0;
+}
+.activity-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg-base);
+  border-radius: var(--radius-sm);
+}
+.activity-item__action {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.activity-item__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 /* ── Status banner ────────────────────────────────────────────────────────── */
 /* Sits above every screen and pushes the layout down rather than covering the
    topbar, so it can't hide the controls it is reporting on. */
@@ -1158,6 +1195,10 @@ body {
 /* Session state in the panel footer rather than behind a modal, so it is
    readable at a glance. */
 .explorer-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   padding: 10px 16px;
   border-top: 1px solid var(--border);
   font-size: 11px;

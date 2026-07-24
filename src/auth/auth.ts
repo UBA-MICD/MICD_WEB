@@ -21,6 +21,8 @@ export interface AuthUser {
 
 let accessToken: string | null = null;
 let currentUser: AuthUser | null = null;
+/** Epoch ms the access token expires, from its `exp` claim. */
+let accessTokenExpiresAt: number | null = null;
 
 // ── Session state & change notifications ─────────────────────────────────────
 
@@ -49,24 +51,45 @@ export function isAuthenticated(): boolean {
 }
 
 /**
- * Recovers the user from the access token's JWT claims (sub/email).
- * Needed after /auth/refresh, whose response carries no user object.
+ * When the current access token expires, in epoch ms, or null without a
+ * session. Read from the token's own `exp` claim rather than timed locally,
+ * so it stays right across a suspended laptop or a clock the app never saw.
  */
-function decodeUserFromToken(token: string): AuthUser | null {
+export function getSessionExpiresAt(): number | null {
+  return accessTokenExpiresAt;
+}
+
+/**
+ * Reads the access token's JWT claims: the user (sub/email), needed after
+ * /auth/refresh whose response carries no user object, and `exp`, which drives
+ * the session countdown.
+ *
+ * These are display-only claims off a token the server will verify anyway —
+ * nothing here is a security decision.
+ */
+function decodeToken(token: string): {
+  user: AuthUser | null;
+  expiresAt: number | null;
+} {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const claims = JSON.parse(atob(base64));
-    if (typeof claims.sub !== "number" || typeof claims.email !== "string")
-      return null;
-    return { id: claims.sub, email: claims.email };
+    const user =
+      typeof claims.sub === "number" && typeof claims.email === "string"
+        ? { id: claims.sub, email: claims.email }
+        : null;
+    // `exp` is in seconds since the epoch, per RFC 7519.
+    const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : null;
+    return { user, expiresAt };
   } catch {
-    return null;
+    return { user: null, expiresAt: null };
   }
 }
 
 function setSession(token: string, refreshToken: string, user: AuthUser): void {
   accessToken = token;
   currentUser = user;
+  accessTokenExpiresAt = decodeToken(token).expiresAt;
   localStorage.setItem(REFRESH_KEY, refreshToken);
   notifyAuthChange();
 }
@@ -74,6 +97,7 @@ function setSession(token: string, refreshToken: string, user: AuthUser): void {
 function clearSession(): void {
   accessToken = null;
   currentUser = null;
+  accessTokenExpiresAt = null;
   localStorage.removeItem(REFRESH_KEY);
   notifyAuthChange();
 }
@@ -164,8 +188,10 @@ async function doRefresh(): Promise<boolean> {
   }
 
   const data = await res.json();
+  const claims = decodeToken(data.accessToken);
   accessToken = data.accessToken;
-  currentUser = decodeUserFromToken(data.accessToken) ?? currentUser;
+  currentUser = claims.user ?? currentUser;
+  accessTokenExpiresAt = claims.expiresAt;
   localStorage.setItem(REFRESH_KEY, data.refreshToken);
   notifyAuthChange();
   return true;

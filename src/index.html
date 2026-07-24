@@ -606,6 +606,9 @@
             <span id="explorer-session-line"
               >Sin sesión · solo lectura local</span
             >
+            <button class="btn-link hidden" id="btn-activity">
+              Ver historial de actividad
+            </button>
           </div>
         </aside>
       </div>
@@ -926,6 +929,39 @@
         </footer>
       </div>
     </section>
+
+    <!-- Announced once when the session is nearly over. Separate from the
+         visible countdown, which updates every second and must not be live. -->
+    <p
+      id="session-announce"
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+    ></p>
+
+    <!-- Activity history -->
+    <div id="activity-dialog" class="dialog-overlay hidden">
+      <div
+        class="dialog dialog--wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="activity-title"
+      >
+        <h3 class="dialog__title" id="activity-title">
+          Historial de actividad
+        </h3>
+        <div id="activity-body" class="activity-body"></div>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--secondary"
+            id="activity-close"
+            data-dialog-autofocus
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Duplicate confirmation dialog -->
     <div id="duplicate-dialog" class="dialog-overlay hidden">

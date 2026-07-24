@@ -893,26 +893,37 @@
             </div>
           </div>
 
-          <div
-            id="upload-progress-wrap"
-            class="upload-progress hidden"
-            role="progressbar"
-            aria-label="Progreso de carga"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-valuenow="0"
-          >
-            <div id="upload-progress-bar" class="upload-progress__bar"></div>
-          </div>
-          <span
-            id="upload-status"
-            class="upload-status"
-            role="status"
-            aria-live="polite"
-          ></span>
+          <!-- One row per file. Not a live region: per-byte updates would
+               flood a screen reader. The per-file count below is announced
+               instead, and each bar carries aria-valuenow for on-demand
+               reading. -->
+          <ul class="upload-rows" id="upload-rows"></ul>
+
+          <p class="upload-summary">
+            <span
+              id="upload-status"
+              class="upload-status"
+              role="status"
+              aria-live="polite"
+            ></span>
+            <span
+              id="upload-percent"
+              class="upload-percent"
+              aria-hidden="true"
+            ></span>
+          </p>
 
           <p class="upload-note" id="upload-note"></p>
         </div>
+
+        <footer class="server-panel__actions">
+          <button class="btn btn--secondary" id="btn-upload-cancel">
+            Cancelar
+          </button>
+          <button class="btn btn--accent" id="btn-upload-finish">
+            Finalizar
+          </button>
+        </footer>
       </div>
     </section>
 

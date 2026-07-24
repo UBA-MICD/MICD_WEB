@@ -18,6 +18,7 @@ import {
   openStudy,
   clearSelection,
 } from "../explorer/explorer.js";
+import { cancelUpload, isUploading } from "../upload/upload.js";
 import { $ } from "../shared/dom.js";
 import { showBanner } from "../shared/banner.js";
 import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
@@ -181,9 +182,19 @@ export function initServerScreen(): void {
   onSelectionActivate((studyId) => void openSelectedStudy(studyId));
   $("btn-buscar-cancel").addEventListener("click", () => closeServerScreen());
 
+  // Cargar footer. Cancelar stops anything in flight before leaving, so a
+  // half-finished queue can't keep running against a screen you have left.
+  $("btn-upload-cancel").addEventListener("click", () => {
+    cancelUpload();
+    closeServerScreen();
+  });
+  $("btn-upload-finish").addEventListener("click", () => closeServerScreen());
+
   // Escape leaves the screen, matching the back link.
   $("server-screen").addEventListener("keydown", (e: KeyboardEvent) => {
     if (e.key !== "Escape" || currentScreen() !== "server") return;
+    // Leaving mid-upload would orphan the queue; make the user decide.
+    if (isUploading()) return;
     e.preventDefault();
     closeServerScreen();
   });

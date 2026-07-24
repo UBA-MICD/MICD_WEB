@@ -1,8 +1,4 @@
-import {
-  authFetch,
-  ensureAuthenticated,
-  API_BASE,
-} from "../auth/auth.js";
+import { authFetch, ensureAuthenticated, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
 
@@ -37,6 +33,20 @@ const explorerState = {
   dateFrom: "",
   dateTo: "",
 };
+
+/**
+ * Selects one modality chip. The chips are toggle buttons, so the visual
+ * .filter-chip--active class and aria-pressed have to move together — a
+ * screen reader has no way to perceive the class.
+ */
+function setActiveChip(container: HTMLElement, chip: HTMLElement): void {
+  container.querySelectorAll(".filter-chip").forEach((c) => {
+    c.classList.remove("filter-chip--active");
+    c.setAttribute("aria-pressed", "false");
+  });
+  chip.classList.add("filter-chip--active");
+  chip.setAttribute("aria-pressed", "true");
+}
 
 function updateClearFiltersVisibility(): void {
   const active =
@@ -98,10 +108,7 @@ export function initStudyExplorer(): void {
   chipsContainer.addEventListener("click", (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>(".filter-chip");
     if (!chip) return;
-    chipsContainer
-      .querySelectorAll(".filter-chip")
-      .forEach((c) => c.classList.remove("filter-chip--active"));
-    chip.classList.add("filter-chip--active");
+    setActiveChip(chipsContainer, chip);
     explorerState.modality = chip.dataset.modality ?? "";
     explorerState.page = 1;
     updateClearFiltersVisibility();
@@ -133,12 +140,10 @@ export function initStudyExplorer(): void {
     searchClear.classList.add("hidden");
     ($("filter-date-from") as HTMLInputElement).value = "";
     ($("filter-date-to") as HTMLInputElement).value = "";
-    chipsContainer
-      .querySelectorAll(".filter-chip")
-      .forEach((c) => c.classList.remove("filter-chip--active"));
-    chipsContainer
-      .querySelector<HTMLElement>('.filter-chip[data-modality=""]')
-      ?.classList.add("filter-chip--active");
+    const allChip = chipsContainer.querySelector<HTMLElement>(
+      '.filter-chip[data-modality=""]',
+    );
+    if (allChip) setActiveChip(chipsContainer, allChip);
     updateClearFiltersVisibility();
     void loadStudyExplorer();
   });

@@ -10,28 +10,54 @@
   display: none !important;
 }
 
+/* Visually hidden, still read by screen readers. Pairs with .skip-link, which
+   un-hides itself on focus. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Contrast ratios below were measured, not eyeballed. Text tokens clear WCAG AA
+   (4.5:1) against every surface they are used on — --text-muted is the floor at
+   4.78:1 on --bg-active. --text-dim is deliberately BELOW 4.5:1: it is for
+   non-text UI only (dashed borders, decorative rules), never for copy. */
 :root {
-  --bg-base: #0a0a0f;
-  --bg-surface: #111118;
-  --bg-elevated: #1a1a24;
-  --bg-hover: #222230;
-  --bg-active: #2a2a3a;
+  --bg-base: #0d0f11;
+  --bg-surface: #131619;
+  --bg-elevated: #1a1e22;
+  --bg-hover: #22272c;
+  --bg-active: #2a3036;
 
-  --accent: #00d4aa;
-  --accent-dim: #00a888;
-  --accent-soft: rgba(0, 212, 170, 0.12);
-  --accent-glow: rgba(0, 212, 170, 0.25);
+  --accent: #2ee6a8;
+  --accent-dim: #21c48e;
+  --accent-soft: rgba(46, 230, 168, 0.12);
+  --accent-glow: rgba(46, 230, 168, 0.25);
+  /* Near-black used for text on solid --accent fills — 11.8:1. */
+  --on-accent: #06120e;
 
-  --cyan: #00c8ff;
-  --cyan-soft: rgba(0, 200, 255, 0.12);
+  --amber: #e0a458;
+  --amber-soft: rgba(224, 164, 88, 0.12);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.12);
 
-  --text-primary: #e8e8f0;
-  --text-secondary: #8888a0;
-  --text-muted: #555568;
-  --text-dim: #3a3a4a;
+  --text-primary: #e9eef0;
+  --text-secondary: #a3adb4;
+  --text-muted: #939ca3;
+  --text-dim: #626c73;
 
-  --border: rgba(255, 255, 255, 0.06);
-  --border-accent: rgba(0, 212, 170, 0.3);
+  /* Decorative hairline between regions. Control boundaries that carry meaning
+     on their own (inputs, outline buttons) must use --border-strong, which
+     clears the 3:1 of WCAG 1.4.11. */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: #626c73;
+  --border-accent: rgba(46, 230, 168, 0.35);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -42,6 +68,49 @@
   --font: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
   --transition: 0.18s ease;
+}
+
+/* ── Focus visibility ─────────────────────────────────────────────────────── */
+/* The app had no focus styling at all before this. Keyboard users need every
+   interactive element to show where they are. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 500;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 0s;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {
@@ -183,7 +252,7 @@ body {
 
 .btn--accent {
   background: var(--accent);
-  color: #0a0a0f;
+  color: var(--on-accent);
   border-color: var(--accent);
   font-weight: 600;
 }
@@ -368,12 +437,12 @@ body {
 }
 
 .drop-zone.drag-over {
-  background: rgba(0, 212, 170, 0.04);
+  background: var(--accent-soft);
 }
 
 .drop-zone.drag-over .drop-zone__content {
   border-color: var(--accent);
-  background: rgba(0, 212, 170, 0.06);
+  background: var(--accent-soft);
 }
 
 .drop-zone__content {
@@ -442,7 +511,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: rgba(10, 10, 15, 0.85);
+  background: rgba(13, 15, 17, 0.85);
   backdrop-filter: blur(8px);
   z-index: 30;
   font-size: 14px;
@@ -475,10 +544,10 @@ body {
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 20px;
-  background: rgba(255, 80, 80, 0.15);
-  border: 1px solid rgba(255, 80, 80, 0.3);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
   border-radius: var(--radius-md);
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 13px;
   z-index: 30;
   backdrop-filter: blur(8px);
@@ -635,7 +704,7 @@ body {
   color: var(--accent);
 }
 .upload-status--error {
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 /* ── Study Explorer ───────────────────────────────────────────────────────── */
@@ -670,15 +739,20 @@ body {
   color: var(--text-primary);
 }
 
+/* min-width/height 24px satisfies WCAG 2.2 SC 2.5.8 (target size, minimum);
+   the 14px glyph alone was a 22px target. */
 .icon-btn {
   background: none;
   border: none;
   cursor: pointer;
   color: var(--text-secondary);
   padding: 4px;
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 4px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 .icon-btn:hover {
   background: var(--bg-hover);
@@ -735,9 +809,12 @@ body {
   cursor: pointer;
   color: var(--text-muted);
   padding: 3px;
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
+  justify-content: center;
   transition:
     color 0.15s,
     background 0.15s;
@@ -762,13 +839,16 @@ body {
 .filter-chip {
   flex-shrink: 0;
   background: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
   font-family: inherit;
   padding: 3px 10px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   letter-spacing: 0.04em;
   transition:
@@ -798,7 +878,7 @@ body {
   flex: 1;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
   outline: none;
   color: var(--text-secondary);
   font-size: 11px;
@@ -819,7 +899,7 @@ body {
   transform: scale(0.85);
 }
 .filter-dates__sep {
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-size: 10px;
   flex-shrink: 0;
 }
@@ -950,7 +1030,7 @@ body {
   cursor: default;
 }
 .study-item--error {
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 .study-item--empty {
@@ -1060,7 +1140,7 @@ body {
 }
 .login-field input {
   background: var(--bg-base);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 8px 10px;
   color: var(--text-primary);
@@ -1073,7 +1153,7 @@ body {
 }
 .login-error {
   font-size: 12px;
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 .session-email {

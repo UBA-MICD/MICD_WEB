@@ -1,6 +1,4 @@
-import {
-  calculateAutoWindowLevel,
-} from "../dicom/dicom-parser-util.js";
+import { calculateAutoWindowLevel } from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
   fitToContainer,
@@ -54,6 +52,10 @@ export function initToolbar(): void {
     state.isMetadataOpen = !state.isMetadataOpen;
     $("metadata-panel").classList.toggle("open", state.isMetadataOpen);
     $("tool-metadata").classList.toggle("active", state.isMetadataOpen);
+    $("tool-metadata").setAttribute(
+      "aria-expanded",
+      String(state.isMetadataOpen),
+    );
   });
 
   $("btn-open").addEventListener("click", openFiles);
@@ -62,10 +64,15 @@ export function initToolbar(): void {
 }
 
 function updateToolbarUI(): void {
-  document
-    .querySelectorAll(".toolbar__tool")
-    .forEach((el) => el.classList.remove("active"));
-  $(`tool-${state.activeTool}`).classList.add("active");
+  // Only the three mode tools are mutually exclusive. Clearing every
+  // .toolbar__tool would also strip the metadata toggle's state, leaving its
+  // class and aria-expanded disagreeing with the open panel.
+  (["wl", "zoom", "pan"] as const).forEach((tool) => {
+    const btn = $(`tool-${tool}`);
+    const isActive = tool === state.activeTool;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
+  });
 
   const viewport = $("viewport-container");
   viewport.className = "viewport-container";

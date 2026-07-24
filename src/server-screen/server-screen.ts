@@ -18,7 +18,11 @@ import {
   openStudy,
   clearSelection,
 } from "../explorer/explorer.js";
-import { cancelUpload, isUploading } from "../upload/upload.js";
+import {
+  cancelUpload,
+  isUploading,
+  onUploadComplete,
+} from "../upload/upload.js";
 import { $ } from "../shared/dom.js";
 import { showBanner } from "../shared/banner.js";
 import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
@@ -189,6 +193,27 @@ export function initServerScreen(): void {
     closeServerScreen();
   });
   $("btn-upload-finish").addEventListener("click", () => closeServerScreen());
+
+  // Screen 05: a clean upload opens the study and returns on its own — no
+  // manual navigation back. Anything that went wrong keeps the user here with
+  // the per-file rows and the error still on screen.
+  onUploadComplete(async (summary) => {
+    // Duplicates count as "stay put" too: they are not failures, but returning
+    // automatically would hide the fact that some files were skipped.
+    const clean =
+      !summary.cancelled &&
+      summary.errors === 0 &&
+      summary.duplicates === 0 &&
+      summary.ok > 0;
+    if (!clean) return;
+    if (summary.studyId) await openStudy(summary.studyId);
+    closeServerScreen();
+    showBanner(
+      summary.ok === 1
+        ? "Estudio cargado · volviendo al visualizador"
+        : `${summary.ok} estudios cargados · volviendo al visualizador`,
+    );
+  });
 
   // Escape leaves the screen, matching the back link.
   $("server-screen").addEventListener("keydown", (e: KeyboardEvent) => {

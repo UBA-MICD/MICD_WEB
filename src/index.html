@@ -928,7 +928,15 @@
         <p id="duplicate-msg" class="dialog__msg"></p>
         <div class="dialog__actions">
           <button class="btn btn--danger" id="duplicate-yes">Reemplazar</button>
-          <button class="btn btn--secondary" id="duplicate-no">Cancelar</button>
+          <!-- Focus lands on the safe option, not on "Reemplazar", which
+               overwrites an existing study. -->
+          <button
+            class="btn btn--secondary"
+            id="duplicate-no"
+            data-dialog-autofocus
+          >
+            Cancelar
+          </button>
         </div>
       </div>
     </div>

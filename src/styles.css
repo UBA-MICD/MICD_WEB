@@ -1171,7 +1171,9 @@ body {
   letter-spacing: 0.03em;
   cursor: pointer;
   padding: 8px 4px 10px;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 .z-tab:hover {
   color: var(--text-secondary);
@@ -1231,7 +1233,9 @@ body {
   overflow-x: auto;
   scrollbar-width: none;
 }
-.z-search-filters::-webkit-scrollbar { display: none; }
+.z-search-filters::-webkit-scrollbar {
+  display: none;
+}
 
 .z-env-toggle {
   display: flex;
@@ -1265,9 +1269,16 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--bg-active) transparent;
 }
-.z-results::-webkit-scrollbar { width: 4px; }
-.z-results::-webkit-scrollbar-track { background: transparent; }
-.z-results::-webkit-scrollbar-thumb { background: var(--bg-active); border-radius: 4px; }
+.z-results::-webkit-scrollbar {
+  width: 4px;
+}
+.z-results::-webkit-scrollbar-track {
+  background: transparent;
+}
+.z-results::-webkit-scrollbar-thumb {
+  background: var(--bg-active);
+  border-radius: 4px;
+}
 
 .z-record-card {
   padding: 11px 14px;
@@ -1374,8 +1385,13 @@ body {
 
 /* ── Skeletons ────────────────────────────────────────────────────────────── */
 @keyframes z-pulse {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 .z-skeleton-card {
   padding: 12px 14px;
@@ -1389,9 +1405,18 @@ body {
   border-radius: 4px;
   animation: z-pulse 1.2s ease-in-out infinite;
 }
-.z-skeleton--lg { height: 12px; width: 85%; }
-.z-skeleton--md { height: 10px; width: 55%; }
-.z-skeleton--sm { height: 9px; width: 35%; }
+.z-skeleton--lg {
+  height: 12px;
+  width: 85%;
+}
+.z-skeleton--md {
+  height: 10px;
+  width: 55%;
+}
+.z-skeleton--sm {
+  height: 9px;
+  width: 35%;
+}
 
 /* ── Config tab ───────────────────────────────────────────────────────────── */
 .z-config-scroll {
@@ -1638,4 +1663,140 @@ body {
 }
 .toolbar__tool--zenodo.active svg {
   filter: drop-shadow(0 0 4px rgba(0, 200, 255, 0.4));
+}
+
+/* ── US 1: Stack Slider & Controls ───────────────────────────────────────── */
+.nav-slider {
+  width: 110px;
+  height: 4px;
+  border-radius: 2px;
+  accent-color: var(--accent);
+  background: var(--bg-elevated);
+  cursor: pointer;
+}
+.nav-slider:hover {
+  accent-color: var(--cyan);
+}
+
+.toolbar__tool:disabled,
+.toolbar__tool.disabled {
+  opacity: 0.4;
+  cursor: not-allowed !important;
+  pointer-events: auto !important;
+}
+
+/* ── US 2: MPR (Multiplanar Reconstruction) ─────────────────────────────── */
+.mpr-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 15;
+  background: var(--bg-base);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 10px;
+}
+
+.mpr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.mpr-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.mpr-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+.mpr-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.mpr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.mpr-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mpr-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mpr-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mpr-panel__canvas-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+
+.mpr-panel__canvas-wrap canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: crosshair;
+}
+
+.mpr-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.mpr-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }

@@ -49,6 +49,13 @@ export interface DicomMetadata {
 
   // Transfer syntax
   transferSyntaxUid: string;
+
+  // Volumetric / Geometry
+  pixelSpacing?: [number, number]; // [rowSpacing, colSpacing] (0028,0030)
+  imagePositionPatient?: [number, number, number]; // [x, y, z] (0020,0032)
+  imageOrientationPatient?: number[]; // [Rx, Ry, Rz, Cx, Cy, Cz] (0020,0037)
+  sliceThickness?: number; // (0028,0050)
+  spacingBetweenSlices?: number; // (0018,0088)
 }
 
 export interface ParsedDicom {
@@ -116,6 +123,36 @@ function extractMetadata(dataSet: any): DicomMetadata {
     windowWidth = parseFloat(parts[0]) || 0;
   }
 
+  // Parse PixelSpacing (0028,0030)
+  const psStr = safeString(dataSet, "x00280030");
+  let pixelSpacing: [number, number] | undefined = undefined;
+  if (psStr) {
+    const parts = psStr.split("\\").map((p) => parseFloat(p.trim()));
+    if (parts.length >= 2 && !parts.some((n) => isNaN(n))) {
+      pixelSpacing = [parts[0], parts[1]];
+    }
+  }
+
+  // Parse ImagePositionPatient (0020,0032)
+  const ippStr = safeString(dataSet, "x00200032");
+  let imagePositionPatient: [number, number, number] | undefined = undefined;
+  if (ippStr) {
+    const parts = ippStr.split("\\").map((p) => parseFloat(p.trim()));
+    if (parts.length >= 3 && !parts.some((n) => isNaN(n))) {
+      imagePositionPatient = [parts[0], parts[1], parts[2]];
+    }
+  }
+
+  // Parse ImageOrientationPatient (0020,0037)
+  const iopStr = safeString(dataSet, "x00200037");
+  let imageOrientationPatient: number[] | undefined = undefined;
+  if (iopStr) {
+    const parts = iopStr.split("\\").map((p) => parseFloat(p.trim()));
+    if (parts.length >= 6 && !parts.some((n) => isNaN(n))) {
+      imageOrientationPatient = parts;
+    }
+  }
+
   return {
     // Patient
     patientName: formatPatientName(safeString(dataSet, "x00100010")),
@@ -157,7 +194,56 @@ function extractMetadata(dataSet: any): DicomMetadata {
 
     // Transfer
     transferSyntaxUid: safeString(dataSet, "x00020010"),
+
+    // Volumetric / Geometry
+    pixelSpacing,
+    imagePositionPatient,
+    imageOrientationPatient,
+    sliceThickness: safeFloat(dataSet, "x00280050", 0) || undefined,
+    spacingBetweenSlices: safeFloat(dataSet, "x00180088", 0) || undefined,
   };
+}
+
+// ── Volumetric Tags Validation ───────────────────────────────────────────────
+
+export interface VolumetricValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+export function validateVolumetricTags(
+  metadataList: DicomMetadata[],
+): VolumetricValidationResult {
+  if (!metadataList || metadataList.length <= 1) {
+    return {
+      valid: false,
+      reason:
+        "El estudio no es compatible con MPR: requiere una serie con más de 1 corte.",
+    };
+  }
+
+  for (let i = 0; i < metadataList.length; i++) {
+    const meta = metadataList[i];
+    if (
+      !meta.pixelSpacing ||
+      meta.pixelSpacing.length < 2 ||
+      meta.pixelSpacing[0] <= 0 ||
+      meta.pixelSpacing[1] <= 0
+    ) {
+      return {
+        valid: false,
+        reason: `Estudio no compatible con MPR: falta el tag PixelSpacing (0028,0030) o es inválido en el corte ${i + 1}.`,
+      };
+    }
+    if (!meta.imagePositionPatient || meta.imagePositionPatient.length < 3) {
+      return {
+        valid: false,
+        reason: `Estudio no compatible con MPR: falta el tag ImagePositionPatient (0020,0032) en el corte ${i + 1}.`,
+      };
+    }
+  }
+
+  return { valid: true };
 }
 
 // ── Pixel Data Extraction ────────────────────────────────────────────────────

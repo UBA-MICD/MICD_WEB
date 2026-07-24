@@ -1,6 +1,4 @@
-import {
-  calculateAutoWindowLevel,
-} from "../dicom/dicom-parser-util.js";
+import { calculateAutoWindowLevel } from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
   fitToContainer,
@@ -9,6 +7,7 @@ import { $ } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 import { render } from "./rendering.js";
 import { loadCurrent, openFiles, openFolder } from "./loading.js";
+import { mprViewer } from "./mpr.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +55,13 @@ export function initToolbar(): void {
     $("tool-metadata").classList.toggle("active", state.isMetadataOpen);
   });
 
+  $("tool-mpr")?.addEventListener("click", () => {
+    const btn = $("tool-mpr") as HTMLButtonElement | null;
+    if (btn && !btn.disabled) {
+      void mprViewer.openMPR();
+    }
+  });
+
   $("btn-open").addEventListener("click", openFiles);
 
   updateToolbarUI();
@@ -65,7 +71,11 @@ function updateToolbarUI(): void {
   document
     .querySelectorAll(".toolbar__tool")
     .forEach((el) => el.classList.remove("active"));
-  $(`tool-${state.activeTool}`).classList.add("active");
+
+  const activeBtn = $(`tool-${state.activeTool}`);
+  if (activeBtn) {
+    activeBtn.classList.add("active");
+  }
 
   const viewport = $("viewport-container");
   viewport.className = "viewport-container";
@@ -120,17 +130,33 @@ export function initViewportInteraction(): void {
     state.isDragging = false;
   });
 
+  // Stack Scrolling on mouse wheel (US 1)
   container.addEventListener(
     "wheel",
-    (e: WheelEvent) => {
+    async (e: WheelEvent) => {
       if (!state.parsed) return;
       e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
-      state.viewport.zoom = Math.max(
-        0.1,
-        Math.min(10, state.viewport.zoom * zoomFactor),
-      );
-      render();
+
+      const total = itemCount();
+      if (total > 1 && !e.ctrlKey && !e.metaKey) {
+        // Scroll slice navigation
+        const delta = e.deltaY > 0 ? 1 : -1;
+        const targetIndex = state.currentIndex + delta;
+
+        // Manejar el límite silencioso: no arrojar error ni romper la UI
+        if (targetIndex >= 0 && targetIndex < total) {
+          state.currentIndex = targetIndex;
+          await loadCurrent();
+        }
+      } else {
+        // Zoom on wheel when Ctrl is pressed or single image
+        const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
+        state.viewport.zoom = Math.max(
+          0.1,
+          Math.min(10, state.viewport.zoom * zoomFactor),
+        );
+        render();
+      }
     },
     { passive: false },
   );
@@ -152,6 +178,17 @@ export function initSeriesNav(): void {
       await loadCurrent();
     }
   });
+
+  const slider = $("nav-slider") as HTMLInputElement | null;
+  if (slider) {
+    slider.addEventListener("input", async () => {
+      const val = parseInt(slider.value, 10);
+      if (val >= 0 && val < itemCount() && val !== state.currentIndex) {
+        state.currentIndex = val;
+        await loadCurrent();
+      }
+    });
+  }
 }
 
 // ── Menu Events (Electron only) ──────────────────────────────────────────────
@@ -162,7 +199,7 @@ export function initMenuListeners(): void {
   window.api.on("menu:open-folder", () => void openFolder());
 }
 
-// ── Keyboard Shortcuts ───────────────────────────────────────────────────────
+// ── Keyboard Shortcuts (US 1) ────────────────────────────────────────────────
 
 export function initKeyboardShortcuts(): void {
   document.addEventListener("keydown", async (e: KeyboardEvent) => {
@@ -176,13 +213,17 @@ export function initKeyboardShortcuts(): void {
       return;
     }
 
+    const total = itemCount();
+
     if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      // Límite silencioso: si está en 0, no hace nada
       if (state.currentIndex > 0) {
         state.currentIndex--;
         await loadCurrent();
       }
     } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      if (state.currentIndex < itemCount() - 1) {
+      // Límite silencioso: si está en el último corte, no hace nada
+      if (state.currentIndex < total - 1) {
         state.currentIndex++;
         await loadCurrent();
       }

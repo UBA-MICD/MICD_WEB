@@ -1,8 +1,4 @@
-import {
-  authFetch,
-  ensureAuthenticated,
-  API_BASE,
-} from "../auth/auth.js";
+import { authFetch, ensureAuthenticated, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
 

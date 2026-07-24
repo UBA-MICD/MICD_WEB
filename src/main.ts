@@ -29,6 +29,7 @@ import {
   loadStudyExplorer,
   renderLoggedOutExplorer,
 } from "./explorer/explorer.js";
+import { initZenodoPanel } from "./zenodo/zenodo-panel.js";
 import { $ } from "./shared/dom.js";
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ function startApp(): void {
   initResizeObserver();
   initUploadPanel();
   initStudyExplorer();
+  initZenodoPanel();
 }
 
 async function onLogout(): Promise<void> {

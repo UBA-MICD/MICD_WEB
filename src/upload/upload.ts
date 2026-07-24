@@ -46,6 +46,16 @@ export function initUploadPanel(): void {
   $("btn-refresh-studies")?.addEventListener("click", loadStudyExplorer);
 }
 
+/**
+ * Moves the progress bar. The width alone is invisible to assistive tech, so
+ * aria-valuenow on the role="progressbar" wrapper has to move with it.
+ */
+function setUploadProgress(percent: number): void {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  $("upload-progress-bar").style.width = `${clamped}%`;
+  $("upload-progress-wrap").setAttribute("aria-valuenow", String(clamped));
+}
+
 async function uploadFile(
   file: File,
   force = false,
@@ -58,10 +68,9 @@ async function uploadFile(
   }
 
   const progressWrap = $("upload-progress-wrap");
-  const progressBar = $("upload-progress-bar");
 
   progressWrap.classList.remove("hidden");
-  progressBar.style.width = "0%";
+  setUploadProgress(0);
   showUploadStatus("", "");
 
   const formData = new FormData();
@@ -76,7 +85,7 @@ async function uploadFile(
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
-        progressBar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+        setUploadProgress((e.loaded / e.total) * 100);
       }
     });
 
@@ -148,8 +157,8 @@ async function uploadFileSilent(
 
 async function uploadFolderFiles(files: File[]): Promise<void> {
   const progressWrap = $("upload-progress-wrap");
-  const progressBar = $("upload-progress-bar");
   progressWrap.classList.remove("hidden");
+  setUploadProgress(0);
 
   let ok = 0;
   let duplicates = 0;
@@ -160,7 +169,7 @@ async function uploadFolderFiles(files: File[]): Promise<void> {
       `Subiendo ${i + 1} de ${files.length}: ${files[i].name}`,
       "",
     );
-    progressBar.style.width = `${Math.round((i / files.length) * 100)}%`;
+    setUploadProgress((i / files.length) * 100);
 
     const result = await uploadFileSilent(files[i]);
     if (result === "ok") ok++;
@@ -168,7 +177,7 @@ async function uploadFolderFiles(files: File[]): Promise<void> {
     else errors++;
   }
 
-  progressBar.style.width = "100%";
+  setUploadProgress(100);
   progressWrap.classList.add("hidden");
 
   const parts = [`${ok} de ${files.length} subidos`];

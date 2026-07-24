@@ -1,7 +1,4 @@
-import {
-  renderDicom,
-  applyCanvasTransform,
-} from "../dicom/dicom-renderer.js";
+import { renderDicom, applyCanvasTransform } from "../dicom/dicom-renderer.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 

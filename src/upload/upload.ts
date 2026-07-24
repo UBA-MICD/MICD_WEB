@@ -7,6 +7,7 @@ import {
 } from "../auth/auth.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
 import { $ } from "../shared/dom.js";
+import { openDialog, closeDialog } from "../shared/dialog.js";
 import { loadStudyExplorer } from "../explorer/explorer.js";
 
 // ── Upload Panel ─────────────────────────────────────────────────────────────
@@ -198,17 +199,19 @@ function showUploadStatus(text: string, type: "" | "ok" | "error"): void {
 
 function showDuplicateDialog(file: File, message: string): void {
   const dialog = $("duplicate-dialog");
-  const msg = $("duplicate-msg");
   const btnYes = $("duplicate-yes");
   const btnNo = $("duplicate-no");
 
-  msg.textContent = message;
-  dialog.classList.remove("hidden");
+  $("duplicate-msg").textContent = message;
 
-  const close = () => dialog.classList.add("hidden");
+  // openDialog traps focus, inerts the background and handles Escape; Escape
+  // and "Cancelar" both mean "don't replace", which is the safe default for a
+  // destructive confirmation.
   btnYes.onclick = async () => {
-    close();
+    closeDialog(dialog);
     await uploadFile(file, true);
   };
-  btnNo.onclick = close;
+  btnNo.onclick = () => closeDialog(dialog);
+
+  openDialog(dialog);
 }

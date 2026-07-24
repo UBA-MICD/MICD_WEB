@@ -7,9 +7,9 @@
  * auth.ts only touches localStorage/fetch inside functions, so stubbing the
  * globals here (module scope) is enough — no DOM required.
  */
-import test, { beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
-import { Buffer } from 'node:buffer';
+import test, { beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import {
   login,
   logout,
@@ -23,7 +23,7 @@ import {
   getCurrentUser,
   API_ORIGIN,
   type AuthUser,
-} from './auth.ts';
+} from "./auth.ts";
 
 // auth.ts prefixes its own /auth/* calls with the configured API origin
 // (default http://localhost:3000). The /api/* URLs below are passed straight
@@ -34,7 +34,7 @@ const AUTH_LOGOUT = `${API_ORIGIN}/auth/logout`;
 
 // ── Global stubs ──────────────────────────────────────────────────────────────
 
-const REFRESH_KEY = 'micd_refresh_token';
+const REFRESH_KEY = "micd_refresh_token";
 const store = new Map<string, string>();
 (globalThis as { localStorage?: unknown }).localStorage = {
   getItem: (k: string) => store.get(k) ?? null,
@@ -52,13 +52,18 @@ interface FetchCall {
 }
 let fetchCalls: FetchCall[] = [];
 let fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
-(globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) => {
+(globalThis as { fetch?: unknown }).fetch = (
+  url: string,
+  init?: RequestInit,
+) => {
   fetchCalls.push({ url, init });
   return fetchImpl(url, init);
 };
 
 /** Routes fetches by exact URL; unexpected URLs fail the test loudly. */
-function respondBy(routes: Record<string, (init?: RequestInit) => Response | Promise<Response>>): void {
+function respondBy(
+  routes: Record<string, (init?: RequestInit) => Response | Promise<Response>>,
+): void {
   fetchImpl = async (url, init) => {
     const handler = routes[url];
     if (!handler) throw new Error(`unexpected fetch: ${url}`);
@@ -67,25 +72,35 @@ function respondBy(routes: Record<string, (init?: RequestInit) => Response | Pro
 }
 
 const json = (body: unknown, status = 200): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
 /** Builds an unsigned-but-well-formed JWT whose payload auth.ts can decode. */
 function jwt(payload: Record<string, unknown>): string {
-  const enc = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString('base64url');
-  return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc(payload)}.sig`;
+  const enc = (obj: unknown) =>
+    Buffer.from(JSON.stringify(obj)).toString("base64url");
+  return `${enc({ alg: "HS256", typ: "JWT" })}.${enc(payload)}.sig`;
 }
 
-const adminUser: AuthUser = { id: 1, email: 'admin@micd.local' };
+const adminUser: AuthUser = { id: 1, email: "admin@micd.local" };
 const adminToken = jwt({ sub: adminUser.id, email: adminUser.email });
 
 function bearerOf(call: FetchCall): string | undefined {
-  return (call.init?.headers as Record<string, string> | undefined)?.Authorization;
+  return (call.init?.headers as Record<string, string> | undefined)
+    ?.Authorization;
 }
 
 /** Seeds a live session the same way the login dialog does. */
-async function loginAsAdmin(accessToken = adminToken, refreshToken = 'refresh-1'): Promise<void> {
-  respondBy({ [AUTH_LOGIN]: () => json({ accessToken, refreshToken, user: adminUser }) });
-  const result = await login(adminUser.email, 'secret');
+async function loginAsAdmin(
+  accessToken = adminToken,
+  refreshToken = "refresh-1",
+): Promise<void> {
+  respondBy({
+    [AUTH_LOGIN]: () => json({ accessToken, refreshToken, user: adminUser }),
+  });
+  const result = await login(adminUser.email, "secret");
   assert.deepEqual(result, { ok: true });
 }
 
@@ -99,7 +114,7 @@ beforeEach(async () => {
 
 // ── login ─────────────────────────────────────────────────────────────────────
 
-test('login success stores the session and notifies listeners', async () => {
+test("login success stores the session and notifies listeners", async () => {
   let notified: AuthUser | null = null;
   onAuthChange((user) => {
     notified = user;
@@ -108,32 +123,32 @@ test('login success stores the session and notifies listeners', async () => {
 
   assert.equal(isAuthenticated(), true);
   assert.equal(getAccessToken(), adminToken);
-  assert.equal(store.get(REFRESH_KEY), 'refresh-1');
+  assert.equal(store.get(REFRESH_KEY), "refresh-1");
   assert.deepEqual(getCurrentUser(), adminUser);
   assert.deepEqual(notified, adminUser);
 });
 
-test('login 429 reports the rate-limit message and keeps no session', async () => {
-  respondBy({ [AUTH_LOGIN]: () => json({ error: 'rate limited' }, 429) });
-  const result = await login('a@b.c', 'pw');
+test("login 429 reports the rate-limit message and keeps no session", async () => {
+  respondBy({ [AUTH_LOGIN]: () => json({ error: "rate limited" }, 429) });
+  const result = await login("a@b.c", "pw");
   assert.equal(result.ok, false);
   assert.match((result as { error: string }).error, /Demasiados intentos/);
   assert.equal(isAuthenticated(), false);
 });
 
-test('login with bad credentials reports the credentials message', async () => {
-  respondBy({ [AUTH_LOGIN]: () => json({ error: 'nope' }, 401) });
-  const result = await login('a@b.c', 'pw');
+test("login with bad credentials reports the credentials message", async () => {
+  respondBy({ [AUTH_LOGIN]: () => json({ error: "nope" }, 401) });
+  const result = await login("a@b.c", "pw");
   assert.equal(result.ok, false);
   assert.match((result as { error: string }).error, /incorrectos/);
   assert.equal(isAuthenticated(), false);
 });
 
-test('login network failure reports the connection message', async () => {
+test("login network failure reports the connection message", async () => {
   fetchImpl = async () => {
-    throw new Error('offline');
+    throw new Error("offline");
   };
-  const result = await login('a@b.c', 'pw');
+  const result = await login("a@b.c", "pw");
   assert.equal(result.ok, false);
   assert.match((result as { error: string }).error, /No se pudo conectar/);
   assert.equal(isAuthenticated(), false);
@@ -141,47 +156,54 @@ test('login network failure reports the connection message', async () => {
 
 // ── refreshAccessToken ────────────────────────────────────────────────────────
 
-test('refresh with no stored token returns false without any request', async () => {
+test("refresh with no stored token returns false without any request", async () => {
   assert.equal(await refreshAccessToken(), false);
   assert.equal(fetchCalls.length, 0);
 });
 
-test('refresh success rotates the stored token and decodes the user from the JWT', async () => {
-  store.set(REFRESH_KEY, 'refresh-1');
-  respondBy({ [AUTH_REFRESH]: () => json({ accessToken: adminToken, refreshToken: 'refresh-2' }) });
+test("refresh success rotates the stored token and decodes the user from the JWT", async () => {
+  store.set(REFRESH_KEY, "refresh-1");
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({ accessToken: adminToken, refreshToken: "refresh-2" }),
+  });
 
   assert.equal(await refreshAccessToken(), true);
-  assert.equal(store.get(REFRESH_KEY), 'refresh-2');
+  assert.equal(store.get(REFRESH_KEY), "refresh-2");
   assert.equal(isAuthenticated(), true);
   // /auth/refresh returns no user object — it must come from the JWT claims
   assert.deepEqual(getCurrentUser(), adminUser);
 });
 
-test('refresh rejected by the server clears the whole session', async () => {
+test("refresh rejected by the server clears the whole session", async () => {
   await loginAsAdmin();
-  respondBy({ [AUTH_REFRESH]: () => json({ error: 'revoked' }, 401) });
+  respondBy({ [AUTH_REFRESH]: () => json({ error: "revoked" }, 401) });
 
   assert.equal(await refreshAccessToken(), false);
   assert.equal(isAuthenticated(), false);
   assert.equal(store.has(REFRESH_KEY), false);
 });
 
-test('refresh network failure keeps the refresh token for a later retry', async () => {
-  store.set(REFRESH_KEY, 'refresh-1');
+test("refresh network failure keeps the refresh token for a later retry", async () => {
+  store.set(REFRESH_KEY, "refresh-1");
   fetchImpl = async () => {
-    throw new Error('offline');
+    throw new Error("offline");
   };
   assert.equal(await refreshAccessToken(), false);
-  assert.equal(store.get(REFRESH_KEY), 'refresh-1');
+  assert.equal(store.get(REFRESH_KEY), "refresh-1");
 });
 
-test('concurrent refreshes are single-flight (rotation makes parallel refreshes race)', async () => {
-  store.set(REFRESH_KEY, 'refresh-1');
+test("concurrent refreshes are single-flight (rotation makes parallel refreshes race)", async () => {
+  store.set(REFRESH_KEY, "refresh-1");
   let release!: (res: Response) => void;
   fetchImpl = () => new Promise<Response>((resolve) => (release = resolve));
 
-  const results = [refreshAccessToken(), refreshAccessToken(), refreshAccessToken()];
-  release(json({ accessToken: adminToken, refreshToken: 'refresh-2' }));
+  const results = [
+    refreshAccessToken(),
+    refreshAccessToken(),
+    refreshAccessToken(),
+  ];
+  release(json({ accessToken: adminToken, refreshToken: "refresh-2" }));
 
   assert.deepEqual(await Promise.all(results), [true, true, true]);
   assert.equal(fetchCalls.filter((c) => c.url === AUTH_REFRESH).length, 1);
@@ -189,32 +211,34 @@ test('concurrent refreshes are single-flight (rotation makes parallel refreshes 
 
 // ── authFetch ─────────────────────────────────────────────────────────────────
 
-test('authFetch attaches the bearer token', async () => {
+test("authFetch attaches the bearer token", async () => {
   await loginAsAdmin();
-  respondBy({ '/api/v1/studies': () => json({ studies: [] }) });
+  respondBy({ "/api/v1/studies": () => json({ studies: [] }) });
 
-  const res = await authFetch('/api/v1/studies');
+  const res = await authFetch("/api/v1/studies");
   assert.equal(res.status, 200);
   assert.equal(bearerOf(fetchCalls.at(-1)!), `Bearer ${adminToken}`);
 });
 
-test('authFetch on 401 refreshes and retries with the new token', async () => {
+test("authFetch on 401 refreshes and retries with the new token", async () => {
   await loginAsAdmin();
   const newToken = jwt({ sub: adminUser.id, email: adminUser.email, iat: 2 });
   respondBy({
-    '/api/x': (init) =>
-      (init?.headers as Record<string, string>).Authorization === `Bearer ${newToken}`
+    "/api/x": (init) =>
+      (init?.headers as Record<string, string>).Authorization ===
+      `Bearer ${newToken}`
         ? json({ ok: true })
-        : json({ error: 'expired' }, 401),
-    [AUTH_REFRESH]: () => json({ accessToken: newToken, refreshToken: 'refresh-2' }),
+        : json({ error: "expired" }, 401),
+    [AUTH_REFRESH]: () =>
+      json({ accessToken: newToken, refreshToken: "refresh-2" }),
   });
 
-  const res = await authFetch('/api/x');
+  const res = await authFetch("/api/x");
   assert.equal(res.status, 200);
   assert.equal(bearerOf(fetchCalls.at(-1)!), `Bearer ${newToken}`);
 });
 
-test('authFetch on 401 + dead refresh + cancelled login returns the original 401', async () => {
+test("authFetch on 401 + dead refresh + cancelled login returns the original 401", async () => {
   await loginAsAdmin();
   let prompts = 0;
   setLoginPrompt(() => {
@@ -222,35 +246,41 @@ test('authFetch on 401 + dead refresh + cancelled login returns the original 401
     return Promise.resolve(false);
   });
   respondBy({
-    '/api/x': () => json({ error: 'expired' }, 401),
-    [AUTH_REFRESH]: () => json({ error: 'revoked' }, 401),
+    "/api/x": () => json({ error: "expired" }, 401),
+    [AUTH_REFRESH]: () => json({ error: "revoked" }, 401),
   });
 
-  const res = await authFetch('/api/x');
+  const res = await authFetch("/api/x");
   assert.equal(res.status, 401);
   assert.equal(prompts, 1);
 });
 
-test('authFetch on 401 + dead refresh + interactive login retries with the new session', async () => {
+test("authFetch on 401 + dead refresh + interactive login retries with the new session", async () => {
   await loginAsAdmin();
   const newToken = jwt({ sub: adminUser.id, email: adminUser.email, iat: 3 });
   respondBy({
-    '/api/x': (init) =>
-      (init?.headers as Record<string, string>).Authorization === `Bearer ${newToken}`
+    "/api/x": (init) =>
+      (init?.headers as Record<string, string>).Authorization ===
+      `Bearer ${newToken}`
         ? json({ ok: true })
-        : json({ error: 'expired' }, 401),
-    [AUTH_REFRESH]: () => json({ error: 'revoked' }, 401),
-    [AUTH_LOGIN]: () => json({ accessToken: newToken, refreshToken: 'refresh-2', user: adminUser }),
+        : json({ error: "expired" }, 401),
+    [AUTH_REFRESH]: () => json({ error: "revoked" }, 401),
+    [AUTH_LOGIN]: () =>
+      json({
+        accessToken: newToken,
+        refreshToken: "refresh-2",
+        user: adminUser,
+      }),
   });
-  setLoginPrompt(async () => (await login(adminUser.email, 'secret')).ok);
+  setLoginPrompt(async () => (await login(adminUser.email, "secret")).ok);
 
-  const res = await authFetch('/api/x');
+  const res = await authFetch("/api/x");
   assert.equal(res.status, 200);
 });
 
 // ── ensureAuthenticated ───────────────────────────────────────────────────────
 
-test('concurrent ensureAuthenticated calls share a single login prompt', async () => {
+test("concurrent ensureAuthenticated calls share a single login prompt", async () => {
   let prompts = 0;
   let release!: (ok: boolean) => void;
   setLoginPrompt(() => {
@@ -258,7 +288,11 @@ test('concurrent ensureAuthenticated calls share a single login prompt', async (
     return new Promise<boolean>((resolve) => (release = resolve));
   });
 
-  const gates = [ensureAuthenticated(), ensureAuthenticated(), ensureAuthenticated()];
+  const gates = [
+    ensureAuthenticated(),
+    ensureAuthenticated(),
+    ensureAuthenticated(),
+  ];
   await new Promise((r) => setTimeout(r, 0)); // let all three reach the prompt
   release(true);
 
@@ -266,7 +300,7 @@ test('concurrent ensureAuthenticated calls share a single login prompt', async (
   assert.equal(prompts, 1);
 });
 
-test('ensureAuthenticated resolves without a prompt when a session exists', async () => {
+test("ensureAuthenticated resolves without a prompt when a session exists", async () => {
   await loginAsAdmin();
   let prompts = 0;
   setLoginPrompt(() => {
@@ -280,10 +314,10 @@ test('ensureAuthenticated resolves without a prompt when a session exists', asyn
 
 // ── logout ────────────────────────────────────────────────────────────────────
 
-test('logout posts the refresh token and clears the session even if the network fails', async () => {
+test("logout posts the refresh token and clears the session even if the network fails", async () => {
   await loginAsAdmin();
   fetchImpl = async () => {
-    throw new Error('offline');
+    throw new Error("offline");
   };
 
   await logout();
@@ -293,5 +327,7 @@ test('logout posts the refresh token and clears the session even if the network 
 
   const call = fetchCalls.at(-1)!;
   assert.equal(call.url, AUTH_LOGOUT);
-  assert.deepEqual(JSON.parse(String(call.init?.body)), { refreshToken: 'refresh-1' });
+  assert.deepEqual(JSON.parse(String(call.init?.body)), {
+    refreshToken: "refresh-1",
+  });
 });

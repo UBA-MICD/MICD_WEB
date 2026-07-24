@@ -194,6 +194,36 @@ test("refresh network failure keeps the refresh token for a later retry", async 
   assert.equal(store.get(REFRESH_KEY), "refresh-1");
 });
 
+test("refresh keeps the known user when the new token carries no claims", async () => {
+  await loginAsAdmin();
+  // A token whose payload has no sub/email at all — the session is still valid,
+  // so the user we already know must survive rather than being nulled out and
+  // blanking the account block in the panel footer.
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({ accessToken: jwt({ iat: 7 }), refreshToken: "refresh-2" }),
+  });
+
+  assert.equal(await refreshAccessToken(), true);
+  assert.deepEqual(getCurrentUser(), adminUser);
+});
+
+test("refresh keeps the known user when the claims are the wrong types", async () => {
+  await loginAsAdmin();
+  // sub as a string is the shape a JWT library change could plausibly produce;
+  // it must be rejected as a user rather than trusted into { id: "1" }.
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({
+        accessToken: jwt({ sub: "1", email: 42 }),
+        refreshToken: "refresh-2",
+      }),
+  });
+
+  assert.equal(await refreshAccessToken(), true);
+  assert.deepEqual(getCurrentUser(), adminUser);
+});
+
 test("concurrent refreshes are single-flight (rotation makes parallel refreshes race)", async () => {
   store.set(REFRESH_KEY, "refresh-1");
   let release!: (res: Response) => void;
@@ -219,6 +249,16 @@ test("authFetch attaches the bearer token", async () => {
   const res = await authFetch("/api/v1/studies");
   assert.equal(res.status, 200);
   assert.equal(bearerOf(fetchCalls.at(-1)!), `Bearer ${adminToken}`);
+});
+
+test("authFetch sends no Authorization header when there is no session", async () => {
+  // Guest state: the header must be absent, not `Bearer null`, which some
+  // servers parse as a malformed token and answer 400 instead of 401.
+  respondBy({ "/api/v1/studies": () => json({ studies: [] }) });
+
+  const res = await authFetch("/api/v1/studies");
+  assert.equal(res.status, 200);
+  assert.equal(bearerOf(fetchCalls.at(-1)!), undefined);
 });
 
 test("authFetch on 401 refreshes and retries with the new token", async () => {
@@ -311,6 +351,25 @@ test("ensureAuthenticated resolves without a prompt when a session exists", asyn
 
   assert.equal(await ensureAuthenticated(), true);
   assert.equal(prompts, 0);
+});
+
+test("ensureAuthenticated restores a dead in-memory session silently", async () => {
+  // The access token lives in memory only, so every page reload arrives here:
+  // no token, a refresh token in localStorage. That must not show a login form.
+  store.set(REFRESH_KEY, "refresh-1");
+  let prompts = 0;
+  setLoginPrompt(() => {
+    prompts++;
+    return Promise.resolve(false);
+  });
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({ accessToken: adminToken, refreshToken: "refresh-2" }),
+  });
+
+  assert.equal(await ensureAuthenticated(), true);
+  assert.equal(prompts, 0, "a silent refresh must not prompt");
+  assert.deepEqual(getCurrentUser(), adminUser);
 });
 
 // ── logout ────────────────────────────────────────────────────────────────────

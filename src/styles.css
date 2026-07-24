@@ -339,6 +339,84 @@ body {
   flex-wrap: wrap;
   justify-content: center;
 }
+/* One row per file: name, its own track, and its own outcome. */
+.upload-rows {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.upload-rows:empty {
+  display: none;
+}
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+.upload-row__name {
+  flex: 0 0 200px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.upload-row__track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-base);
+  overflow: hidden;
+}
+.upload-row__bar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+/* The outcome is in this cell as text, so colour is never the only carrier
+   of the result (WCAG 1.4.1). */
+.upload-row__pct {
+  flex: 0 0 90px;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.upload-row--ok .upload-row__pct {
+  color: var(--accent);
+}
+.upload-row--duplicate .upload-row__pct {
+  color: var(--amber);
+}
+.upload-row--duplicate .upload-row__bar {
+  background: var(--amber);
+}
+.upload-row--error .upload-row__pct {
+  color: var(--danger);
+}
+.upload-row--error .upload-row__bar {
+  background: var(--danger);
+}
+
+.upload-summary {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.upload-percent {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .upload-note {
   font-size: 12px;
   color: var(--text-muted);
@@ -1039,22 +1117,6 @@ body {
 }
 .btn--danger:hover {
   background: #a93226;
-}
-
-.upload-progress {
-  width: 100%;
-  height: 4px;
-  background: var(--bg-elevated);
-  border-radius: 2px;
-  margin-top: 6px;
-  overflow: hidden;
-}
-.upload-progress__bar {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.1s ease;
-  width: 0%;
 }
 
 .upload-status {

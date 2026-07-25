@@ -218,34 +218,6 @@
             </button>
             <button
               class="toolbar__tool"
-              id="tool-windowing"
-              title="Ventana WL/WW (V)"
-              aria-pressed="false"
-              aria-expanded="false"
-              aria-controls="windowing-panel"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <line x1="4" y1="6" x2="10" y2="6" />
-                <line x1="14" y1="6" x2="20" y2="6" />
-                <circle cx="12" cy="6" r="2" fill="currentColor" stroke="none" />
-                <line x1="4" y1="12" x2="7" y2="12" />
-                <line x1="11" y1="12" x2="20" y2="12" />
-                <circle cx="9" cy="12" r="2" fill="currentColor" stroke="none" />
-                <line x1="4" y1="18" x2="15" y2="18" />
-                <line x1="19" y1="18" x2="20" y2="18" />
-                <circle cx="17" cy="18" r="2" fill="currentColor" stroke="none" />
-              </svg>
-              <span>Ventana</span>
-            </button>
-            <button
-              class="toolbar__tool"
               id="tool-metadata"
               title="Etiquetas DICOM (M)"
               aria-expanded="false"
@@ -445,80 +417,6 @@
               ></div>
             </div>
 
-            <!-- Windowing panel (slide-out) -->
-            <aside class="windowing-panel" id="windowing-panel" aria-label="Ajuste de ventana DICOM">
-              <div class="windowing-header">
-                <h2>Ventana WL/WW</h2>
-              </div>
-              <div class="windowing-body">
-                <div class="windowing-section">
-                  <p class="windowing-section__title">Presets</p>
-                  <div
-                    class="preset-grid"
-                    role="group"
-                    aria-label="Presets de ventana"
-                  >
-                    <button class="preset-btn" data-preset-wl="-600" data-preset-ww="1500">Pulmón</button>
-                    <button class="preset-btn" data-preset-wl="400" data-preset-ww="1800">Hueso</button>
-                    <button class="preset-btn" data-preset-wl="40" data-preset-ww="400">Tej. blando</button>
-                    <button class="preset-btn" data-preset-wl="40" data-preset-ww="80">Cerebro</button>
-                  </div>
-                </div>
-                <div class="windowing-divider"></div>
-                <div class="windowing-section">
-                  <div class="windowing-control">
-                    <label class="windowing-control__label" for="wl-slider">
-                      Window Level (WL)
-                    </label>
-                    <div class="windowing-slider-row">
-                      <input
-                        type="range"
-                        id="wl-slider"
-                        class="windowing-slider"
-                        min="-2048"
-                        max="4096"
-                        step="1"
-                        value="40"
-                        aria-label="Window Level"
-                      />
-                      <input
-                        type="number"
-                        id="wl-number"
-                        class="windowing-number"
-                        value="40"
-                        aria-label="Valor de Window Level"
-                      />
-                    </div>
-                  </div>
-                  <div class="windowing-control">
-                    <label class="windowing-control__label" for="ww-slider">
-                      Window Width (WW)
-                    </label>
-                    <div class="windowing-slider-row">
-                      <input
-                        type="range"
-                        id="ww-slider"
-                        class="windowing-slider"
-                        min="1"
-                        max="8192"
-                        step="1"
-                        value="400"
-                        aria-label="Window Width"
-                      />
-                      <input
-                        type="number"
-                        id="ww-number"
-                        class="windowing-number"
-                        value="400"
-                        min="1"
-                        aria-label="Valor de Window Width"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </aside>
-
             <!-- Metadata panel (slide-out) -->
             <aside class="metadata-panel" id="metadata-panel">
               <div class="metadata-header">
@@ -671,6 +569,13 @@
                 aria-pressed="false"
               >
                 XA
+              </button>
+              <button
+                class="filter-chip filter-chip--zenodo"
+                data-zenodo-linked
+                aria-pressed="false"
+              >
+                📤 Vinculado a Zenodo
               </button>
             </div>
 
@@ -1131,6 +1036,13 @@
             <button class="filter-chip" data-modality="XA" aria-pressed="false">
               XA
             </button>
+            <button
+              class="filter-chip filter-chip--zenodo"
+              data-zenodo-linked
+              aria-pressed="false"
+            >
+              📤 Vinculado a Zenodo
+            </button>
           </div>
 
           <!-- A listbox, not a list of buttons: one study is chosen, then
@@ -1317,6 +1229,5 @@
     <script src="./dicomParser.min.js"></script>
     <!-- Compiled renderer script (output of tsc) -->
     <script src="./main.js" type="module"></script>
-    <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="false"></div>
   </body>
 </html>

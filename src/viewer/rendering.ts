@@ -1,7 +1,6 @@
 import { renderDicom, applyCanvasTransform } from "../dicom/dicom-renderer.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
-import { updateWindowingPanel } from "./windowing.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
@@ -23,7 +22,6 @@ export function render(): void {
   );
 
   updateInfoOverlay();
-  updateWindowingPanel();
 }
 
 // ── Series Navigation ────────────────────────────────────────────────────────

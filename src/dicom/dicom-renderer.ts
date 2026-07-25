@@ -70,6 +70,9 @@ export function renderDicom(params: RenderParams): void {
     );
   }
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
   // Clear and apply transforms
   const displayCanvas = canvas;
   const displayCtx = ctx;
@@ -178,5 +181,5 @@ export function fitToContainer(
   if (imageWidth === 0 || imageHeight === 0) return 1;
   const scaleX = containerWidth / imageWidth;
   const scaleY = containerHeight / imageHeight;
-  return Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
+  return Math.min(scaleX, scaleY) * 0.9;
 }

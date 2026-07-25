@@ -1,18 +1,19 @@
-import { ParsedDicom, DicomMetadata } from "../dicom/dicom-parser-util.js";
+import { ParsedDicom } from "../dicom/dicom-parser-util.js";
 import { dicomCache } from "./cache.js";
 import { $, showLoading, showError } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 
 /**
- * MPR (Multiplanar Reconstruction) Module
- * Generates 3D voxel volume (Z x Y x X) using TypedArrays and renders
- * synchronized Axial, Coronal, and Sagittal orthogonal views with an interactive crosshair.
+ * MPR 3D Unified Viewport Module (US 2 Replaced)
+ * Manages 3D voxel volume reconstruction using TypedArrays, software raycasting / 3D slice projection,
+ * color-coded 3D Crosshair navigation (X=Red, Y=Green, Z=Blue), camera rotation/pan/zoom,
+ * and 3D Orientation Gizmo rendering.
  */
 
 export interface VoxelVolume {
-  depth: number; // Z dimension (slices)
-  rows: number; // Y dimension (height)
-  cols: number; // X dimension (width)
+  depth: number; // Z dimension
+  rows: number; // Y dimension
+  cols: number; // X dimension
   data: Int16Array | Uint16Array;
   pixelSpacing: [number, number]; // [rowSpacing (dy), colSpacing (dx)] in mm
   sliceSpacing: number; // dz in mm
@@ -22,35 +23,46 @@ export interface VoxelVolume {
   windowWidth: number;
 }
 
-export interface CrosshairPosition {
+export interface Camera3D {
+  theta: number; // Pitch angle in radians
+  phi: number; // Yaw/Roll angle in radians
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+export interface Crosshair3D {
   x: number; // 0..cols-1
   y: number; // 0..rows-1
   z: number; // 0..depth-1
 }
 
-class MPRViewer {
-  private volume: VoxelVolume | null = null;
-  private crosshair: CrosshairPosition = { x: 0, y: 0, z: 0 };
-  private activePlaneDrag: "axial" | "coronal" | "sagittal" | null = null;
-  private isOpen = false;
+export class MPR3DViewer {
+  public volume: VoxelVolume | null = null;
+  public camera: Camera3D = { theta: 0, phi: 0, zoom: 1, panX: 0, panY: 0 };
+  public crosshair: Crosshair3D = { x: 0, y: 0, z: 0 };
+  public activeView: "axial" | "coronal" | "sagittal" = "axial";
+  public isActive = false;
 
-  // Offscreen canvases for fast pixel rendering
-  private offscreenAxial: HTMLCanvasElement = document.createElement("canvas");
-  private offscreenCoronal: HTMLCanvasElement =
-    document.createElement("canvas");
-  private offscreenSagittal: HTMLCanvasElement =
-    document.createElement("canvas");
+  private offscreenCanvas: HTMLCanvasElement = document.createElement("canvas");
 
-  public async openMPR(): Promise<void> {
+  public async toggle3DMode(): Promise<boolean> {
+    if (this.isActive) {
+      this.isActive = false;
+      state.is3DMode = false;
+      return false;
+    }
+
+    const totalSlices = itemCount();
+    if (totalSlices <= 1) {
+      showError(
+        "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
+      );
+      return false;
+    }
+
     showLoading(true);
     try {
-      // 1. Fetch/ensure all slices in memory
-      const totalSlices = itemCount();
-      if (totalSlices <= 1) {
-        showError("El estudio requiere al menos 2 cortes para la vista MPR.");
-        return;
-      }
-
       const parsedSlices: ParsedDicom[] = [];
       for (let i = 0; i < totalSlices; i++) {
         const parsed = await dicomCache.getOrFetch(i);
@@ -62,37 +74,46 @@ class MPRViewer {
         parsedSlices.push(parsed);
       }
 
-      // 2. Build 3D volume using TypedArrays for performance
       this.volume = this.buildVolume(parsedSlices);
-
-      // 3. Initialize crosshair to middle of volume
       this.crosshair = {
         x: Math.floor(this.volume.cols / 2),
         y: Math.floor(this.volume.rows / 2),
         z: Math.floor(this.volume.depth / 2),
       };
 
-      // 4. Setup UI elements & event handlers
-      this.setupUI();
-      this.isOpen = true;
-      this.renderAll();
-      $("mpr-container").classList.remove("hidden");
+      const container = $("viewport-container");
+      let fitZoom = 1;
+      if (
+        container &&
+        container.clientWidth > 0 &&
+        container.clientHeight > 0
+      ) {
+        fitZoom =
+          Math.min(
+            container.clientWidth / this.volume.cols,
+            container.clientHeight / this.volume.rows,
+          ) * 0.9;
+      }
+
+      this.camera = {
+        theta: 0,
+        phi: 0,
+        zoom: fitZoom > 0 ? fitZoom : 1,
+        panX: 0,
+        panY: 0,
+      };
+      this.activeView = "axial";
+      this.isActive = true;
+      state.is3DMode = true;
+      return true;
     } catch (err: any) {
-      showError(
-        `Error al inicializar la reconstrucción MPR: ${err.message || err}`,
-      );
+      showError(`Error al cargar el volumen 3D: ${err.message || err}`);
+      return false;
     } finally {
       showLoading(false);
     }
   }
 
-  public closeMPR(): void {
-    this.isOpen = false;
-    $("mpr-container").classList.add("hidden");
-    this.volume = null;
-  }
-
-  /** Construct a contiguous 3D TypedArray buffer from 2D slices. */
   private buildVolume(slices: ParsedDicom[]): VoxelVolume {
     const depth = slices.length;
     const refMeta = slices[0].metadata;
@@ -102,7 +123,6 @@ class MPRViewer {
     const rowSpacing = refMeta.pixelSpacing ? refMeta.pixelSpacing[0] : 1;
     const colSpacing = refMeta.pixelSpacing ? refMeta.pixelSpacing[1] : 1;
 
-    // Calculate Z slice spacing from ImagePositionPatient
     let sliceSpacing =
       refMeta.spacingBetweenSlices || refMeta.sliceThickness || 1;
     const ipp0 = slices[0].metadata.imagePositionPatient;
@@ -123,10 +143,8 @@ class MPRViewer {
       : new Uint16Array(totalVoxels);
 
     for (let z = 0; z < depth; z++) {
-      const slicePixelData = slices[z].pixelData;
-      if (slicePixelData) {
-        data.set(slicePixelData, z * slicePixels);
-      }
+      const p = slices[z].pixelData;
+      if (p) data.set(p, z * slicePixels);
     }
 
     let windowCenter = refMeta.windowCenter;
@@ -150,327 +168,407 @@ class MPRViewer {
     };
   }
 
-  private setupUI(): void {
-    if (!this.volume) return;
+  /** Set quick orientation: Axial, Coronal, Sagittal. */
+  public setOrientation(view: "axial" | "coronal" | "sagittal"): void {
+    this.activeView = view;
+    if (view === "axial") {
+      this.camera.theta = 0;
+      this.camera.phi = 0;
+    } else if (view === "coronal") {
+      this.camera.theta = Math.PI / 2;
+      this.camera.phi = 0;
+    } else if (view === "sagittal") {
+      this.camera.theta = Math.PI / 2;
+      this.camera.phi = Math.PI / 2;
+    }
+  }
 
+  /** Update 3D Crosshair focal point from canvas click/drag coordinates. */
+  public updateCrosshairFromPointer(
+    clickX: number,
+    clickY: number,
+    canvasW: number,
+    canvasH: number,
+  ): void {
+    if (!this.volume) return;
     const { depth, rows, cols } = this.volume;
 
-    // Set slider bounds
-    const sliderAxial = $("mpr-slider-axial") as HTMLInputElement;
-    sliderAxial.min = "0";
-    sliderAxial.max = String(depth - 1);
-    sliderAxial.value = String(this.crosshair.z);
+    const centerCanvasX = canvasW / 2 + this.camera.panX + state.viewport.panX;
+    const centerCanvasY = canvasH / 2 + this.camera.panY + state.viewport.panY;
 
-    const sliderCoronal = $("mpr-slider-coronal") as HTMLInputElement;
-    sliderCoronal.min = "0";
-    sliderCoronal.max = String(rows - 1);
-    sliderCoronal.value = String(this.crosshair.y);
+    const totalZoom = this.camera.zoom * state.viewport.zoom;
+    const relX = (clickX - centerCanvasX) / totalZoom;
+    const relY = (clickY - centerCanvasY) / totalZoom;
 
-    const sliderSagittal = $("mpr-slider-sagittal") as HTMLInputElement;
-    sliderSagittal.min = "0";
-    sliderSagittal.max = String(cols - 1);
-    sliderSagittal.value = String(this.crosshair.x);
-
-    // Bind slider input events
-    sliderAxial.oninput = () => {
-      this.crosshair.z = parseInt(sliderAxial.value, 10);
-      this.renderAll();
-    };
-    sliderCoronal.oninput = () => {
-      this.crosshair.y = parseInt(sliderCoronal.value, 10);
-      this.renderAll();
-    };
-    sliderSagittal.oninput = () => {
-      this.crosshair.x = parseInt(sliderSagittal.value, 10);
-      this.renderAll();
-    };
-
-    // Close button
-    $("mpr-close-btn").onclick = () => this.closeMPR();
-
-    // Mouse interaction for Crosshair sync
-    this.attachCanvasInteraction("mpr-canvas-axial", "axial");
-    this.attachCanvasInteraction("mpr-canvas-coronal", "coronal");
-    this.attachCanvasInteraction("mpr-canvas-sagittal", "sagittal");
-  }
-
-  private attachCanvasInteraction(
-    canvasId: string,
-    plane: "axial" | "coronal" | "sagittal",
-  ): void {
-    const canvas = $(canvasId) as HTMLCanvasElement;
-
-    const handlePointer = (e: MouseEvent) => {
-      if (!this.volume) return;
-      const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      const normX = Math.max(0, Math.min(1, clickX / rect.width));
-      const normY = Math.max(0, Math.min(1, clickY / rect.height));
-
-      const { depth, rows, cols } = this.volume;
-
-      if (plane === "axial") {
-        // Axial: X -> cols, Y -> rows
-        this.crosshair.x = Math.round(normX * (cols - 1));
-        this.crosshair.y = Math.round(normY * (rows - 1));
-      } else if (plane === "coronal") {
-        // Coronal: X -> cols, Y -> depth (Z)
-        this.crosshair.x = Math.round(normX * (cols - 1));
-        this.crosshair.z = Math.round(normY * (depth - 1));
-      } else if (plane === "sagittal") {
-        // Sagittal: X -> rows, Y -> depth (Z)
-        this.crosshair.y = Math.round(normX * (rows - 1));
-        this.crosshair.z = Math.round(normY * (depth - 1));
-      }
-
-      this.renderAll();
-    };
-
-    canvas.onmousedown = (e: MouseEvent) => {
-      this.activePlaneDrag = plane;
-      handlePointer(e);
-    };
-
-    document.addEventListener("mousemove", (e: MouseEvent) => {
-      if (this.activePlaneDrag === plane) {
-        handlePointer(e);
-      }
-    });
-
-    document.addEventListener("mouseup", () => {
-      if (this.activePlaneDrag === plane) {
-        this.activePlaneDrag = null;
-      }
-    });
-  }
-
-  /** Render all 3 views and update sliders/labels. */
-  private renderAll(): void {
-    if (!this.volume || !this.isOpen) return;
-
-    this.renderAxial();
-    this.renderCoronal();
-    this.renderSagittal();
-
-    // Update labels and sliders
-    ($("mpr-slider-axial") as HTMLInputElement).value = String(
-      this.crosshair.z,
-    );
-    $("mpr-val-axial").textContent =
-      `${this.crosshair.z + 1} / ${this.volume.depth}`;
-
-    ($("mpr-slider-coronal") as HTMLInputElement).value = String(
-      this.crosshair.y,
-    );
-    $("mpr-val-coronal").textContent =
-      `${this.crosshair.y + 1} / ${this.volume.rows}`;
-
-    ($("mpr-slider-sagittal") as HTMLInputElement).value = String(
-      this.crosshair.x,
-    );
-    $("mpr-val-sagittal").textContent =
-      `${this.crosshair.x + 1} / ${this.volume.cols}`;
-  }
-
-  /** Axial View (XY at fixed Z) */
-  private renderAxial(): void {
-    if (!this.volume) return;
-    const {
-      depth,
-      rows,
-      cols,
-      data,
-      rescaleSlope,
-      rescaleIntercept,
-      windowCenter,
-      windowWidth,
-    } = this.volume;
-    const z = Math.max(0, Math.min(depth - 1, this.crosshair.z));
-
-    this.offscreenAxial.width = cols;
-    this.offscreenAxial.height = rows;
-    const ctxOff = this.offscreenAxial.getContext("2d")!;
-    const imgData = ctxOff.createImageData(cols, rows);
-
-    const sliceOffset = z * rows * cols;
-    const minW = windowCenter - windowWidth / 2;
-
-    for (let i = 0; i < rows * cols; i++) {
-      const hu = data[sliceOffset + i] * rescaleSlope + rescaleIntercept;
-      let val = 0;
-      if (hu <= minW) val = 0;
-      else if (hu >= windowCenter + windowWidth / 2) val = 255;
-      else val = Math.round(((hu - minW) / windowWidth) * 255);
-
-      const idx = i * 4;
-      imgData.data[idx] = val;
-      imgData.data[idx + 1] = val;
-      imgData.data[idx + 2] = val;
-      imgData.data[idx + 3] = 255;
+    if (this.activeView === "axial") {
+      this.crosshair.x = Math.max(
+        0,
+        Math.min(cols - 1, Math.round(relX + cols / 2)),
+      );
+      this.crosshair.y = Math.max(
+        0,
+        Math.min(rows - 1, Math.round(relY + rows / 2)),
+      );
+    } else if (this.activeView === "coronal") {
+      this.crosshair.x = Math.max(
+        0,
+        Math.min(cols - 1, Math.round(relX + cols / 2)),
+      );
+      this.crosshair.z = Math.max(
+        0,
+        Math.min(depth - 1, Math.round(relY + depth / 2)),
+      );
+    } else {
+      // Sagittal
+      this.crosshair.y = Math.max(
+        0,
+        Math.min(rows - 1, Math.round(relX + rows / 2)),
+      );
+      this.crosshair.z = Math.max(
+        0,
+        Math.min(depth - 1, Math.round(relY + depth / 2)),
+      );
     }
-    ctxOff.putImageData(imgData, 0, 0);
-
-    const displayCanvas = $("mpr-canvas-axial") as HTMLCanvasElement;
-    displayCanvas.width = cols;
-    displayCanvas.height = rows;
-    const ctx = displayCanvas.getContext("2d")!;
-    ctx.drawImage(this.offscreenAxial, 0, 0);
-
-    // Crosshair (Cyan & Yellow)
-    this.drawCrosshair(
-      ctx,
-      cols,
-      rows,
-      this.crosshair.x,
-      this.crosshair.y,
-      "#00c8ff",
-      "#ffd700",
-    );
   }
 
-  /** Coronal View (XZ at fixed Y) */
-  private renderCoronal(): void {
+  /** Get current slice depth index and total count for current active view. */
+  public getDepthInfo(): { current: number; total: number } {
+    if (!this.volume) return { current: 0, total: 1 };
+    if (this.activeView === "axial") {
+      return { current: this.crosshair.z, total: this.volume.depth };
+    } else if (this.activeView === "coronal") {
+      return { current: this.crosshair.y, total: this.volume.rows };
+    } else {
+      return { current: this.crosshair.x, total: this.volume.cols };
+    }
+  }
+
+  /** Set current slice depth from right-side vertical depth slider. */
+  public setDepthIndex(index: number): void {
     if (!this.volume) return;
-    const {
-      depth,
-      rows,
-      cols,
-      data,
-      rescaleSlope,
-      rescaleIntercept,
-      windowCenter,
-      windowWidth,
-    } = this.volume;
-    const y = Math.max(0, Math.min(rows - 1, this.crosshair.y));
+    const { depth, rows, cols } = this.volume;
+    if (this.activeView === "axial") {
+      this.crosshair.z = Math.max(0, Math.min(depth - 1, index));
+    } else if (this.activeView === "coronal") {
+      this.crosshair.y = Math.max(0, Math.min(rows - 1, index));
+    } else {
+      this.crosshair.x = Math.max(0, Math.min(cols - 1, index));
+    }
+  }
 
-    this.offscreenCoronal.width = cols;
-    this.offscreenCoronal.height = depth;
-    const ctxOff = this.offscreenCoronal.getContext("2d")!;
-    const imgData = ctxOff.createImageData(cols, depth);
+  /** Render the 3D Unified Volume Viewport on the main canvas. */
+  public render(canvas: HTMLCanvasElement): void {
+    if (!this.volume || !canvas) return;
 
-    const minW = windowCenter - windowWidth / 2;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-    for (let z = 0; z < depth; z++) {
-      const zRowOffset = z * rows * cols + y * cols;
-      for (let x = 0; x < cols; x++) {
-        const hu = data[zRowOffset + x] * rescaleSlope + rescaleIntercept;
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    const { depth, rows, cols, data, rescaleSlope, rescaleIntercept } =
+      this.volume;
+
+    const wc =
+      state.viewport.windowWidth > 0
+        ? state.viewport.windowCenter
+        : this.volume.windowCenter;
+    const ww =
+      state.viewport.windowWidth > 0
+        ? state.viewport.windowWidth
+        : this.volume.windowWidth;
+
+    const minW = wc - ww / 2;
+
+    // 1. Render active 2D slice onto offscreen canvas
+    if (this.activeView === "axial") {
+      const z = Math.max(0, Math.min(depth - 1, this.crosshair.z));
+      this.offscreenCanvas.width = cols;
+      this.offscreenCanvas.height = rows;
+      const offCtx = this.offscreenCanvas.getContext("2d")!;
+      offCtx.imageSmoothingEnabled = true;
+      offCtx.imageSmoothingQuality = "high";
+      const imgData = offCtx.createImageData(cols, rows);
+      const sliceOffset = z * rows * cols;
+
+      for (let i = 0; i < rows * cols; i++) {
+        const hu = data[sliceOffset + i] * rescaleSlope + rescaleIntercept;
         let val = 0;
         if (hu <= minW) val = 0;
-        else if (hu >= windowCenter + windowWidth / 2) val = 255;
-        else val = Math.round(((hu - minW) / windowWidth) * 255);
+        else if (hu >= minW + ww) val = 255;
+        else val = Math.round(((hu - minW) / ww) * 255);
 
-        const idx = (z * cols + x) * 4;
+        const idx = i * 4;
         imgData.data[idx] = val;
         imgData.data[idx + 1] = val;
         imgData.data[idx + 2] = val;
         imgData.data[idx + 3] = 255;
       }
-    }
-    ctxOff.putImageData(imgData, 0, 0);
+      offCtx.putImageData(imgData, 0, 0);
+    } else if (this.activeView === "coronal") {
+      const y = Math.max(0, Math.min(rows - 1, this.crosshair.y));
+      this.offscreenCanvas.width = cols;
+      this.offscreenCanvas.height = depth;
+      const offCtx = this.offscreenCanvas.getContext("2d")!;
+      offCtx.imageSmoothingEnabled = true;
+      offCtx.imageSmoothingQuality = "high";
+      const imgData = offCtx.createImageData(cols, depth);
 
-    const displayCanvas = $("mpr-canvas-coronal") as HTMLCanvasElement;
-    displayCanvas.width = cols;
-    displayCanvas.height = depth;
-    const ctx = displayCanvas.getContext("2d")!;
-    ctx.drawImage(this.offscreenCoronal, 0, 0);
+      for (let z = 0; z < depth; z++) {
+        const zRowOffset = z * rows * cols + y * cols;
+        for (let x = 0; x < cols; x++) {
+          const hu = data[zRowOffset + x] * rescaleSlope + rescaleIntercept;
+          let val = 0;
+          if (hu <= minW) val = 0;
+          else if (hu >= minW + ww) val = 255;
+          else val = Math.round(((hu - minW) / ww) * 255);
 
-    // Crosshair (Cyan & Magenta)
-    this.drawCrosshair(
-      ctx,
-      cols,
-      depth,
-      this.crosshair.x,
-      this.crosshair.z,
-      "#00c8ff",
-      "#ff00ff",
-    );
-  }
-
-  /** Sagittal View (YZ at fixed X) */
-  private renderSagittal(): void {
-    if (!this.volume) return;
-    const {
-      depth,
-      rows,
-      cols,
-      data,
-      rescaleSlope,
-      rescaleIntercept,
-      windowCenter,
-      windowWidth,
-    } = this.volume;
-    const x = Math.max(0, Math.min(cols - 1, this.crosshair.x));
-
-    this.offscreenSagittal.width = rows;
-    this.offscreenSagittal.height = depth;
-    const ctxOff = this.offscreenSagittal.getContext("2d")!;
-    const imgData = ctxOff.createImageData(rows, depth);
-
-    const minW = windowCenter - windowWidth / 2;
-
-    for (let z = 0; z < depth; z++) {
-      const zOffset = z * rows * cols + x;
-      for (let y = 0; y < rows; y++) {
-        const hu = data[zOffset + y * cols] * rescaleSlope + rescaleIntercept;
-        let val = 0;
-        if (hu <= minW) val = 0;
-        else if (hu >= windowCenter + windowWidth / 2) val = 255;
-        else val = Math.round(((hu - minW) / windowWidth) * 255);
-
-        const idx = (z * rows + y) * 4;
-        imgData.data[idx] = val;
-        imgData.data[idx + 1] = val;
-        imgData.data[idx + 2] = val;
-        imgData.data[idx + 3] = 255;
+          const idx = (z * cols + x) * 4;
+          imgData.data[idx] = val;
+          imgData.data[idx + 1] = val;
+          imgData.data[idx + 2] = val;
+          imgData.data[idx + 3] = 255;
+        }
       }
+      offCtx.putImageData(imgData, 0, 0);
+    } else {
+      // Sagittal
+      const x = Math.max(0, Math.min(cols - 1, this.crosshair.x));
+      this.offscreenCanvas.width = rows;
+      this.offscreenCanvas.height = depth;
+      const offCtx = this.offscreenCanvas.getContext("2d")!;
+      offCtx.imageSmoothingEnabled = true;
+      offCtx.imageSmoothingQuality = "high";
+      const imgData = offCtx.createImageData(rows, depth);
+
+      for (let z = 0; z < depth; z++) {
+        const zOffset = z * rows * cols + x;
+        for (let y = 0; y < rows; y++) {
+          const hu = data[zOffset + y * cols] * rescaleSlope + rescaleIntercept;
+          let val = 0;
+          if (hu <= minW) val = 0;
+          else if (hu >= minW + ww) val = 255;
+          else val = Math.round(((hu - minW) / ww) * 255);
+
+          const idx = (z * rows + y) * 4;
+          imgData.data[idx] = val;
+          imgData.data[idx + 1] = val;
+          imgData.data[idx + 2] = val;
+          imgData.data[idx + 3] = 255;
+        }
+      }
+      offCtx.putImageData(imgData, 0, 0);
     }
-    ctxOff.putImageData(imgData, 0, 0);
 
-    const displayCanvas = $("mpr-canvas-sagittal") as HTMLCanvasElement;
-    displayCanvas.width = rows;
-    displayCanvas.height = depth;
-    const ctx = displayCanvas.getContext("2d")!;
-    ctx.drawImage(this.offscreenSagittal, 0, 0);
-
-    // Crosshair (Yellow & Magenta)
-    this.drawCrosshair(
-      ctx,
-      rows,
-      depth,
-      this.crosshair.y,
-      this.crosshair.z,
-      "#ffd700",
-      "#ff00ff",
+    // 2. Draw volume slice and crosshair centered on main viewport canvas
+    ctx.save();
+    ctx.translate(
+      width / 2 + this.camera.panX + state.viewport.panX,
+      height / 2 + this.camera.panY + state.viewport.panY,
     );
+
+    const totalZoom = this.camera.zoom * state.viewport.zoom;
+    ctx.scale(totalZoom, totalZoom);
+    ctx.rotate(this.camera.phi);
+
+    const drawW = this.offscreenCanvas.width;
+    const drawH = this.offscreenCanvas.height;
+
+    // Draw main volume image
+    ctx.drawImage(this.offscreenCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
+
+    // 3. Render 3D Crosshair with color-coded axes (Red=X, Green=Y, Blue=Z)
+    this.draw3DCrosshair(ctx, drawW, drawH);
+
+    ctx.restore();
+
+    // Render 3D orientation gizmo on widget canvas
+    const gizmoCanvas = $("mpr-gizmo-canvas") as HTMLCanvasElement | null;
+    if (gizmoCanvas) {
+      this.renderGizmo(gizmoCanvas);
+    }
   }
 
-  private drawCrosshair(
+  /** Helper method to draw a high-contrast line with a 3px black outline. */
+  private drawOutlinedLine(
     ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    cx: number,
-    cy: number,
-    colorVert: string,
-    colorHoriz: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color: string,
   ): void {
-    ctx.lineWidth = 1;
-
-    // Vertical crosshair line
-    ctx.strokeStyle = colorVert;
+    // Outer black border (3px) for maximum contrast against bone (white) and air (black)
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(cx + 0.5, 0);
-    ctx.lineTo(cx + 0.5, height);
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
     ctx.stroke();
 
-    // Horizontal crosshair line
-    ctx.strokeStyle = colorHoriz;
+    // Inner vibrant line (1.5px)
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(0, cy + 0.5);
-    ctx.lineTo(width, cy + 0.5);
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
     ctx.stroke();
+  }
+
+  /** Render 3D Crosshair lines intersecting focal point (x, y, z). */
+  private draw3DCrosshair(
+    ctx: CanvasRenderingContext2D,
+    drawW: number,
+    drawH: number,
+  ): void {
+    if (!this.volume) return;
+    const { depth, rows, cols } = this.volume;
+
+    let focalX = 0;
+    let focalY = 0;
+
+    if (this.activeView === "axial") {
+      focalX = this.crosshair.x - cols / 2;
+      focalY = this.crosshair.y - rows / 2;
+
+      // X Axis line (Red #ff4444) with black outline
+      this.drawOutlinedLine(
+        ctx,
+        -drawW / 2,
+        focalY,
+        drawW / 2,
+        focalY,
+        "#ff4444",
+      );
+
+      // Y Axis line (Green #00e676) with black outline
+      this.drawOutlinedLine(
+        ctx,
+        focalX,
+        -drawH / 2,
+        focalX,
+        drawH / 2,
+        "#00e676",
+      );
+    } else if (this.activeView === "coronal") {
+      focalX = this.crosshair.x - cols / 2;
+      focalY = this.crosshair.z - depth / 2;
+
+      // X Axis line (Red #ff4444) with black outline
+      this.drawOutlinedLine(
+        ctx,
+        -drawW / 2,
+        focalY,
+        drawW / 2,
+        focalY,
+        "#ff4444",
+      );
+
+      // Z Axis line (Blue #29b6f6) with black outline
+      this.drawOutlinedLine(
+        ctx,
+        focalX,
+        -drawH / 2,
+        focalX,
+        drawH / 2,
+        "#29b6f6",
+      );
+    } else {
+      // Sagittal
+      focalX = this.crosshair.y - rows / 2;
+      focalY = this.crosshair.z - depth / 2;
+
+      // Y Axis line (Green #00e676) with black outline
+      this.drawOutlinedLine(
+        ctx,
+        -drawW / 2,
+        focalY,
+        drawW / 2,
+        focalY,
+        "#00e676",
+      );
+
+      // Z Axis line (Blue #29b6f6) with black outline
+      this.drawOutlinedLine(
+        ctx,
+        focalX,
+        -drawH / 2,
+        focalX,
+        drawH / 2,
+        "#29b6f6",
+      );
+    }
+
+    // High-contrast focal point ring indicator
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(focalX, focalY, 4, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(focalX, focalY, 4, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
+
+  /** Render 3D Orientation Gizmo (bottom-right widget). */
+  public renderGizmo(canvas: HTMLCanvasElement): void {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const len = 20;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const cosT = Math.cos(this.camera.theta);
+    const sinT = Math.sin(this.camera.theta);
+    const cosP = Math.cos(this.camera.phi);
+    const sinP = Math.sin(this.camera.phi);
+
+    // Projected 3D axes
+    const x2d = { x: len * cosP, y: len * sinP * sinT };
+    const y2d = { x: -len * sinP, y: len * cosP * sinT };
+    const z2d = { x: 0, y: -len * cosT };
+
+    // X Axis (Red)
+    ctx.strokeStyle = "#ff4444";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + x2d.x, cy + x2d.y);
+    ctx.stroke();
+    ctx.fillStyle = "#ff4444";
+    ctx.font = "bold 9px sans-serif";
+    ctx.fillText("X", cx + x2d.x + (x2d.x >= 0 ? 3 : -8), cy + x2d.y + 3);
+
+    // Y Axis (Green)
+    ctx.strokeStyle = "#00e676";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + y2d.x, cy + y2d.y);
+    ctx.stroke();
+    ctx.fillStyle = "#00e676";
+    ctx.fillText("Y", cx + y2d.x + (y2d.x >= 0 ? 3 : -8), cy + y2d.y + 3);
+
+    // Z Axis (Blue)
+    ctx.strokeStyle = "#29b6f6";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + z2d.x, cy + z2d.y);
+    ctx.stroke();
+    ctx.fillStyle = "#29b6f6";
+    ctx.fillText("Z", cx + z2d.x + 3, cy + z2d.y - 2);
   }
 }
 
-export const mprViewer = new MPRViewer();
+export const mpr3DViewer = new MPR3DViewer();

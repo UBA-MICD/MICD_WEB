@@ -131,6 +131,25 @@
             </svg>
             <span>Pan</span>
           </button>
+          <button
+            class="toolbar__tool"
+            id="tool-crosshair"
+            title="Navegación Crosshair 3D (C)"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <line x1="12" y1="3" x2="12" y2="21" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+            </svg>
+            <span>Crosshair</span>
+          </button>
 
           <div class="tool-divider"></div>
 
@@ -381,105 +400,35 @@
 
         <!-- Viewport -->
         <div class="viewport-wrapper">
-          <!-- MPR Container Overlay -->
-          <div class="mpr-container hidden" id="mpr-container">
-            <div class="mpr-header">
-              <div class="mpr-title">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <rect x="3" y="3" width="8" height="8" rx="1" />
-                  <rect x="13" y="3" width="8" height="8" rx="1" />
-                  <rect x="3" y="13" width="8" height="8" rx="1" />
-                </svg>
-                <span>Reconstrucción Multiplanar (MPR 3D)</span>
-              </div>
-              <button
-                class="mpr-close-btn"
-                id="mpr-close-btn"
-                title="Cerrar MPR"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+          <!-- 3D Unified Depth Slider (Right) -->
+          <div class="mpr-depth-slider-wrap hidden" id="mpr-depth-slider-wrap">
+            <span class="mpr-depth-counter" id="mpr-depth-counter"
+              >Corte: 1/1</span
+            >
+            <input
+              type="range"
+              id="mpr-depth-slider"
+              class="mpr-depth-slider"
+              min="0"
+              max="0"
+              value="0"
+            />
+          </div>
+
+          <!-- 3D Orientation Widget (Bottom-Right) -->
+          <div
+            class="mpr-orientation-widget hidden"
+            id="mpr-orientation-widget"
+          >
+            <div class="mpr-orient-buttons">
+              <button class="btn-orient active" id="btn-view-axial">
+                Axial
               </button>
+              <button class="btn-orient" id="btn-view-sagittal">Sagital</button>
+              <button class="btn-orient" id="btn-view-coronal">Coronal</button>
             </div>
-            <div class="mpr-grid">
-              <!-- Axial Panel -->
-              <div class="mpr-panel" id="mpr-panel-axial">
-                <div class="mpr-panel__header">
-                  <span class="mpr-panel__title" style="color: #00c8ff"
-                    >Axial (XY)</span
-                  >
-                  <span id="mpr-val-axial" class="mpr-val">1 / 1</span>
-                </div>
-                <div class="mpr-panel__canvas-wrap">
-                  <canvas id="mpr-canvas-axial"></canvas>
-                </div>
-                <div class="mpr-panel__controls">
-                  <span>Plano Z:</span>
-                  <input
-                    type="range"
-                    id="mpr-slider-axial"
-                    class="mpr-slider"
-                  />
-                </div>
-              </div>
-
-              <!-- Coronal Panel -->
-              <div class="mpr-panel" id="mpr-panel-coronal">
-                <div class="mpr-panel__header">
-                  <span class="mpr-panel__title" style="color: #ffd700"
-                    >Coronal (XZ)</span
-                  >
-                  <span id="mpr-val-coronal" class="mpr-val">1 / 1</span>
-                </div>
-                <div class="mpr-panel__canvas-wrap">
-                  <canvas id="mpr-canvas-coronal"></canvas>
-                </div>
-                <div class="mpr-panel__controls">
-                  <span>Plano Y:</span>
-                  <input
-                    type="range"
-                    id="mpr-slider-coronal"
-                    class="mpr-slider"
-                  />
-                </div>
-              </div>
-
-              <!-- Sagittal Panel -->
-              <div class="mpr-panel" id="mpr-panel-sagittal">
-                <div class="mpr-panel__header">
-                  <span class="mpr-panel__title" style="color: #ff00ff"
-                    >Sagital (YZ)</span
-                  >
-                  <span id="mpr-val-sagittal" class="mpr-val">1 / 1</span>
-                </div>
-                <div class="mpr-panel__canvas-wrap">
-                  <canvas id="mpr-canvas-sagittal"></canvas>
-                </div>
-                <div class="mpr-panel__controls">
-                  <span>Plano X:</span>
-                  <input
-                    type="range"
-                    id="mpr-slider-sagittal"
-                    class="mpr-slider"
-                  />
-                </div>
-              </div>
+            <div class="mpr-gizmo-wrap">
+              <canvas id="mpr-gizmo-canvas" width="60" height="60"></canvas>
             </div>
           </div>
           <div class="viewport-container cursor-wl" id="viewport-container">

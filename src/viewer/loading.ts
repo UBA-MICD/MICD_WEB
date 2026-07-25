@@ -186,7 +186,7 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
   }
 
   const container = $("viewport-container");
-  if (state.viewport.zoom <= 0) {
+  if (state.viewport.zoom <= 0 || state.currentIndex === 0) {
     state.viewport.zoom = fitToContainer(
       container.clientWidth,
       container.clientHeight,

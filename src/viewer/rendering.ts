@@ -1,13 +1,26 @@
 import { renderDicom, applyCanvasTransform } from "../dicom/dicom-renderer.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
+import { mpr3DViewer } from "./mpr.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 export function render(): void {
+  const canvas = $("dicom-canvas") as HTMLCanvasElement;
+
+  if (state.is3DMode && mpr3DViewer.isActive) {
+    // 3D Unified Viewport rendering
+    mpr3DViewer.render(canvas);
+
+    // Show and update depth slider and orientation widget
+    update3DControls();
+    return;
+  }
+
+  // Standard 2D Slice rendering
+  hide3DControls();
   if (!state.parsed?.pixelData) return;
 
-  const canvas = $("dicom-canvas") as HTMLCanvasElement;
   renderDicom({
     canvas,
     pixelData: state.parsed.pixelData,
@@ -24,14 +37,47 @@ export function render(): void {
   updateInfoOverlay();
 }
 
+// ── 3D Controls Update ───────────────────────────────────────────────────────
+
+export function update3DControls(): void {
+  const depthWrap = $("mpr-depth-slider-wrap");
+  const orientWidget = $("mpr-orientation-widget");
+
+  if (depthWrap) depthWrap.classList.remove("hidden");
+  if (orientWidget) orientWidget.classList.remove("hidden");
+
+  const depthInfo = mpr3DViewer.getDepthInfo();
+  const depthSlider = $("mpr-depth-slider") as HTMLInputElement | null;
+  const depthCounter = $("mpr-depth-counter");
+
+  if (depthSlider) {
+    depthSlider.min = "0";
+    depthSlider.max = String(Math.max(0, depthInfo.total - 1));
+    depthSlider.value = String(depthInfo.current);
+  }
+
+  if (depthCounter) {
+    depthCounter.textContent = `Corte: ${depthInfo.current + 1}/${depthInfo.total}`;
+  }
+
+  updateMprButtonState();
+}
+
+export function hide3DControls(): void {
+  const depthWrap = $("mpr-depth-slider-wrap");
+  const orientWidget = $("mpr-orientation-widget");
+
+  if (depthWrap) depthWrap.classList.add("hidden");
+  if (orientWidget) orientWidget.classList.add("hidden");
+}
+
 // ── Series Navigation ────────────────────────────────────────────────────────
 
 export function updateSeriesNav(): void {
   const nav = $("series-nav");
   const count = itemCount();
 
-  // Condicional de UI: Si la serie contiene una (1) sola imagen, ocultar completamente
-  if (count <= 1) {
+  if (count <= 1 || state.is3DMode) {
     nav.classList.add("hidden");
     updateMprButtonState();
     return;
@@ -99,8 +145,11 @@ export function updateMprButtonState(): void {
   }
 
   mprBtn.disabled = false;
-  mprBtn.title = "Reconstrucción Multiplanar (MPR)";
+  mprBtn.title = state.is3DMode
+    ? "Volver a Vista 2D"
+    : "Reconstrucción Volumétrica 3D (MPR)";
   mprBtn.classList.remove("disabled");
+  mprBtn.classList.toggle("active", state.is3DMode);
 }
 
 // ── Metadata Panel ───────────────────────────────────────────────────────────

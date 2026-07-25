@@ -21,6 +21,7 @@ import {
   isAuthenticated,
   getAccessToken,
   getCurrentUser,
+  getSessionExpiresAt,
   API_ORIGIN,
   type AuthUser,
 } from "./auth.ts";
@@ -193,6 +194,37 @@ test("refresh network failure keeps the refresh token for a later retry", async 
   assert.equal(store.get(REFRESH_KEY), "refresh-1");
 });
 
+test("refresh keeps the known user when the new token carries no claims", async () => {
+  await loginAsAdmin();
+  // A token whose payload has no sub/email at all — the session is still valid,
+  // so the user we already know must survive rather than being nulled out and
+  // blanking the account block in the panel footer.
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({ accessToken: jwt({ iat: 7 }), refreshToken: "refresh-2" }),
+  });
+
+  assert.equal(await refreshAccessToken(), true);
+  assert.deepEqual(getCurrentUser(), adminUser);
+});
+
+test("refresh keeps the known user when the claims are the wrong types", async () => {
+  await loginAsAdmin();
+  // sub as a string is the shape a JWT library change could plausibly produce;
+  // it must be rejected as a user rather than trusted into { id: "1" }.
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({
+        accessToken: jwt({ sub: "1", email: 42 }),
+        refreshToken: "refresh-2",
+      }),
+  });
+
+  assert.equal(await refreshAccessToken(), true);
+  assert.deepEqual(getCurrentUser(), adminUser);
+});
+
+
 test("concurrent refreshes are single-flight (rotation makes parallel refreshes race)", async () => {
   store.set(REFRESH_KEY, "refresh-1");
   let release!: (res: Response) => void;
@@ -219,6 +251,17 @@ test("authFetch attaches the bearer token", async () => {
   assert.equal(res.status, 200);
   assert.equal(bearerOf(fetchCalls.at(-1)!), `Bearer ${adminToken}`);
 });
+
+test("authFetch sends no Authorization header when there is no session", async () => {
+  // Guest state: the header must be absent, not `Bearer null`, which some
+  // servers parse as a malformed token and answer 400 instead of 401.
+  respondBy({ "/api/v1/studies": () => json({ studies: [] }) });
+
+  const res = await authFetch("/api/v1/studies");
+  assert.equal(res.status, 200);
+  assert.equal(bearerOf(fetchCalls.at(-1)!), undefined);
+});
+
 
 test("authFetch on 401 refreshes and retries with the new token", async () => {
   await loginAsAdmin();
@@ -312,6 +355,25 @@ test("ensureAuthenticated resolves without a prompt when a session exists", asyn
   assert.equal(prompts, 0);
 });
 
+test("ensureAuthenticated restores a dead in-memory session silently", async () => {
+  // The access token lives in memory only, so every page reload arrives here:
+  // no token, a refresh token in localStorage. That must not show a login form.
+  store.set(REFRESH_KEY, "refresh-1");
+  let prompts = 0;
+  setLoginPrompt(() => {
+    prompts++;
+    return Promise.resolve(false);
+  });
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({ accessToken: adminToken, refreshToken: "refresh-2" }),
+  });
+
+  assert.equal(await ensureAuthenticated(), true);
+  assert.equal(prompts, 0, "a silent refresh must not prompt");
+  assert.deepEqual(getCurrentUser(), adminUser);
+});
+
 // ── logout ────────────────────────────────────────────────────────────────────
 
 test("logout posts the refresh token and clears the session even if the network fails", async () => {
@@ -330,4 +392,55 @@ test("logout posts the refresh token and clears the session even if the network 
   assert.deepEqual(JSON.parse(String(call.init?.body)), {
     refreshToken: "refresh-1",
   });
+});
+
+// ── session expiry (drives the countdown in the UI) ──────────────────────────
+
+test("login records the access token's exp claim in epoch ms", async () => {
+  const expSeconds = Math.floor(Date.now() / 1000) + 900; // the backend's 15m
+  await loginAsAdmin(
+    jwt({ sub: adminUser.id, email: adminUser.email, exp: expSeconds }),
+  );
+  assert.equal(getSessionExpiresAt(), expSeconds * 1000);
+});
+
+test("a token with no exp claim reports no expiry rather than 0", () => {
+  // adminToken carries sub/email only. Treating a missing exp as 0 would show
+  // a permanently expired session.
+  assert.equal(getSessionExpiresAt(), null);
+});
+
+test("refresh replaces the expiry with the new token's", async () => {
+  await loginAsAdmin(
+    jwt({ sub: adminUser.id, email: adminUser.email, exp: 1000 }),
+  );
+  assert.equal(getSessionExpiresAt(), 1_000_000);
+
+  respondBy({
+    [AUTH_REFRESH]: () =>
+      json({
+        accessToken: jwt({
+          sub: adminUser.id,
+          email: adminUser.email,
+          exp: 2000,
+        }),
+        refreshToken: "refresh-2",
+      }),
+  });
+  assert.equal(await refreshAccessToken(), true);
+  assert.equal(getSessionExpiresAt(), 2_000_000);
+});
+
+test("logout clears the expiry along with the session", async () => {
+  await loginAsAdmin(
+    jwt({ sub: adminUser.id, email: adminUser.email, exp: 1000 }),
+  );
+  await logout();
+  assert.equal(getSessionExpiresAt(), null);
+});
+
+test("a malformed token yields no expiry instead of throwing", async () => {
+  await loginAsAdmin("not-a-jwt");
+  assert.equal(getSessionExpiresAt(), null);
+  assert.equal(isAuthenticated(), true);
 });

@@ -1,8 +1,19 @@
 import { authFetch, ensureAuthenticated, API_BASE } from "../auth/auth.js";
-import { $, escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
+import { escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
 
 // ── Study Explorer ────────────────────────────────────────────────────────────
+//
+// The study list appears on two surfaces: the compact panel beside the viewer,
+// and the wide grid on the server screen's Buscar tab. They share one set of
+// filters and one fetch — changing the search in either updates both — so the
+// controls are found by data attribute inside a view root rather than by
+// global id, which could only ever describe one of them.
+//
+// The two differ in what a click means:
+//   viewer  ("open")   — clicking a study loads it immediately.
+//   server  ("select") — clicking selects it; a confirm button opens it. This
+//                        is the comp's "Abrir estudio seleccionado" flow.
 
 interface StudyRecord {
   id: number;
@@ -25,6 +36,23 @@ interface StudiesResponse {
   totalPages: number;
 }
 
+type ExplorerMode = "open" | "select";
+
+interface ExplorerView {
+  root: HTMLElement;
+  mode: ExplorerMode;
+  list: HTMLElement;
+  search: HTMLInputElement | null;
+  searchClear: HTMLElement | null;
+  chips: HTMLElement | null;
+  dateFrom: HTMLInputElement | null;
+  dateTo: HTMLInputElement | null;
+  paginationInfo: HTMLElement | null;
+  prev: HTMLButtonElement | null;
+  next: HTMLButtonElement | null;
+  clearWrap: HTMLElement | null;
+}
+
 const explorerState = {
   page: 1,
   totalPages: 1,
@@ -34,152 +62,278 @@ const explorerState = {
   dateTo: "",
 };
 
-function updateClearFiltersVisibility(): void {
-  const active =
-    explorerState.search ||
-    explorerState.modality ||
-    explorerState.dateFrom ||
-    explorerState.dateTo;
-  $("filter-clear-wrap").classList.toggle("hidden", !active);
+const views: ExplorerView[] = [];
+/**
+ * Studies uploaded during this session, badged "Nuevo" so the thing you just
+ * added is findable in a list you did not sort. Client-side only and
+ * deliberately not persisted: "new" means "new to you, just now".
+ */
+const newStudyIds = new Set<string>();
+let selectedStudyId: string | null = null;
+let selectionListener: ((id: string | null) => void) | null = null;
+let activateListener: ((id: string) => void) | null = null;
+
+// ── Selection (server screen's select-then-confirm flow) ─────────────────────
+
+export function getSelectedStudyId(): string | null {
+  return selectedStudyId;
 }
 
-export function initStudyExplorer(): void {
-  // Click to view study
-  const list = $("study-list");
-  list.addEventListener("click", async (e) => {
-    // Login button inside the logged-out placeholder — the gate pops the dialog.
-    if ((e.target as HTMLElement).closest("#study-list-login")) {
+/** Notified whenever the selection changes, so the confirm button can follow. */
+export function onSelectionChange(cb: (id: string | null) => void): void {
+  selectionListener = cb;
+}
+
+/**
+ * Notified when the user activates the selection from the keyboard (Enter on
+ * an option). The owning screen handles it, so Enter and the confirm button
+ * take exactly the same path — including returning to the viewer.
+ */
+export function onSelectionActivate(cb: (id: string) => void): void {
+  activateListener = cb;
+}
+
+function setSelected(id: string | null): void {
+  selectedStudyId = id;
+  views
+    .filter((v) => v.mode === "select")
+    .forEach((v) => {
+      v.list.querySelectorAll<HTMLElement>("[data-id]").forEach((el) => {
+        const isSelected = el.dataset.id === id;
+        el.setAttribute("aria-selected", String(isSelected));
+        el.tabIndex = isSelected ? 0 : -1;
+      });
+    });
+  selectionListener?.(id);
+}
+
+export function clearSelection(): void {
+  setSelected(null);
+}
+
+/** Flags a study as freshly uploaded; cleared on reload. */
+export function markStudyAsNew(studyId: string): void {
+  newStudyIds.add(studyId);
+}
+
+// ── View registration ────────────────────────────────────────────────────────
+
+function q<T extends HTMLElement>(root: HTMLElement, attr: string): T | null {
+  return root.querySelector<T>(`[${attr}]`);
+}
+
+function registerView(root: HTMLElement): void {
+  const list = q<HTMLElement>(root, "data-explorer-list");
+  if (!list) return;
+
+  const view: ExplorerView = {
+    root,
+    mode: root.dataset.explorerView === "server" ? "select" : "open",
+    list,
+    search: q<HTMLInputElement>(root, "data-explorer-search"),
+    searchClear: q<HTMLElement>(root, "data-explorer-search-clear"),
+    chips: q<HTMLElement>(root, "data-explorer-chips"),
+    dateFrom: q<HTMLInputElement>(root, "data-explorer-date-from"),
+    dateTo: q<HTMLInputElement>(root, "data-explorer-date-to"),
+    paginationInfo: q<HTMLElement>(root, "data-explorer-pagination-info"),
+    prev: q<HTMLButtonElement>(root, "data-explorer-prev"),
+    next: q<HTMLButtonElement>(root, "data-explorer-next"),
+    clearWrap: q<HTMLElement>(root, "data-explorer-clear-wrap"),
+  };
+  views.push(view);
+  wireView(view);
+}
+
+function wireView(view: ExplorerView): void {
+  // Activating a study: open it, or select it, depending on the surface.
+  view.list.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-explorer-login]")) {
       void loadStudyExplorer();
       return;
     }
-    const item = (e.target as HTMLElement).closest<HTMLElement>(
-      ".study-item[data-id]",
-    );
-    if (!item) return;
-    const studyId = item.dataset.id;
+    const item = target.closest<HTMLElement>("[data-id]");
+    const studyId = item?.dataset.id;
     if (!studyId) return;
-    list
-      .querySelectorAll(".study-item")
-      .forEach((el) => el.classList.remove("study-item--active"));
-    item.classList.add("study-item--active");
-    await loadStudyFromServer(studyId);
+
+    if (view.mode === "select") {
+      setSelected(studyId);
+    } else {
+      void openStudy(studyId);
+    }
   });
 
-  // Search with debounce + inline clear button
-  const searchInput = $("search-studies") as HTMLInputElement;
-  const searchClear = $("btn-clear-search");
+  if (view.mode === "select") wireListboxKeys(view);
+
+  // Search, debounced. The other view's box is kept in step by syncControls().
   let searchTimer: ReturnType<typeof setTimeout>;
-  searchInput.addEventListener("input", () => {
-    const val = searchInput.value;
-    searchClear.classList.toggle("hidden", val.length === 0);
+  view.search?.addEventListener("input", () => {
+    const value = view.search!.value;
+    view.searchClear?.classList.toggle("hidden", value.length === 0);
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      explorerState.search = val.trim();
-      explorerState.page = 1;
-      updateClearFiltersVisibility();
-      void loadStudyExplorer();
+      explorerState.search = value.trim();
+      applyFilterChange();
     }, 400);
   });
-  searchClear.addEventListener("click", () => {
-    searchInput.value = "";
-    searchClear.classList.add("hidden");
+  view.searchClear?.addEventListener("click", () => {
     explorerState.search = "";
-    explorerState.page = 1;
-    updateClearFiltersVisibility();
-    void loadStudyExplorer();
+    applyFilterChange();
   });
 
-  // Modality chips
-  const chipsContainer = $("filter-modality-chips");
-  chipsContainer.addEventListener("click", (e) => {
+  view.chips?.addEventListener("click", (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>(".filter-chip");
     if (!chip) return;
-    chipsContainer
-      .querySelectorAll(".filter-chip")
-      .forEach((c) => c.classList.remove("filter-chip--active"));
-    chip.classList.add("filter-chip--active");
     explorerState.modality = chip.dataset.modality ?? "";
-    explorerState.page = 1;
-    updateClearFiltersVisibility();
-    void loadStudyExplorer();
+    applyFilterChange();
   });
 
-  // Date filters
-  $("filter-date-from").addEventListener("change", (e) => {
-    explorerState.dateFrom = (e.target as HTMLInputElement).value;
-    explorerState.page = 1;
-    updateClearFiltersVisibility();
-    void loadStudyExplorer();
+  view.dateFrom?.addEventListener("change", () => {
+    explorerState.dateFrom = view.dateFrom!.value;
+    applyFilterChange();
   });
-  $("filter-date-to").addEventListener("change", (e) => {
-    explorerState.dateTo = (e.target as HTMLInputElement).value;
-    explorerState.page = 1;
-    updateClearFiltersVisibility();
-    void loadStudyExplorer();
+  view.dateTo?.addEventListener("change", () => {
+    explorerState.dateTo = view.dateTo!.value;
+    applyFilterChange();
   });
 
-  // Clear all filters
-  $("btn-clear-filters").addEventListener("click", () => {
-    explorerState.search = "";
-    explorerState.modality = "";
-    explorerState.dateFrom = "";
-    explorerState.dateTo = "";
-    explorerState.page = 1;
-    searchInput.value = "";
-    searchClear.classList.add("hidden");
-    ($("filter-date-from") as HTMLInputElement).value = "";
-    ($("filter-date-to") as HTMLInputElement).value = "";
-    chipsContainer
-      .querySelectorAll(".filter-chip")
-      .forEach((c) => c.classList.remove("filter-chip--active"));
-    chipsContainer
-      .querySelector<HTMLElement>('.filter-chip[data-modality=""]')
-      ?.classList.add("filter-chip--active");
-    updateClearFiltersVisibility();
-    void loadStudyExplorer();
-  });
+  q<HTMLElement>(view.root, "data-explorer-clear")?.addEventListener(
+    "click",
+    () => {
+      explorerState.search = "";
+      explorerState.modality = "";
+      explorerState.dateFrom = "";
+      explorerState.dateTo = "";
+      applyFilterChange();
+    },
+  );
 
-  // Pagination
-  $("pagination-prev").addEventListener("click", () => {
+  view.prev?.addEventListener("click", () => {
     if (explorerState.page > 1) {
       explorerState.page--;
       void loadStudyExplorer();
     }
   });
-  $("pagination-next").addEventListener("click", () => {
+  view.next?.addEventListener("click", () => {
     if (explorerState.page < explorerState.totalPages) {
       explorerState.page++;
       void loadStudyExplorer();
     }
   });
+}
 
-  // Close / reopen panel
-  const panel = $("explorer-panel");
-  const shell = document.querySelector<HTMLElement>(".app-shell")!;
-  const btnClose = $("btn-close-explorer");
-  const btnReopen = $("btn-reopen-explorer");
-  btnClose.addEventListener("click", () => {
-    panel.classList.add("explorer-panel--closed");
-    shell.classList.add("explorer-closed");
-    btnReopen.classList.remove("hidden");
-  });
-  btnReopen.addEventListener("click", () => {
-    panel.classList.remove("explorer-panel--closed");
-    shell.classList.remove("explorer-closed");
-    btnReopen.classList.add("hidden");
+/** Arrow-key navigation for the listbox, per the WCAG listbox pattern. */
+function wireListboxKeys(view: ExplorerView): void {
+  view.list.addEventListener("keydown", (e: KeyboardEvent) => {
+    const options = Array.from(
+      view.list.querySelectorAll<HTMLElement>("[data-id]"),
+    );
+    if (options.length === 0) return;
+
+    const current = options.findIndex(
+      (el) => el.dataset.id === selectedStudyId,
+    );
+
+    if (e.key === "Enter" || e.key === " ") {
+      if (selectedStudyId) {
+        e.preventDefault();
+        activateListener?.(selectedStudyId);
+      }
+      return;
+    }
+
+    let next: number | null = null;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      next = current < 0 ? 0 : Math.min(current + 1, options.length - 1);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      next = current < 0 ? 0 : Math.max(current - 1, 0);
+    } else if (e.key === "Home") {
+      next = 0;
+    } else if (e.key === "End") {
+      next = options.length - 1;
+    }
+    if (next === null) return;
+
+    e.preventDefault();
+    setSelected(options[next].dataset.id ?? null);
+    options[next].focus();
   });
 }
 
+// ── Filter plumbing ──────────────────────────────────────────────────────────
+
+/** A filter changed: reset to page 1, repaint every view's controls, refetch. */
+function applyFilterChange(): void {
+  explorerState.page = 1;
+  syncControls();
+  void loadStudyExplorer();
+}
+
+/** Pushes the shared filter state back into every view's controls. */
+function syncControls(): void {
+  const hasFilters = Boolean(
+    explorerState.search ||
+    explorerState.modality ||
+    explorerState.dateFrom ||
+    explorerState.dateTo,
+  );
+
+  views.forEach((view) => {
+    if (view.search && view.search.value !== explorerState.search) {
+      view.search.value = explorerState.search;
+    }
+    view.searchClear?.classList.toggle("hidden", explorerState.search === "");
+    if (view.dateFrom) view.dateFrom.value = explorerState.dateFrom;
+    if (view.dateTo) view.dateTo.value = explorerState.dateTo;
+    view.clearWrap?.classList.toggle("hidden", !hasFilters);
+
+    view.chips
+      ?.querySelectorAll<HTMLElement>(".filter-chip")
+      .forEach((chip) => {
+        const isActive =
+          (chip.dataset.modality ?? "") === explorerState.modality;
+        chip.classList.toggle("filter-chip--active", isActive);
+        chip.setAttribute("aria-pressed", String(isActive));
+      });
+  });
+}
+
+// ── Public entry points ──────────────────────────────────────────────────────
+
+export function initStudyExplorer(): void {
+  document
+    .querySelectorAll<HTMLElement>("[data-explorer-view]")
+    .forEach(registerView);
+  syncControls();
+}
+
+/**
+ * Opens a study in the viewer and marks it current everywhere. Callers on the
+ * server screen return to the viewer themselves — this only touches data.
+ */
+export async function openStudy(studyId: string): Promise<void> {
+  views.forEach((v) =>
+    v.list.querySelectorAll("[data-id]").forEach((el) => {
+      el.setAttribute(
+        "aria-current",
+        String(el.getAttribute("data-id") === studyId),
+      );
+    }),
+  );
+  await loadStudyFromServer(studyId);
+}
+
 export async function loadStudyExplorer(): Promise<void> {
-  // Every server-bound explorer action funnels through here: no session → popup.
+  // Every server-bound explorer action funnels through here: no session → gate.
   if (!(await ensureAuthenticated())) {
     renderLoggedOutExplorer();
     return;
   }
 
-  const list = $("study-list");
-  list.innerHTML =
-    '<li class="study-item study-item--loading">Cargando estudios…</li>';
+  views.forEach((v) => {
+    v.list.innerHTML =
+      '<li class="study-item study-item--loading">Cargando estudios…</li>';
+  });
 
   const params = new URLSearchParams({
     page: String(explorerState.page),
@@ -197,84 +351,125 @@ export async function loadStudyExplorer(): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: StudiesResponse = await res.json();
 
-    const totalPages = data.totalPages || 1;
-    explorerState.totalPages = totalPages;
-    updatePaginationUI(data.page, totalPages, data.total);
+    explorerState.totalPages = data.totalPages || 1;
+    updatePaginationUI(data.page, explorerState.totalPages, data.total);
 
     if (data.studies.length === 0) {
-      list.innerHTML = `
-        <li class="study-item study-item--empty">
-          <div class="empty-state">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-              <rect x="3" y="3" width="18" height="18" rx="3"/>
-              <circle cx="12" cy="12" r="4"/>
-            </svg>
-            <p>No hay estudios${explorerState.search || explorerState.modality || explorerState.dateFrom || explorerState.dateTo ? " con esos filtros" : " cargados"}.</p>
-          </div>
-        </li>`;
+      const filtered =
+        explorerState.search ||
+        explorerState.modality ||
+        explorerState.dateFrom ||
+        explorerState.dateTo;
+      views.forEach((v) => {
+        v.list.innerHTML = emptyState(
+          `No hay estudios${filtered ? " con esos filtros" : " cargados"}.`,
+        );
+      });
+      setSelected(null);
       return;
     }
 
-    list.innerHTML = data.studies
-      .map((s) => {
-        const encodedId = encodeURIComponent(s.orthanc_study_id);
-        const modality = escapeHtml(s.modality || "?");
-        const name = escapeHtml(s.patient_name || "Paciente desconocido");
-        const date = formatDate(s.study_date);
-        const desc = escapeHtml(s.study_description || "—");
-        const count = Number(s.num_instances);
-        const imgLabel = count === 1 ? "1 imagen" : `${count} imágenes`;
+    views.forEach((view) => {
+      view.list.innerHTML = data.studies
+        .map((s) => renderStudy(s, view.mode))
+        .join("");
+      loadThumbnails(view.list);
+    });
 
-        return `
-        <li class="study-item" data-id="${escapeAttr(s.orthanc_study_id)}" title="Click para visualizar">
-          <div class="study-item__thumb">
-            <img data-thumb-id="${escapeAttr(s.orthanc_study_id)}" alt="${modality}" style="display:none" />
-            <div class="study-item__thumb-fallback">${modality}</div>
-          </div>
-          <div class="study-item__info">
-            <span class="study-item__name">${name}</span>
-            <span class="study-item__date">${date} · ${desc}</span>
-            <span class="study-item__meta">
-              <span class="study-item__badge">${modality}</span>
-              ${imgLabel} · Disponible
-            </span>
-          </div>
-        </li>`;
-      })
-      .join("");
-    loadThumbnails(list);
+    // A selection from a previous page is meaningless once the list changes.
+    if (!data.studies.some((s) => s.orthanc_study_id === selectedStudyId)) {
+      setSelected(null);
+    } else {
+      setSelected(selectedStudyId);
+    }
   } catch {
-    list.innerHTML =
-      '<li class="study-item study-item--error">Error al cargar estudios.</li>';
+    views.forEach((v) => {
+      v.list.innerHTML =
+        '<li class="study-item study-item--error">Error al cargar estudios.</li>';
+    });
     explorerState.page = 1;
     explorerState.totalPages = 1;
     updatePaginationUI(1, 1, 0);
+    setSelected(null);
   }
 }
 
-/** What the explorer shows without a session: a prompt instead of studies. */
-export function renderLoggedOutExplorer(): void {
-  $("study-list").innerHTML = `
+function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
+  const id = escapeAttr(s.orthanc_study_id);
+  const modality = escapeHtml(s.modality || "?");
+  const name = escapeHtml(s.patient_name || "Paciente desconocido");
+  const date = formatDate(s.study_date);
+  const desc = escapeHtml(s.study_description || "—");
+  const count = Number(s.num_instances);
+  const imgLabel = count === 1 ? "1 imagen" : `${count} imágenes`;
+
+  const isNew = newStudyIds.has(s.orthanc_study_id);
+  const newBadge = isNew ? '<span class="study-item__new">Nuevo</span>' : "";
+
+  const body = `${newBadge}
+    <span class="study-item__thumb">
+      <img data-thumb-id="${id}" alt="" style="display:none" />
+      <span class="study-item__thumb-fallback">${modality}</span>
+    </span>
+    <span class="study-item__info">
+      <span class="study-item__name">${name}</span>
+      <span class="study-item__date">${date} · ${desc}</span>
+      <span class="study-item__meta">
+        <span class="study-item__badge">${modality}</span>
+        ${imgLabel}
+      </span>
+    </span>`;
+
+  // In the listbox each <li> IS the option; in the panel each row is a button,
+  // because there a click acts immediately rather than selecting.
+  return mode === "select"
+    ? `<li class="study-item" role="option" data-id="${id}" aria-selected="false" tabindex="-1">${body}</li>`
+    : `<li><button type="button" class="study-item" data-id="${id}">${body}</button></li>`;
+}
+
+function emptyState(message: string): string {
+  return `
     <li class="study-item study-item--empty">
       <div class="empty-state">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
-          <rect x="3" y="11" width="18" height="10" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <circle cx="12" cy="12" r="4"/>
         </svg>
-        <p>Iniciá sesión para ver los estudios del servidor.</p>
-        <button class="btn btn--accent" id="study-list-login">Iniciar sesión</button>
+        <p>${message}</p>
       </div>
     </li>`;
+}
+
+/** What the viewer's panel shows without a session: the rule, in words. */
+export function renderLoggedOutExplorer(): void {
+  views.forEach((v) => {
+    v.list.innerHTML = `
+      <li class="study-item study-item--empty">
+        <div class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+            <rect x="3" y="11" width="18" height="10" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <p>
+            Iniciá sesión para ver los estudios del servidor.<br />
+            Abrir archivos locales no requiere sesión.
+          </p>
+          <button class="btn btn--accent" data-explorer-login>Iniciar sesión</button>
+        </div>
+      </li>`;
+  });
   explorerState.page = 1;
   explorerState.totalPages = 1;
   updatePaginationUI(1, 1, 0);
+  setSelected(null);
 }
 
 let thumbUrls: string[] = [];
 
 /**
  * Thumbnails are a protected endpoint, so a plain <img src> can't carry the
- * bearer token — fetch each one and swap in a blob URL instead.
+ * bearer token — fetch each one and swap in a blob URL instead. (The CSP has
+ * to allow blob: in img-src for this to render at all.)
  */
 function loadThumbnails(list: HTMLElement): void {
   thumbUrls.forEach((url) => URL.revokeObjectURL(url));
@@ -305,11 +500,12 @@ function updatePaginationUI(
   totalPages: number,
   total: number,
 ): void {
-  const info = $("pagination-info");
-  const btnPrev = $("pagination-prev") as HTMLButtonElement;
-  const btnNext = $("pagination-next") as HTMLButtonElement;
-
-  info.textContent = total > 0 ? `${page} / ${totalPages}` : "—";
-  btnPrev.disabled = page <= 1;
-  btnNext.disabled = page >= totalPages;
+  views.forEach((view) => {
+    if (view.paginationInfo) {
+      view.paginationInfo.textContent =
+        total > 0 ? `${page} / ${totalPages}` : "—";
+    }
+    if (view.prev) view.prev.disabled = page <= 1;
+    if (view.next) view.next.disabled = page >= totalPages;
+  });
 }

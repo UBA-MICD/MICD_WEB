@@ -68,6 +68,11 @@ const state = {
 export function initZenodoPanel(): void {
   $("btn-open-zenodo").addEventListener("click", openPanel);
   $("btn-close-zenodo").addEventListener("click", closePanel);
+  // Starts closed in the markup; make the DOM state say so too.
+  setPanelOpen(false);
+  $("zenodo-panel").addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape") closePanel();
+  });
 
   // Tab switching
   document.querySelectorAll<HTMLElement>(".z-tab").forEach((tab) => {
@@ -131,12 +136,27 @@ export function initZenodoPanel(): void {
 }
 
 function openPanel(): void {
-  $("zenodo-panel").classList.remove("zenodo-panel--closed");
+  setPanelOpen(true);
   if (state.tab === "config") void loadConfig();
 }
 
 function closePanel(): void {
-  $("zenodo-panel").classList.add("zenodo-panel--closed");
+  setPanelOpen(false);
+  // Send focus back to the control that opened the panel, rather than leaving
+  // it on a button that is now hidden.
+  $("btn-open-zenodo").focus();
+}
+
+/**
+ * The panel is a disclosure, so the rail button's aria-expanded has to follow
+ * it. `inert` matters too: the closed panel is only translated off-screen, so
+ * without it a keyboard user could tab into a panel they cannot see.
+ */
+function setPanelOpen(open: boolean): void {
+  const panel = $("zenodo-panel");
+  panel.classList.toggle("zenodo-panel--closed", !open);
+  panel.inert = !open;
+  $("btn-open-zenodo").setAttribute("aria-expanded", String(open));
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
@@ -552,8 +572,12 @@ async function runSyncNow(): Promise<void> {
 
 function renderPublishTab(): void {
   const container = $("z-publish-content");
+  // The loaded study is marked with aria-current, not a .study-item--active
+  // class: the explorer keys its styling off the ARIA attribute so the visual
+  // and programmatic state cannot drift apart. Both explorer views mark the
+  // same study, so the first match is the right one either way.
   const active = document.querySelector<HTMLElement>(
-    ".study-item--active[data-id]",
+    '.study-item[aria-current="true"][data-id]',
   );
   const studyId = active?.dataset.id ?? null;
   const studyName =

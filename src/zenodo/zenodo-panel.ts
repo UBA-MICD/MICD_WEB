@@ -1,5 +1,6 @@
 import { authFetch, ensureAuthenticated, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml } from "../shared/dom.js";
+import { showToast } from "../shared/banner.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -128,10 +129,56 @@ export function initZenodoPanel(): void {
 
   // Import click delegation
   $("z-results").addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
-      "[data-import-id]",
-    );
-    if (btn) void importRecord(Number(btn.dataset.importId), btn);
+    const target = e.target as HTMLElement;
+
+    // Cancel button inside a ZIP confirm strip
+    if (target.closest(".z-zip-confirm__cancel")) {
+      target.closest<HTMLElement>(".z-zip-confirm")?.remove();
+      return;
+    }
+
+    // Confirm button inside a ZIP confirm strip
+    const confirmBtn = target.closest<HTMLButtonElement>(".z-zip-confirm__ok");
+    if (confirmBtn) {
+      const strip = confirmBtn.closest<HTMLElement>(".z-zip-confirm")!;
+      const recordId = Number(strip.dataset.recordId);
+      strip.remove();
+      const importBtn = document.querySelector<HTMLButtonElement>(`[data-import-id="${recordId}"]`);
+      if (importBtn) void importRecord(recordId, importBtn);
+      return;
+    }
+
+    // Regular import button
+    const btn = target.closest<HTMLButtonElement>("[data-import-id]");
+    if (!btn) return;
+    const hasZip = btn.dataset.hasZip === "true";
+
+    if (hasZip) {
+      const card = btn.closest<HTMLElement>(".z-record-card")!;
+      if (card.querySelector(".z-zip-confirm")) return;
+      const totalBytes = Number(btn.closest<HTMLElement>(".z-record-card")
+        ?.querySelector<HTMLElement>("[data-total-size]")?.dataset.totalSize ?? 0);
+      const sizeLabel = card.querySelector<HTMLElement>(".z-badge--muted")?.textContent ?? "";
+      const bigWarning = totalBytes > 500 * 1024 * 1024
+        ? `<p class="z-zip-confirm__warn">⚠ Archivo grande — la descarga puede tardar varios minutos.</p>`
+        : "";
+      const strip = document.createElement("div");
+      strip.className = "z-zip-confirm";
+      strip.dataset.recordId = btn.dataset.importId!;
+      strip.innerHTML = `
+        <span class="z-zip-confirm__msg">
+          ¿Descomprimír el ZIP (${escapeHtml(sizeLabel)}) e importar los DICOM que contenga?
+        </span>
+        ${bigWarning}
+        <div class="z-zip-confirm__actions">
+          <button class="btn btn--accent btn--xs z-zip-confirm__ok">Sí, importar</button>
+          <button class="btn btn--secondary btn--xs z-zip-confirm__cancel">Cancelar</button>
+        </div>`;
+      card.appendChild(strip);
+      return;
+    }
+
+    void importRecord(Number(btn.dataset.importId), btn);
   });
 }
 
@@ -230,18 +277,26 @@ function recordCard(r: ZenodoRecord): string {
   const author = r.authors[0]?.name ?? "—";
   const more = r.authors.length > 1 ? " et al." : "";
   const year = r.publicationDate?.slice(0, 4) ?? "—";
+  const hasOnlyZips = (r.files ?? []).length > 0 && (r.files ?? []).every((f) => f.key.toLowerCase().endsWith(".zip"));
   const importBadge = r.importable
-    ? `<span class="z-badge z-badge--dicom">DICOM</span>`
+    ? hasOnlyZips
+      ? `<span class="z-badge z-badge--zip">ZIP·DICOM</span>`
+      : `<span class="z-badge z-badge--dicom">DICOM</span>`
     : `<span class="z-badge z-badge--muted">No importable</span>`;
   const importBtn = r.importable
-    ? `<button class="btn btn--accent btn--xs" data-import-id="${r.id}">Importar</button>`
+    ? `<button class="btn btn--accent btn--xs" data-import-id="${r.id}" data-has-zip="${hasOnlyZips}">${hasOnlyZips ? "Importar ZIP" : "Importar"}</button>`
+    : "";
+
+  const zipNote = hasOnlyZips
+    ? `<p class="z-record-zip-note">El servidor descomprimirá el ZIP e importará los archivos DICOM que contenga.</p>`
     : "";
 
   return `
-    <div class="z-record-card">
+    <div class="z-record-card" data-total-size="${r.totalSize}">
       <p class="z-record-title">${escapeHtml(r.title)}</p>
       <p class="z-record-meta">${escapeHtml(author)}${more} · ${year}</p>
       <p class="z-record-doi">${escapeHtml(r.doi)}</p>
+      ${zipNote}
       <div class="z-record-footer">
         ${importBadge}
         <span class="z-badge z-badge--muted">${formatBytes(r.totalSize)}</span>
@@ -274,6 +329,9 @@ async function importRecord(
       .filter((f) => f.key.endsWith(".dcm") || f.key.endsWith(".zip"))
       .map((f) => ({ fileKey: f.key }));
 
+    const hasZips = files.some((f) => f.fileKey.endsWith(".zip"));
+    if (hasZips) btn.textContent = "Descargando…";
+
     if (files.length === 0) {
       btn.textContent = "Sin archivos";
       setTimeout(() => {
@@ -294,17 +352,30 @@ async function importRecord(
       }),
     });
     const data = await res.json();
+    console.log("[zenodo] import response", res.status, data);
     if (!res.ok) {
       const msg = data.error ?? `Error ${res.status}`;
-      btn.textContent = msg.length > 18 ? "Error" : msg;
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = origLabel;
-      }, 2500);
+      console.log("[zenodo] showing banner:", msg);
+      showToast(msg, "warning");
+      btn.disabled = false;
+      btn.textContent = origLabel;
       return;
     }
 
     const n = data.imported ?? 0;
+    const dupes = data.duplicates ?? 0;
+
+    if (n === 0 && dupes > 0) {
+      const msg =
+        dupes === 1
+          ? "Este archivo ya estaba importado."
+          : `${dupes} archivos ya estaban importados.`;
+      showToast(msg, "warning");
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      return;
+    }
+
     btn.textContent = `✓ ${n} importado${n !== 1 ? "s" : ""}`;
     btn.classList.add("btn--success");
     setTimeout(() => {
@@ -740,6 +811,7 @@ async function publishStudy(studyId: string): Promise<void> {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 function skeleton(): string {
   return Array.from({ length: 3 })

@@ -1,4 +1,7 @@
-import { calculateAutoWindowLevel } from "../dicom/dicom-parser-util.js";
+import {
+  calculateAutoWindowLevel,
+  getModalityDefaultWindow,
+} from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
   fitToContainer,
@@ -8,6 +11,7 @@ import { anyDialogOpen } from "../shared/dialog.js";
 import { currentScreen } from "../shared/screen.js";
 import { state, itemCount } from "./state.js";
 import { render } from "./rendering.js";
+import { updateWindowingPanel } from "./windowing.js";
 import { loadCurrent, openFiles, openFolder } from "./loading.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
@@ -27,19 +31,32 @@ export function initToolbar(): void {
     const container = $("viewport-container");
     if (state.parsed.metadata.windowWidth > 0) {
       state.viewport = createDefaultViewport(state.parsed.metadata);
-    } else if (state.parsed.pixelData) {
-      const auto = calculateAutoWindowLevel(
-        state.parsed.pixelData,
-        state.parsed.metadata.rescaleSlope,
-        state.parsed.metadata.rescaleIntercept,
+    } else {
+      const modalityDefault = getModalityDefaultWindow(
+        state.parsed.metadata.modality,
       );
-      state.viewport = {
-        windowCenter: auto.windowCenter,
-        windowWidth: auto.windowWidth,
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-      };
+      if (modalityDefault.windowWidth > 0) {
+        state.viewport = {
+          windowCenter: modalityDefault.windowCenter,
+          windowWidth: modalityDefault.windowWidth,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+        };
+      } else if (state.parsed.pixelData) {
+        const auto = calculateAutoWindowLevel(
+          state.parsed.pixelData,
+          state.parsed.metadata.rescaleSlope,
+          state.parsed.metadata.rescaleIntercept,
+        );
+        state.viewport = {
+          windowCenter: auto.windowCenter,
+          windowWidth: auto.windowWidth,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+        };
+      }
     }
     state.viewport.zoom = fitToContainer(
       container.clientWidth,
@@ -47,6 +64,7 @@ export function initToolbar(): void {
       state.parsed.metadata.columns,
       state.parsed.metadata.rows,
     );
+    updateWindowingPanel();
     render();
   });
 
@@ -284,6 +302,8 @@ export function initKeyboardShortcuts(): void {
       $("tool-reset").click();
     } else if (e.key === "m" || e.key === "M") {
       $("tool-metadata").click();
+    } else if (e.key === "v" || e.key === "V") {
+      $("tool-windowing").click();
     }
   });
 }

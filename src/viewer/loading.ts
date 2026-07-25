@@ -1,6 +1,7 @@
 import {
   parseDicomFile,
   calculateAutoWindowLevel,
+  getModalityDefaultWindow,
 } from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
@@ -16,6 +17,7 @@ import {
   updateSeriesNav,
   updateInfoOverlay,
 } from "./rendering.js";
+import { updateWindowingPanel } from "./windowing.js";
 
 /** Load the image at state.currentIndex from whichever source is active. */
 export async function loadCurrent(): Promise<void> {
@@ -168,18 +170,29 @@ async function displayDicom(
   if (parsed.metadata.windowWidth > 0) {
     state.viewport = createDefaultViewport(parsed.metadata);
   } else {
-    const auto = calculateAutoWindowLevel(
-      parsed.pixelData,
-      parsed.metadata.rescaleSlope,
-      parsed.metadata.rescaleIntercept,
-    );
-    state.viewport = {
-      windowCenter: auto.windowCenter,
-      windowWidth: auto.windowWidth,
-      zoom: 1,
-      panX: 0,
-      panY: 0,
-    };
+    const modalityDefault = getModalityDefaultWindow(parsed.metadata.modality);
+    if (modalityDefault.windowWidth > 0) {
+      state.viewport = {
+        windowCenter: modalityDefault.windowCenter,
+        windowWidth: modalityDefault.windowWidth,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+      };
+    } else {
+      const auto = calculateAutoWindowLevel(
+        parsed.pixelData,
+        parsed.metadata.rescaleSlope,
+        parsed.metadata.rescaleIntercept,
+      );
+      state.viewport = {
+        windowCenter: auto.windowCenter,
+        windowWidth: auto.windowWidth,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+      };
+    }
   }
 
   const container = $("viewport-container");
@@ -195,6 +208,7 @@ async function displayDicom(
   updateMetadataPanel();
   updateSeriesNav();
   updateInfoOverlay();
+  updateWindowingPanel();
 
   $("topbar-title").textContent = name;
   $("topbar-title").title = name;

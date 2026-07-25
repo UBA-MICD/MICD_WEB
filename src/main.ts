@@ -24,6 +24,7 @@ import {
   initKeyboardShortcuts,
   initResizeObserver,
 } from "./viewer/interaction.js";
+import { initWindowing } from "./viewer/windowing.js";
 import { initUploadPanel } from "./upload/upload.js";
 import {
   initStudyExplorer,
@@ -77,6 +78,7 @@ function startApp(): void {
   initKeyboardShortcuts();
   initSeriesNav();
   initResizeObserver();
+  initWindowing();
   initUploadPanel();
   initStudyExplorer();
   initServerScreen();

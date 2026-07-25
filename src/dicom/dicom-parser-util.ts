@@ -210,6 +210,35 @@ function formatDicomDate(dateStr: string): string {
   return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
 }
 
+// ── Modality Default Window ───────────────────────────────────────────────────
+
+/**
+ * Returns the standard clinical WL/WW defaults for a given modality.
+ * Returns { windowCenter: 0, windowWidth: 0 } when no standard default exists,
+ * signalling the caller to fall back to pixel-range auto-calculation.
+ */
+export function getModalityDefaultWindow(
+  modality: string,
+): { windowCenter: number; windowWidth: number } {
+  switch (modality.toUpperCase()) {
+    case "CT":
+      return { windowCenter: 40, windowWidth: 400 };
+    case "MR":
+      return { windowCenter: 600, windowWidth: 1200 };
+    case "US":
+      return { windowCenter: 128, windowWidth: 256 };
+    case "CR":
+    case "DX":
+      return { windowCenter: 2048, windowWidth: 4096 };
+    case "PT":
+      return { windowCenter: 3000, windowWidth: 6000 };
+    case "NM":
+      return { windowCenter: 600, windowWidth: 1200 };
+    default:
+      return { windowCenter: 0, windowWidth: 0 };
+  }
+}
+
 // ── Auto Window/Level Calculation ────────────────────────────────────────────
 
 export function calculateAutoWindowLevel(

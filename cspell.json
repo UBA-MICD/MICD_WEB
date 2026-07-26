@@ -246,6 +246,15 @@
     "todavía",
     "registrada",
     "respuesta",
-    "inesperada"
+    "inesperada",
+    "raymarching",
+    "fovy",
+    "highp",
+    "accum",
+    "glsl",
+    "estado",
+    "interacción",
+    "cámara",
+    "ventana"
   ]
 }

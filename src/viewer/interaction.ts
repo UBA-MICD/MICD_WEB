@@ -142,8 +142,47 @@ export function initViewportInteraction(): void {
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
 
-    if (state.activeTool === "crosshair") {
-      handlePointerAction(e);
+    if (state.is3DMode && state.isDragging) {
+      if (state.activeTool === "pan") {
+        mpr3DViewer.camera.panX += dx;
+        mpr3DViewer.camera.panY += dy;
+      } else if (state.activeTool === "zoom") {
+        mpr3DViewer.camera.zoom = Math.max(
+          0.1,
+          Math.min(10, mpr3DViewer.camera.zoom * (1 - dy * 0.005)),
+        );
+      } else if (state.activeTool === "wl") {
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
+        state.viewport.windowCenter += dy * 2;
+      } else {
+        // Priority 3D Orbit Controls (Rotate Camera)
+        const sensitivity = 0.01;
+        const movementX = e.movementX ?? dx;
+        const movementY = e.movementY ?? dy;
+
+        mpr3DViewer.camera.phi += movementX * sensitivity;
+        mpr3DViewer.camera.theta = Math.max(
+          -Math.PI / 2 + 0.1,
+          Math.min(
+            Math.PI / 2 - 0.1,
+            mpr3DViewer.camera.theta + movementY * sensitivity,
+          ),
+        );
+        if (state.activeTool === "crosshair") {
+          handlePointerAction(e);
+        }
+      }
+      const canvas = document.getElementById(
+        "dicom-canvas",
+      ) as HTMLCanvasElement;
+      if (state.is3DMode && canvas) {
+        mpr3DViewer.render(canvas);
+      } else {
+        render();
+      }
       return;
     }
 
@@ -183,6 +222,18 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mouseup", () => {
+    if (state.isDragging && state.is3DMode) {
+      console.groupCollapsed("⚙️ [MPR 3D Debug] Estado Post-Interacción");
+      console.log("Cámara (Theta, Phi, Zoom):", mpr3DViewer.camera);
+      console.log("Crosshair (X, Y, Z):", mpr3DViewer.crosshair);
+      console.log(
+        "Ventana (W/L):",
+        state.viewport.windowWidth,
+        state.viewport.windowCenter,
+      );
+      console.log("Vista Activa:", mpr3DViewer.activeView);
+      console.groupEnd();
+    }
     state.isDragging = false;
   });
 
@@ -200,7 +251,14 @@ export function initViewportInteraction(): void {
         const target = depthInfo.current + delta;
         if (target >= 0 && target < depthInfo.total) {
           mpr3DViewer.setDepthIndex(target);
-          render();
+          const canvas = document.getElementById(
+            "dicom-canvas",
+          ) as HTMLCanvasElement;
+          if (state.is3DMode && canvas) {
+            mpr3DViewer.render(canvas);
+          } else {
+            render();
+          }
         }
       } else {
         // 2D mode stack scrolling
@@ -257,12 +315,18 @@ function init3DControlsInteraction(): void {
     updateOrientationButtonsUI("sagittal");
     render();
   });
+
+  $("btn-view-3d")?.addEventListener("click", () => {
+    mpr3DViewer.setOrientation("3d");
+    updateOrientationButtonsUI("3d");
+    render();
+  });
 }
 
 function updateOrientationButtonsUI(
-  activeView: "axial" | "coronal" | "sagittal",
+  activeView: "axial" | "coronal" | "sagittal" | "3d",
 ): void {
-  ["axial", "coronal", "sagittal"].forEach((view) => {
+  ["axial", "coronal", "sagittal", "3d"].forEach((view) => {
     const btn = $(`btn-view-${view}`);
     if (btn) {
       btn.classList.toggle("active", view === activeView);

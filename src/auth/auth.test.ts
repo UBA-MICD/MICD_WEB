@@ -224,7 +224,6 @@ test("refresh keeps the known user when the claims are the wrong types", async (
   assert.deepEqual(getCurrentUser(), adminUser);
 });
 
-
 test("concurrent refreshes are single-flight (rotation makes parallel refreshes race)", async () => {
   store.set(REFRESH_KEY, "refresh-1");
   let release!: (res: Response) => void;
@@ -261,7 +260,6 @@ test("authFetch sends no Authorization header when there is no session", async (
   assert.equal(res.status, 200);
   assert.equal(bearerOf(fetchCalls.at(-1)!), undefined);
 });
-
 
 test("authFetch on 401 refreshes and retries with the new token", async () => {
   await loginAsAdmin();

@@ -14,14 +14,14 @@
     "*.md"
   ],
   "words": [
-    "MICD",
+    "micd",
     "gihub",
     "codecov",
     "kubuntu",
     "kdenlive",
     "dicom",
-    "DICM",
-    "SAMPLE_DCM",
+    "dicm",
+    "sample_dcm",
     "dicomdir",
     "orthanc",
     "timestamptz",
@@ -30,6 +30,22 @@
     "togglefullscreen",
     "ilike",
     "repr",
-    "navigations"
+    "navigations",
+    "multiplanar",
+    "zenodo",
+    "gizmo",
+    "orient",
+    "crosshair",
+    "colour",
+    "dedup",
+    "behaviour",
+    "inerting",
+    "inerted",
+    "nums",
+    "raymarching",
+    "fovy",
+    "highp",
+    "accum",
+    "glsl"
   ]
 }

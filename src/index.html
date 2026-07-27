@@ -1,3 +1,4 @@
+<!-- cspell:disable -->
 <!doctype html>
 <html lang="es">
   <head>
@@ -106,6 +107,14 @@
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
+            <input
+              type="range"
+              id="nav-slider"
+              class="nav-slider"
+              min="0"
+              max="0"
+              value="0"
+            />
             <span class="nav-counter" id="nav-counter">1 / 1</span>
             <button class="nav-btn" id="nav-next" title="Siguiente (PageDown)">
               <svg
@@ -200,6 +209,26 @@
             </button>
             <button
               class="toolbar__tool"
+              id="tool-crosshair"
+              title="Navegación Crosshair 3D (C)"
+              aria-pressed="false"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+              </svg>
+              <span>Crosshair</span>
+            </button>
+            <button
+              class="toolbar__tool"
               id="tool-reset"
               title="Restablecer (R)"
             >
@@ -261,6 +290,30 @@
               </svg>
               <span>Zenodo</span>
             </button>
+
+            <div class="tool-divider"></div>
+
+            <button
+              class="toolbar__tool"
+              id="tool-mpr"
+              title="Reconstrucción Multiplanar (MPR)"
+              disabled
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="8" height="8" rx="1" />
+                <rect x="13" y="3" width="8" height="8" rx="1" />
+                <rect x="3" y="13" width="8" height="8" rx="1" />
+                <rect x="13" y="13" width="8" height="8" rx="1" />
+              </svg>
+              <span>MPR</span>
+            </button>
           </div>
 
           <div class="sidebar__footer">
@@ -321,6 +374,46 @@
         <main class="main-content" id="main-content" tabindex="-1">
           <!-- Viewport -->
           <div class="viewport-wrapper">
+            <!-- 3D Unified Depth Slider (Right) -->
+            <div
+              class="mpr-depth-slider-wrap hidden"
+              id="mpr-depth-slider-wrap"
+            >
+              <span class="mpr-depth-counter" id="mpr-depth-counter"
+                >Corte: 1/1</span
+              >
+              <input
+                type="range"
+                id="mpr-depth-slider"
+                class="mpr-depth-slider"
+                min="0"
+                max="0"
+                value="0"
+              />
+            </div>
+
+            <!-- 3D Orientation Widget (Bottom-Right) -->
+            <div
+              class="mpr-orientation-widget hidden"
+              id="mpr-orientation-widget"
+            >
+              <div class="mpr-orient-buttons">
+                <button class="btn-orient active" id="btn-view-axial">
+                  Axial
+                </button>
+                <button class="btn-orient" id="btn-view-sagittal">
+                  Sagital
+                </button>
+                <button class="btn-orient" id="btn-view-coronal">
+                  Coronal
+                </button>
+                <button class="btn-orient" id="btn-view-3d">3D Volume</button>
+              </div>
+              <div class="mpr-gizmo-wrap">
+                <canvas id="mpr-gizmo-canvas" width="60" height="60"></canvas>
+              </div>
+            </div>
+
             <div class="viewport-container cursor-wl" id="viewport-container">
               <!-- role="img" + a label written from the DICOM metadata; this
                  was an unlabelled black box to assistive tech. -->

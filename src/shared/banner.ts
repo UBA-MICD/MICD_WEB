@@ -1,7 +1,7 @@
 // ── Status banner ────────────────────────────────────────────────────────────
 //
 // The strip that appears above the topbar to confirm an action finished —
-// "Estudio cargado · volviendo al visualizador". It is a live region, so the
+// "Study loaded · returning to viewer". It is a live region, so the
 // confirmation reaches screen-reader users too rather than being a purely
 // visual reward.
 

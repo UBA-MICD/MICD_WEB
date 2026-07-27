@@ -116,16 +116,19 @@ export async function login(
       body: JSON.stringify({ email, password }),
     });
   } catch {
+    // cspell:disable-next-line
     return { ok: false, error: "No se pudo conectar con el servidor." };
   }
 
   if (res.status === 429) {
     return {
       ok: false,
+      // cspell:disable-next-line
       error: "Demasiados intentos. Esperá unos minutos e intentá de nuevo.",
     };
   }
   if (!res.ok) {
+    // cspell:disable-next-line
     return { ok: false, error: "Email o contraseña incorrectos." };
   }
 

@@ -1,3 +1,4 @@
+/* cspell:disable */
 // ── Server screen ────────────────────────────────────────────────────────────
 //
 // Searching and uploading leave the viewer for their own screen (design

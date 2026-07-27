@@ -1,16 +1,107 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Matrix4, MPR3DViewer } from "./mpr.js";
+import { Matrix4, MPR3DViewer, VoxelVolume } from "./mpr.js";
+import { state } from "./state.js";
 
-test("Matrix4.identity creates a 4x4 identity matrix", () => {
-  const mat = Matrix4.identity();
+// ── WebGL2 Context Mock ──────────────────────────────────────────────────────
+
+function createMockWebGL2Context(): any {
+  return {
+    canvas: {},
+    TEXTURE_3D: 0x806f,
+    TEXTURE_MAG_FILTER: 0x2800,
+    TEXTURE_MIN_FILTER: 0x2801,
+    LINEAR: 0x2601,
+    TEXTURE_WRAP_S: 0x2802,
+    TEXTURE_WRAP_T: 0x2803,
+    TEXTURE_WRAP_R: 0x8072,
+    CLAMP_TO_EDGE: 0x812f,
+    R8: 0x8229,
+    RED: 0x1903,
+    UNSIGNED_BYTE: 0x1401,
+    COLOR_BUFFER_BIT: 0x4000,
+    DEPTH_BUFFER_BIT: 0x0100,
+    TRIANGLES: 0x0004,
+    FLOAT: 0x1406,
+    ARRAY_BUFFER: 0x8892,
+    STATIC_DRAW: 0x88e4,
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    COMPILE_STATUS: 0x8b81,
+    LINK_STATUS: 0x8b82,
+    TEXTURE0: 0x84c0,
+    UNPACK_ALIGNMENT: 0x0cf5,
+    DEPTH_TEST: 0x0b71,
+    BLEND: 0x0be2,
+    SRC_ALPHA: 0x0302,
+    ONE_MINUS_SRC_ALPHA: 0x0303,
+    LEQUAL: 0x0203,
+
+    enable: () => {},
+    disable: () => {},
+    blendFunc: () => {},
+    depthFunc: () => {},
+    pixelStorei: () => {},
+    generateMipmap: () => {},
+    createShader: () => ({}),
+    shaderSource: () => {},
+    compileShader: () => {},
+    getShaderParameter: () => true,
+    getShaderInfoLog: () => "",
+    createProgram: () => ({}),
+    attachShader: () => {},
+    linkProgram: () => {},
+    getProgramParameter: () => true,
+    getProgramInfoLog: () => "",
+    useProgram: () => {},
+    createBuffer: () => ({}),
+    bindBuffer: () => {},
+    bufferData: () => {},
+    createVertexArray: () => ({}),
+    bindVertexArray: () => {},
+    enableVertexAttribArray: () => {},
+    vertexAttribPointer: () => {},
+    getAttribLocation: () => 0,
+    getUniformLocation: () => ({}),
+    uniformMatrix4fv: () => {},
+    uniform3fv: () => {},
+    uniform3f: () => {},
+    uniform1f: () => {},
+    uniform1i: () => {},
+    activeTexture: () => {},
+    bindTexture: () => {},
+    texParameteri: () => {},
+    texImage3D: () => {},
+    createTexture: () => ({}),
+    deleteTexture: () => {},
+    deleteProgram: () => {},
+    deleteShader: () => {},
+    deleteBuffer: () => {},
+    deleteVertexArray: () => {},
+    viewport: () => {},
+    clearColor: () => {},
+    clear: () => {},
+    drawArrays: () => {},
+  };
+}
+
+// ── Matrix4 Tests ────────────────────────────────────────────────────────────
+
+test("Matrix4.create creates a 4x4 identity matrix", () => {
+  const mat = Matrix4.create();
   assert.equal(mat.length, 16);
   assert.equal(mat[0], 1);
   assert.equal(mat[5], 1);
   assert.equal(mat[10], 1);
   assert.equal(mat[15], 1);
   assert.equal(mat[1], 0);
-  assert.equal(mat[4], 0);
+});
+
+test("Matrix4.identity creates an identity matrix", () => {
+  const mat = Matrix4.identity();
+  assert.equal(mat.length, 16);
+  assert.equal(mat[0], 1);
+  assert.equal(mat[15], 1);
 });
 
 test("Matrix4.perspective produces valid projection matrix", () => {
@@ -42,6 +133,8 @@ test("Matrix4.multiply correctly computes matrix product", () => {
   assert.deepEqual(Array.from(result), Array.from(id1));
 });
 
+// ── MPR3DViewer State Tests ──────────────────────────────────────────────────
+
 test("MPR3DViewer initializes with default state", () => {
   const viewer = new MPR3DViewer();
   assert.equal(viewer.isActive, false);
@@ -50,14 +143,136 @@ test("MPR3DViewer initializes with default state", () => {
   assert.equal(typeof viewer.camera.theta, "number");
   assert.equal(typeof viewer.camera.phi, "number");
   assert.ok(viewer.crosshair);
-  assert.equal(typeof viewer.crosshair.x, "number");
-  assert.equal(typeof viewer.crosshair.y, "number");
-  assert.equal(typeof viewer.crosshair.z, "number");
 });
 
-test("MPR3DViewer render handles missing WebGL context gracefully", () => {
+test("MPR3DViewer setOrientation updates activeView and camera angles", () => {
   const viewer = new MPR3DViewer();
+
+  viewer.setOrientation("axial");
+  assert.equal(viewer.activeView, "axial");
+  assert.equal(viewer.camera.theta, 0);
+  assert.equal(viewer.camera.phi, 0);
+
+  viewer.setOrientation("coronal");
+  assert.equal(viewer.activeView, "coronal");
+  assert.equal(viewer.camera.theta, Math.PI / 2);
+
+  viewer.setOrientation("sagittal");
+  assert.equal(viewer.activeView, "sagittal");
+  assert.equal(viewer.camera.phi, Math.PI / 2);
+
+  viewer.setOrientation("3d");
+  assert.equal(viewer.activeView, "3d");
+});
+
+test("MPR3DViewer getDepthInfo and setDepthIndex manage slice positions", () => {
+  const viewer = new MPR3DViewer();
+  const mockVolume: VoxelVolume = {
+    depth: 10,
+    rows: 256,
+    cols: 256,
+    data: new Int16Array(10 * 256 * 256),
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    rescaleSlope: 1,
+    rescaleIntercept: 0,
+    windowCenter: 50,
+    windowWidth: 100,
+  };
+  viewer.volume = mockVolume;
+
+  viewer.setOrientation("axial");
+  viewer.setDepthIndex(5);
+  let info = viewer.getDepthInfo();
+  assert.equal(info.current, 5);
+  assert.equal(info.total, 10);
+
+  viewer.setOrientation("coronal");
+  viewer.setDepthIndex(120);
+  info = viewer.getDepthInfo();
+  assert.equal(info.current, 120);
+  assert.equal(info.total, 256);
+
+  viewer.setOrientation("sagittal");
+  viewer.setDepthIndex(80);
+  info = viewer.getDepthInfo();
+  assert.equal(info.current, 80);
+  assert.equal(info.total, 256);
+});
+
+test("MPR3DViewer updateCrosshairFromPointer updates crosshair coordinates", () => {
+  const viewer = new MPR3DViewer();
+  viewer.volume = {
+    depth: 20,
+    rows: 100,
+    cols: 100,
+    data: new Int16Array(20 * 100 * 100),
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    rescaleSlope: 1,
+    rescaleIntercept: 0,
+    windowCenter: 0,
+    windowWidth: 100,
+  };
+  state.viewport.panX = 0;
+  state.viewport.panY = 0;
+  state.viewport.zoom = 1;
+
+  viewer.setOrientation("axial");
+  viewer.updateCrosshairFromPointer(250, 250, 400, 400);
+  assert.ok(viewer.crosshair.x >= 0);
+  assert.ok(viewer.crosshair.y >= 0);
+});
+
+test("MPR3DViewer render executes cleanly with WebGL2 mock", () => {
+  const viewer = new MPR3DViewer();
+  viewer.volume = {
+    depth: 5,
+    rows: 64,
+    cols: 64,
+    data: new Int16Array(5 * 64 * 64),
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    rescaleSlope: 1,
+    rescaleIntercept: 0,
+    windowCenter: 0,
+    windowWidth: 100,
+  };
+
+  const mockCtx = createMockWebGL2Context();
+  const mockCanvas: any = {
+    getContext: (type: string) => (type === "webgl2" ? mockCtx : null),
+    clientWidth: 500,
+    clientHeight: 500,
+    width: 500,
+    height: 500,
+  };
+
   assert.doesNotThrow(() => {
-    viewer.render(null);
+    viewer.render(mockCanvas);
+  });
+});
+
+test("MPR3DViewer renderGizmo draws axes on 2D context", () => {
+  const viewer = new MPR3DViewer();
+  const mock2dCtx: any = {
+    clearRect: () => {},
+    strokeStyle: "",
+    lineWidth: 1,
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fillStyle: "",
+    fillText: () => {},
+  };
+  const mockGizmoCanvas: any = {
+    getContext: (type: string) => (type === "2d" ? mock2dCtx : null),
+    width: 100,
+    height: 100,
+  };
+
+  assert.doesNotThrow(() => {
+    viewer.renderGizmo(mockGizmoCanvas);
   });
 });

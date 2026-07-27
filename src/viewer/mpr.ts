@@ -850,7 +850,12 @@ void main() {
     gl.drawArrays(gl.TRIANGLES, 0, 36);
 
     // Render 3D orientation gizmo on widget canvas
-    const gizmoCanvas = $("mpr-gizmo-canvas") as HTMLCanvasElement | null;
+    const gizmoCanvas =
+      typeof document !== "undefined"
+        ? (document.getElementById(
+            "mpr-gizmo-canvas",
+          ) as HTMLCanvasElement | null)
+        : null;
     if (gizmoCanvas) {
       this.renderGizmo(gizmoCanvas);
     }

@@ -98,3 +98,24 @@ test("validateVolumetricTags returns valid when all volumetric tags are present 
   assert.equal(result.valid, true);
   assert.equal(result.reason, undefined);
 });
+
+test("calculateAutoWindowLevel computes correct center and width from pixel array", () => {
+  const { calculateAutoWindowLevel } = require("./dicom-parser-util.js");
+  const pixels = new Int16Array([0, 100, 200, 300, 400]);
+  const wl = calculateAutoWindowLevel(pixels, 1, -1024);
+
+  assert.equal(wl.windowCenter, -824);
+  assert.equal(wl.windowWidth, 400);
+});
+
+test("calculateAutoWindowLevel computes correct values for unsigned 8-bit pixels", () => {
+  const { calculateAutoWindowLevel } = require("./dicom-parser-util.js");
+  const pixels = new Uint8Array([50, 100, 150, 200]);
+  const wl = calculateAutoWindowLevel(pixels, 2, 10);
+
+  // min = 50*2+10 = 110, max = 200*2+10 = 410
+  // center = (110 + 410) / 2 = 260
+  // width = 410 - 110 = 300
+  assert.equal(wl.windowCenter, 260);
+  assert.equal(wl.windowWidth, 300);
+});

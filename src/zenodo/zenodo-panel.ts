@@ -1,4 +1,4 @@
-import { authFetch, ensureAuthenticated, API_BASE } from "../auth/auth.js";
+import { authFetch, ensureAuthenticated, isAuthenticated, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
 
@@ -131,6 +131,12 @@ export function initZenodoPanel(): void {
   $("z-results").addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
 
+    // "Ir a Config" link inside an error empty-state
+    if (target.closest("#z-empty-config-link")) {
+      switchTab("config");
+      return;
+    }
+
     // Cancel button inside a ZIP confirm strip
     if (target.closest(".z-zip-confirm__cancel")) {
       target.closest<HTMLElement>(".z-zip-confirm")?.remove();
@@ -224,6 +230,19 @@ function switchTab(tab: Tab): void {
   if (tab === "publish") renderPublishTab();
 }
 
+/**
+ * Warns before ensureAuthenticated() escalates to the full-screen login
+ * (server-screen.ts): without this, a dead MICD session made the app jump
+ * away from the Zenodo panel with zero explanation — confusing on its own,
+ * and easy to mistake for a Zenodo-token problem. Session check is
+ * synchronous, so the toast always lands before the screen switch.
+ */
+async function guardSession(): Promise<boolean> {
+  if (isAuthenticated()) return true;
+  showToast("Tu sesión de MICD expiró. Iniciá sesión para continuar.", "warning");
+  return ensureAuthenticated();
+}
+
 // ── Search ─────────────────────────────────────────────────────────────────────
 
 function runSearch(raw: string): void {
@@ -236,6 +255,17 @@ function runSearch(raw: string): void {
 
 async function loadSearch(): Promise<void> {
   const results = $("z-results");
+
+  if (!(await guardSession())) {
+    results.innerHTML = emptyState(
+      "Sesión requerida",
+      "Iniciá sesión para buscar en Zenodo",
+      true,
+    );
+    showToast("Necesitás iniciar sesión para buscar en Zenodo.", "error");
+    return;
+  }
+
   results.innerHTML = skeleton();
   setPaginationUI(state.page, 1, 0);
 
@@ -249,7 +279,13 @@ async function loadSearch(): Promise<void> {
 
   try {
     const res = await authFetch(`${API_BASE}/v1/zenodo/search?${params}`);
-    if (!res.ok) throw new Error(`${res.status}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      const info = searchErrorInfo(res.status, data);
+      results.innerHTML = emptyState(info.title, info.subtitle, true, info.showConfigLink);
+      showToast(info.toast, "error");
+      return;
+    }
     const data: SearchResponse = await res.json();
 
     const total = data.total ?? 0;
@@ -266,11 +302,52 @@ async function loadSearch(): Promise<void> {
         : data.records.map(recordCard).join("");
   } catch {
     results.innerHTML = emptyState(
-      "Error al buscar",
-      "Verificá la conexión con Zenodo",
+      "Error de conexión",
+      "No se pudo contactar al servidor. Revisá tu conexión e intentá de nuevo.",
       true,
     );
+    showToast("Error de conexión con el servidor.", "error");
   }
+}
+
+/**
+ * Maps a failed search response to user-facing copy. 429 is the practical
+ * symptom a user sees when no Zenodo token is configured — Zenodo throttles
+ * unauthenticated requests hard — so that case points at the Config tab
+ * instead of just saying "try again later".
+ */
+function searchErrorInfo(
+  status: number,
+  data: { error?: string },
+): { title: string; subtitle: string; toast: string; showConfigLink?: boolean } {
+  if (status === 401) {
+    return {
+      title: "Sesión requerida",
+      subtitle: "Tu sesión expiró. Volvé a iniciar sesión para buscar en Zenodo.",
+      toast: "Tu sesión expiró. Iniciá sesión de nuevo.",
+    };
+  }
+  if (status === 429) {
+    return {
+      title: "Límite de búsquedas alcanzado",
+      subtitle:
+        "Sin un token de Zenodo configurado, el límite de búsquedas es más bajo. Configurá uno en la pestaña Config o esperá unos minutos.",
+      toast: data.error ?? "Límite de requests a Zenodo alcanzado.",
+      showConfigLink: true,
+    };
+  }
+  if (status === 503) {
+    return {
+      title: "Zenodo no disponible",
+      subtitle: data.error ?? "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.",
+      toast: "Zenodo no está disponible en este momento.",
+    };
+  }
+  return {
+    title: "Error al buscar",
+    subtitle: data.error ?? "Ocurrió un error inesperado. Intentá de nuevo.",
+    toast: data.error ?? "Error al buscar en Zenodo.",
+  };
 }
 
 function recordCard(r: ZenodoRecord): string {
@@ -307,11 +384,18 @@ function recordCard(r: ZenodoRecord): string {
     </div>`;
 }
 
+function importErrorMessage(status: number, error: unknown): string {
+  if (typeof error === "string" && error) return error;
+  if (status === 404) return "El dataset no existe en este entorno de Zenodo (sandbox/producción).";
+  if (status === 503) return "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.";
+  return `No se pudo importar el dataset (error ${status}).`;
+}
+
 async function importRecord(
   recordId: number,
   btn: HTMLButtonElement,
 ): Promise<void> {
-  if (!(await ensureAuthenticated())) return;
+  if (!(await guardSession())) return;
 
   const origLabel = btn.textContent ?? "Importar";
   btn.disabled = true;
@@ -322,7 +406,13 @@ async function importRecord(
     const detailRes = await authFetch(
       `${API_BASE}/v1/zenodo/records/${recordId}?environment=${state.environment}`,
     );
-    if (!detailRes.ok) throw new Error(`detail ${detailRes.status}`);
+    if (!detailRes.ok) {
+      const detailData = await detailRes.json().catch(() => ({}) as { error?: string });
+      showToast(importErrorMessage(detailRes.status, detailData.error), "error");
+      btn.disabled = false;
+      btn.textContent = origLabel;
+      return;
+    }
     const detail: ZenodoRecord = await detailRes.json();
 
     const files = (detail.files ?? [])
@@ -333,6 +423,7 @@ async function importRecord(
     if (hasZips) btn.textContent = "Descargando…";
 
     if (files.length === 0) {
+      showToast("Este dataset no tiene archivos .dcm ni .zip para importar.", "warning");
       btn.textContent = "Sin archivos";
       setTimeout(() => {
         btn.disabled = false;
@@ -351,19 +442,16 @@ async function importRecord(
         overwrite_duplicates: false,
       }),
     });
-    const data = await res.json();
-    console.log("[zenodo] import response", res.status, data);
+    const data = await res.json().catch(() => ({}) as Record<string, unknown>);
     if (!res.ok) {
-      const msg = data.error ?? `Error ${res.status}`;
-      console.log("[zenodo] showing banner:", msg);
-      showToast(msg, "warning");
+      showToast(importErrorMessage(res.status, data.error), "error");
       btn.disabled = false;
       btn.textContent = origLabel;
       return;
     }
 
-    const n = data.imported ?? 0;
-    const dupes = data.duplicates ?? 0;
+    const n = (data.imported as number | undefined) ?? 0;
+    const dupes = (data.duplicates as number | undefined) ?? 0;
 
     if (n === 0 && dupes > 0) {
       const msg =
@@ -384,6 +472,7 @@ async function importRecord(
       btn.classList.remove("btn--success");
     }, 3000);
   } catch {
+    showToast("Error de conexión al importar el dataset.", "error");
     btn.textContent = "Error";
     setTimeout(() => {
       btn.disabled = false;
@@ -557,6 +646,19 @@ function syncCard(sync: SyncConfig): string {
     </div>`;
 }
 
+const TOKEN_ERROR_MESSAGES: Record<string, string> = {
+  invalid_token: "Token inválido. Verificá que lo copiaste completo y que no esté revocado.",
+  insufficient_permissions: "El token no tiene los permisos necesarios en Zenodo.",
+  timeout: "Zenodo no respondió a tiempo. Intentá de nuevo en unos minutos.",
+};
+
+function tokenErrorMessage(reason: unknown, fallbackError: unknown): string {
+  if (typeof reason === "string" && reason in TOKEN_ERROR_MESSAGES) {
+    return TOKEN_ERROR_MESSAGES[reason];
+  }
+  return typeof fallbackError === "string" ? fallbackError : "No se pudo guardar el token.";
+}
+
 async function saveToken(env: "sandbox" | "production"): Promise<void> {
   const input = document.getElementById(
     `z-${env}-token`,
@@ -566,7 +668,13 @@ async function saveToken(env: "sandbox" | "production"): Promise<void> {
   ) as HTMLButtonElement | null;
   if (!input || !btn) return;
   const token = input.value.trim();
-  if (!token) return;
+  if (!token) {
+    showToast("Ingresá un token de Zenodo antes de guardar.", "warning");
+    input.focus();
+    return;
+  }
+  if (!(await guardSession())) return;
+
   btn.disabled = true;
   btn.textContent = "Guardando…";
   try {
@@ -575,7 +683,15 @@ async function saveToken(env: "sandbox" | "production"): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ environment: env, token }),
     });
-    if (!res.ok) throw new Error(`${res.status}`);
+    if (!res.ok) {
+      if (res.status === 401) {
+        showToast("Tu sesión expiró. Iniciá sesión de nuevo para guardar el token.", "error");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(tokenErrorMessage(data.reason, data.error), "error");
+      }
+      throw new Error(`${res.status}`);
+    }
     input.value = "";
     void loadConfig();
   } catch {
@@ -592,6 +708,8 @@ async function deleteToken(env: "sandbox" | "production"): Promise<void> {
     `z-${env}-delete`,
   ) as HTMLButtonElement | null;
   if (!btn) return;
+  if (!(await guardSession())) return;
+
   btn.disabled = true;
   try {
     await authFetch(`${API_BASE}/v1/zenodo/config/${env}`, {
@@ -604,12 +722,23 @@ async function deleteToken(env: "sandbox" | "production"): Promise<void> {
 }
 
 async function setSyncInterval(hours: number | null): Promise<void> {
-  await authFetch(`${API_BASE}/v1/zenodo/config/sync`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ interval_hours: hours }),
-  });
-  void loadConfig();
+  if (!(await guardSession())) return;
+
+  try {
+    const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interval_hours: hours }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      showToast(data.error ?? "No se pudo actualizar la sincronización.", "error");
+      return;
+    }
+    void loadConfig();
+  } catch {
+    showToast("Error de conexión al actualizar la sincronización.", "error");
+  }
 }
 
 async function runSyncNow(): Promise<void> {
@@ -617,20 +746,29 @@ async function runSyncNow(): Promise<void> {
     "btn-z-sync-now",
   ) as HTMLButtonElement | null;
   if (!btn) return;
+  if (!(await guardSession())) return;
+
   btn.disabled = true;
   btn.textContent = "Sincronizando…";
   try {
     const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/run`, {
       method: "POST",
     });
-    const data = await res.json();
-    btn.textContent = `✓ ${data.records_checked ?? 0} chequeados`;
+    const data = await res.json().catch(() => ({}) as { error?: string });
+    if (!res.ok) {
+      showToast(data.error ?? "No se pudo ejecutar la sincronización.", "error");
+      btn.disabled = false;
+      btn.textContent = "Sincronizar ahora";
+      return;
+    }
+    btn.textContent = `✓ ${(data as { records_checked?: number }).records_checked ?? 0} chequeados`;
     setTimeout(() => {
       btn.disabled = false;
       btn.textContent = "Sincronizar ahora";
       void loadConfig();
     }, 2500);
   } catch {
+    showToast("Error de conexión al sincronizar.", "error");
     btn.disabled = false;
     btn.textContent = "Error";
     setTimeout(() => {
@@ -734,7 +872,7 @@ function renderPublishTab(): void {
 }
 
 async function publishStudy(studyId: string): Promise<void> {
-  if (!(await ensureAuthenticated())) return;
+  if (!(await guardSession())) return;
 
   const btn = document.getElementById("btn-z-publish") as HTMLButtonElement;
   const feedback = document.getElementById("z-pub-feedback") as HTMLElement;
@@ -826,7 +964,12 @@ function skeleton(): string {
     .join("");
 }
 
-function emptyState(title: string, subtitle: string, isError = false): string {
+function emptyState(
+  title: string,
+  subtitle: string,
+  isError = false,
+  showConfigLink = false,
+): string {
   return `
     <div class="z-empty-state${isError ? " z-empty-state--error" : ""}">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
@@ -838,6 +981,7 @@ function emptyState(title: string, subtitle: string, isError = false): string {
       </svg>
       <p>${escapeHtml(title)}</p>
       <span>${escapeHtml(subtitle)}</span>
+      ${showConfigLink ? `<button class="btn btn--secondary btn--sm" id="z-empty-config-link">Ir a Config</button>` : ""}
     </div>`;
 }
 

@@ -575,7 +575,7 @@
                 data-zenodo-linked
                 aria-pressed="false"
               >
-                📤 Vinculado a Zenodo
+                 Vinculado a Zenodo
               </button>
             </div>
 
@@ -1041,7 +1041,7 @@
               data-zenodo-linked
               aria-pressed="false"
             >
-              📤 Vinculado a Zenodo
+               Vinculado a Zenodo
             </button>
           </div>
 
@@ -1219,6 +1219,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
          must run before auth.ts's module-load-time resolveApiOrigin() call. -->

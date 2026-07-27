@@ -493,6 +493,82 @@ body {
   content: "!";
 }
 
+/* ── Toast stack ──────────────────────────────────────────────────────────── */
+/* Fixed over everything (highest z-index in the app) so a Zenodo error is
+   visible regardless of which panel or dialog is open. */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 340px;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font-size: 12.5px;
+  animation: toast-in 0.18s ease-out;
+}
+.toast--success {
+  border-left-color: var(--accent);
+}
+.toast--error {
+  border-left-color: var(--danger);
+}
+.toast--warning {
+  border-left-color: var(--amber);
+}
+.toast__msg {
+  flex: 1;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.toast__close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.toast__close:hover {
+  color: var(--text-primary);
+}
+.toast--out {
+  animation: toast-out 0.18s ease-in forwards;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* ── App Shell ────────────────────────────────────────────────────────────── */
 .app-shell {
   display: flex;

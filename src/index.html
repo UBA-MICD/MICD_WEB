@@ -148,6 +148,8 @@
               id="tool-wl"
               title="Brillo / contraste (W)"
               aria-pressed="true"
+              aria-expanded="false"
+              aria-controls="wl-panel"
             >
               <svg
                 width="20"
@@ -509,6 +511,92 @@
                 role="alert"
               ></div>
             </div>
+
+            <!-- Window Level / Presets Panel -->
+            <aside
+              class="wl-panel"
+              id="wl-panel"
+              aria-label="Ajuste de Ventana (WL/WW)"
+            >
+              <div class="wl-header">
+                <h2>Ajuste de Ventana (WL/WW)</h2>
+              </div>
+              <div class="wl-body">
+                <!-- Sliders Section -->
+                <div class="wl-section">
+                  <div class="slider-control">
+                    <div class="slider-header">
+                      <label for="slider-ww">Window Width (WW)</label>
+                      <span class="slider-val" id="val-ww">0</span>
+                    </div>
+                    <input
+                      type="range"
+                      id="slider-ww"
+                      class="wl-slider"
+                      min="1"
+                      max="4000"
+                      step="1"
+                      value="0"
+                    />
+                  </div>
+
+                  <div class="slider-control">
+                    <div class="slider-header">
+                      <label for="slider-wl">Window Level (WL)</label>
+                      <span class="slider-val" id="val-wl">0</span>
+                    </div>
+                    <input
+                      type="range"
+                      id="slider-wl"
+                      class="wl-slider"
+                      min="-1000"
+                      max="3000"
+                      step="1"
+                      value="0"
+                    />
+                  </div>
+                </div>
+
+                <!-- Presets Section -->
+                <div class="wl-section">
+                  <span class="wl-section-title">Presets Predefinidos</span>
+                  <div class="preset-grid" id="preset-grid">
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-preset-lung"
+                      data-preset="lung"
+                    >
+                      Pulmón
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-preset-bone"
+                      data-preset="bone"
+                    >
+                      Hueso
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-preset-soft"
+                      data-preset="softTissue"
+                    >
+                      Tejido Blando
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-preset-brain"
+                      data-preset="brain"
+                    >
+                      Cerebro
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </aside>
 
             <!-- Metadata panel (slide-out) -->
             <aside class="metadata-panel" id="metadata-panel">

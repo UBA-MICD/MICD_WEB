@@ -244,6 +244,41 @@ export function updateInfoOverlay(): void {
   ]);
 
   updateCanvasLabel();
+  updateWlControlsUI();
+}
+
+export function updateWlControlsUI(): void {
+  const valWW = $("val-ww");
+  const valWL = $("val-wl");
+  const sliderWW = $("slider-ww") as HTMLInputElement | null;
+  const sliderWL = $("slider-wl") as HTMLInputElement | null;
+
+  const ww = Math.round(state.viewport.windowWidth);
+  const wl = Math.round(state.viewport.windowCenter);
+
+  if (valWW) valWW.textContent = String(ww);
+  if (valWL) valWL.textContent = String(wl);
+
+  if (sliderWW) {
+    if (ww > parseInt(sliderWW.max, 10)) {
+      sliderWW.max = String(Math.ceil(ww * 1.5));
+    }
+    if (document.activeElement !== sliderWW) {
+      sliderWW.value = String(ww);
+    }
+  }
+
+  if (sliderWL) {
+    if (wl < parseInt(sliderWL.min, 10)) {
+      sliderWL.min = String(Math.floor(wl - 1000));
+    }
+    if (wl > parseInt(sliderWL.max, 10)) {
+      sliderWL.max = String(Math.ceil(wl + 1000));
+    }
+    if (document.activeElement !== sliderWL) {
+      sliderWL.value = String(wl);
+    }
+  }
 }
 
 /**

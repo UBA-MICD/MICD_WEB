@@ -52,6 +52,10 @@ export class Matrix4 {
     return out;
   }
 
+  public static identity(): Float32Array {
+    return Matrix4.create();
+  }
+
   public static perspective(
     fovy: number,
     aspect: number,

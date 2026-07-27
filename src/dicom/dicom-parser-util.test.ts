@@ -119,3 +119,52 @@ test("calculateAutoWindowLevel computes correct values for unsigned 8-bit pixels
   assert.equal(wl.windowCenter, 260);
   assert.equal(wl.windowWidth, 300);
 });
+
+test("calculateAutoWindowLevel applies soft tissue default for CT modality", () => {
+  const {
+    calculateAutoWindowLevel,
+    WINDOW_PRESETS,
+  } = require("./dicom-parser-util.js");
+  const pixels = new Int16Array([0, 100, 200, 300, 400]);
+  const wl = calculateAutoWindowLevel(pixels, 1, -1024, "CT");
+
+  assert.equal(wl.windowCenter, 40);
+  assert.equal(wl.windowWidth, 400);
+  assert.equal(wl.windowCenter, WINDOW_PRESETS.softTissue.windowCenter);
+  assert.equal(wl.windowWidth, WINDOW_PRESETS.softTissue.windowWidth);
+});
+
+test("calculateAutoWindowLevel uses min/max for non-CT modality", () => {
+  const { calculateAutoWindowLevel } = require("./dicom-parser-util.js");
+  const pixels = new Int16Array([0, 100, 200, 300, 400]);
+  const wl = calculateAutoWindowLevel(pixels, 1, -1024, "MR");
+
+  assert.equal(wl.windowCenter, -824);
+  assert.equal(wl.windowWidth, 400);
+});
+
+// cspell:disable
+test("WINDOW_PRESETS contains exact values for required presets", () => {
+  const { WINDOW_PRESETS } = require("./dicom-parser-util.js");
+  assert.deepEqual(WINDOW_PRESETS.lung, {
+    name: "Pulmón",
+    windowCenter: -600,
+    windowWidth: 1500,
+  });
+  assert.deepEqual(WINDOW_PRESETS.bone, {
+    name: "Hueso",
+    windowCenter: 400,
+    windowWidth: 1800,
+  });
+  assert.deepEqual(WINDOW_PRESETS.softTissue, {
+    name: "Tejido Blando",
+    windowCenter: 40,
+    windowWidth: 400,
+  });
+  assert.deepEqual(WINDOW_PRESETS.brain, {
+    name: "Cerebro",
+    windowCenter: 40,
+    windowWidth: 80,
+  });
+});
+// cspell:enable

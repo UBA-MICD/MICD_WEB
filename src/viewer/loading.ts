@@ -183,6 +183,7 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
         parsed.pixelData,
         parsed.metadata.rescaleSlope,
         parsed.metadata.rescaleIntercept,
+        parsed.metadata.modality,
       );
       state.viewport = {
         windowCenter: auto.windowCenter,

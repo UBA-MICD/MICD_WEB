@@ -1,4 +1,7 @@
-import { calculateAutoWindowLevel } from "../dicom/dicom-parser-util.js";
+import {
+  calculateAutoWindowLevel,
+  WINDOW_PRESETS,
+} from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
   fitToContainer,
@@ -19,7 +22,17 @@ export function initToolbar(): void {
     const btn = $(`tool-${tool}`);
     if (btn) {
       btn.addEventListener("click", () => {
-        state.activeTool = tool;
+        if (tool === "wl") {
+          if (state.activeTool === "wl") {
+            state.isWlPanelOpen = !state.isWlPanelOpen;
+          } else {
+            state.activeTool = "wl";
+            state.isWlPanelOpen = true;
+          }
+        } else {
+          state.activeTool = tool;
+          state.isWlPanelOpen = false;
+        }
         updateToolbarUI();
       });
     }
@@ -35,6 +48,7 @@ export function initToolbar(): void {
         state.parsed.pixelData,
         state.parsed.metadata.rescaleSlope,
         state.parsed.metadata.rescaleIntercept,
+        state.parsed.metadata.modality,
       );
       state.viewport = {
         windowCenter: auto.windowCenter,
@@ -81,8 +95,53 @@ export function initToolbar(): void {
 
   $("btn-open").addEventListener("click", openFiles);
 
+  initWlControlsInteraction();
   init3DControlsInteraction();
   updateToolbarUI();
+}
+
+function initWlControlsInteraction(): void {
+  const sliderWW = $("slider-ww") as HTMLInputElement | null;
+  const sliderWL = $("slider-wl") as HTMLInputElement | null;
+
+  if (sliderWW) {
+    sliderWW.addEventListener("input", () => {
+      const val = parseFloat(sliderWW.value);
+      state.viewport.windowWidth = Math.max(1, val);
+      render();
+    });
+  }
+
+  if (sliderWL) {
+    sliderWL.addEventListener("input", () => {
+      const val = parseFloat(sliderWL.value);
+      state.viewport.windowCenter = val;
+      render();
+    });
+  }
+
+  const presets = ["lung", "bone", "soft", "brain"] as const;
+  const presetMap: Record<string, keyof typeof WINDOW_PRESETS> = {
+    lung: "lung",
+    bone: "bone",
+    soft: "softTissue",
+    brain: "brain",
+  };
+
+  presets.forEach((key) => {
+    const btn = $(`btn-preset-${key}`);
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const presetKey = presetMap[key];
+        const preset = WINDOW_PRESETS[presetKey];
+        if (preset) {
+          state.viewport.windowCenter = preset.windowCenter;
+          state.viewport.windowWidth = preset.windowWidth;
+          render();
+        }
+      });
+    }
+  });
 }
 
 function updateToolbarUI(): void {
@@ -96,6 +155,16 @@ function updateToolbarUI(): void {
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-pressed", String(isActive));
   });
+
+  const wlBtn = $("tool-wl");
+  if (wlBtn) {
+    wlBtn.setAttribute("aria-expanded", String(state.isWlPanelOpen));
+  }
+
+  const wlPanel = $("wl-panel");
+  if (wlPanel) {
+    wlPanel.classList.toggle("open", state.isWlPanelOpen);
+  }
 
   const viewport = $("viewport-container");
   viewport.className = "viewport-container";
@@ -488,17 +557,13 @@ export function initKeyboardShortcuts(): void {
     }
 
     if (e.key === "w" || e.key === "W") {
-      state.activeTool = "wl";
-      updateToolbarUI();
+      $("tool-wl").click();
     } else if (e.key === "z" || e.key === "Z") {
-      state.activeTool = "zoom";
-      updateToolbarUI();
+      $("tool-zoom").click();
     } else if (e.key === "p" || e.key === "P") {
-      state.activeTool = "pan";
-      updateToolbarUI();
+      $("tool-pan").click();
     } else if (e.key === "c" || e.key === "C") {
-      state.activeTool = "crosshair";
-      updateToolbarUI();
+      $("tool-crosshair").click();
     } else if (e.key === "r" || e.key === "R") {
       $("tool-reset").click();
     } else if (e.key === "m" || e.key === "M") {

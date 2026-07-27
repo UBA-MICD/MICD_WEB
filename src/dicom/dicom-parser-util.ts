@@ -296,13 +296,38 @@ function formatDicomDate(dateStr: string): string {
   return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
 }
 
+// ── Window Presets ───────────────────────────────────────────────────────────
+
+export interface WindowPreset {
+  name: string;
+  windowCenter: number;
+  windowWidth: number;
+}
+
+// cspell:disable
+export const WINDOW_PRESETS: Record<string, WindowPreset> = {
+  lung: { name: "Pulmón", windowCenter: -600, windowWidth: 1500 },
+  bone: { name: "Hueso", windowCenter: 400, windowWidth: 1800 },
+  softTissue: { name: "Tejido Blando", windowCenter: 40, windowWidth: 400 },
+  brain: { name: "Cerebro", windowCenter: 40, windowWidth: 80 },
+};
+// cspell:enable
+
 // ── Auto Window/Level Calculation ────────────────────────────────────────────
 
 export function calculateAutoWindowLevel(
   pixelData: Int16Array | Uint16Array | Uint8Array,
   rescaleSlope: number,
   rescaleIntercept: number,
+  modality?: string,
 ): { windowCenter: number; windowWidth: number } {
+  if (modality && modality.trim().toUpperCase() === "CT") {
+    return {
+      windowCenter: WINDOW_PRESETS.softTissue.windowCenter,
+      windowWidth: WINDOW_PRESETS.softTissue.windowWidth,
+    };
+  }
+
   let min = Infinity;
   let max = -Infinity;
 

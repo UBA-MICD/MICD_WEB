@@ -41,7 +41,7 @@ test("validateVolumetricTags returns invalid if metadata list has <= 1 slice", (
     },
   ]);
   assert.equal(resultSingle.valid, false);
-  assert.match(resultSingle.reason || "", /más de 1 corte/i);
+  assert.match(resultSingle.reason || "", /more than 1 slice/i);
 });
 
 test("validateVolumetricTags returns invalid if PixelSpacing is missing or zero", () => {

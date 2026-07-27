@@ -218,7 +218,7 @@ export function validateVolumetricTags(
     return {
       valid: false,
       reason:
-        "El estudio no es compatible con MPR: requiere una serie con más de 1 corte.",
+        "Study is not compatible with MPR: requires a series with more than 1 slice.",
     };
   }
 
@@ -232,13 +232,13 @@ export function validateVolumetricTags(
     ) {
       return {
         valid: false,
-        reason: `Estudio no compatible con MPR: falta el tag PixelSpacing (0028,0030) o es inválido en el corte ${i + 1}.`,
+        reason: `Study is not compatible with MPR: missing PixelSpacing tag (0028,0030) or invalid in slice ${i + 1}.`,
       };
     }
     if (!meta.imagePositionPatient || meta.imagePositionPatient.length < 3) {
       return {
         valid: false,
-        reason: `Estudio no compatible con MPR: falta el tag ImagePositionPatient (0020,0032) en el corte ${i + 1}.`,
+        reason: `Study is not compatible with MPR: missing ImagePositionPatient tag (0020,0032) in slice ${i + 1}.`,
       };
     }
   }

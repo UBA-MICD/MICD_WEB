@@ -35,6 +35,7 @@ export async function loadCurrent(): Promise<void> {
   try {
     const parsed = await dicomCache.getOrFetch(index);
     if (!parsed) {
+      // cspell:disable-next-line
       showError(`No se pudo cargar la imagen en el índice ${index + 1}`);
       return;
     }
@@ -42,6 +43,7 @@ export async function loadCurrent(): Promise<void> {
     displayParsed(parsed, getTitleForIndex(index));
     dicomCache.prefetchNext(index, 5);
   } catch (err: any) {
+    // cspell:disable-next-line
     showError(`Error al cargar la imagen: ${err.message || err}`);
   } finally {
     showLoading(false);
@@ -50,6 +52,7 @@ export async function loadCurrent(): Promise<void> {
 
 function getTitleForIndex(index: number): string {
   if (state.source === "server") {
+    // cspell:disable-next-line
     return `${state.serverStudyId || "Estudio"} — Corte ${index + 1}`;
   }
   if (state.files.length > 0 && index < state.files.length) {
@@ -70,6 +73,7 @@ export function resetViewerToDropZone(): void {
   $("topbar-title").textContent = "DICOM Viewer";
   $("topbar-title").title = "";
   // Otherwise the canvas keeps describing the study that is no longer shown.
+  // cspell:disable-next-line
   $("dicom-canvas").setAttribute("aria-label", "Sin imagen cargada");
   showDropZone();
 }
@@ -95,6 +99,7 @@ export function initFileInputs(): void {
     if (!folderInput.files || folderInput.files.length === 0) return;
     const dcmFiles = collectDicomFiles(Array.from(folderInput.files));
     if (dcmFiles.length === 0) {
+      // cspell:disable-next-line
       showError("No se encontraron archivos DICOM en la carpeta seleccionada.");
       return;
     }
@@ -105,7 +110,7 @@ export function initFileInputs(): void {
     folderInput.value = "";
   });
 
-  // "Abrir carpeta" button → opens the folder picker (webkitdirectory)
+  // "Open folder" button → opens the folder picker (webkitdirectory)
   $("btn-open-folder")?.addEventListener("click", openFolder);
 }
 
@@ -146,11 +151,13 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
     };
     state.serverInstances = (data.instances ?? []).map((i) => i.instanceId);
     if (state.serverInstances.length === 0) {
+      // cspell:disable-next-line
       showError("El estudio no tiene imágenes.");
       return;
     }
     await loadCurrent();
   } catch (err: any) {
+    // cspell:disable-next-line
     showError(`Error al cargar el estudio del servidor: ${err.message || err}`);
   } finally {
     showLoading(false);

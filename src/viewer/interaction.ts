@@ -223,15 +223,15 @@ export function initViewportInteraction(): void {
 
   document.addEventListener("mouseup", () => {
     if (state.isDragging && state.is3DMode) {
-      console.groupCollapsed("⚙️ [MPR 3D Debug] Estado Post-Interacción");
-      console.log("Cámara (Theta, Phi, Zoom):", mpr3DViewer.camera);
+      console.groupCollapsed("⚙️ [MPR 3D Debug] Post-Interaction State");
+      console.log("Camera (Theta, Phi, Zoom):", mpr3DViewer.camera);
       console.log("Crosshair (X, Y, Z):", mpr3DViewer.crosshair);
       console.log(
-        "Ventana (W/L):",
+        "Window (W/L):",
         state.viewport.windowWidth,
         state.viewport.windowCenter,
       );
-      console.log("Vista Activa:", mpr3DViewer.activeView);
+      console.log("Active View:", mpr3DViewer.activeView);
       console.groupEnd();
     }
     state.isDragging = false;

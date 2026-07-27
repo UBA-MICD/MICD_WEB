@@ -1,7 +1,7 @@
 // ── Top-level screens ────────────────────────────────────────────────────────
 //
 // The app has two full-window screens: the viewer and the server screen
-// (Buscar/Cargar). Only one is visible at a time — server actions leave the
+// (Search/Upload). Only one is visible at a time — server actions leave the
 // viewer rather than covering it.
 //
 // The hidden screen is left in the DOM, not torn down, so viewport state

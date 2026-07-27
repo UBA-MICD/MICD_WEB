@@ -166,9 +166,11 @@ export class MPR3DViewer {
 
     const totalSlices = itemCount();
     if (totalSlices <= 1) {
+      /* cspell:disable */
       showError(
         "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
       );
+      /* cspell:enable */
       return false;
     }
 
@@ -178,9 +180,7 @@ export class MPR3DViewer {
       for (let i = 0; i < totalSlices; i++) {
         const parsed = await dicomCache.getOrFetch(i);
         if (!parsed || !parsed.pixelData) {
-          throw new Error(
-            `No se pudo obtener el píxel data del corte ${i + 1}`,
-          );
+          throw new Error(`Failed to get pixel data for slice ${i + 1}`);
         }
         parsedSlices.push(parsed);
       }
@@ -243,6 +243,7 @@ export class MPR3DViewer {
 
       return true;
     } catch (err: any) {
+      // cspell:disable-next-line
       showError(`Error al cargar el volumen 3D: ${err.message || err}`);
       return false;
     } finally {

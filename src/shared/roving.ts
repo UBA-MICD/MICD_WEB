@@ -1,6 +1,6 @@
 // ── Roving tabindex ──────────────────────────────────────────────────────────
 //
-// A group of related controls (the tool rail, the Buscar/Cargar tablist) should
+// A group of related controls (the tool rail, the Search/Upload tablist) should
 // be ONE tab stop, with the arrow keys moving between the items inside it —
 // the WCAG toolbar/tabs authoring pattern. Tabbing through fifteen separate
 // controls to reach the viewport is what we are avoiding.

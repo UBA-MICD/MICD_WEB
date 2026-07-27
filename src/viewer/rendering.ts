@@ -57,6 +57,7 @@ export function update3DControls(): void {
   }
 
   if (depthCounter) {
+    // cspell:disable-next-line
     depthCounter.textContent = `Corte: ${depthInfo.current + 1}/${depthInfo.total}`;
   }
 
@@ -95,6 +96,7 @@ export function updateSeriesNav(): void {
     slider.value = String(state.currentIndex);
   }
 
+  // cspell:disable-next-line
   $("nav-counter").textContent = `Corte ${state.currentIndex + 1}/${count}`;
 
   updateMprButtonState();
@@ -102,6 +104,7 @@ export function updateSeriesNav(): void {
 
 // ── MPR Button Tooltip / Validation State ─────────────────────────────────────
 
+// cspell:disable
 export function updateMprButtonState(): void {
   const mprBtn = $("tool-mpr") as HTMLButtonElement | null;
   if (!mprBtn) return;
@@ -151,6 +154,7 @@ export function updateMprButtonState(): void {
   mprBtn.classList.remove("disabled");
   mprBtn.classList.toggle("active", state.is3DMode);
 }
+// cspell:enable
 
 // ── Metadata Panel ───────────────────────────────────────────────────────────
 
@@ -246,6 +250,7 @@ export function updateInfoOverlay(): void {
  * The canvas is the whole point of the app and was an unlabelled black box to
  * assistive tech. Describe what is on it, refreshed whenever the overlay is.
  */
+// cspell:disable
 function updateCanvasLabel(): void {
   if (!state.parsed) return;
   const m = state.parsed.metadata;
@@ -263,3 +268,4 @@ function updateCanvasLabel(): void {
 
   $("dicom-canvas").setAttribute("aria-label", parts.join(", "));
 }
+// cspell:enable

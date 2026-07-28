@@ -26,6 +26,8 @@ interface StudyRecord {
   study_description: string;
   uploaded_at: string;
   num_instances: number;
+  zenodo_doi: string | null;
+  zenodo_source_doi: string | null;
 }
 
 interface StudiesResponse {
@@ -60,6 +62,7 @@ const explorerState = {
   modality: "",
   dateFrom: "",
   dateTo: "",
+  zenodoLinked: false,
 };
 
 const views: ExplorerView[] = [];
@@ -70,7 +73,7 @@ const views: ExplorerView[] = [];
  */
 const newStudyIds = new Set<string>();
 let selectedStudyId: string | null = null;
-let selectionListener: ((id: string | null) => void) | null = null;
+const selectionListeners: ((id: string | null) => void)[] = [];
 let activateListener: ((id: string) => void) | null = null;
 
 // ── Selection (server screen's select-then-confirm flow) ─────────────────────
@@ -81,7 +84,7 @@ export function getSelectedStudyId(): string | null {
 
 /** Notified whenever the selection changes, so the confirm button can follow. */
 export function onSelectionChange(cb: (id: string | null) => void): void {
-  selectionListener = cb;
+  selectionListeners.push(cb);
 }
 
 /**
@@ -104,7 +107,7 @@ function setSelected(id: string | null): void {
         el.tabIndex = isSelected ? 0 : -1;
       });
     });
-  selectionListener?.(id);
+  selectionListeners.forEach((cb) => cb(id));
 }
 
 export function clearSelection(): void {
@@ -184,7 +187,11 @@ function wireView(view: ExplorerView): void {
   view.chips?.addEventListener("click", (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>(".filter-chip");
     if (!chip) return;
-    explorerState.modality = chip.dataset.modality ?? "";
+    if ("zenodoLinked" in chip.dataset) {
+      explorerState.zenodoLinked = !explorerState.zenodoLinked;
+    } else {
+      explorerState.modality = chip.dataset.modality ?? "";
+    }
     applyFilterChange();
   });
 
@@ -204,6 +211,7 @@ function wireView(view: ExplorerView): void {
       explorerState.modality = "";
       explorerState.dateFrom = "";
       explorerState.dateTo = "";
+      explorerState.zenodoLinked = false;
       applyFilterChange();
     },
   );
@@ -275,7 +283,8 @@ function syncControls(): void {
     explorerState.search ||
     explorerState.modality ||
     explorerState.dateFrom ||
-    explorerState.dateTo,
+    explorerState.dateTo ||
+    explorerState.zenodoLinked,
   );
 
   views.forEach((view) => {
@@ -291,7 +300,9 @@ function syncControls(): void {
       ?.querySelectorAll<HTMLElement>(".filter-chip")
       .forEach((chip) => {
         const isActive =
-          (chip.dataset.modality ?? "") === explorerState.modality;
+          "zenodoLinked" in chip.dataset
+            ? explorerState.zenodoLinked
+            : (chip.dataset.modality ?? "") === explorerState.modality;
         chip.classList.toggle("filter-chip--active", isActive);
         chip.setAttribute("aria-pressed", String(isActive));
       });
@@ -347,6 +358,7 @@ export async function loadStudyExplorer(): Promise<void> {
   if (explorerState.dateTo)
     params.set("date_to", explorerState.dateTo.replace(/-/g, ""));
   if (explorerState.search) params.set("search", explorerState.search);
+  if (explorerState.zenodoLinked) params.set("zenodo_linked", "true");
 
   try {
     const res = await authFetch(`${API_BASE}/v1/studies?${params}`);
@@ -362,7 +374,8 @@ export async function loadStudyExplorer(): Promise<void> {
         explorerState.search ||
         explorerState.modality ||
         explorerState.dateFrom ||
-        explorerState.dateTo;
+        explorerState.dateTo ||
+        explorerState.zenodoLinked;
       views.forEach((v) => {
         v.list.innerHTML = emptyState(
           `No hay estudios${filtered ? " con esos filtros" : " cargados"}.`,
@@ -397,6 +410,13 @@ export async function loadStudyExplorer(): Promise<void> {
   }
 }
 
+function zenodoRecordUrl(doi: string): string {
+  const isSandbox = doi.startsWith("10.5072/");
+  const base = isSandbox ? "https://sandbox.zenodo.org" : "https://zenodo.org";
+  const match = doi.match(/zenodo\.(\d+)$/i);
+  return match ? `${base}/records/${match[1]}` : `https://doi.org/${encodeURIComponent(doi)}`;
+}
+
 function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
   const id = escapeAttr(s.orthanc_study_id);
   const modality = escapeHtml(s.modality || "?");
@@ -408,6 +428,32 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
 
   const isNew = newStudyIds.has(s.orthanc_study_id);
   const newBadge = isNew ? '<span class="study-item__new">Nuevo</span>' : "";
+
+  function doiShort(doi: string): string {
+    const suffix = doi.split("/").pop() ?? doi;
+    return suffix.length > 8 ? "…" + suffix.slice(-8) : suffix;
+  }
+
+  const zenodoBadges = [
+    s.zenodo_doi
+      ? `<a class="study-item__zenodo-badge study-item__zenodo-badge--published"
+           href="${escapeAttr(zenodoRecordUrl(s.zenodo_doi))}"
+           target="_blank" rel="noopener noreferrer"
+           title="${escapeAttr(s.zenodo_doi)}"
+           aria-label="Publicado en Zenodo — ${escapeAttr(s.zenodo_doi)}"
+           onclick="event.stopPropagation()">📤 Zenodo · ${escapeHtml(doiShort(s.zenodo_doi))}</a>`
+      : "",
+    s.zenodo_source_doi
+      ? `<a class="study-item__zenodo-badge study-item__zenodo-badge--imported"
+           href="${escapeAttr(zenodoRecordUrl(s.zenodo_source_doi))}"
+           target="_blank" rel="noopener noreferrer"
+           title="${escapeAttr(s.zenodo_source_doi)}"
+           aria-label="Importado de Zenodo — ${escapeAttr(s.zenodo_source_doi)}"
+           onclick="event.stopPropagation()">📥 Importado · ${escapeHtml(doiShort(s.zenodo_source_doi))}</a>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
 
   const body = `${newBadge}
     <span class="study-item__thumb">
@@ -421,6 +467,7 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
         <span class="study-item__badge">${modality}</span>
         ${imgLabel}
       </span>
+      ${zenodoBadges ? `<span class="study-item__zenodo-badges">${zenodoBadges}</span>` : ""}
     </span>`;
 
   // In the listbox each <li> IS the option; in the panel each row is a button,

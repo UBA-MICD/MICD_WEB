@@ -95,7 +95,6 @@ export function updateAuthUI(): void {
   const email = getCurrentUser()?.email ?? "";
 
   $("btn-login").classList.toggle("hidden", authed);
-  $("btn-logout").classList.toggle("hidden", !authed);
   $("session-block").classList.toggle("hidden", !authed);
   $("btn-activity").classList.toggle("hidden", !authed);
 

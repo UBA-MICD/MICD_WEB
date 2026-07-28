@@ -273,7 +273,30 @@
             <div class="tool-divider"></div>
 
             <button
-              class="toolbar__tool"
+              class="toolbar__tool toolbar__tool--explorer"
+              id="btn-toggle-explorer"
+              title="Estudios en servidor"
+              aria-expanded="true"
+              aria-controls="explorer-panel"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="12" cy="12" r="4"/>
+                <line x1="3" y1="12" x2="8" y2="12"/>
+                <line x1="16" y1="12" x2="21" y2="12"/>
+              </svg>
+              <span>Estudios</span>
+            </button>
+
+            <button
+              class="toolbar__tool toolbar__tool--zenodo"
               id="btn-open-zenodo"
               title="Zenodo — repositorio de ciencia abierta"
               aria-expanded="false"
@@ -329,43 +352,47 @@
             />
             <input type="file" id="open-folder-input" class="hidden" />
 
-            <!-- Local viewing: free, and the app's primary action. -->
+            <!-- Primary action -->
             <button class="btn btn--accent btn--full" id="btn-open">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>
+              </svg>
               Abrir archivo
             </button>
-            <button class="btn-link btn--full" id="btn-open-folder">
-              Abrir carpeta
-            </button>
 
-            <div class="tool-divider"></div>
+            <!-- Secondary actions -->
+            <div class="sidebar-actions">
+              <button class="sidebar-action" id="btn-open-folder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Abrir carpeta</span>
+              </button>
+              <button class="sidebar-action sidebar-action--server" id="btn-server">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+                  <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+                </svg>
+                <span>Servidor</span>
+                <svg class="sidebar-action__chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            </div>
 
-            <!-- Everything server-bound lives behind this one step. -->
-            <button class="btn btn--outline btn--full" id="btn-server">
-              Servidor
-            </button>
-
-            <div class="tool-divider"></div>
-
-            <!-- Session. Logged-out is the default render state; updateAuthUI()
-               is the only thing that repaints it. -->
-            <div class="session hidden" id="session-block">
-              <span
-                class="session__avatar"
-                id="session-avatar"
-                aria-hidden="true"
-                >··</span
-              >
+            <!-- Session card. Logged-out is the default; updateAuthUI() repaints. -->
+            <div class="session-card hidden" id="session-block">
+              <span class="session__avatar" id="session-avatar" aria-hidden="true">··</span>
               <div class="session__info">
                 <span class="session__email" id="session-email"></span>
-                <span class="session__status" id="session-status">
-                  <span class="session__dot" aria-hidden="true"></span>
-                  <span id="session-expiry">Sesión activa</span>
-                </span>
+                <span class="session__expiry" id="session-expiry">Sesión activa</span>
               </div>
+              <button class="session-card__logout" id="btn-logout" title="Cerrar sesión" aria-label="Cerrar sesión">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </button>
             </div>
-            <button class="btn btn--session btn--full hidden" id="btn-logout">
-              Cerrar sesión
-            </button>
             <button class="btn btn--outline btn--full" id="btn-login">
               Iniciar sesión
             </button>
@@ -613,9 +640,16 @@
         </main>
 
         <!-- Study Explorer panel -->
-        <aside class="explorer-panel" id="explorer-panel">
+        <aside class="explorer-panel" id="explorer-panel" data-explorer-view>
+          <div class="explorer-panel__resize-handle" id="explorer-resize-handle" aria-hidden="true"></div>
           <div class="explorer-panel__header">
             <h2>Estudios en servidor</h2>
+            <div class="explorer-panel__header-actions">
+            <button class="icon-btn hidden" id="btn-activity" title="Historial de actividad" aria-label="Historial de actividad">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>
+              </svg>
+            </button>
             <button class="icon-btn" id="btn-refresh-studies" title="Recargar">
               <svg
                 width="14"
@@ -629,6 +663,7 @@
                 <path d="M3 22v-7h7" />
               </svg>
             </button>
+            </div>
           </div>
 
           <!-- Filters -->
@@ -653,12 +688,14 @@
                 type="text"
                 id="search-studies"
                 class="filter-search__input"
+                data-explorer-search
                 placeholder="Buscar paciente o ID"
                 autocomplete="off"
               />
               <button
                 class="filter-search__clear hidden"
                 id="btn-clear-search"
+                data-explorer-search-clear
                 aria-label="Limpiar búsqueda"
               >
                 <svg
@@ -678,6 +715,7 @@
             <div
               class="filter-chips"
               id="filter-modality-chips"
+              data-explorer-chips
               role="group"
               aria-label="Modalidad"
             >
@@ -751,6 +789,13 @@
               >
                 XA
               </button>
+              <button
+                class="filter-chip filter-chip--zenodo"
+                data-zenodo-linked
+                aria-pressed="false"
+              >
+                 Vinculado a Zenodo
+              </button>
             </div>
 
             <div class="filter-dates">
@@ -759,6 +804,7 @@
                 type="date"
                 id="filter-date-from"
                 class="filter-date"
+                data-explorer-date-from
                 title="Desde"
               />
               <label class="sr-only" for="filter-date-to">Hasta</label>
@@ -766,6 +812,7 @@
                 type="date"
                 id="filter-date-to"
                 class="filter-date"
+                data-explorer-date-to
                 title="Hasta"
               />
             </div>
@@ -777,7 +824,7 @@
             </div>
           </div>
 
-          <ul id="study-list" class="study-list"></ul>
+          <ul id="study-list" class="study-list" data-explorer-list></ul>
 
           <!-- Pagination -->
           <div class="explorer-pagination">
@@ -823,15 +870,13 @@
             <span id="explorer-session-line"
               >Sin sesión · solo lectura local</span
             >
-            <button class="btn-link hidden" id="btn-activity">
-              Ver historial de actividad
-            </button>
           </div>
         </aside>
       </div>
 
       <!-- Zenodo Panel -->
       <aside class="zenodo-panel zenodo-panel--closed" id="zenodo-panel">
+        <div class="zenodo-panel__resize-handle" id="zenodo-resize-handle" aria-hidden="true"></div>
         <!-- Header: logo + tabs + close -->
         <div class="z-panel-header">
           <div class="z-panel-logo">
@@ -854,6 +899,7 @@
             </button>
             <button class="z-tab" data-tab="publish">Publicar</button>
             <button class="z-tab" data-tab="config">Config</button>
+            <button class="z-tab" data-tab="logs">Logs</button>
           </div>
           <button
             class="icon-btn z-panel-close"
@@ -1010,6 +1056,34 @@
             </div>
           </div>
         </div>
+
+        <!-- Tab: Logs -->
+        <div class="z-tab-panel hidden" id="z-tab-logs">
+          <div class="activity-log-toolbar" id="activity-filters">
+            <div class="activity-log-toolbar-row">
+              <span class="activity-filter-label">Tipo</span>
+              <button class="btn btn--secondary activity-export-btn" id="btn-export-activity">Descargar CSV</button>
+            </div>
+            <div class="activity-log-filters">
+              <button class="filter-chip filter-chip--active" data-filter-action="">Todos</button>
+              <button class="filter-chip" data-filter-action="ZENODO_STUDY_PUBLISHED,ZENODO_PUBLISH_FAILED">Publicación</button>
+              <button class="filter-chip" data-filter-action="ZENODO_IMPORT_STARTED,ZENODO_IMPORT_COMPLETED">Importación</button>
+              <button class="filter-chip" data-filter-action="ZENODO_SYNC_STARTED,ZENODO_SYNC_COMPLETED,ZENODO_SYNC_FAILED">Sync</button>
+              <button class="filter-chip" data-filter-action="ZENODO_TOKEN_CONFIGURED,ZENODO_TOKEN_REMOVED">Token</button>
+            </div>
+            <div class="activity-log-filters">
+              <span class="activity-filter-label">Resultado</span>
+              <button class="filter-chip filter-chip--active" data-filter-result="">Todos</button>
+              <button class="filter-chip" data-filter-result="success">Éxito</button>
+              <button class="filter-chip" data-filter-result="error">Error</button>
+            </div>
+          </div>
+          <div class="activity-log-scroll" id="activity-log-content">
+            <div class="z-empty-state">
+              <span>Abrí este tab para cargar el historial</span>
+            </div>
+          </div>
+        </div>
       </aside>
     </div>
 
@@ -1108,6 +1182,7 @@
         aria-labelledby="tab-buscar"
         tabindex="0"
       >
+        <div class="buscar-layout">
         <div class="server-panel__body" data-explorer-view="server">
           <div class="server-filters">
             <div class="filter-search">
@@ -1210,6 +1285,13 @@
             <button class="filter-chip" data-modality="XA" aria-pressed="false">
               XA
             </button>
+            <button
+              class="filter-chip filter-chip--zenodo"
+              data-zenodo-linked
+              aria-pressed="false"
+            >
+               Vinculado a Zenodo
+            </button>
           </div>
 
           <!-- A listbox, not a list of buttons: one study is chosen, then
@@ -1260,6 +1342,18 @@
             </button>
           </div>
         </div>
+
+        </div><!-- /.server-panel__body -->
+
+        <aside
+          class="study-detail-panel hidden"
+          id="study-detail-panel"
+          aria-label="Detalle del estudio en Zenodo"
+        >
+          <div id="study-detail-content" class="study-detail-panel__content"></div>
+        </aside>
+
+        </div><!-- /.buscar-layout -->
 
         <footer class="server-panel__actions">
           <button class="btn btn--secondary" id="btn-buscar-cancel">
@@ -1386,6 +1480,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
          must run before auth.ts's module-load-time resolveApiOrigin() call. -->

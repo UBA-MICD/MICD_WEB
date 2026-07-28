@@ -680,6 +680,7 @@
             </button>
             <button class="z-tab" data-tab="publish">Publicar</button>
             <button class="z-tab" data-tab="config">Config</button>
+            <button class="z-tab" data-tab="logs">Logs</button>
           </div>
           <button
             class="icon-btn z-panel-close"
@@ -836,6 +837,32 @@
             </div>
           </div>
         </div>
+
+        <!-- Tab: Logs -->
+        <div class="z-tab-panel hidden" id="z-tab-logs">
+          <div class="activity-log-toolbar">
+            <div class="activity-log-filters" id="activity-filters">
+              <span class="activity-filter-label">Tipo:</span>
+              <button class="filter-chip filter-chip--active" data-filter-action="">Todos</button>
+              <button class="filter-chip" data-filter-action="ZENODO_STUDY_PUBLISHED,ZENODO_PUBLISH_FAILED">Publicación</button>
+              <button class="filter-chip" data-filter-action="ZENODO_IMPORT_STARTED,ZENODO_IMPORT_COMPLETED">Importación</button>
+              <button class="filter-chip" data-filter-action="ZENODO_SYNC_STARTED,ZENODO_SYNC_COMPLETED,ZENODO_SYNC_FAILED">Sincronización</button>
+              <button class="filter-chip" data-filter-action="ZENODO_TOKEN_CONFIGURED,ZENODO_TOKEN_REMOVED">Token</button>
+              <span class="activity-filter-label activity-filter-label--gap">Resultado:</span>
+              <button class="filter-chip filter-chip--active" data-filter-result="">Todos</button>
+              <button class="filter-chip" data-filter-result="success">Éxito</button>
+              <button class="filter-chip" data-filter-result="error">Error</button>
+            </div>
+            <button class="btn btn--secondary activity-export-btn" id="btn-export-activity">
+              Exportar CSV
+            </button>
+          </div>
+          <div class="activity-log-scroll" id="activity-log-content">
+            <div class="z-empty-state">
+              <span>Abrí este tab para cargar el historial</span>
+            </div>
+          </div>
+        </div>
       </aside>
     </div>
 
@@ -934,6 +961,7 @@
         aria-labelledby="tab-buscar"
         tabindex="0"
       >
+        <div class="buscar-layout">
         <div class="server-panel__body" data-explorer-view="server">
           <div class="server-filters">
             <div class="filter-search">
@@ -1093,6 +1121,18 @@
             </button>
           </div>
         </div>
+
+        </div><!-- /.server-panel__body -->
+
+        <aside
+          class="study-detail-panel hidden"
+          id="study-detail-panel"
+          aria-label="Detalle del estudio en Zenodo"
+        >
+          <div id="study-detail-content" class="study-detail-panel__content"></div>
+        </aside>
+
+        </div><!-- /.buscar-layout -->
 
         <footer class="server-panel__actions">
           <button class="btn btn--secondary" id="btn-buscar-cancel">

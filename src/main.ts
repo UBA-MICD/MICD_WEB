@@ -31,6 +31,7 @@ import {
   renderLoggedOutExplorer,
 } from "./explorer/explorer.js";
 import { initZenodoPanel } from "./zenodo/zenodo-panel.js";
+import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
 
@@ -82,6 +83,7 @@ function startApp(): void {
   initServerScreen();
   initActivityHistory();
   initZenodoPanel();
+  initStudyDetailPanel();
   // Last: the rail is one tab stop, with the arrow keys moving between tools,
   // so reaching the viewport does not mean tabbing through every tool. It
   // reads the tool buttons at init, so it runs after they are all wired.

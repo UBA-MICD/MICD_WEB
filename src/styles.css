@@ -2329,6 +2329,154 @@ body {
   font-size: 10px;
 }
 
+/* ── Study detail panel (server-screen split layout) ─────────────────────── */
+.buscar-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.buscar-layout .server-panel__body {
+  flex: 1;
+  min-width: 0;
+}
+.study-detail-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+.study-detail-panel.hidden {
+  display: none;
+}
+.study-detail-panel__content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.study-detail-panel__loading {
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 8px 0;
+}
+.study-detail-panel__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 8px 0;
+}
+.study-detail-panel__stale {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.4;
+}
+.study-detail-panel__stale svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.study-detail-panel__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.study-detail-panel__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.study-detail-panel__doi {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text-secondary);
+  word-break: break-all;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.study-detail-panel__doi:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+.study-detail-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.study-detail-panel__section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+.study-detail-panel__meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  font-size: 11px;
+}
+.study-detail-panel__label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.study-detail-panel__versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.study-detail-panel__version {
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--bg-surface);
+}
+.study-detail-panel__version--latest {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-accent);
+}
+.study-detail-panel__version-doi {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  word-break: break-all;
+}
+.study-detail-panel__version-doi:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+.study-detail-panel__version-date {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.study-detail-panel__version-date em {
+  color: var(--accent);
+  font-style: normal;
+}
+.study-detail-panel__actions {
+  margin-top: 4px;
+}
+
 /* ── Sidebar Zenodo button ────────────────────────────────────────────────── */
 .toolbar__tool--zenodo.active,
 .toolbar__tool--zenodo:hover {
@@ -2338,4 +2486,124 @@ body {
 }
 .toolbar__tool--zenodo.active svg {
   filter: drop-shadow(0 0 4px rgba(0, 200, 255, 0.4));
+}
+
+/* ── Activity Log (Logs tab) ─────────────────────────────────────────────── */
+.activity-log-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.activity-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  flex: 1;
+}
+.activity-filter-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+.activity-filter-label--gap {
+  margin-left: 8px;
+}
+.activity-export-btn {
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 3px 10px;
+}
+.activity-log-scroll {
+  overflow-y: auto;
+  flex: 1;
+}
+.activity-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.activity-log-table th {
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.activity-log__cell {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.activity-log__row--expandable {
+  cursor: pointer;
+}
+.activity-log__row--expandable:hover td {
+  background: var(--bg-elevated);
+}
+.activity-log__action {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.activity-log__resource {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.activity-log__detail-hint {
+  color: var(--text-dim);
+  font-size: 10px;
+  width: 16px;
+  text-align: center;
+}
+.activity-log__result {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.activity-log__result--success {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.activity-log__result--error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.activity-log__detail-row td {
+  padding: 0 8px 8px;
+  background: var(--bg-base);
+}
+.activity-log__detail {
+  background: var(--bg-base);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  max-height: 160px;
+}
+.activity-log__pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-dim);
 }

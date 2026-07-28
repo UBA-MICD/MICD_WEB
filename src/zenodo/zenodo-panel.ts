@@ -1,5 +1,5 @@
 import { authFetch, ensureAuthenticated, isAuthenticated, API_BASE } from "../auth/auth.js";
-import { $, escapeHtml } from "../shared/dom.js";
+import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ interface SyncConfig {
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
-type Tab = "search" | "publish" | "config";
+type Tab = "search" | "publish" | "config" | "logs";
 
 const state = {
   tab: "search" as Tab,
@@ -228,6 +228,7 @@ function switchTab(tab: Tab): void {
   $(`z-tab-${tab}`).classList.remove("hidden");
   if (tab === "config") void loadConfig();
   if (tab === "publish") renderPublishTab();
+  if (tab === "logs") void loadActivityLog();
 }
 
 /**
@@ -1000,4 +1001,189 @@ function defaultStatus(): ConfigStatus {
     last_updated: null,
   };
   return { sandbox: empty, production: empty };
+}
+
+// ── Activity Log (Logs tab) ────────────────────────────────────────────────────
+
+interface ActivityEntry {
+  id: number;
+  action: string;
+  resourceId: string;
+  timestamp: string;
+  userId: number | null;
+  ip: string | null;
+  detail: Record<string, unknown> | null;
+  result: "success" | "error";
+}
+
+interface ActivityListResult {
+  entries: ActivityEntry[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+const activityState = {
+  filterAction: "",
+  filterResult: "",
+  page: 1,
+  loaded: false,
+};
+
+function initActivityLog(): void {
+  const toolbar = document.getElementById("activity-filters");
+  if (!toolbar) return;
+
+  toolbar.querySelectorAll<HTMLElement>("[data-filter-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      toolbar.querySelectorAll("[data-filter-action]").forEach((b) => b.classList.remove("filter-chip--active"));
+      btn.classList.add("filter-chip--active");
+      activityState.filterAction = btn.dataset.filterAction ?? "";
+      activityState.page = 1;
+      void loadActivityLog();
+    });
+  });
+
+  toolbar.querySelectorAll<HTMLElement>("[data-filter-result]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      toolbar.querySelectorAll("[data-filter-result]").forEach((b) => b.classList.remove("filter-chip--active"));
+      btn.classList.add("filter-chip--active");
+      activityState.filterResult = btn.dataset.filterResult ?? "";
+      activityState.page = 1;
+      void loadActivityLog();
+    });
+  });
+
+  document.getElementById("btn-export-activity")?.addEventListener("click", () => void exportActivityCsv());
+}
+
+async function loadActivityLog(): Promise<void> {
+  const container = document.getElementById("activity-log-content");
+  if (!container) return;
+
+  if (!activityState.loaded) {
+    // Wire up filter buttons the first time we load
+    initActivityLog();
+    activityState.loaded = true;
+  }
+
+  container.innerHTML = `<div class="z-loading">Cargando historial…</div>`;
+
+  const params = new URLSearchParams();
+  if (activityState.filterAction) {
+    // Multiple actions are comma-separated; for now we pass the first
+    const actions = activityState.filterAction.split(",");
+    actions.forEach((a) => params.append("action", a));
+  }
+  if (activityState.filterResult) params.set("result", activityState.filterResult);
+  params.set("page", String(activityState.page));
+  params.set("limit", "50");
+
+  try {
+    const res = await authFetch(`${API_BASE}/v1/activity?${params.toString()}`);
+    if (!res.ok) {
+      container.innerHTML = `<p class="z-error">Error al cargar el historial (${escapeHtml(String(res.status))}).</p>`;
+      return;
+    }
+    const data = (await res.json()) as ActivityListResult;
+    container.innerHTML = renderActivityLog(data);
+
+    container.querySelectorAll<HTMLElement>(".activity-log__row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const detail = row.nextElementSibling;
+        if (detail?.classList.contains("activity-log__detail-row")) {
+          detail.classList.toggle("hidden");
+        }
+      });
+    });
+
+    container.querySelectorAll<HTMLButtonElement>(".activity-log__page-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activityState.page = parseInt(btn.dataset.page ?? "1", 10);
+        void loadActivityLog();
+      });
+    });
+  } catch {
+    container.innerHTML = `<p class="z-error">No se pudo conectar al servidor.</p>`;
+  }
+}
+
+function renderActivityLog(data: ActivityListResult): string {
+  if (data.entries.length === 0) {
+    return `<div class="z-empty-state"><span>No hay registros para los filtros seleccionados.</span></div>`;
+  }
+
+  const rows = data.entries
+    .map((entry) => {
+      const resultClass =
+        entry.result === "error" ? "activity-log__result--error" : "activity-log__result--success";
+      const resultLabel = entry.result === "error" ? "Error" : "Éxito";
+      const date = new Date(entry.timestamp).toLocaleString("es-AR");
+      const hasDetail = entry.detail !== null;
+      const detailRow = hasDetail
+        ? `<tr class="activity-log__detail-row hidden">
+            <td colspan="5">
+              <pre class="activity-log__detail">${escapeHtml(JSON.stringify(entry.detail, null, 2))}</pre>
+            </td>
+          </tr>`
+        : "";
+
+      return `
+        <tr class="activity-log__row${hasDetail ? " activity-log__row--expandable" : ""}" tabindex="${hasDetail ? "0" : "-1"}">
+          <td class="activity-log__cell">${escapeHtml(date)}</td>
+          <td class="activity-log__cell activity-log__action">${escapeHtml(entry.action)}</td>
+          <td class="activity-log__cell activity-log__resource">${escapeHtml(entry.resourceId)}</td>
+          <td class="activity-log__cell">
+            <span class="activity-log__result ${escapeAttr(resultClass)}">${escapeHtml(resultLabel)}</span>
+          </td>
+          <td class="activity-log__cell activity-log__detail-hint">${hasDetail ? "▶" : ""}</td>
+        </tr>${detailRow}`;
+    })
+    .join("");
+
+  const pagination =
+    data.totalPages > 1
+      ? `<div class="activity-log__pagination">
+          ${data.page > 1 ? `<button class="btn btn--secondary btn--sm activity-log__page-btn" data-page="${data.page - 1}">← Anterior</button>` : ""}
+          <span class="activity-log__page-info">Pág. ${data.page} / ${data.totalPages}</span>
+          ${data.page < data.totalPages ? `<button class="btn btn--secondary btn--sm activity-log__page-btn" data-page="${data.page + 1}">Siguiente →</button>` : ""}
+        </div>`
+      : "";
+
+  return `
+    <table class="activity-log-table">
+      <thead>
+        <tr>
+          <th>Fecha/hora</th>
+          <th>Acción</th>
+          <th>Recurso</th>
+          <th>Resultado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${pagination}`;
+}
+
+async function exportActivityCsv(): Promise<void> {
+  const params = new URLSearchParams();
+  if (activityState.filterAction) {
+    activityState.filterAction.split(",").forEach((a) => params.append("action", a));
+  }
+  if (activityState.filterResult) params.set("result", activityState.filterResult);
+
+  try {
+    const res = await authFetch(`${API_BASE}/v1/activity/export?${params.toString()}`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "zenodo-log.csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  } catch {
+    // silently fail — user can retry
+  }
 }

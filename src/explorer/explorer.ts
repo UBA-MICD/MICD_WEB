@@ -73,7 +73,7 @@ const views: ExplorerView[] = [];
  */
 const newStudyIds = new Set<string>();
 let selectedStudyId: string | null = null;
-let selectionListener: ((id: string | null) => void) | null = null;
+const selectionListeners: ((id: string | null) => void)[] = [];
 let activateListener: ((id: string) => void) | null = null;
 
 // ── Selection (server screen's select-then-confirm flow) ─────────────────────
@@ -84,7 +84,7 @@ export function getSelectedStudyId(): string | null {
 
 /** Notified whenever the selection changes, so the confirm button can follow. */
 export function onSelectionChange(cb: (id: string | null) => void): void {
-  selectionListener = cb;
+  selectionListeners.push(cb);
 }
 
 /**
@@ -107,7 +107,7 @@ function setSelected(id: string | null): void {
         el.tabIndex = isSelected ? 0 : -1;
       });
     });
-  selectionListener?.(id);
+  selectionListeners.forEach((cb) => cb(id));
 }
 
 export function clearSelection(): void {
@@ -407,6 +407,13 @@ export async function loadStudyExplorer(): Promise<void> {
   }
 }
 
+function zenodoRecordUrl(doi: string): string {
+  const isSandbox = doi.startsWith("10.5072/");
+  const base = isSandbox ? "https://sandbox.zenodo.org" : "https://zenodo.org";
+  const match = doi.match(/zenodo\.(\d+)$/i);
+  return match ? `${base}/records/${match[1]}` : `https://doi.org/${encodeURIComponent(doi)}`;
+}
+
 function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
   const id = escapeAttr(s.orthanc_study_id);
   const modality = escapeHtml(s.modality || "?");
@@ -427,7 +434,7 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
   const zenodoBadges = [
     s.zenodo_doi
       ? `<a class="study-item__zenodo-badge study-item__zenodo-badge--published"
-           href="https://zenodo.org/records/${encodeURIComponent(s.zenodo_doi.split("/").pop() ?? "")}"
+           href="${escapeAttr(zenodoRecordUrl(s.zenodo_doi))}"
            target="_blank" rel="noopener noreferrer"
            title="${escapeAttr(s.zenodo_doi)}"
            aria-label="Publicado en Zenodo — ${escapeAttr(s.zenodo_doi)}"
@@ -435,7 +442,7 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
       : "",
     s.zenodo_source_doi
       ? `<a class="study-item__zenodo-badge study-item__zenodo-badge--imported"
-           href="https://zenodo.org/records/${encodeURIComponent(s.zenodo_source_doi.split("/").pop() ?? "")}"
+           href="${escapeAttr(zenodoRecordUrl(s.zenodo_source_doi))}"
            target="_blank" rel="noopener noreferrer"
            title="${escapeAttr(s.zenodo_source_doi)}"
            aria-label="Importado de Zenodo — ${escapeAttr(s.zenodo_source_doi)}"

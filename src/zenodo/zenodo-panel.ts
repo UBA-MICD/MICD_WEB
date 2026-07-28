@@ -66,8 +66,54 @@ const state = {
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 
+function initResizeHandle(): void {
+  const panel = $("zenodo-panel");
+  const handle = document.getElementById("zenodo-resize-handle");
+  if (!handle) return;
+
+  let startX = 0;
+  let startWidth = 0;
+
+  handle.addEventListener("mousedown", (e: MouseEvent) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startWidth = panel.offsetWidth;
+    handle.classList.add("zenodo-panel__resize-handle--dragging");
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+
+    const onMove = (ev: MouseEvent): void => {
+      const delta = startX - ev.clientX;
+      const newWidth = Math.min(
+        Math.max(startWidth + delta, 260),
+        Math.round(window.innerWidth * 0.7),
+      );
+      panel.style.width = `${newWidth}px`;
+    };
+
+    const onUp = (): void => {
+      handle.classList.remove("zenodo-panel__resize-handle--dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+}
+
 export function initZenodoPanel(): void {
-  $("btn-open-zenodo").addEventListener("click", openPanel);
+  initResizeHandle();
+
+  $("btn-open-zenodo").addEventListener("click", () => {
+    if ($("zenodo-panel").classList.contains("zenodo-panel--closed")) {
+      openPanel();
+    } else {
+      closePanel();
+    }
+  });
   $("btn-close-zenodo").addEventListener("click", closePanel);
   // Starts closed in the markup; make the DOM state say so too.
   setPanelOpen(false);
@@ -207,9 +253,11 @@ function closePanel(): void {
  */
 function setPanelOpen(open: boolean): void {
   const panel = $("zenodo-panel");
+  const btn = $("btn-open-zenodo");
   panel.classList.toggle("zenodo-panel--closed", !open);
   panel.inert = !open;
-  $("btn-open-zenodo").setAttribute("aria-expanded", String(open));
+  btn.setAttribute("aria-expanded", String(open));
+  btn.classList.toggle("active", open);
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────

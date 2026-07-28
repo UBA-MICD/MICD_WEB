@@ -96,7 +96,10 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
       </div>`
     : "";
 
-  const doiUrl = `https://zenodo.org/records/${encodeURIComponent(detail.doi.split("/").pop() ?? detail.doi)}`;
+  const isSandboxDoi = detail.doi.startsWith("10.5072/");
+  const doiBase = isSandboxDoi ? "https://sandbox.zenodo.org" : "https://zenodo.org";
+  const doiMatch = detail.doi.match(/zenodo\.(\d+)$/i);
+  const doiUrl = doiMatch ? `${doiBase}/records/${doiMatch[1]}` : `https://doi.org/${encodeURIComponent(detail.doi)}`;
 
   const authorsHtml = detail.record?.authors?.length
     ? `<p class="study-detail-panel__meta-row">
@@ -206,7 +209,7 @@ async function showDetail(studyId: string): Promise<void> {
     });
 
     if (res.status === 404) {
-      renderError("Este estudio no tiene datos de Zenodo.");
+      hideDetail();
       return;
     }
     if (!res.ok) {

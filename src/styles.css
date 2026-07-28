@@ -46,6 +46,8 @@
   --amber-soft: rgba(224, 164, 88, 0.12);
   --danger: #ff6b6b;
   --danger-soft: rgba(255, 107, 107, 0.12);
+  --cyan: #00c8ff;
+  --cyan-soft: rgba(0, 200, 255, 0.12);
 
   --text-primary: #e9eef0;
   --text-secondary: #a3adb4;
@@ -663,6 +665,86 @@ body {
 .sidebar__footer {
   border-top: 1px solid var(--border);
   padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Sidebar secondary actions list ─────────────────────────────────────── */
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  text-align: left;
+}
+.sidebar-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.sidebar-action svg:first-child {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.sidebar-action span {
+  flex: 1;
+}
+.sidebar-action__chevron {
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+/* ── Session card ───────────────────────────────────────────────────────── */
+.session-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+}
+.session-card.hidden {
+  display: none;
+}
+.session-card__logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity var(--transition), background var(--transition);
+}
+.session-card__logout:hover {
+  opacity: 1;
+  background: var(--danger-soft);
+}
+.session__expiry {
+  font-size: 10px;
+  color: var(--amber);
 }
 
 .btn {
@@ -1255,13 +1337,36 @@ body {
 
 /* ── Study Explorer ───────────────────────────────────────────────────────── */
 .explorer-panel {
+  position: relative;
   width: 340px;
+  min-width: 220px;
+  max-width: 55vw;
   flex-shrink: 0;
   background: var(--bg-surface);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
+  transition: width 0.2s ease;
+}
+.explorer-panel--collapsed {
+  width: 0 !important;
+  min-width: 0;
+  overflow: hidden;
+  border-left: none;
+}
+.explorer-panel__resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: ew-resize;
+  z-index: 10;
+}
+.explorer-panel__resize-handle:hover,
+.explorer-panel__resize-handle--dragging {
+  background: var(--border-accent);
 }
 
 .explorer-panel__header {
@@ -1270,6 +1375,11 @@ body {
   justify-content: space-between;
   padding: 16px 16px 12px;
   flex-shrink: 0;
+}
+.explorer-panel__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .explorer-panel__header h2 {
   font-size: 15px;
@@ -1787,12 +1897,27 @@ body {
   top: var(--topbar-h);
   bottom: 0;
   width: 340px;
+  min-width: 260px;
+  max-width: 70vw;
   background: var(--bg-surface);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   z-index: 150;
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.zenodo-panel__resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: ew-resize;
+  z-index: 10;
+}
+.zenodo-panel__resize-handle:hover,
+.zenodo-panel__resize-handle--dragging {
+  background: var(--border-accent);
 }
 .zenodo-panel--closed {
   transform: translateX(100%);
@@ -2478,6 +2603,16 @@ body {
 }
 
 /* ── Sidebar Zenodo button ────────────────────────────────────────────────── */
+.toolbar__tool--explorer.active,
+.toolbar__tool--explorer:hover {
+  color: #5b9cf6;
+  background: rgba(91, 156, 246, 0.12);
+  border-color: rgba(91, 156, 246, 0.3);
+}
+.toolbar__tool--explorer.active svg {
+  filter: drop-shadow(0 0 4px rgba(91, 156, 246, 0.4));
+}
+
 .toolbar__tool--zenodo.active,
 .toolbar__tool--zenodo:hover {
   color: var(--cyan);
@@ -2491,18 +2626,23 @@ body {
 /* ── Activity Log (Logs tab) ─────────────────────────────────────────────── */
 .activity-log-toolbar {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 12px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
 }
 .activity-log-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
-  flex: 1;
+  min-width: 0;
+}
+.activity-log-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 .activity-filter-label {
   font-size: 11px;

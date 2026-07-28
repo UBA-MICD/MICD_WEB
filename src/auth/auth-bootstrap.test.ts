@@ -34,21 +34,18 @@ const store = new Map<string, string>();
   },
 };
 
-const { API_ORIGIN, API_BASE, ensureAuthenticated, isAuthenticated } =
-  await import("./auth.ts");
-
-test("a configured origin overrides the localhost default", () => {
+test("a configured origin overrides the localhost default", async () => {
+  const { API_ORIGIN } = await import("./auth.js");
   assert.equal(API_ORIGIN, "https://micd.example.org");
 });
 
-test("API_BASE hangs /api off the configured origin", () => {
-  // One slash, not two — the trailing slash above has to have been stripped.
+test("API_BASE hangs /api off the configured origin", async () => {
+  const { API_BASE } = await import("./auth.js");
   assert.equal(API_BASE, "https://micd.example.org/api");
 });
 
 test("ensureAuthenticated resolves false when no login prompt is registered", async () => {
-  // A server action fired before main.ts finished wiring must resolve false,
-  // not hang forever on a prompt that will never be shown.
+  const { ensureAuthenticated, isAuthenticated } = await import("./auth.js");
   assert.equal(await ensureAuthenticated(), false);
   assert.equal(isAuthenticated(), false);
 });

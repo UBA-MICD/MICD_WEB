@@ -40,6 +40,7 @@ function formatRemaining(ms: number): string {
  */
 function tick(): void {
   const expiresAt = getSessionExpiresAt();
+  // cspell:disable
   if (!isAuthenticated() || expiresAt === null) {
     $("session-expiry").textContent = "Sesión activa";
     return;
@@ -61,6 +62,7 @@ function tick(): void {
   if (remaining <= 60_000) {
     announceOnce("Tu sesión expira en menos de un minuto.");
   }
+  // cspell:enable
 }
 
 function announceOnce(message: string): void {
@@ -100,10 +102,12 @@ export function updateAuthUI(): void {
     stopTicking();
     // The panel footer states the rule in words, so a guest can see why the
     // list is empty without having to click anything.
+    // cspell:disable-next-line
     $("explorer-session-line").textContent = "Sin sesión · solo lectura local";
     return;
   }
 
+  // cspell:disable-next-line
   $("session-email").textContent = email || "Sesión activa";
   $("session-email").title = email;
   $("session-avatar").textContent = email ? initials(email) : "··";
@@ -131,6 +135,7 @@ function message(text: string): string {
   return `<p class="activity-empty">${escapeHtml(text)}</p>`;
 }
 
+// cspell:disable
 async function loadActivity(): Promise<void> {
   const body = $("activity-body");
   body.innerHTML = message("Cargando…");
@@ -179,3 +184,4 @@ async function loadActivity(): Promise<void> {
     body.innerHTML = message("Respuesta inesperada del servidor.");
   }
 }
+// cspell:enable

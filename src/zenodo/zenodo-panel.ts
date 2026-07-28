@@ -1,3 +1,4 @@
+/* cspell:disable */
 import { authFetch, ensureAuthenticated, isAuthenticated, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
@@ -828,6 +829,7 @@ async function runSyncNow(): Promise<void> {
 
 // ── Publish ────────────────────────────────────────────────────────────────────
 
+// cspell:disable
 function renderPublishTab(): void {
   const container = $("z-publish-content");
   // The loaded study is marked with aria-current, not a .study-item--active
@@ -996,6 +998,7 @@ async function publishStudy(studyId: string): Promise<void> {
     btnEl.textContent = "Publicar en Zenodo";
   }
 }
+// cspell:enable
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

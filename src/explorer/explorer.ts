@@ -5,7 +5,7 @@ import { loadStudyFromServer } from "../viewer/loading.js";
 // ── Study Explorer ────────────────────────────────────────────────────────────
 //
 // The study list appears on two surfaces: the compact panel beside the viewer,
-// and the wide grid on the server screen's Buscar tab. They share one set of
+// and the wide grid on the server screen's Search tab. They share one set of
 // filters and one fetch — changing the search in either updates both — so the
 // controls are found by data attribute inside a view root rather than by
 // global id, which could only ever describe one of them.
@@ -13,7 +13,7 @@ import { loadStudyFromServer } from "../viewer/loading.js";
 // The two differ in what a click means:
 //   viewer  ("open")   — clicking a study loads it immediately.
 //   server  ("select") — clicking selects it; a confirm button opens it. This
-//                        is the comp's "Abrir estudio seleccionado" flow.
+//                        is the comp's "Open selected study" flow.
 
 interface StudyRecord {
   id: number;
@@ -67,7 +67,7 @@ const explorerState = {
 
 const views: ExplorerView[] = [];
 /**
- * Studies uploaded during this session, badged "Nuevo" so the thing you just
+ * Studies uploaded during this session, badged "New" so the thing you just
  * added is findable in a list you did not sort. Client-side only and
  * deliberately not persisted: "new" means "new to you, just now".
  */
@@ -341,10 +341,12 @@ export async function loadStudyExplorer(): Promise<void> {
     return;
   }
 
+  /* cspell:disable */
   views.forEach((v) => {
     v.list.innerHTML =
       '<li class="study-item study-item--loading">Cargando estudios…</li>';
   });
+  /* cspell:enable */
 
   const params = new URLSearchParams({
     page: String(explorerState.page),
@@ -366,6 +368,7 @@ export async function loadStudyExplorer(): Promise<void> {
     explorerState.totalPages = data.totalPages || 1;
     updatePaginationUI(data.page, explorerState.totalPages, data.total);
 
+    // cspell:disable
     if (data.studies.length === 0) {
       const filtered =
         explorerState.search ||
@@ -505,11 +508,8 @@ export function renderLoggedOutExplorer(): void {
         </div>
       </li>`;
   });
-  explorerState.page = 1;
-  explorerState.totalPages = 1;
-  updatePaginationUI(1, 1, 0);
-  setSelected(null);
 }
+// cspell:enable
 
 let thumbUrls: string[] = [];
 

@@ -133,6 +133,7 @@ test("login 429 reports the rate-limit message and keeps no session", async () =
   respondBy({ [AUTH_LOGIN]: () => json({ error: "rate limited" }, 429) });
   const result = await login("a@b.c", "pw");
   assert.equal(result.ok, false);
+  // cspell:disable-next-line
   assert.match((result as { error: string }).error, /Demasiados intentos/);
   assert.equal(isAuthenticated(), false);
 });
@@ -141,6 +142,7 @@ test("login with bad credentials reports the credentials message", async () => {
   respondBy({ [AUTH_LOGIN]: () => json({ error: "nope" }, 401) });
   const result = await login("a@b.c", "pw");
   assert.equal(result.ok, false);
+  // cspell:disable-next-line
   assert.match((result as { error: string }).error, /incorrectos/);
   assert.equal(isAuthenticated(), false);
 });
@@ -151,6 +153,7 @@ test("login network failure reports the connection message", async () => {
   };
   const result = await login("a@b.c", "pw");
   assert.equal(result.ok, false);
+  // cspell:disable-next-line
   assert.match((result as { error: string }).error, /No se pudo conectar/);
   assert.equal(isAuthenticated(), false);
 });

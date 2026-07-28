@@ -1,4 +1,7 @@
-import { calculateAutoWindowLevel } from "../dicom/dicom-parser-util.js";
+import {
+  calculateAutoWindowLevel,
+  WINDOW_PRESETS,
+} from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
   fitToContainer,
@@ -7,19 +10,32 @@ import { $ } from "../shared/dom.js";
 import { anyDialogOpen } from "../shared/dialog.js";
 import { currentScreen } from "../shared/screen.js";
 import { state, itemCount } from "./state.js";
-import { render } from "./rendering.js";
+import { render, updateSeriesNav } from "./rendering.js";
 import { loadCurrent, openFiles, openFolder } from "./loading.js";
+import { mpr3DViewer } from "./mpr.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
 export function initToolbar(): void {
-  const tools = ["wl", "zoom", "pan"] as const;
+  const tools = ["wl", "zoom", "pan", "crosshair"] as const;
   tools.forEach((tool) => {
     const btn = $(`tool-${tool}`);
-    btn.addEventListener("click", () => {
-      state.activeTool = tool;
-      updateToolbarUI();
-    });
+    if (btn) {
+      btn.addEventListener("click", () => {
+        if (tool === "wl") {
+          if (state.activeTool === "wl") {
+            state.isWlPanelOpen = !state.isWlPanelOpen;
+          } else {
+            state.activeTool = "wl";
+            state.isWlPanelOpen = true;
+          }
+        } else {
+          state.activeTool = tool;
+          state.isWlPanelOpen = false;
+        }
+        updateToolbarUI();
+      });
+    }
   });
 
   $("tool-reset").addEventListener("click", () => {
@@ -32,6 +48,7 @@ export function initToolbar(): void {
         state.parsed.pixelData,
         state.parsed.metadata.rescaleSlope,
         state.parsed.metadata.rescaleIntercept,
+        state.parsed.metadata.modality,
       );
       state.viewport = {
         windowCenter: auto.windowCenter,
@@ -47,6 +64,13 @@ export function initToolbar(): void {
       state.parsed.metadata.columns,
       state.parsed.metadata.rows,
     );
+
+    if (state.is3DMode) {
+      mpr3DViewer.camera.zoom = 1;
+      mpr3DViewer.camera.panX = 0;
+      mpr3DViewer.camera.panY = 0;
+    }
+
     render();
   });
 
@@ -60,21 +84,87 @@ export function initToolbar(): void {
     );
   });
 
+  $("tool-mpr")?.addEventListener("click", async () => {
+    const btn = $("tool-mpr") as HTMLButtonElement | null;
+    if (btn && !btn.disabled) {
+      await mpr3DViewer.toggle3DMode();
+      updateSeriesNav();
+      render();
+    }
+  });
+
   $("btn-open").addEventListener("click", openFiles);
 
+  initWlControlsInteraction();
+  init3DControlsInteraction();
   updateToolbarUI();
 }
 
+function initWlControlsInteraction(): void {
+  const sliderWW = $("slider-ww") as HTMLInputElement | null;
+  const sliderWL = $("slider-wl") as HTMLInputElement | null;
+
+  if (sliderWW) {
+    sliderWW.addEventListener("input", () => {
+      const val = parseFloat(sliderWW.value);
+      state.viewport.windowWidth = Math.max(1, val);
+      render();
+    });
+  }
+
+  if (sliderWL) {
+    sliderWL.addEventListener("input", () => {
+      const val = parseFloat(sliderWL.value);
+      state.viewport.windowCenter = val;
+      render();
+    });
+  }
+
+  const presets = ["lung", "bone", "soft", "brain"] as const;
+  const presetMap: Record<string, keyof typeof WINDOW_PRESETS> = {
+    lung: "lung",
+    bone: "bone",
+    soft: "softTissue",
+    brain: "brain",
+  };
+
+  presets.forEach((key) => {
+    const btn = $(`btn-preset-${key}`);
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const presetKey = presetMap[key];
+        const preset = WINDOW_PRESETS[presetKey];
+        if (preset) {
+          state.viewport.windowCenter = preset.windowCenter;
+          state.viewport.windowWidth = preset.windowWidth;
+          render();
+        }
+      });
+    }
+  });
+}
+
 function updateToolbarUI(): void {
-  // Only the three mode tools are mutually exclusive. Clearing every
-  // .toolbar__tool would also strip the metadata toggle's state, leaving its
-  // class and aria-expanded disagreeing with the open panel.
-  (["wl", "zoom", "pan"] as const).forEach((tool) => {
+  // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
+  // would also strip the metadata toggle's state, leaving its class and
+  // aria-expanded disagreeing with the open panel.
+  (["wl", "zoom", "pan", "crosshair"] as const).forEach((tool) => {
     const btn = $(`tool-${tool}`);
+    if (!btn) return;
     const isActive = tool === state.activeTool;
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-pressed", String(isActive));
   });
+
+  const wlBtn = $("tool-wl");
+  if (wlBtn) {
+    wlBtn.setAttribute("aria-expanded", String(state.isWlPanelOpen));
+  }
+
+  const wlPanel = $("wl-panel");
+  if (wlPanel) {
+    wlPanel.classList.toggle("open", state.isWlPanelOpen);
+  }
 
   const viewport = $("viewport-container");
   viewport.className = "viewport-container";
@@ -86,11 +176,30 @@ function updateToolbarUI(): void {
 export function initViewportInteraction(): void {
   const container = $("viewport-container");
 
+  const handlePointerAction = (e: MouseEvent) => {
+    if (!state.parsed) return;
+    const rect = container.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    if (state.is3DMode && state.activeTool === "crosshair") {
+      mpr3DViewer.updateCrosshairFromPointer(
+        clickX,
+        clickY,
+        container.clientWidth,
+        container.clientHeight,
+      );
+      render();
+    }
+  };
+
   container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
+
+    handlePointerAction(e);
     e.preventDefault();
   });
 
@@ -102,6 +211,50 @@ export function initViewportInteraction(): void {
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
 
+    if (state.is3DMode && state.isDragging) {
+      if (state.activeTool === "pan") {
+        mpr3DViewer.camera.panX += dx;
+        mpr3DViewer.camera.panY += dy;
+      } else if (state.activeTool === "zoom") {
+        mpr3DViewer.camera.zoom = Math.max(
+          0.1,
+          Math.min(10, mpr3DViewer.camera.zoom * (1 - dy * 0.005)),
+        );
+      } else if (state.activeTool === "wl") {
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
+        state.viewport.windowCenter += dy * 2;
+      } else {
+        // Priority 3D Orbit Controls (Rotate Camera)
+        const sensitivity = 0.01;
+        const movementX = e.movementX ?? dx;
+        const movementY = e.movementY ?? dy;
+
+        mpr3DViewer.camera.phi += movementX * sensitivity;
+        mpr3DViewer.camera.theta = Math.max(
+          -Math.PI / 2 + 0.1,
+          Math.min(
+            Math.PI / 2 - 0.1,
+            mpr3DViewer.camera.theta + movementY * sensitivity,
+          ),
+        );
+        if (state.activeTool === "crosshair") {
+          handlePointerAction(e);
+        }
+      }
+      const canvas = document.getElementById(
+        "dicom-canvas",
+      ) as HTMLCanvasElement;
+      if (state.is3DMode && canvas) {
+        mpr3DViewer.render(canvas);
+      } else {
+        render();
+      }
+      return;
+    }
+
     switch (state.activeTool) {
       case "wl":
         state.viewport.windowWidth = Math.max(
@@ -111,14 +264,26 @@ export function initViewportInteraction(): void {
         state.viewport.windowCenter += dy * 2;
         break;
       case "zoom":
-        state.viewport.zoom = Math.max(
-          0.1,
-          Math.min(10, state.viewport.zoom * (1 - dy * 0.005)),
-        );
+        if (state.is3DMode) {
+          mpr3DViewer.camera.zoom = Math.max(
+            0.1,
+            Math.min(10, mpr3DViewer.camera.zoom * (1 - dy * 0.005)),
+          );
+        } else {
+          state.viewport.zoom = Math.max(
+            0.1,
+            Math.min(10, state.viewport.zoom * (1 - dy * 0.005)),
+          );
+        }
         break;
       case "pan":
-        state.viewport.panX += dx;
-        state.viewport.panY += dy;
+        if (state.is3DMode) {
+          mpr3DViewer.camera.panX += dx;
+          mpr3DViewer.camera.panY += dy;
+        } else {
+          state.viewport.panX += dx;
+          state.viewport.panY += dy;
+        }
         break;
     }
 
@@ -126,23 +291,116 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mouseup", () => {
+    if (state.isDragging && state.is3DMode) {
+      console.groupCollapsed("⚙️ [MPR 3D Debug] Post-Interaction State");
+      console.log("Camera (Theta, Phi, Zoom):", mpr3DViewer.camera);
+      console.log("Crosshair (X, Y, Z):", mpr3DViewer.crosshair);
+      console.log(
+        "Window (W/L):",
+        state.viewport.windowWidth,
+        state.viewport.windowCenter,
+      );
+      console.log("Active View:", mpr3DViewer.activeView);
+      console.groupEnd();
+    }
     state.isDragging = false;
   });
 
+  // Mouse wheel interaction
   container.addEventListener(
     "wheel",
-    (e: WheelEvent) => {
+    async (e: WheelEvent) => {
       if (!state.parsed) return;
       e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
-      state.viewport.zoom = Math.max(
-        0.1,
-        Math.min(10, state.viewport.zoom * zoomFactor),
-      );
-      render();
+
+      if (state.is3DMode) {
+        // Depth slice navigation in 3D mode
+        const depthInfo = mpr3DViewer.getDepthInfo();
+        const delta = e.deltaY > 0 ? 1 : -1;
+        const target = depthInfo.current + delta;
+        if (target >= 0 && target < depthInfo.total) {
+          mpr3DViewer.setDepthIndex(target);
+          const canvas = document.getElementById(
+            "dicom-canvas",
+          ) as HTMLCanvasElement;
+          if (state.is3DMode && canvas) {
+            mpr3DViewer.render(canvas);
+          } else {
+            render();
+          }
+        }
+      } else {
+        // 2D mode stack scrolling
+        const total = itemCount();
+        if (total > 1 && !e.ctrlKey && !e.metaKey) {
+          const delta = e.deltaY > 0 ? 1 : -1;
+          const targetIndex = state.currentIndex + delta;
+          if (targetIndex >= 0 && targetIndex < total) {
+            state.currentIndex = targetIndex;
+            await loadCurrent();
+          }
+        } else {
+          const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
+          state.viewport.zoom = Math.max(
+            0.1,
+            Math.min(10, state.viewport.zoom * zoomFactor),
+          );
+          render();
+        }
+      }
     },
     { passive: false },
   );
+}
+
+// ── 3D Controls & Orientation Interactions ───────────────────────────────────
+
+function init3DControlsInteraction(): void {
+  // Depth slider
+  const depthSlider = $("mpr-depth-slider") as HTMLInputElement | null;
+  if (depthSlider) {
+    depthSlider.addEventListener("input", () => {
+      const idx = parseInt(depthSlider.value, 10);
+      mpr3DViewer.setDepthIndex(idx);
+      render();
+    });
+  }
+
+  // Quick view orientation buttons
+  $("btn-view-axial")?.addEventListener("click", () => {
+    mpr3DViewer.setOrientation("axial");
+    updateOrientationButtonsUI("axial");
+    render();
+  });
+
+  $("btn-view-coronal")?.addEventListener("click", () => {
+    mpr3DViewer.setOrientation("coronal");
+    updateOrientationButtonsUI("coronal");
+    render();
+  });
+
+  $("btn-view-sagittal")?.addEventListener("click", () => {
+    mpr3DViewer.setOrientation("sagittal");
+    updateOrientationButtonsUI("sagittal");
+    render();
+  });
+
+  $("btn-view-3d")?.addEventListener("click", () => {
+    mpr3DViewer.setOrientation("3d");
+    updateOrientationButtonsUI("3d");
+    render();
+  });
+}
+
+function updateOrientationButtonsUI(
+  activeView: "axial" | "coronal" | "sagittal" | "3d",
+): void {
+  ["axial", "coronal", "sagittal", "3d"].forEach((view) => {
+    const btn = $(`btn-view-${view}`);
+    if (btn) {
+      btn.classList.toggle("active", view === activeView);
+    }
+  });
 }
 
 // ── Series Navigation ────────────────────────────────────────────────────────
@@ -161,6 +419,17 @@ export function initSeriesNav(): void {
       await loadCurrent();
     }
   });
+
+  const slider = $("nav-slider") as HTMLInputElement | null;
+  if (slider) {
+    slider.addEventListener("input", async () => {
+      const val = parseInt(slider.value, 10);
+      if (val >= 0 && val < itemCount() && val !== state.currentIndex) {
+        state.currentIndex = val;
+        await loadCurrent();
+      }
+    });
+  }
 }
 
 // ── Menu Events (Electron only) ──────────────────────────────────────────────
@@ -247,11 +516,27 @@ export function initKeyboardShortcuts(): void {
       return;
     }
 
-    // Arrows drive the active tool; series navigation moves to PageUp/PageDown
-    // so both are reachable without a pointer.
-    if (adjustActiveTool(e)) {
-      e.preventDefault();
-      return;
+    // In 3D mode, arrows navigate depth slices instead of adjusting the tool.
+    if (state.is3DMode) {
+      const depthInfo = mpr3DViewer.getDepthInfo();
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        if (depthInfo.current > 0) {
+          mpr3DViewer.setDepthIndex(depthInfo.current - 1);
+          render();
+        }
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        if (depthInfo.current < depthInfo.total - 1) {
+          mpr3DViewer.setDepthIndex(depthInfo.current + 1);
+          render();
+        }
+      }
+    } else {
+      // Arrows drive the active tool; series navigation uses PageUp/PageDown
+      // so both are reachable without a pointer.
+      if (adjustActiveTool(e)) {
+        e.preventDefault();
+        return;
+      }
     }
 
     if (e.key === "PageUp") {
@@ -272,14 +557,13 @@ export function initKeyboardShortcuts(): void {
     }
 
     if (e.key === "w" || e.key === "W") {
-      state.activeTool = "wl";
-      updateToolbarUI();
+      $("tool-wl").click();
     } else if (e.key === "z" || e.key === "Z") {
-      state.activeTool = "zoom";
-      updateToolbarUI();
+      $("tool-zoom").click();
     } else if (e.key === "p" || e.key === "P") {
-      state.activeTool = "pan";
-      updateToolbarUI();
+      $("tool-pan").click();
+    } else if (e.key === "c" || e.key === "C") {
+      $("tool-crosshair").click();
     } else if (e.key === "r" || e.key === "R") {
       $("tool-reset").click();
     } else if (e.key === "m" || e.key === "M") {

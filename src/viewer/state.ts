@@ -1,5 +1,9 @@
 import type { ParsedDicom } from "../dicom/dicom-parser-util.js";
 import type { ViewportState } from "../dicom/dicom-renderer.js";
+export {
+  WINDOW_PRESETS,
+  type WindowPreset,
+} from "../dicom/dicom-parser-util.js";
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -14,11 +18,13 @@ export interface AppState {
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
-  activeTool: "wl" | "zoom" | "pan";
+  activeTool: "wl" | "zoom" | "pan" | "crosshair";
   isDragging: boolean;
   lastMouseX: number;
   lastMouseY: number;
   isMetadataOpen: boolean;
+  isWlPanelOpen: boolean;
+  is3DMode: boolean;
 }
 
 export const state: AppState = {
@@ -34,6 +40,8 @@ export const state: AppState = {
   lastMouseX: 0,
   lastMouseY: 0,
   isMetadataOpen: false,
+  isWlPanelOpen: false,
+  is3DMode: false,
 };
 
 /** Number of images in the current series, regardless of source. */

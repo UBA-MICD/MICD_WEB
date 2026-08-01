@@ -791,6 +791,27 @@ async function setSyncInterval(hours: number | null): Promise<void> {
   }
 }
 
+interface SyncStatus {
+  running: boolean;
+  status: "running" | "completed" | "failed" | "idle";
+  recordsChecked: number;
+  totalRecords: number | null;
+  newVersions: number;
+  errors: number;
+  pausedUntil: string | null;
+}
+
+function formatSyncProgress(status: SyncStatus): string {
+  if (status.pausedUntil) {
+    const secondsLeft = Math.max(
+      0,
+      Math.round((new Date(status.pausedUntil).getTime() - Date.now()) / 1000),
+    );
+    return `Rate limit alcanzado — continuará en ${secondsLeft} segundos`;
+  }
+  return `Verificando ${status.recordsChecked}/${status.totalRecords ?? "?"} registros…`;
+}
+
 async function runSyncNow(): Promise<void> {
   const btn = document.getElementById(
     "btn-z-sync-now",
@@ -799,25 +820,53 @@ async function runSyncNow(): Promise<void> {
   if (!(await guardSession())) return;
 
   btn.disabled = true;
-  btn.textContent = "Sincronizando…";
+  btn.textContent = "Verificando…";
+
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  const stopPolling = () => {
+    if (pollTimer !== null) clearInterval(pollTimer);
+    pollTimer = null;
+  };
+
+  const poll = async (): Promise<void> => {
+    try {
+      const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/status`);
+      if (!res.ok) return;
+      const status: SyncStatus = await res.json();
+      if (status.running) {
+        btn.textContent = formatSyncProgress(status);
+        return;
+      }
+      stopPolling();
+      btn.disabled = false;
+      btn.textContent = "Sincronizar ahora";
+      showToast(
+        `Sincronización completa — ${status.recordsChecked} registros verificados, ${status.newVersions} con nuevas versiones disponibles`,
+        status.status === "failed" ? "error" : "success",
+      );
+      void loadConfig();
+    } catch {
+      // transient poll error — try again on the next tick
+    }
+  };
+
+  pollTimer = setInterval(() => void poll(), 1000);
+  void poll();
+
   try {
     const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/run`, {
       method: "POST",
     });
-    const data = await res.json().catch(() => ({}) as { error?: string });
+    if (res.status === 409) return; // another run is in progress — the poll loop above finishes it
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      stopPolling();
       showToast(data.error ?? "No se pudo ejecutar la sincronización.", "error");
       btn.disabled = false;
       btn.textContent = "Sincronizar ahora";
-      return;
     }
-    btn.textContent = `✓ ${(data as { records_checked?: number }).records_checked ?? 0} chequeados`;
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = "Sincronizar ahora";
-      void loadConfig();
-    }, 2500);
   } catch {
+    stopPolling();
     showToast("Error de conexión al sincronizar.", "error");
     btn.disabled = false;
     btn.textContent = "Error";

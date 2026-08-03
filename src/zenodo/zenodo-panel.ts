@@ -475,6 +475,11 @@ async function selectDoiVersion(recordId: number): Promise<void> {
     const record: ZenodoRecord = await res.json();
     doiVersions = doiVersions.map((v) => ({ ...v, isSelected: v.recordId === recordId }));
     results.innerHTML = versionPickerHtml(doiVersions) + recordCard(record);
+    results
+      .querySelector("#z-doi-version-select")
+      ?.addEventListener("change", (e) => {
+        void selectDoiVersion(Number((e.target as HTMLSelectElement).value));
+      });
   } catch {
     showToast("Error de conexión al cargar la versión.", "error");
   }
@@ -979,7 +984,8 @@ async function runSyncNow(): Promise<void> {
     const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/run`, {
       method: "POST",
     });
-    if (res.status === 409) return; // another run is in progress — the poll loop above finishes it
+    if (res.status === 409) return; // another run is in progress — poll loop above will finish it
+    // (poll keeps running intentionally — do not stopPolling() here)
     if (!res.ok) {
       const data = await res.json().catch(() => ({}) as { error?: string });
       stopPolling();

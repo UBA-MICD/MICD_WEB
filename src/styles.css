@@ -2123,6 +2123,12 @@ body {
 }
 
 /* ── Search tab ───────────────────────────────────────────────────────────── */
+.z-doi-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+}
 .z-search-bar {
   display: flex;
   gap: 6px;

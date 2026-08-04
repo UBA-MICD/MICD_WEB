@@ -414,7 +414,9 @@ function zenodoRecordUrl(doi: string): string {
   const isSandbox = doi.startsWith("10.5072/");
   const base = isSandbox ? "https://sandbox.zenodo.org" : "https://zenodo.org";
   const match = doi.match(/zenodo\.(\d+)$/i);
-  return match ? `${base}/records/${match[1]}` : `https://doi.org/${encodeURIComponent(doi)}`;
+  return match
+    ? `${base}/records/${match[1]}`
+    : `https://doi.org/${encodeURIComponent(doi)}`;
 }
 
 function renderStudy(s: StudyRecord, mode: ExplorerMode): string {

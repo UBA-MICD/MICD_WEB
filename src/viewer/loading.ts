@@ -18,6 +18,7 @@ import {
   updateSeriesNav,
   updateInfoOverlay,
 } from "./rendering.js";
+import { updateToolbarUI } from "./interaction.js";
 
 /** Load the image at state.currentIndex from whichever source is active. */
 export async function loadCurrent(): Promise<void> {
@@ -75,6 +76,7 @@ export function resetViewerToDropZone(): void {
   // Otherwise the canvas keeps describing the study that is no longer shown.
   // cspell:disable-next-line
   $("dicom-canvas").setAttribute("aria-label", "Sin imagen cargada");
+  updateToolbarUI();
   showDropZone();
 }
 
@@ -210,6 +212,7 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
   updateMetadataPanel();
   updateSeriesNav();
   updateInfoOverlay();
+  updateToolbarUI();
 
   $("topbar-title").textContent = name;
   $("topbar-title").title = name;

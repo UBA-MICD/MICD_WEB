@@ -46,6 +46,9 @@
     "fovy",
     "highp",
     "accum",
-    "glsl"
+    "glsl",
+    "fflate",
+    "anonymization",
+    "buscar"
   ]
 }

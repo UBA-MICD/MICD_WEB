@@ -1,6 +1,8 @@
+/* cspell:disable */
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { onSelectionChange } from "../explorer/explorer.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,16 +57,24 @@ function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("es-AR", { year: "numeric", month: "short", day: "numeric" });
+  return d.toLocaleDateString("es-AR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function statusBadgeHtml(status: StudyZenodoDetail["status"]): string {
   const badges: string[] = [];
   if (status === "published" || status === "both") {
-    badges.push(`<span class="study-item__zenodo-badge study-item__zenodo-badge--published">📤 Publicado</span>`);
+    badges.push(
+      `<span class="study-item__zenodo-badge study-item__zenodo-badge--published">📤 Publicado</span>`,
+    );
   }
   if (status === "imported" || status === "both") {
-    badges.push(`<span class="study-item__zenodo-badge study-item__zenodo-badge--imported">📥 Importado</span>`);
+    badges.push(
+      `<span class="study-item__zenodo-badge study-item__zenodo-badge--imported">📥 Importado</span>`,
+    );
   }
   return badges.join(" ");
 }
@@ -97,9 +107,13 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
     : "";
 
   const isSandboxDoi = detail.doi.startsWith("10.5072/");
-  const doiBase = isSandboxDoi ? "https://sandbox.zenodo.org" : "https://zenodo.org";
+  const doiBase = isSandboxDoi
+    ? "https://sandbox.zenodo.org"
+    : "https://zenodo.org";
   const doiMatch = detail.doi.match(/zenodo\.(\d+)$/i);
-  const doiUrl = doiMatch ? `${doiBase}/records/${doiMatch[1]}` : `https://doi.org/${encodeURIComponent(detail.doi)}`;
+  const doiUrl = doiMatch
+    ? `${doiBase}/records/${doiMatch[1]}`
+    : `https://doi.org/${encodeURIComponent(detail.doi)}`;
 
   const authorsHtml = detail.record?.authors?.length
     ? `<p class="study-detail-panel__meta-row">
@@ -122,15 +136,17 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
       </p>`
     : "";
 
-  const downloadsHtml = detail.downloads !== null
-    ? `<p class="study-detail-panel__meta-row">
+  const downloadsHtml =
+    detail.downloads !== null
+      ? `<p class="study-detail-panel__meta-row">
         <span class="study-detail-panel__label">Descargas</span>
         <span>${escapeHtml(String(detail.downloads))}</span>
       </p>`
-    : "";
+      : "";
 
-  const versionsHtml = detail.versions.length > 0
-    ? `<section class="study-detail-panel__section">
+  const versionsHtml =
+    detail.versions.length > 0
+      ? `<section class="study-detail-panel__section">
         <h3 class="study-detail-panel__section-title">Historial de versiones</h3>
         <ol class="study-detail-panel__versions">
           ${detail.versions
@@ -148,7 +164,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
             .join("")}
         </ol>
       </section>`
-    : "";
+      : "";
 
   const importButtonHtml = detail.newVersionAvailable
     ? `<div class="study-detail-panel__actions">
@@ -177,18 +193,35 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
       >${escapeHtml(detail.doi)}</a>
     </div>
 
-    ${detail.record
-      ? `<section class="study-detail-panel__section">
+    ${
+      detail.record
+        ? `<section class="study-detail-panel__section">
           <h3 class="study-detail-panel__section-title">${escapeHtml(detail.record.title)}</h3>
           ${authorsHtml}
           ${dateHtml}
           ${licenseHtml}
           ${downloadsHtml}
         </section>`
-      : ""}
+        : ""
+    }
 
     ${versionsHtml}
-    ${importButtonHtml}`;
+    ${importButtonHtml}
+    <div class="study-detail-panel__actions" style="margin-top: 8px;">
+      <button
+        type="button"
+        class="btn btn--outline btn--sm"
+        id="btn-export-study-detail"
+        data-study-id="${escapeAttr(studyId)}"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Exportar .zip anonimizado
+      </button>
+    </div>`;
 }
 
 // ── Logic ────────────────────────────────────────────────────────────────────
@@ -204,9 +237,12 @@ async function showDetail(studyId: string): Promise<void> {
   renderLoading();
 
   try {
-    const res = await authFetch(`${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/zenodo`, {
-      signal: abortController.signal,
-    });
+    const res = await authFetch(
+      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/zenodo`,
+      {
+        signal: abortController.signal,
+      },
+    );
 
     if (res.status === 404) {
       hideDetail();
@@ -241,6 +277,15 @@ export function initStudyDetailPanel(): void {
       void showDetail(studyId);
     } else {
       hideDetail();
+    }
+  });
+
+  content().addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+      "#btn-export-study-detail",
+    );
+    if (btn && btn.dataset.studyId) {
+      void exportStudyByIdAsZip(btn.dataset.studyId);
     }
   });
 }

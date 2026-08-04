@@ -129,3 +129,61 @@ test("exportStudyToZip compresses files into a valid ZIP blob", () => {
   assert.equal(blob.type, "application/zip");
   assert.ok(blob.size > 0);
 });
+
+test("anonymizeDicomBuffer handles corrupt buffer throwing in parser", () => {
+  const mockParser = {
+    parseDicom: () => {
+      throw new Error("Invalid DICOM header");
+    },
+  };
+  const input = new Uint8Array([1, 2, 3, 4]).buffer;
+  const result = anonymizeDicomBuffer(input, { customParser: mockParser });
+  assert.equal(result.byteLength, 4);
+});
+
+test("anonymizeDicomBuffer handles out-of-bounds dataOffset or invalid element lengths", () => {
+  const mockParser = {
+    parseDicom: () => ({
+      elements: {
+        x00100010: { dataOffset: 999, length: 50 },
+        x00100020: { dataOffset: -5, length: 10 },
+        x00100030: { dataOffset: 0, length: 0 },
+      },
+    }),
+  };
+  const input = new Uint8Array(20).buffer;
+  const result = anonymizeDicomBuffer(input, { customParser: mockParser });
+  assert.equal(result.byteLength, 20);
+});
+
+test("anonymizeDicomBuffer supports custom tags and replacement byte", () => {
+  const input = new Uint8Array([65, 66, 67, 68, 69]); // ABCDE
+  const mockParser = {
+    parseDicom: () => ({
+      elements: {
+        customTag: { dataOffset: 1, length: 3 },
+      },
+    }),
+  };
+  const result = anonymizeDicomBuffer(input, {
+    customParser: mockParser,
+    tagsToScrub: ["customTag"],
+    replacementByte: 0x58, // 'X'
+  });
+  const resultArray = new Uint8Array(result);
+  assert.equal(resultArray[0], 65); // A
+  assert.equal(resultArray[1], 88); // X
+  assert.equal(resultArray[2], 88); // X
+  assert.equal(resultArray[3], 88); // X
+  assert.equal(resultArray[4], 69); // E
+});
+
+test("generateDescriptiveFilename handles invalid date, empty modality and long description", () => {
+  const meta: StudyExportMetadata = {
+    studyDate: "INVALID_DATE_STRING",
+    modality: "---",
+    studyDescription: "---",
+  };
+  const filename = generateDescriptiveFilename(meta, "zip");
+  assert.match(filename, /^\d{8}_STUDY_Study\.zip$/);
+});

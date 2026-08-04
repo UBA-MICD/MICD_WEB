@@ -139,6 +139,15 @@ export function initZenodoPanel(): void {
     if (e.key === "Enter") runSearch(input.value);
   });
 
+  const doiInput = $("z-doi-input") as HTMLInputElement;
+  $("btn-z-resolve-doi").addEventListener(
+    "click",
+    () => void resolveDoi(doiInput.value),
+  );
+  doiInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") void resolveDoi(doiInput.value);
+  });
+
   // File type chips
   $("z-filter-chips").addEventListener("click", (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>(".filter-chip");
@@ -427,6 +436,145 @@ function searchErrorInfo(
     subtitle: data.error ?? "Ocurrió un error inesperado. Intentá de nuevo.",
     toast: data.error ?? "Error al buscar en Zenodo.",
   };
+}
+
+interface ZenodoVersionInfo {
+  recordId: number;
+  doi: string | null;
+  version: string | null;
+  publicationDate: string | null;
+  isLatest: boolean;
+  isSelected: boolean;
+}
+
+interface ResolveResponse {
+  record: ZenodoRecord;
+  versions: ZenodoVersionInfo[];
+  environment: "sandbox" | "production";
+}
+
+// Mirrors the backend's zenodo-resolve.service.ts parsing — a fast client-side
+// pre-check so obviously-wrong input never triggers a request. The backend
+// response remains authoritative for the actual error message.
+const DOI_RE =
+  /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?10\.\d{4,}\/zenodo\.\d+$/i;
+const ZENODO_URL_RE =
+  /^https?:\/\/(sandbox\.)?zenodo\.org\/records?\/\d+(?:[/?#].*)?$/i;
+
+function looksLikeZenodoInput(raw: string): boolean {
+  const trimmed = raw.trim();
+  return (
+    trimmed !== "" && (DOI_RE.test(trimmed) || ZENODO_URL_RE.test(trimmed))
+  );
+}
+
+const NOT_ZENODO_ERROR =
+  "Este DOI no pertenece a Zenodo — solo se soporta importación desde Zenodo";
+
+let doiVersions: ZenodoVersionInfo[] = [];
+
+function versionPickerHtml(versions: ZenodoVersionInfo[]): string {
+  if (versions.length <= 1) return "";
+  const options = versions
+    .slice()
+    .reverse()
+    .map((v) => {
+      const label = `v${v.version ?? "?"} · ${v.publicationDate ?? "—"}${v.isLatest ? " (más reciente)" : ""}`;
+      return `<option value="${v.recordId}" ${v.isSelected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+  return `
+    <div class="z-doi-version-picker">
+      <label for="z-doi-version-select">Versión</label>
+      <select id="z-doi-version-select">${options}</select>
+    </div>`;
+}
+
+function syncEnvToggle(environment: "sandbox" | "production"): void {
+  state.environment = environment;
+  $("z-env-toggle")
+    .querySelectorAll<HTMLElement>("[data-env]")
+    .forEach((b) =>
+      b.classList.toggle("active", b.dataset.env === environment),
+    );
+}
+
+async function selectDoiVersion(recordId: number): Promise<void> {
+  const results = $("z-results");
+  try {
+    const res = await authFetch(
+      `${API_BASE}/v1/zenodo/records/${recordId}?environment=${state.environment}`,
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      showToast(
+        data.error ?? "No se pudo cargar la versión seleccionada.",
+        "error",
+      );
+      return;
+    }
+    const record: ZenodoRecord = await res.json();
+    doiVersions = doiVersions.map((v) => ({
+      ...v,
+      isSelected: v.recordId === recordId,
+    }));
+    results.innerHTML = versionPickerHtml(doiVersions) + recordCard(record);
+    results
+      .querySelector("#z-doi-version-select")
+      ?.addEventListener("change", (e) => {
+        void selectDoiVersion(Number((e.target as HTMLSelectElement).value));
+      });
+  } catch {
+    showToast("Error de conexión al cargar la versión.", "error");
+  }
+}
+
+async function resolveDoi(raw: string): Promise<void> {
+  const input = raw.trim();
+  const btn = $("btn-z-resolve-doi") as HTMLButtonElement;
+
+  if (!looksLikeZenodoInput(input)) {
+    showToast(NOT_ZENODO_ERROR, "error");
+    return;
+  }
+  if (!(await guardSession())) return;
+
+  btn.disabled = true;
+  btn.textContent = "Resolviendo…";
+
+  try {
+    const res = await authFetch(
+      `${API_BASE}/v1/zenodo/resolve?input=${encodeURIComponent(input)}`,
+    );
+    const data = await res.json().catch(() => ({}) as { error?: string });
+    if (!res.ok) {
+      showToast(
+        (data as { error?: string }).error ?? "No se pudo resolver el DOI.",
+        "error",
+      );
+      return;
+    }
+
+    const resolved = data as ResolveResponse;
+    syncEnvToggle(resolved.environment);
+    doiVersions = resolved.versions;
+
+    const results = $("z-results");
+    results.innerHTML =
+      versionPickerHtml(doiVersions) + recordCard(resolved.record);
+    setPaginationUI(1, 1, 1);
+
+    results
+      .querySelector("#z-doi-version-select")
+      ?.addEventListener("change", (e) => {
+        void selectDoiVersion(Number((e.target as HTMLSelectElement).value));
+      });
+  } catch {
+    showToast("Error de conexión al resolver el DOI.", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Importar por DOI";
+  }
 }
 
 function recordCard(r: ZenodoRecord): string {
@@ -842,6 +990,27 @@ async function setSyncInterval(hours: number | null): Promise<void> {
   }
 }
 
+interface SyncStatus {
+  running: boolean;
+  status: "running" | "completed" | "failed" | "idle";
+  recordsChecked: number;
+  totalRecords: number | null;
+  newVersions: number;
+  errors: number;
+  pausedUntil: string | null;
+}
+
+function formatSyncProgress(status: SyncStatus): string {
+  if (status.pausedUntil) {
+    const secondsLeft = Math.max(
+      0,
+      Math.round((new Date(status.pausedUntil).getTime() - Date.now()) / 1000),
+    );
+    return `Rate limit alcanzado — continuará en ${secondsLeft} segundos`;
+  }
+  return `Verificando ${status.recordsChecked}/${status.totalRecords ?? "?"} registros…`;
+}
+
 async function runSyncNow(): Promise<void> {
   const btn = document.getElementById(
     "btn-z-sync-now",
@@ -850,28 +1019,57 @@ async function runSyncNow(): Promise<void> {
   if (!(await guardSession())) return;
 
   btn.disabled = true;
-  btn.textContent = "Sincronizando…";
+  btn.textContent = "Verificando…";
+
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  const stopPolling = () => {
+    if (pollTimer !== null) clearInterval(pollTimer);
+    pollTimer = null;
+  };
+
+  const poll = async (): Promise<void> => {
+    try {
+      const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/status`);
+      if (!res.ok) return;
+      const status: SyncStatus = await res.json();
+      if (status.running) {
+        btn.textContent = formatSyncProgress(status);
+        return;
+      }
+      stopPolling();
+      btn.disabled = false;
+      btn.textContent = "Sincronizar ahora";
+      showToast(
+        `Sincronización completa — ${status.recordsChecked} registros verificados, ${status.newVersions} con nuevas versiones disponibles`,
+        status.status === "failed" ? "error" : "success",
+      );
+      void loadConfig();
+    } catch {
+      // transient poll error — try again on the next tick
+    }
+  };
+
+  pollTimer = setInterval(() => void poll(), 1000);
+  void poll();
+
   try {
     const res = await authFetch(`${API_BASE}/v1/zenodo/config/sync/run`, {
       method: "POST",
     });
-    const data = await res.json().catch(() => ({}) as { error?: string });
+    if (res.status === 409) return; // another run is in progress — poll loop above will finish it
+    // (poll keeps running intentionally — do not stopPolling() here)
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      stopPolling();
       showToast(
         data.error ?? "No se pudo ejecutar la sincronización.",
         "error",
       );
       btn.disabled = false;
       btn.textContent = "Sincronizar ahora";
-      return;
     }
-    btn.textContent = `✓ ${(data as { records_checked?: number }).records_checked ?? 0} chequeados`;
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = "Sincronizar ahora";
-      void loadConfig();
-    }, 2500);
   } catch {
+    stopPolling();
     showToast("Error de conexión al sincronizar.", "error");
     btn.disabled = false;
     btn.textContent = "Error";

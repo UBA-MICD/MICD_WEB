@@ -1,6 +1,7 @@
 /* cspell:disable */
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
+import { showToast } from "../shared/banner.js";
 import { onSelectionChange } from "../explorer/explorer.js";
 import { exportStudyByIdAsZip } from "../services/export-service.js";
 
@@ -36,6 +37,14 @@ interface StudyZenodoDetail {
   downloads: number | null;
   newVersionAvailable: boolean;
   latestVersion: string | null;
+}
+
+interface StudyZenodoCheckResult {
+  upToDate: boolean;
+  newVersionAvailable: boolean;
+  latestVersion: string | null;
+  latestPublishedAt: string | null;
+  checkedAt: string;
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -167,17 +176,23 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
       : "";
 
   const importButtonHtml = detail.newVersionAvailable
-    ? `<div class="study-detail-panel__actions">
-        <button
-          type="button"
-          class="btn btn--secondary study-detail-panel__import-btn"
-          data-study-id="${escapeAttr(studyId)}"
-          data-zenodo-doi="${escapeAttr(detail.versions[detail.versions.length - 1]?.doi ?? detail.doi)}"
-        >
-          Importar versión más reciente
-        </button>
-      </div>`
+    ? `<button
+        type="button"
+        class="btn btn--secondary study-detail-panel__import-btn"
+        data-study-id="${escapeAttr(studyId)}"
+        data-zenodo-doi="${escapeAttr(detail.versions[detail.versions.length - 1]?.doi ?? detail.doi)}"
+      >
+        Importar versión más reciente
+      </button>`
     : "";
+
+  const actionsHtml = `
+    <div class="study-detail-panel__actions">
+      <button type="button" class="btn btn--secondary study-detail-panel__check-btn">
+        Verificar actualización en Zenodo
+      </button>
+      ${importButtonHtml}
+    </div>`;
 
   content().innerHTML = `
     ${staleWarning}
@@ -206,7 +221,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
     }
 
     ${versionsHtml}
-    ${importButtonHtml}
+    ${actionsHtml}
     <div class="study-detail-panel__actions" style="margin-top: 8px;">
       <button
         type="button"
@@ -222,6 +237,10 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
         Exportar .zip anonimizado
       </button>
     </div>`;
+
+  content()
+    .querySelector(".study-detail-panel__check-btn")
+    ?.addEventListener("click", () => void checkForUpdate(studyId));
 }
 
 // ── Logic ────────────────────────────────────────────────────────────────────
@@ -258,6 +277,56 @@ async function showDetail(studyId: string): Promise<void> {
   } catch (err: any) {
     if (err?.name === "AbortError") return;
     renderError("Error al conectar con el servidor.");
+  }
+}
+
+async function checkForUpdate(studyId: string): Promise<void> {
+  const btn = content().querySelector<HTMLButtonElement>(
+    ".study-detail-panel__check-btn",
+  );
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Verificando…";
+
+  try {
+    const res = await authFetch(
+      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/zenodo/check`,
+      { method: "POST" },
+    );
+    const data = await res.json().catch(() => ({}) as { error?: string });
+    if (!res.ok) {
+      showToast(
+        (data as { error?: string }).error ??
+          "No se pudo verificar la actualización.",
+        "error",
+      );
+      return;
+    }
+
+    const result = data as StudyZenodoCheckResult;
+    if (result.newVersionAvailable) {
+      const dateStr = result.latestPublishedAt
+        ? formatDate(result.latestPublishedAt)
+        : null;
+      showToast(
+        `Nueva versión disponible: v${result.latestVersion ?? "?"}${dateStr ? ` (publicada el ${dateStr})` : ""}`,
+        "warning",
+      );
+    } else {
+      showToast("Al día", "success");
+    }
+
+    // Force a re-fetch so the badge/flag reflects the fresh check immediately.
+    currentStudyId = null;
+    await showDetail(studyId);
+  } catch {
+    showToast("Error de conexión al verificar la actualización.", "error");
+  } finally {
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
   }
 }
 

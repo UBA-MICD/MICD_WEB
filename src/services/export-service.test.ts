@@ -1,11 +1,70 @@
+/* cspell:disable */
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
   generateDescriptiveFilename,
   exportStudyToZip,
+  exportCurrentViewToPNG,
+  exportCurrentStudyAsZip,
+  exportStudyByIdAsZip,
   type StudyExportMetadata,
 } from "./export-service.ts";
 import { anonymizeDicomBuffer, PII_TAGS } from "../utils/dicom-anonymizer.ts";
+import { state } from "../viewer/state.ts";
+import { dicomCache } from "../viewer/cache.ts";
+
+// ── Environment & Mocking Setup ─────────────────────────────────────────────
+
+function setupBrowserEnvironment() {
+  const elementsMap = new Map<string, any>();
+
+  const bannerEl = {
+    textContent: "",
+    className: "",
+    classList: {
+      remove: () => {},
+      add: () => {},
+    },
+  };
+  elementsMap.set("app-banner", bannerEl);
+
+  (globalThis as any).window = globalThis;
+  (globalThis as any).URL = {
+    createObjectURL: () => "blob:mock-url",
+    revokeObjectURL: () => {},
+  };
+
+  (globalThis as any).document = {
+    getElementById: (id: string) => elementsMap.get(id) || null,
+    createElement: (tag: string) => {
+      if (tag === "a") {
+        return {
+          href: "",
+          download: "",
+          click: () => {},
+        };
+      }
+      return {};
+    },
+    body: {
+      appendChild: () => {},
+      removeChild: () => {},
+    },
+  };
+
+  return { bannerEl, elementsMap };
+}
+
+function resetState() {
+  state.files = [];
+  state.source = "local";
+  state.serverStudyId = null;
+  state.serverInstances = [];
+  state.parsed = null;
+  dicomCache.clear();
+}
+
+// ── Filename & Zip Unit Tests ───────────────────────────────────────────────
 
 test("generateDescriptiveFilename formats metadata correctly", () => {
   const meta: StudyExportMetadata = {
@@ -47,20 +106,42 @@ test("generateDescriptiveFilename excludes PII and UUIDs", () => {
   assert.equal(filename.includes("12345"), false);
 });
 
+test("generateDescriptiveFilename handles invalid date, empty modality and long description", () => {
+  const meta: StudyExportMetadata = {
+    studyDate: "INVALID_DATE_STRING",
+    modality: "---",
+    studyDescription: "---",
+  };
+  const filename = generateDescriptiveFilename(meta, "zip");
+  assert.match(filename, /^\d{8}_STUDY_Study\.zip$/);
+});
+
+test("exportStudyToZip compresses files into a valid ZIP blob", () => {
+  setupBrowserEnvironment();
+
+  const files = [
+    { name: "slice1.dcm", buffer: new Uint8Array([10, 20, 30, 40]).buffer },
+    { name: "slice2.dcm", buffer: new Uint8Array([50, 60, 70, 80]).buffer },
+  ];
+
+  const blob = exportStudyToZip(files, "test_study.zip");
+  assert.equal(blob.type, "application/zip");
+  assert.ok(blob.size > 0);
+});
+
+// ── Anonymizer Unit Tests ───────────────────────────────────────────────────
+
 test("anonymizeDicomBuffer replaces PII offsets with spaces (0x20)", () => {
-  // Create a buffer simulating binary DICOM layout
   const textEncoder = new TextEncoder();
-  const samplePiiName = "DOE^JOHN^MIDDLE"; // 15 bytes
+  const samplePiiName = "DOE^JOHN^MIDDLE";
   const nameBytes = textEncoder.encode(samplePiiName);
 
   const bufferSize = 100;
   const originalUint8 = new Uint8Array(bufferSize);
   const dataOffset = 20;
 
-  // Insert PII string at byte offset 20
   originalUint8.set(nameBytes, dataOffset);
 
-  // Mock parser that returns dataOffset: 20, length: 15 for PatientName
   const mockParser = {
     parseDicom: () => ({
       elements: {
@@ -75,12 +156,9 @@ test("anonymizeDicomBuffer replaces PII offsets with spaces (0x20)", () => {
 
   const anonymizedUint8 = new Uint8Array(anonymizedBuffer);
 
-  // Check that PII bytes at offset [20..35] are now space character (0x20)
   for (let i = dataOffset; i < dataOffset + nameBytes.length; i++) {
     assert.equal(anonymizedUint8[i], 0x20);
   }
-
-  // Check that original buffer was not mutated (immutable copy returned)
   assert.equal(originalUint8[dataOffset], nameBytes[0]);
 });
 
@@ -88,46 +166,6 @@ test("anonymizeDicomBuffer handles missing parser or corrupt buffer gracefully",
   const buffer = new Uint8Array([1, 2, 3, 4, 5]).buffer;
   const result = anonymizeDicomBuffer(buffer, { customParser: null });
   assert.equal(result.byteLength, 5);
-});
-
-test("anonymizeDicomBuffer lists standard DICOM PII tags", () => {
-  assert.ok(PII_TAGS.includes("x00100010")); // PatientName
-  assert.ok(PII_TAGS.includes("x00100020")); // PatientID
-  assert.ok(PII_TAGS.includes("x00100030")); // PatientBirthDate
-  assert.ok(PII_TAGS.includes("x00100040")); // PatientSex
-});
-
-test("exportStudyToZip compresses files into a valid ZIP blob", () => {
-  // Mock window.URL if not present in Node
-  if (typeof window === "undefined" || !window.URL) {
-    (globalThis as any).window = globalThis;
-    (globalThis as any).URL = {
-      createObjectURL: () => "blob:mock-url",
-      revokeObjectURL: () => {},
-    };
-  }
-  if (typeof document === "undefined") {
-    (globalThis as any).document = {
-      createElement: () => ({
-        href: "",
-        download: "",
-        click: () => {},
-      }),
-      body: {
-        appendChild: () => {},
-        removeChild: () => {},
-      },
-    };
-  }
-
-  const files = [
-    { name: "slice1.dcm", buffer: new Uint8Array([10, 20, 30, 40]).buffer },
-    { name: "slice2.dcm", buffer: new Uint8Array([50, 60, 70, 80]).buffer },
-  ];
-
-  const blob = exportStudyToZip(files, "test_study.zip");
-  assert.equal(blob.type, "application/zip");
-  assert.ok(blob.size > 0);
 });
 
 test("anonymizeDicomBuffer handles corrupt buffer throwing in parser", () => {
@@ -178,12 +216,248 @@ test("anonymizeDicomBuffer supports custom tags and replacement byte", () => {
   assert.equal(resultArray[4], 69); // E
 });
 
-test("generateDescriptiveFilename handles invalid date, empty modality and long description", () => {
-  const meta: StudyExportMetadata = {
-    studyDate: "INVALID_DATE_STRING",
-    modality: "---",
-    studyDescription: "---",
+test("anonymizeDicomBuffer lists standard DICOM PII tags", () => {
+  assert.ok(PII_TAGS.includes("x00100010"));
+  assert.ok(PII_TAGS.includes("x00100020"));
+  assert.ok(PII_TAGS.includes("x00100030"));
+  assert.ok(PII_TAGS.includes("x00100040"));
+});
+
+// ── Tests para exportCurrentViewToPNG ───────────────────────────────────────
+
+test("exportCurrentViewToPNG error case: canvas does not exist", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+
+  await exportCurrentViewToPNG("non-existent-canvas");
+
+  assert.equal(
+    bannerEl.textContent,
+    "No se encontró el canvas de renderizado para exportar PNG.",
+  );
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
+});
+
+test("exportCurrentViewToPNG error case: toBlob returns null/fails", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+
+  const mockCanvas = {
+    toBlob: (cb: (blob: Blob | null) => void) => {
+      cb(null);
+    },
+  } as unknown as HTMLCanvasElement;
+
+  await assert.rejects(
+    async () => {
+      await exportCurrentViewToPNG(mockCanvas);
+    },
+    {
+      name: "Error",
+      message: "Canvas toBlob failed",
+    },
+  );
+
+  assert.equal(
+    bannerEl.textContent,
+    "Error al generar imagen PNG desde el canvas.",
+  );
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
+});
+
+test("exportCurrentViewToPNG success case: renders PNG and triggers download", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  state.parsed = {
+    metadata: {
+      studyDate: "20240101",
+      modality: "CT",
+      studyDescription: "CHEST",
+    },
+  } as any;
+
+  const mockCanvas = {
+    toBlob: (cb: (blob: Blob | null) => void) => {
+      cb(new Blob(["png-binary-content"], { type: "image/png" }));
+    },
+  } as unknown as HTMLCanvasElement;
+
+  await exportCurrentViewToPNG(mockCanvas, "custom_view.png");
+
+  assert.equal(bannerEl.textContent, "Imagen PNG descargada con éxito.");
+  assert.equal(bannerEl.className, "app-banner app-banner--success");
+});
+
+// ── Tests para exportCurrentStudyAsZip ──────────────────────────────────────
+
+test("exportCurrentStudyAsZip error case: no files or study loaded", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  await exportCurrentStudyAsZip();
+
+  assert.equal(
+    bannerEl.textContent,
+    "Error al exportar estudio: No hay ningún estudio cargado para exportar.",
+  );
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
+});
+
+test("exportCurrentStudyAsZip error case: server study has 0 instances", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  state.source = "server";
+  state.serverStudyId = "study-empty-123";
+  state.serverInstances = [];
+
+  await exportCurrentStudyAsZip();
+
+  assert.equal(
+    bannerEl.textContent,
+    "Error al exportar estudio: El estudio no contiene imágenes.",
+  );
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
+});
+
+test("exportCurrentStudyAsZip success case: local files export", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  const file1 = {
+    name: "slice1.dcm",
+    arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+  } as unknown as File;
+
+  state.files = [file1];
+  state.parsed = {
+    metadata: {
+      studyDate: "20240201",
+      modality: "MR",
+      studyDescription: "BRAIN",
+    },
+  } as any;
+
+  await exportCurrentStudyAsZip({ anonymize: true });
+
+  assert.match(bannerEl.textContent, /Estudio exportado exitosamente como/);
+  assert.equal(bannerEl.className, "app-banner app-banner--success");
+});
+
+test("exportCurrentStudyAsZip async success case: server study with cache and authFetch", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  state.source = "server";
+  state.serverStudyId = "study-server-999";
+  state.serverInstances = ["inst-1", "inst-2"];
+
+  // Populate instance 0 in cache
+  dicomCache.set(0, {
+    rawDataSet: {
+      byteArray: {
+        buffer: new Uint8Array([100, 101, 102]).buffer,
+      },
+    },
+  } as any);
+
+  // Mock global fetch for instance 1
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async (url: string) => {
+    if (url.includes("inst-2")) {
+      return new Response(new Uint8Array([200, 201, 202]).buffer, {
+        status: 200,
+      });
+    }
+    return new Response("Not Found", { status: 404 });
   };
-  const filename = generateDescriptiveFilename(meta, "zip");
-  assert.match(filename, /^\d{8}_STUDY_Study\.zip$/);
+
+  try {
+    await exportCurrentStudyAsZip({ anonymize: true });
+    assert.match(bannerEl.textContent, /Estudio exportado exitosamente como/);
+    assert.equal(bannerEl.className, "app-banner app-banner--success");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ── Tests para exportStudyByIdAsZip ─────────────────────────────────────────
+
+test("exportStudyByIdAsZip error case: /instances endpoint returns HTTP 500", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async () => {
+    return new Response("Internal Error", { status: 500 });
+  };
+
+  try {
+    await exportStudyByIdAsZip("study-error-500");
+    assert.equal(bannerEl.textContent, "Error al exportar estudio: HTTP 500");
+    assert.equal(bannerEl.className, "app-banner app-banner--error");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("exportStudyByIdAsZip error case: zero instances returned", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async () => {
+    return new Response(JSON.stringify({ instances: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  try {
+    await exportStudyByIdAsZip("study-zero-instances");
+    assert.equal(
+      bannerEl.textContent,
+      "Error al exportar estudio: El estudio seleccionado no contiene instancias.",
+    );
+    assert.equal(bannerEl.className, "app-banner app-banner--error");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("exportStudyByIdAsZip success case: fetches instances iteratively and creates ZIP", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async (url: string) => {
+    if (url.endsWith("/instances")) {
+      return new Response(
+        JSON.stringify({
+          instances: [{ instanceId: "inst-A" }, { instanceId: "inst-B" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url.includes("/file")) {
+      return new Response(new Uint8Array([50, 60, 70]).buffer, {
+        status: 200,
+      });
+    }
+    return new Response("Not Found", { status: 404 });
+  };
+
+  try {
+    const meta: StudyExportMetadata = {
+      studyDate: "20240315",
+      modality: "CT",
+      studyDescription: "CHEST_SCAN",
+    };
+
+    await exportStudyByIdAsZip("study-success-123", meta, { anonymize: true });
+
+    assert.match(
+      bannerEl.textContent,
+      /Estudio exportado exitosamente como '20240315_CT_CHEST_SCAN.zip'/,
+    );
+    assert.equal(bannerEl.className, "app-banner app-banner--success");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

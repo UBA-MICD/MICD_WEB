@@ -9,8 +9,15 @@
          Authorization header and shown via URL.createObjectURL. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:"
     />
+    <script type="importmap">
+      {
+        "imports": {
+          "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+        }
+      }
+    </script>
     <title>MICD — DICOM Viewer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
@@ -287,10 +294,10 @@
                 stroke="currentColor"
                 stroke-width="2"
               >
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <circle cx="12" cy="12" r="4"/>
-                <line x1="3" y1="12" x2="8" y2="12"/>
-                <line x1="16" y1="12" x2="21" y2="12"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="12" cy="12" r="4" />
+                <line x1="3" y1="12" x2="8" y2="12" />
+                <line x1="16" y1="12" x2="21" y2="12" />
               </svg>
               <span>Estudios</span>
             </button>
@@ -354,8 +361,19 @@
 
             <!-- Primary action -->
             <button class="btn btn--accent btn--full" id="btn-open">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                aria-hidden="true"
+              >
+                <path
+                  d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"
+                />
+                <polyline points="13 2 13 9 20 9" />
               </svg>
               Abrir archivo
             </button>
@@ -363,33 +381,112 @@
             <!-- Secondary actions -->
             <div class="sidebar-actions">
               <button class="sidebar-action" id="btn-open-folder">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                  />
                 </svg>
                 <span>Abrir carpeta</span>
               </button>
-              <button class="sidebar-action sidebar-action--server" id="btn-server">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+              <button
+                class="sidebar-action sidebar-action--server"
+                id="btn-server"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="2" width="20" height="8" rx="2" />
+                  <rect x="2" y="14" width="20" height="8" rx="2" />
+                  <line x1="6" y1="6" x2="6.01" y2="6" />
+                  <line x1="6" y1="18" x2="6.01" y2="18" />
                 </svg>
                 <span>Servidor</span>
-                <svg class="sidebar-action__chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                  <polyline points="9 18 15 12 9 6"/>
+                <svg
+                  class="sidebar-action__chevron"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  aria-hidden="true"
+                >
+                  <polyline points="9 18 15 12 9 6" />
                 </svg>
+              </button>
+            </div>
+
+            <!-- Export action -->
+            <div class="sidebar-actions">
+              <button
+                class="sidebar-action"
+                id="btn-export-menu"
+                title="Exportar estudio o imagen"
+                disabled
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Exportar</span>
               </button>
             </div>
 
             <!-- Session card. Logged-out is the default; updateAuthUI() repaints. -->
             <div class="session-card hidden" id="session-block">
-              <span class="session__avatar" id="session-avatar" aria-hidden="true">··</span>
+              <span
+                class="session__avatar"
+                id="session-avatar"
+                aria-hidden="true"
+                >··</span
+              >
               <div class="session__info">
                 <span class="session__email" id="session-email"></span>
-                <span class="session__expiry" id="session-expiry">Sesión activa</span>
+                <span class="session__expiry" id="session-expiry"
+                  >Sesión activa</span
+                >
               </div>
-              <button class="session-card__logout" id="btn-logout" title="Cerrar sesión" aria-label="Cerrar sesión">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              <button
+                class="session-card__logout"
+                id="btn-logout"
+                title="Cerrar sesión"
+                aria-label="Cerrar sesión"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
               </button>
             </div>
@@ -641,28 +738,68 @@
 
         <!-- Study Explorer panel -->
         <aside class="explorer-panel" id="explorer-panel" data-explorer-view>
-          <div class="explorer-panel__resize-handle" id="explorer-resize-handle" aria-hidden="true"></div>
+          <div
+            class="explorer-panel__resize-handle"
+            id="explorer-resize-handle"
+            aria-hidden="true"
+          ></div>
           <div class="explorer-panel__header">
             <h2>Estudios en servidor</h2>
             <div class="explorer-panel__header-actions">
-            <button class="icon-btn hidden" id="btn-activity" title="Historial de actividad" aria-label="Historial de actividad">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>
-              </svg>
-            </button>
-            <button class="icon-btn" id="btn-refresh-studies" title="Recargar">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
+              <button
+                class="icon-btn"
+                id="btn-export-explorer"
+                title="Exportar estudio (.zip anonimizado)"
+                aria-label="Exportar estudio (.zip anonimizado)"
               >
-                <path d="M3 12a9 9 0 1 1 3 7" />
-                <path d="M3 22v-7h7" />
-              </svg>
-            </button>
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+              <button
+                class="icon-btn hidden"
+                id="btn-activity"
+                title="Historial de actividad"
+                aria-label="Historial de actividad"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 8v4l3 3" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+              </button>
+              <button
+                class="icon-btn"
+                id="btn-refresh-studies"
+                title="Recargar"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <path d="M3 12a9 9 0 1 1 3 7" />
+                  <path d="M3 22v-7h7" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -794,7 +931,7 @@
                 data-zenodo-linked
                 aria-pressed="false"
               >
-                 Vinculado a Zenodo
+                Vinculado a Zenodo
               </button>
             </div>
 
@@ -876,7 +1013,11 @@
 
       <!-- Zenodo Panel -->
       <aside class="zenodo-panel zenodo-panel--closed" id="zenodo-panel">
-        <div class="zenodo-panel__resize-handle" id="zenodo-resize-handle" aria-hidden="true"></div>
+        <div
+          class="zenodo-panel__resize-handle"
+          id="zenodo-resize-handle"
+          aria-hidden="true"
+        ></div>
         <!-- Header: logo + tabs + close -->
         <div class="z-panel-header">
           <div class="z-panel-logo">
@@ -1074,20 +1215,59 @@
           <div class="activity-log-toolbar" id="activity-filters">
             <div class="activity-log-toolbar-row">
               <span class="activity-filter-label">Tipo</span>
-              <button class="btn btn--secondary activity-export-btn" id="btn-export-activity">Descargar CSV</button>
+              <button
+                class="btn btn--secondary activity-export-btn"
+                id="btn-export-activity"
+              >
+                Descargar CSV
+              </button>
             </div>
             <div class="activity-log-filters">
-              <button class="filter-chip filter-chip--active" data-filter-action="">Todos</button>
-              <button class="filter-chip" data-filter-action="ZENODO_STUDY_PUBLISHED,ZENODO_PUBLISH_FAILED">Publicación</button>
-              <button class="filter-chip" data-filter-action="ZENODO_IMPORT_STARTED,ZENODO_IMPORT_COMPLETED">Importación</button>
-              <button class="filter-chip" data-filter-action="ZENODO_SYNC_STARTED,ZENODO_SYNC_COMPLETED,ZENODO_SYNC_FAILED">Sync</button>
-              <button class="filter-chip" data-filter-action="ZENODO_TOKEN_CONFIGURED,ZENODO_TOKEN_REMOVED">Token</button>
+              <button
+                class="filter-chip filter-chip--active"
+                data-filter-action=""
+              >
+                Todos
+              </button>
+              <button
+                class="filter-chip"
+                data-filter-action="ZENODO_STUDY_PUBLISHED,ZENODO_PUBLISH_FAILED"
+              >
+                Publicación
+              </button>
+              <button
+                class="filter-chip"
+                data-filter-action="ZENODO_IMPORT_STARTED,ZENODO_IMPORT_COMPLETED"
+              >
+                Importación
+              </button>
+              <button
+                class="filter-chip"
+                data-filter-action="ZENODO_SYNC_STARTED,ZENODO_SYNC_COMPLETED,ZENODO_SYNC_FAILED"
+              >
+                Sync
+              </button>
+              <button
+                class="filter-chip"
+                data-filter-action="ZENODO_TOKEN_CONFIGURED,ZENODO_TOKEN_REMOVED"
+              >
+                Token
+              </button>
             </div>
             <div class="activity-log-filters">
               <span class="activity-filter-label">Resultado</span>
-              <button class="filter-chip filter-chip--active" data-filter-result="">Todos</button>
-              <button class="filter-chip" data-filter-result="success">Éxito</button>
-              <button class="filter-chip" data-filter-result="error">Error</button>
+              <button
+                class="filter-chip filter-chip--active"
+                data-filter-result=""
+              >
+                Todos
+              </button>
+              <button class="filter-chip" data-filter-result="success">
+                Éxito
+              </button>
+              <button class="filter-chip" data-filter-result="error">
+                Error
+              </button>
             </div>
           </div>
           <div class="activity-log-scroll" id="activity-log-content">
@@ -1195,177 +1375,216 @@
         tabindex="0"
       >
         <div class="buscar-layout">
-        <div class="server-panel__body" data-explorer-view="server">
-          <div class="server-filters">
-            <div class="filter-search">
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                class="filter-search__icon"
-              >
-                <circle cx="10" cy="10" r="7" />
-                <line x1="15" y1="15" x2="21" y2="21" />
-              </svg>
-              <label class="sr-only" for="server-search-studies"
-                >Buscar paciente o ID</label
-              >
+          <div class="server-panel__body" data-explorer-view="server">
+            <div class="server-filters">
+              <div class="filter-search">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  class="filter-search__icon"
+                >
+                  <circle cx="10" cy="10" r="7" />
+                  <line x1="15" y1="15" x2="21" y2="21" />
+                </svg>
+                <label class="sr-only" for="server-search-studies"
+                  >Buscar paciente o ID</label
+                >
+                <input
+                  type="text"
+                  id="server-search-studies"
+                  class="filter-search__input"
+                  data-explorer-search
+                  placeholder="Buscar paciente o ID"
+                  autocomplete="off"
+                />
+                <button
+                  class="filter-search__clear hidden"
+                  data-explorer-search-clear
+                  aria-label="Limpiar búsqueda"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <label class="sr-only" for="server-date-from">Desde</label>
               <input
-                type="text"
-                id="server-search-studies"
-                class="filter-search__input"
-                data-explorer-search
-                placeholder="Buscar paciente o ID"
-                autocomplete="off"
+                type="date"
+                id="server-date-from"
+                class="filter-date"
+                data-explorer-date-from
+                title="Desde"
               />
+              <label class="sr-only" for="server-date-to">Hasta</label>
+              <input
+                type="date"
+                id="server-date-to"
+                class="filter-date"
+                data-explorer-date-to
+                title="Hasta"
+              />
+            </div>
+
+            <div
+              class="filter-chips"
+              data-explorer-chips
+              role="group"
+              aria-label="Modalidad"
+            >
               <button
-                class="filter-search__clear hidden"
-                data-explorer-search-clear
-                aria-label="Limpiar búsqueda"
+                class="filter-chip filter-chip--active"
+                data-modality=""
+                aria-pressed="true"
+              >
+                Todas
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="CT"
+                aria-pressed="false"
+              >
+                CT
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="MR"
+                aria-pressed="false"
+              >
+                MR
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="DX"
+                aria-pressed="false"
+              >
+                RX
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="CR"
+                aria-pressed="false"
+              >
+                CR
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="US"
+                aria-pressed="false"
+              >
+                US
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="NM"
+                aria-pressed="false"
+              >
+                NM
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="PT"
+                aria-pressed="false"
+              >
+                PET
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="MG"
+                aria-pressed="false"
+              >
+                MG
+              </button>
+              <button
+                class="filter-chip"
+                data-modality="XA"
+                aria-pressed="false"
+              >
+                XA
+              </button>
+              <button
+                class="filter-chip filter-chip--zenodo"
+                data-zenodo-linked
+                aria-pressed="false"
+              >
+                Vinculado a Zenodo
+              </button>
+            </div>
+
+            <!-- A listbox, not a list of buttons: one study is chosen, then
+               confirmed with the primary action below. -->
+            <ul
+              class="study-grid"
+              data-explorer-list
+              role="listbox"
+              aria-label="Estudios en servidor"
+              tabindex="0"
+            ></ul>
+
+            <div class="explorer-pagination">
+              <button
+                class="icon-btn"
+                data-explorer-prev
+                title="Página anterior"
+                aria-label="Página anterior"
               >
                 <svg
-                  width="11"
-                  height="11"
+                  width="13"
+                  height="13"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2.5"
                 >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <span class="pagination-info" data-explorer-pagination-info
+                >—</span
+              >
+              <button
+                class="icon-btn"
+                data-explorer-next
+                title="Página siguiente"
+                aria-label="Página siguiente"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                >
+                  <polyline points="9 6 15 12 9 18" />
                 </svg>
               </button>
             </div>
-            <label class="sr-only" for="server-date-from">Desde</label>
-            <input
-              type="date"
-              id="server-date-from"
-              class="filter-date"
-              data-explorer-date-from
-              title="Desde"
-            />
-            <label class="sr-only" for="server-date-to">Hasta</label>
-            <input
-              type="date"
-              id="server-date-to"
-              class="filter-date"
-              data-explorer-date-to
-              title="Hasta"
-            />
           </div>
 
-          <div
-            class="filter-chips"
-            data-explorer-chips
-            role="group"
-            aria-label="Modalidad"
+          <aside
+            class="study-detail-panel hidden"
+            id="study-detail-panel"
+            aria-label="Detalle del estudio en Zenodo"
           >
-            <button
-              class="filter-chip filter-chip--active"
-              data-modality=""
-              aria-pressed="true"
-            >
-              Todas
-            </button>
-            <button class="filter-chip" data-modality="CT" aria-pressed="false">
-              CT
-            </button>
-            <button class="filter-chip" data-modality="MR" aria-pressed="false">
-              MR
-            </button>
-            <button class="filter-chip" data-modality="DX" aria-pressed="false">
-              RX
-            </button>
-            <button class="filter-chip" data-modality="CR" aria-pressed="false">
-              CR
-            </button>
-            <button class="filter-chip" data-modality="US" aria-pressed="false">
-              US
-            </button>
-            <button class="filter-chip" data-modality="NM" aria-pressed="false">
-              NM
-            </button>
-            <button class="filter-chip" data-modality="PT" aria-pressed="false">
-              PET
-            </button>
-            <button class="filter-chip" data-modality="MG" aria-pressed="false">
-              MG
-            </button>
-            <button class="filter-chip" data-modality="XA" aria-pressed="false">
-              XA
-            </button>
-            <button
-              class="filter-chip filter-chip--zenodo"
-              data-zenodo-linked
-              aria-pressed="false"
-            >
-               Vinculado a Zenodo
-            </button>
-          </div>
-
-          <!-- A listbox, not a list of buttons: one study is chosen, then
-               confirmed with the primary action below. -->
-          <ul
-            class="study-grid"
-            data-explorer-list
-            role="listbox"
-            aria-label="Estudios en servidor"
-            tabindex="0"
-          ></ul>
-
-          <div class="explorer-pagination">
-            <button
-              class="icon-btn"
-              data-explorer-prev
-              title="Página anterior"
-              aria-label="Página anterior"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <span class="pagination-info" data-explorer-pagination-info>—</span>
-            <button
-              class="icon-btn"
-              data-explorer-next
-              title="Página siguiente"
-              aria-label="Página siguiente"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-              >
-                <polyline points="9 6 15 12 9 18" />
-              </svg>
-            </button>
-          </div>
+            <div
+              id="study-detail-content"
+              class="study-detail-panel__content"
+            ></div>
+          </aside>
         </div>
-
-        </div><!-- /.server-panel__body -->
-
-        <aside
-          class="study-detail-panel hidden"
-          id="study-detail-panel"
-          aria-label="Detalle del estudio en Zenodo"
-        >
-          <div id="study-detail-content" class="study-detail-panel__content"></div>
-        </aside>
-
-        </div><!-- /.buscar-layout -->
+        <!-- /.buscar-layout -->
 
         <footer class="server-panel__actions">
           <button class="btn btn--secondary" id="btn-buscar-cancel">
@@ -1463,6 +1682,73 @@
             data-dialog-autofocus
           >
             Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export dialog -->
+    <div id="export-dialog" class="dialog-overlay hidden">
+      <div
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-dialog-title"
+      >
+        <h3 class="dialog__title" id="export-dialog-title">
+          Opciones de Exportación
+        </h3>
+        <p class="dialog__msg">Seleccioná el formato de exportación deseado:</p>
+        <div
+          class="dialog__actions"
+          style="
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 16px;
+          "
+        >
+          <button class="btn btn--accent btn--full" id="btn-export-dialog-png">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+              style="margin-right: 6px"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            Exportar vista actual (PNG)
+          </button>
+          <button class="btn btn--outline btn--full" id="btn-export-dialog-zip">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+              style="margin-right: 6px"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Exportar estudio completo (ZIP)
+          </button>
+          <button
+            class="btn btn--secondary btn--full"
+            id="export-dialog-cancel"
+            data-dialog-autofocus
+            style="margin-top: 4px"
+          >
+            Cancelar
           </button>
         </div>
       </div>

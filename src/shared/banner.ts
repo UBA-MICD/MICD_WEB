@@ -1,3 +1,4 @@
+/* cspell:disable */
 // ── Status banner ────────────────────────────────────────────────────────────
 //
 // The strip that appears above the topbar to confirm an action finished —
@@ -54,7 +55,9 @@ export function showToast(
 
   const dismiss = () => {
     toast.classList.add("toast--out");
-    toast.addEventListener("animationend", () => toast.remove(), { once: true });
+    toast.addEventListener("animationend", () => toast.remove(), {
+      once: true,
+    });
     clearTimeout(timer);
   };
 

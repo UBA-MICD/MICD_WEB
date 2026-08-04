@@ -1,3 +1,6 @@
+/* cspell:disable */
+import { exportCurrentStudyAsZip } from "../services/export-service.js";
+
 // ── Explorer panel toggle + drag-resize ──────────────────────────────────────
 // Manages the "Estudios en servidor" panel's open/closed state and its
 // draggable left edge, mirroring the DevTools resize UX.
@@ -23,9 +26,11 @@ function setCollapsed(collapsed: boolean): void {
 }
 
 function initToggle(): void {
-  document.getElementById("btn-toggle-explorer")?.addEventListener("click", () => {
-    setCollapsed(!isCollapsed());
-  });
+  document
+    .getElementById("btn-toggle-explorer")
+    ?.addEventListener("click", () => {
+      setCollapsed(!isCollapsed());
+    });
 }
 
 function initResizeHandle(): void {
@@ -80,6 +85,11 @@ function initResizeHandle(): void {
 export function initExplorerPanel(): void {
   // Panel starts open — mark the toolbar button as active to match.
   document.getElementById("btn-toggle-explorer")?.classList.add("active");
+  document
+    .getElementById("btn-export-explorer")
+    ?.addEventListener("click", () => {
+      void exportCurrentStudyAsZip();
+    });
   initToggle();
   initResizeHandle();
 }

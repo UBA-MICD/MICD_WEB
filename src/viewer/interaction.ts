@@ -7,12 +7,16 @@ import {
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
 import { $ } from "../shared/dom.js";
-import { anyDialogOpen } from "../shared/dialog.js";
+import { anyDialogOpen, openDialog, closeDialog } from "../shared/dialog.js";
 import { currentScreen } from "../shared/screen.js";
 import { state, itemCount } from "./state.js";
 import { render, updateSeriesNav } from "./rendering.js";
 import { loadCurrent, openFiles, openFolder } from "./loading.js";
 import { mpr3DViewer } from "./mpr.js";
+import {
+  exportCurrentViewToPNG,
+  exportCurrentStudyAsZip,
+} from "../services/export-service.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -95,6 +99,24 @@ export function initToolbar(): void {
 
   $("btn-open").addEventListener("click", openFiles);
 
+  $("btn-export-menu")?.addEventListener("click", () => {
+    openDialog($("export-dialog"));
+  });
+
+  $("btn-export-dialog-png")?.addEventListener("click", () => {
+    closeDialog($("export-dialog"));
+    void exportCurrentViewToPNG();
+  });
+
+  $("btn-export-dialog-zip")?.addEventListener("click", () => {
+    closeDialog($("export-dialog"));
+    void exportCurrentStudyAsZip();
+  });
+
+  $("export-dialog-cancel")?.addEventListener("click", () => {
+    closeDialog($("export-dialog"));
+  });
+
   initWlControlsInteraction();
   init3DControlsInteraction();
   updateToolbarUI();
@@ -144,7 +166,7 @@ function initWlControlsInteraction(): void {
   });
 }
 
-function updateToolbarUI(): void {
+export function updateToolbarUI(): void {
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
   // would also strip the metadata toggle's state, leaving its class and
   // aria-expanded disagreeing with the open panel.
@@ -164,6 +186,12 @@ function updateToolbarUI(): void {
   const wlPanel = $("wl-panel");
   if (wlPanel) {
     wlPanel.classList.toggle("open", state.isWlPanelOpen);
+  }
+
+  const exportBtn = $("btn-export-menu") as HTMLButtonElement | null;
+  if (exportBtn) {
+    const hasLoadedStudy = itemCount() > 0 || state.parsed !== null;
+    exportBtn.disabled = !hasLoadedStudy;
   }
 
   const viewport = $("viewport-container");

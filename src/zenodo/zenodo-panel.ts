@@ -1,5 +1,10 @@
 /* cspell:disable */
-import { authFetch, ensureAuthenticated, isAuthenticated, API_BASE } from "../auth/auth.js";
+import {
+  authFetch,
+  ensureAuthenticated,
+  isAuthenticated,
+  API_BASE,
+} from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
 
@@ -135,7 +140,10 @@ export function initZenodoPanel(): void {
   });
 
   const doiInput = $("z-doi-input") as HTMLInputElement;
-  $("btn-z-resolve-doi").addEventListener("click", () => void resolveDoi(doiInput.value));
+  $("btn-z-resolve-doi").addEventListener(
+    "click",
+    () => void resolveDoi(doiInput.value),
+  );
   doiInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") void resolveDoi(doiInput.value);
   });
@@ -202,7 +210,9 @@ export function initZenodoPanel(): void {
       const strip = confirmBtn.closest<HTMLElement>(".z-zip-confirm")!;
       const recordId = Number(strip.dataset.recordId);
       strip.remove();
-      const importBtn = document.querySelector<HTMLButtonElement>(`[data-import-id="${recordId}"]`);
+      const importBtn = document.querySelector<HTMLButtonElement>(
+        `[data-import-id="${recordId}"]`,
+      );
       if (importBtn) void importRecord(recordId, importBtn);
       return;
     }
@@ -215,12 +225,18 @@ export function initZenodoPanel(): void {
     if (hasZip) {
       const card = btn.closest<HTMLElement>(".z-record-card")!;
       if (card.querySelector(".z-zip-confirm")) return;
-      const totalBytes = Number(btn.closest<HTMLElement>(".z-record-card")
-        ?.querySelector<HTMLElement>("[data-total-size]")?.dataset.totalSize ?? 0);
-      const sizeLabel = card.querySelector<HTMLElement>(".z-badge--muted")?.textContent ?? "";
-      const bigWarning = totalBytes > 500 * 1024 * 1024
-        ? `<p class="z-zip-confirm__warn">⚠ Archivo grande — la descarga puede tardar varios minutos.</p>`
-        : "";
+      const totalBytes = Number(
+        btn
+          .closest<HTMLElement>(".z-record-card")
+          ?.querySelector<HTMLElement>("[data-total-size]")?.dataset
+          .totalSize ?? 0,
+      );
+      const sizeLabel =
+        card.querySelector<HTMLElement>(".z-badge--muted")?.textContent ?? "";
+      const bigWarning =
+        totalBytes > 500 * 1024 * 1024
+          ? `<p class="z-zip-confirm__warn">⚠ Archivo grande — la descarga puede tardar varios minutos.</p>`
+          : "";
       const strip = document.createElement("div");
       strip.className = "z-zip-confirm";
       strip.dataset.recordId = btn.dataset.importId!;
@@ -295,7 +311,10 @@ function switchTab(tab: Tab): void {
  */
 async function guardSession(): Promise<boolean> {
   if (isAuthenticated()) return true;
-  showToast("Tu sesión de MICD expiró. Iniciá sesión para continuar.", "warning");
+  showToast(
+    "Tu sesión de MICD expiró. Iniciá sesión para continuar.",
+    "warning",
+  );
   return ensureAuthenticated();
 }
 
@@ -338,7 +357,12 @@ async function loadSearch(): Promise<void> {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}) as { error?: string });
       const info = searchErrorInfo(res.status, data);
-      results.innerHTML = emptyState(info.title, info.subtitle, true, info.showConfigLink);
+      results.innerHTML = emptyState(
+        info.title,
+        info.subtitle,
+        true,
+        info.showConfigLink,
+      );
       showToast(info.toast, "error");
       return;
     }
@@ -375,11 +399,17 @@ async function loadSearch(): Promise<void> {
 function searchErrorInfo(
   status: number,
   data: { error?: string },
-): { title: string; subtitle: string; toast: string; showConfigLink?: boolean } {
+): {
+  title: string;
+  subtitle: string;
+  toast: string;
+  showConfigLink?: boolean;
+} {
   if (status === 401) {
     return {
       title: "Sesión requerida",
-      subtitle: "Tu sesión expiró. Volvé a iniciar sesión para buscar en Zenodo.",
+      subtitle:
+        "Tu sesión expiró. Volvé a iniciar sesión para buscar en Zenodo.",
       toast: "Tu sesión expiró. Iniciá sesión de nuevo.",
     };
   }
@@ -395,7 +425,9 @@ function searchErrorInfo(
   if (status === 503) {
     return {
       title: "Zenodo no disponible",
-      subtitle: data.error ?? "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.",
+      subtitle:
+        data.error ??
+        "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.",
       toast: "Zenodo no está disponible en este momento.",
     };
   }
@@ -424,12 +456,16 @@ interface ResolveResponse {
 // Mirrors the backend's zenodo-resolve.service.ts parsing — a fast client-side
 // pre-check so obviously-wrong input never triggers a request. The backend
 // response remains authoritative for the actual error message.
-const DOI_RE = /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?10\.\d{4,}\/zenodo\.\d+$/i;
-const ZENODO_URL_RE = /^https?:\/\/(sandbox\.)?zenodo\.org\/records?\/\d+(?:[/?#].*)?$/i;
+const DOI_RE =
+  /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?10\.\d{4,}\/zenodo\.\d+$/i;
+const ZENODO_URL_RE =
+  /^https?:\/\/(sandbox\.)?zenodo\.org\/records?\/\d+(?:[/?#].*)?$/i;
 
 function looksLikeZenodoInput(raw: string): boolean {
   const trimmed = raw.trim();
-  return trimmed !== "" && (DOI_RE.test(trimmed) || ZENODO_URL_RE.test(trimmed));
+  return (
+    trimmed !== "" && (DOI_RE.test(trimmed) || ZENODO_URL_RE.test(trimmed))
+  );
 }
 
 const NOT_ZENODO_ERROR =
@@ -458,7 +494,9 @@ function syncEnvToggle(environment: "sandbox" | "production"): void {
   state.environment = environment;
   $("z-env-toggle")
     .querySelectorAll<HTMLElement>("[data-env]")
-    .forEach((b) => b.classList.toggle("active", b.dataset.env === environment));
+    .forEach((b) =>
+      b.classList.toggle("active", b.dataset.env === environment),
+    );
 }
 
 async function selectDoiVersion(recordId: number): Promise<void> {
@@ -469,11 +507,17 @@ async function selectDoiVersion(recordId: number): Promise<void> {
     );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}) as { error?: string });
-      showToast(data.error ?? "No se pudo cargar la versión seleccionada.", "error");
+      showToast(
+        data.error ?? "No se pudo cargar la versión seleccionada.",
+        "error",
+      );
       return;
     }
     const record: ZenodoRecord = await res.json();
-    doiVersions = doiVersions.map((v) => ({ ...v, isSelected: v.recordId === recordId }));
+    doiVersions = doiVersions.map((v) => ({
+      ...v,
+      isSelected: v.recordId === recordId,
+    }));
     results.innerHTML = versionPickerHtml(doiVersions) + recordCard(record);
     results
       .querySelector("#z-doi-version-select")
@@ -499,10 +543,15 @@ async function resolveDoi(raw: string): Promise<void> {
   btn.textContent = "Resolviendo…";
 
   try {
-    const res = await authFetch(`${API_BASE}/v1/zenodo/resolve?input=${encodeURIComponent(input)}`);
+    const res = await authFetch(
+      `${API_BASE}/v1/zenodo/resolve?input=${encodeURIComponent(input)}`,
+    );
     const data = await res.json().catch(() => ({}) as { error?: string });
     if (!res.ok) {
-      showToast((data as { error?: string }).error ?? "No se pudo resolver el DOI.", "error");
+      showToast(
+        (data as { error?: string }).error ?? "No se pudo resolver el DOI.",
+        "error",
+      );
       return;
     }
 
@@ -511,7 +560,8 @@ async function resolveDoi(raw: string): Promise<void> {
     doiVersions = resolved.versions;
 
     const results = $("z-results");
-    results.innerHTML = versionPickerHtml(doiVersions) + recordCard(resolved.record);
+    results.innerHTML =
+      versionPickerHtml(doiVersions) + recordCard(resolved.record);
     setPaginationUI(1, 1, 1);
 
     results
@@ -531,7 +581,9 @@ function recordCard(r: ZenodoRecord): string {
   const author = r.authors[0]?.name ?? "—";
   const more = r.authors.length > 1 ? " et al." : "";
   const year = r.publicationDate?.slice(0, 4) ?? "—";
-  const hasOnlyZips = (r.files ?? []).length > 0 && (r.files ?? []).every((f) => f.key.toLowerCase().endsWith(".zip"));
+  const hasOnlyZips =
+    (r.files ?? []).length > 0 &&
+    (r.files ?? []).every((f) => f.key.toLowerCase().endsWith(".zip"));
   const importBadge = r.importable
     ? hasOnlyZips
       ? `<span class="z-badge z-badge--zip">ZIP·DICOM</span>`
@@ -563,8 +615,10 @@ function recordCard(r: ZenodoRecord): string {
 
 function importErrorMessage(status: number, error: unknown): string {
   if (typeof error === "string" && error) return error;
-  if (status === 404) return "El dataset no existe en este entorno de Zenodo (sandbox/producción).";
-  if (status === 503) return "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.";
+  if (status === 404)
+    return "El dataset no existe en este entorno de Zenodo (sandbox/producción).";
+  if (status === 503)
+    return "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.";
   return `No se pudo importar el dataset (error ${status}).`;
 }
 
@@ -584,8 +638,13 @@ async function importRecord(
       `${API_BASE}/v1/zenodo/records/${recordId}?environment=${state.environment}`,
     );
     if (!detailRes.ok) {
-      const detailData = await detailRes.json().catch(() => ({}) as { error?: string });
-      showToast(importErrorMessage(detailRes.status, detailData.error), "error");
+      const detailData = await detailRes
+        .json()
+        .catch(() => ({}) as { error?: string });
+      showToast(
+        importErrorMessage(detailRes.status, detailData.error),
+        "error",
+      );
       btn.disabled = false;
       btn.textContent = origLabel;
       return;
@@ -600,7 +659,10 @@ async function importRecord(
     if (hasZips) btn.textContent = "Descargando…";
 
     if (files.length === 0) {
-      showToast("Este dataset no tiene archivos .dcm ni .zip para importar.", "warning");
+      showToast(
+        "Este dataset no tiene archivos .dcm ni .zip para importar.",
+        "warning",
+      );
       btn.textContent = "Sin archivos";
       setTimeout(() => {
         btn.disabled = false;
@@ -824,8 +886,10 @@ function syncCard(sync: SyncConfig): string {
 }
 
 const TOKEN_ERROR_MESSAGES: Record<string, string> = {
-  invalid_token: "Token inválido. Verificá que lo copiaste completo y que no esté revocado.",
-  insufficient_permissions: "El token no tiene los permisos necesarios en Zenodo.",
+  invalid_token:
+    "Token inválido. Verificá que lo copiaste completo y que no esté revocado.",
+  insufficient_permissions:
+    "El token no tiene los permisos necesarios en Zenodo.",
   timeout: "Zenodo no respondió a tiempo. Intentá de nuevo en unos minutos.",
 };
 
@@ -833,7 +897,9 @@ function tokenErrorMessage(reason: unknown, fallbackError: unknown): string {
   if (typeof reason === "string" && reason in TOKEN_ERROR_MESSAGES) {
     return TOKEN_ERROR_MESSAGES[reason];
   }
-  return typeof fallbackError === "string" ? fallbackError : "No se pudo guardar el token.";
+  return typeof fallbackError === "string"
+    ? fallbackError
+    : "No se pudo guardar el token.";
 }
 
 async function saveToken(env: "sandbox" | "production"): Promise<void> {
@@ -862,7 +928,10 @@ async function saveToken(env: "sandbox" | "production"): Promise<void> {
     });
     if (!res.ok) {
       if (res.status === 401) {
-        showToast("Tu sesión expiró. Iniciá sesión de nuevo para guardar el token.", "error");
+        showToast(
+          "Tu sesión expiró. Iniciá sesión de nuevo para guardar el token.",
+          "error",
+        );
       } else {
         const data = await res.json().catch(() => ({}));
         showToast(tokenErrorMessage(data.reason, data.error), "error");
@@ -909,7 +978,10 @@ async function setSyncInterval(hours: number | null): Promise<void> {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}) as { error?: string });
-      showToast(data.error ?? "No se pudo actualizar la sincronización.", "error");
+      showToast(
+        data.error ?? "No se pudo actualizar la sincronización.",
+        "error",
+      );
       return;
     }
     void loadConfig();
@@ -989,7 +1061,10 @@ async function runSyncNow(): Promise<void> {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}) as { error?: string });
       stopPolling();
-      showToast(data.error ?? "No se pudo ejecutar la sincronización.", "error");
+      showToast(
+        data.error ?? "No se pudo ejecutar la sincronización.",
+        "error",
+      );
       btn.disabled = false;
       btn.textContent = "Sincronizar ahora";
     }
@@ -1175,10 +1250,8 @@ async function publishStudy(studyId: string): Promise<void> {
     btnEl.textContent = "Publicar en Zenodo";
   }
 }
-// cspell:enable
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
 
 function skeleton(): string {
   return Array.from({ length: 3 })
@@ -1262,27 +1335,37 @@ function initActivityLog(): void {
   const toolbar = document.getElementById("activity-filters");
   if (!toolbar) return;
 
-  toolbar.querySelectorAll<HTMLElement>("[data-filter-action]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      toolbar.querySelectorAll("[data-filter-action]").forEach((b) => b.classList.remove("filter-chip--active"));
-      btn.classList.add("filter-chip--active");
-      activityState.filterAction = btn.dataset.filterAction ?? "";
-      activityState.page = 1;
-      void loadActivityLog();
+  toolbar
+    .querySelectorAll<HTMLElement>("[data-filter-action]")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        toolbar
+          .querySelectorAll("[data-filter-action]")
+          .forEach((b) => b.classList.remove("filter-chip--active"));
+        btn.classList.add("filter-chip--active");
+        activityState.filterAction = btn.dataset.filterAction ?? "";
+        activityState.page = 1;
+        void loadActivityLog();
+      });
     });
-  });
 
-  toolbar.querySelectorAll<HTMLElement>("[data-filter-result]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      toolbar.querySelectorAll("[data-filter-result]").forEach((b) => b.classList.remove("filter-chip--active"));
-      btn.classList.add("filter-chip--active");
-      activityState.filterResult = btn.dataset.filterResult ?? "";
-      activityState.page = 1;
-      void loadActivityLog();
+  toolbar
+    .querySelectorAll<HTMLElement>("[data-filter-result]")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        toolbar
+          .querySelectorAll("[data-filter-result]")
+          .forEach((b) => b.classList.remove("filter-chip--active"));
+        btn.classList.add("filter-chip--active");
+        activityState.filterResult = btn.dataset.filterResult ?? "";
+        activityState.page = 1;
+        void loadActivityLog();
+      });
     });
-  });
 
-  document.getElementById("btn-export-activity")?.addEventListener("click", () => void exportActivityCsv());
+  document
+    .getElementById("btn-export-activity")
+    ?.addEventListener("click", () => void exportActivityCsv());
 }
 
 async function loadActivityLog(): Promise<void> {
@@ -1303,7 +1386,8 @@ async function loadActivityLog(): Promise<void> {
     const actions = activityState.filterAction.split(",");
     actions.forEach((a) => params.append("action", a));
   }
-  if (activityState.filterResult) params.set("result", activityState.filterResult);
+  if (activityState.filterResult)
+    params.set("result", activityState.filterResult);
   params.set("page", String(activityState.page));
   params.set("limit", "50");
 
@@ -1316,21 +1400,25 @@ async function loadActivityLog(): Promise<void> {
     const data = (await res.json()) as ActivityListResult;
     container.innerHTML = renderActivityLog(data);
 
-    container.querySelectorAll<HTMLElement>(".activity-log__row").forEach((row) => {
-      row.addEventListener("click", () => {
-        const detail = row.nextElementSibling;
-        if (detail?.classList.contains("activity-log__detail-row")) {
-          detail.classList.toggle("hidden");
-        }
+    container
+      .querySelectorAll<HTMLElement>(".activity-log__row")
+      .forEach((row) => {
+        row.addEventListener("click", () => {
+          const detail = row.nextElementSibling;
+          if (detail?.classList.contains("activity-log__detail-row")) {
+            detail.classList.toggle("hidden");
+          }
+        });
       });
-    });
 
-    container.querySelectorAll<HTMLButtonElement>(".activity-log__page-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        activityState.page = parseInt(btn.dataset.page ?? "1", 10);
-        void loadActivityLog();
+    container
+      .querySelectorAll<HTMLButtonElement>(".activity-log__page-btn")
+      .forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activityState.page = parseInt(btn.dataset.page ?? "1", 10);
+          void loadActivityLog();
+        });
       });
-    });
   } catch {
     container.innerHTML = `<p class="z-error">No se pudo conectar al servidor.</p>`;
   }
@@ -1344,7 +1432,9 @@ function renderActivityLog(data: ActivityListResult): string {
   const rows = data.entries
     .map((entry) => {
       const resultClass =
-        entry.result === "error" ? "activity-log__result--error" : "activity-log__result--success";
+        entry.result === "error"
+          ? "activity-log__result--error"
+          : "activity-log__result--success";
       const resultLabel = entry.result === "error" ? "Error" : "Éxito";
       const date = new Date(entry.timestamp).toLocaleString("es-AR");
       const hasDetail = entry.detail !== null;
@@ -1397,12 +1487,17 @@ function renderActivityLog(data: ActivityListResult): string {
 async function exportActivityCsv(): Promise<void> {
   const params = new URLSearchParams();
   if (activityState.filterAction) {
-    activityState.filterAction.split(",").forEach((a) => params.append("action", a));
+    activityState.filterAction
+      .split(",")
+      .forEach((a) => params.append("action", a));
   }
-  if (activityState.filterResult) params.set("result", activityState.filterResult);
+  if (activityState.filterResult)
+    params.set("result", activityState.filterResult);
 
   try {
-    const res = await authFetch(`${API_BASE}/v1/activity/export?${params.toString()}`);
+    const res = await authFetch(
+      `${API_BASE}/v1/activity/export?${params.toString()}`,
+    );
     if (!res.ok) return;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

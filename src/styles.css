@@ -689,7 +689,9 @@ body {
   font-family: var(--font);
   font-size: 12px;
   cursor: pointer;
-  transition: background var(--transition), color var(--transition);
+  transition:
+    background var(--transition),
+    color var(--transition);
   text-align: left;
 }
 .sidebar-action:hover {
@@ -736,7 +738,9 @@ body {
   color: var(--danger);
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity var(--transition), background var(--transition);
+  transition:
+    opacity var(--transition),
+    background var(--transition);
 }
 .session-card__logout:hover {
   opacity: 1;

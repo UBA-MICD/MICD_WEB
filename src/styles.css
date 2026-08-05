@@ -1518,6 +1518,21 @@ body {
   color: var(--text-primary);
 }
 
+/* Drag-over state: outline the whole panel so the user can see where to drop. */
+.explorer-panel.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+  background: var(--accent-soft);
+}
+
+/* Transient upload status written while a drop is being processed. */
+.explorer-upload-status {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
 /* Session state in the panel footer rather than behind a modal, so it is
    readable at a glance. */
 .explorer-footer {

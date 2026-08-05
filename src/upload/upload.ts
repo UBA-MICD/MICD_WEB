@@ -7,9 +7,11 @@ import {
   API_BASE,
 } from "../auth/auth.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
+import { expandFiles } from "./zip-expand.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { openDialog, closeDialog } from "../shared/dialog.js";
 import { loadStudyExplorer, markStudyAsNew } from "../explorer/explorer.js";
+import { showToast } from "../shared/banner.js";
 
 // ── Upload (Cargar tab) ──────────────────────────────────────────────────────
 //
@@ -71,9 +73,13 @@ export function initUploadPanel(): void {
   const input = $("upload-input") as HTMLInputElement;
   input.setAttribute("multiple", "");
   input.addEventListener("change", () => {
-    const files = collectDicomFiles(Array.from(input.files ?? []));
+    const selected = Array.from(input.files ?? []);
     input.value = "";
-    void startUpload(files);
+    void (async () => {
+      const expanded = await expandFiles(selected, null);
+      const files = collectDicomFiles(expanded);
+      void startUpload(files);
+    })();
   });
   $("btn-upload-server")?.addEventListener("click", async () => {
     if (await ensureAuthenticated()) input.click();
@@ -100,14 +106,26 @@ export function initUploadPanel(): void {
 function initUploadDropZone(): void {
   const zone = $("upload-drop");
 
-  zone.addEventListener("dragenter", () => zone.classList.add("drag-over"));
+  // dragover must preventDefault for the drop event to fire in Firefox/Edge.
+  zone.addEventListener("dragover", (e: DragEvent) => {
+    e.preventDefault();
+    zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragenter", (e: DragEvent) => {
+    e.preventDefault();
+    zone.classList.add("drag-over");
+  });
   zone.addEventListener("dragleave", (e: DragEvent) => {
     const related = e.relatedTarget as HTMLElement | null;
     if (!related || !zone.contains(related)) zone.classList.remove("drag-over");
   });
   zone.addEventListener("drop", async (e: DragEvent) => {
+    e.preventDefault();
     zone.classList.remove("drag-over");
-    const files = collectDicomFiles(Array.from(e.dataTransfer?.files ?? []));
+    const dropped = Array.from(e.dataTransfer?.files ?? []);
+    showUploadStatus("Descomprimiendo…", "");
+    const expanded = await expandFiles(dropped, null);
+    const files = collectDicomFiles(expanded);
     if (files.length === 0) {
       showUploadStatus("No se encontraron archivos DICOM.", "error");
       return;
@@ -417,6 +435,99 @@ function showUploadStatus(text: string, type: "" | "ok" | "error"): void {
   el.className = type
     ? `upload-status upload-status--${type}`
     : "upload-status";
+}
+
+// ── Explorer panel upload (no per-file row UI) ───────────────────────────────
+
+/**
+ * Upload files dropped onto the explorer panel. Accepts .dcm and .zip files.
+ * Writes a transient status into `statusEl` while running and shows a toast
+ * when done. Does not touch the upload-tab DOM.
+ */
+export async function startExplorerUpload(
+  files: File[],
+  statusEl: HTMLElement,
+): Promise<void> {
+  if (uploading) {
+    showToast("Hay una carga en curso. Esperá a que termine.", "warning");
+    return;
+  }
+  if (!(await ensureAuthenticated())) {
+    showToast("Iniciá sesión para subir estudios.", "warning");
+    return;
+  }
+
+  uploading = true;
+  cancelled = false;
+  statusEl.textContent = `Subiendo ${files.length} archivo${files.length !== 1 ? "s" : ""}…`;
+  statusEl.classList.remove("hidden");
+
+  let ok = 0;
+  let duplicates = 0;
+  let errors = 0;
+
+  for (const file of files) {
+    if (cancelled) break;
+
+    const outcome = await uploadOneExplorer(file);
+    if (outcome === "ok") ok++;
+    else if (outcome === "duplicate") duplicates++;
+    else if (outcome !== "aborted") errors++;
+  }
+
+  uploading = false;
+  activeXhr = null;
+  statusEl.classList.add("hidden");
+  statusEl.textContent = "";
+
+  if (cancelled) {
+    showToast("Carga cancelada.", "warning");
+    return;
+  }
+
+  const parts = [`${ok} de ${files.length} subido${files.length !== 1 ? "s" : ""}`];
+  if (duplicates > 0) parts.push(`${duplicates} ya existían`);
+  if (errors > 0) parts.push(`${errors} errores`);
+  showToast(parts.join(" · "), errors > 0 ? "error" : "success");
+
+  await loadStudyExplorer();
+}
+
+function uploadOneExplorer(file: File): Promise<UploadOutcome> {
+  return new Promise((resolve) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    activeXhr = xhr;
+    xhr.open("POST", `${API_BASE}/v1/studies/upload`);
+    const token = getAccessToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.addEventListener("abort", () => resolve("aborted"));
+    xhr.addEventListener("error", () => {
+      showToast("Error de red al conectar con el servidor.", "error");
+      resolve("error");
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status === 201) {
+        rememberUploadedStudy(xhr.responseText);
+        resolve("ok");
+        return;
+      }
+      if (xhr.status === 409) {
+        resolve("duplicate");
+        return;
+      }
+      if (xhr.status === 413) {
+        showToast("El archivo supera el límite de 500 MB.", "error");
+      }
+      resolve("error");
+    });
+
+    xhr.send(formData);
+  });
 }
 
 // ── Duplicate confirmation ───────────────────────────────────────────────────

@@ -1,5 +1,8 @@
 /* cspell:disable */
 import { exportCurrentStudyAsZip } from "../services/export-service.js";
+import { collectServerUploadFiles } from "../shared/folder-files.js";
+import { startExplorerUpload } from "../upload/upload.js";
+import { showToast } from "../shared/banner.js";
 
 // ── Explorer panel toggle + drag-resize ──────────────────────────────────────
 // Manages the "Estudios en servidor" panel's open/closed state and its
@@ -82,6 +85,57 @@ function initResizeHandle(): void {
   });
 }
 
+function initExplorerDropZone(): void {
+  const panel = getPanel();
+  const statusEl = document.getElementById("explorer-upload-status");
+  if (!statusEl) return;
+
+  panel.addEventListener("dragover", (e: DragEvent) => {
+    e.preventDefault();
+    panel.classList.add("drag-over");
+  });
+
+  panel.addEventListener("dragenter", (e: DragEvent) => {
+    e.preventDefault();
+    panel.classList.add("drag-over");
+  });
+
+  panel.addEventListener("dragleave", (e: DragEvent) => {
+    const related = e.relatedTarget as HTMLElement | null;
+    if (!related || !panel.contains(related)) {
+      panel.classList.remove("drag-over");
+    }
+  });
+
+  panel.addEventListener("drop", async (e: DragEvent) => {
+    e.preventDefault();
+    panel.classList.remove("drag-over");
+
+    const all = Array.from(e.dataTransfer?.files ?? []);
+    if (all.length === 0) return;
+
+    const { valid, rejected } = collectServerUploadFiles(all);
+
+    if (rejected.length > 0 && valid.length === 0) {
+      showToast(
+        `Tipo de archivo no soportado. Solo se aceptan .dcm y .zip.`,
+        "error",
+      );
+      return;
+    }
+    if (rejected.length > 0) {
+      showToast(
+        `${rejected.length} archivo${rejected.length !== 1 ? "s" : ""} ignorado${rejected.length !== 1 ? "s" : ""} (tipo no soportado).`,
+        "warning",
+      );
+    }
+
+    if (valid.length > 0) {
+      await startExplorerUpload(valid, statusEl);
+    }
+  });
+}
+
 export function initExplorerPanel(): void {
   // Panel starts open — mark the toolbar button as active to match.
   document.getElementById("btn-toggle-explorer")?.classList.add("active");
@@ -92,4 +146,5 @@ export function initExplorerPanel(): void {
     });
   initToggle();
   initResizeHandle();
+  initExplorerDropZone();
 }

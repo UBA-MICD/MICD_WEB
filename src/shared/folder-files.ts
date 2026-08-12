@@ -31,7 +31,7 @@ function baseName(path: string): string {
   return segments[segments.length - 1] ?? path;
 }
 
-function isDicomCandidate(path: string): boolean {
+export function isDicomCandidate(path: string): boolean {
   const base = baseName(path);
   const lower = base.toLowerCase();
 

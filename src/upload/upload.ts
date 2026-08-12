@@ -76,7 +76,14 @@ export function initUploadPanel(): void {
     const selected = Array.from(input.files ?? []);
     input.value = "";
     void (async () => {
-      const expanded = await expandFiles(selected, null);
+      const { files: expanded, corruptZips, tooBigZips } = await expandFiles(selected, null);
+      if (corruptZips.length > 0)
+        showToast(`No se pudo leer: ${corruptZips.join(", ")}`, "error");
+      if (tooBigZips.length > 0)
+        showToast(
+          `ZIP demasiado grande para el navegador — arrastralo al panel "Estudios en servidor": ${tooBigZips.join(", ")}`,
+          "warning",
+        );
       const files = collectDicomFiles(expanded);
       void startUpload(files);
     })();
@@ -123,11 +130,22 @@ function initUploadDropZone(): void {
     e.preventDefault();
     zone.classList.remove("drag-over");
     const dropped = Array.from(e.dataTransfer?.files ?? []);
-    showUploadStatus("Descomprimiendo…", "");
-    const expanded = await expandFiles(dropped, null);
+    const hasZip = dropped.some((f) => f.name.toLowerCase().endsWith(".zip"));
+    if (hasZip) showUploadStatus("Descomprimiendo…", "");
+    const { files: expanded, corruptZips, tooBigZips } = await expandFiles(dropped, null);
+    if (hasZip) showUploadStatus("", "");
+    // Use toasts for expansion errors so they survive the per-file upload status updates.
+    if (corruptZips.length > 0)
+      showToast(`No se pudo leer: ${corruptZips.join(", ")}`, "error");
+    if (tooBigZips.length > 0)
+      showToast(
+        `ZIP demasiado grande para el navegador — arrastralo al panel "Estudios en servidor": ${tooBigZips.join(", ")}`,
+        "warning",
+      );
     const files = collectDicomFiles(expanded);
     if (files.length === 0) {
-      showUploadStatus("No se encontraron archivos DICOM.", "error");
+      if (corruptZips.length === 0 && tooBigZips.length === 0)
+        showUploadStatus("No se encontraron archivos DICOM.", "error");
       return;
     }
     if (await ensureAuthenticated()) void startUpload(files);
@@ -151,18 +169,24 @@ function renderTransportNote(): void {
 // ── Queue ────────────────────────────────────────────────────────────────────
 
 async function startUpload(files: File[]): Promise<void> {
-  if (uploading) return;
+  if (uploading) {
+    showUploadStatus("Hay una carga en curso. Esperá a que termine.", "error");
+    return;
+  }
   if (files.length === 0) {
     showUploadStatus("No se encontraron archivos DICOM.", "error");
     return;
   }
+
+  // Set the flag before the first await so a concurrent call sees it immediately.
+  uploading = true;
+  cancelled = false;
+
   if (!(await ensureAuthenticated())) {
+    uploading = false;
     showUploadStatus("Necesitás iniciar sesión para subir estudios.", "error");
     return;
   }
-
-  uploading = true;
-  cancelled = false;
   queue = { done: 0, total: files.length };
   renderTransportNote();
   const rows = renderRows(files);
@@ -173,23 +197,25 @@ async function startUpload(files: File[]): Promise<void> {
   let duplicates = 0;
   let errors = 0;
 
-  for (let i = 0; i < files.length; i++) {
-    if (cancelled) break;
-    // Only the file count is announced; the percentage lives in an
-    // aria-hidden span so progress doesn't spam the screen reader.
-    showUploadStatus(`Subiendo ${i + 1} de ${files.length} archivos`, "");
-    const outcome = await uploadOne(files[i], rows[i]);
-    if (outcome === "aborted") break;
-    if (outcome === "ok") ok++;
-    else if (outcome === "duplicate") duplicates++;
-    else errors++;
-    queue.done = i + 1;
-    setAggregatePercent((queue.done / queue.total) * 100);
+  try {
+    for (let i = 0; i < files.length; i++) {
+      if (cancelled) break;
+      // Only the file count is announced; the percentage lives in an
+      // aria-hidden span so progress doesn't spam the screen reader.
+      showUploadStatus(`Subiendo ${i + 1} de ${files.length} archivos`, "");
+      const outcome = await uploadOne(files[i], rows[i]);
+      if (outcome === "aborted") break;
+      if (outcome === "ok") ok++;
+      else if (outcome === "duplicate") duplicates++;
+      else errors++;
+      queue.done = i + 1;
+      setAggregatePercent((queue.done / queue.total) * 100);
+    }
+  } finally {
+    uploading = false;
+    activeXhr = null;
+    setFinishEnabled(true);
   }
-
-  uploading = false;
-  activeXhr = null;
-  setFinishEnabled(true);
 
   if (cancelled) {
     showUploadStatus("Carga cancelada.", "error");
@@ -325,7 +351,7 @@ function uploadOne(
 
       setRowState(row, "error");
       if (xhr.status === 413) {
-        showUploadStatus("El archivo supera el límite de 500 MB.", "error");
+        showUploadStatus("El archivo supera el límite de 2 GB.", "error");
       } else {
         showUploadStatus(
           safeMessage(xhr.responseText) || "Error al cargar el archivo.",
@@ -452,13 +478,17 @@ export async function startExplorerUpload(
     showToast("Hay una carga en curso. Esperá a que termine.", "warning");
     return;
   }
+
+  // Set the flag before the first await so a concurrent call sees it immediately.
+  uploading = true;
+  cancelled = false;
+
   if (!(await ensureAuthenticated())) {
+    uploading = false;
     showToast("Iniciá sesión para subir estudios.", "warning");
     return;
   }
 
-  uploading = true;
-  cancelled = false;
   statusEl.textContent = `Subiendo ${files.length} archivo${files.length !== 1 ? "s" : ""}…`;
   statusEl.classList.remove("hidden");
 
@@ -466,19 +496,21 @@ export async function startExplorerUpload(
   let duplicates = 0;
   let errors = 0;
 
-  for (const file of files) {
-    if (cancelled) break;
+  try {
+    for (const file of files) {
+      if (cancelled) break;
 
-    const outcome = await uploadOneExplorer(file);
-    if (outcome === "ok") ok++;
-    else if (outcome === "duplicate") duplicates++;
-    else if (outcome !== "aborted") errors++;
+      const outcome = await uploadOneExplorer(file);
+      if (outcome === "ok") ok++;
+      else if (outcome === "duplicate") duplicates++;
+      else if (outcome !== "aborted") errors++;
+    }
+  } finally {
+    uploading = false;
+    activeXhr = null;
+    statusEl.classList.add("hidden");
+    statusEl.textContent = "";
   }
-
-  uploading = false;
-  activeXhr = null;
-  statusEl.classList.add("hidden");
-  statusEl.textContent = "";
 
   if (cancelled) {
     showToast("Carga cancelada.", "warning");
@@ -493,7 +525,10 @@ export async function startExplorerUpload(
   await loadStudyExplorer();
 }
 
-function uploadOneExplorer(file: File): Promise<UploadOutcome> {
+function uploadOneExplorer(
+  file: File,
+  isRetry = false,
+): Promise<UploadOutcome> {
   return new Promise((resolve) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -516,12 +551,43 @@ function uploadOneExplorer(file: File): Promise<UploadOutcome> {
         resolve("ok");
         return;
       }
+
+      if (xhr.status === 401 && !isRetry) {
+        void (async () => {
+          const recovered =
+            (await refreshAccessToken()) || (await ensureAuthenticated());
+          if (!recovered) {
+            showToast("Sesión expirada. Iniciá sesión para subir estudios.", "error");
+            resolve("error");
+            return;
+          }
+          resolve(await uploadOneExplorer(file, true));
+        })();
+        return;
+      }
+
+      if (xhr.status === 401) {
+        showToast("No autorizado. Iniciá sesión de nuevo.", "error");
+        resolve("error");
+        return;
+      }
+
       if (xhr.status === 409) {
+        showToast(
+          `${file.name} ya existe en el servidor. Usá la pestaña Cargar para reemplazarlo.`,
+          "warning",
+        );
         resolve("duplicate");
         return;
       }
+
       if (xhr.status === 413) {
-        showToast("El archivo supera el límite de 500 MB.", "error");
+        showToast("El archivo supera el límite de 2 GB.", "error");
+      } else {
+        showToast(
+          safeMessage(xhr.responseText) || "Error al cargar el archivo.",
+          "error",
+        );
       }
       resolve("error");
     });

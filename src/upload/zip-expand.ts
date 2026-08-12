@@ -2,29 +2,23 @@
  * zip-expand.ts — Client-side ZIP expansion for the Cargar tab.
  *
  * Splits from upload.ts so that extractZipEntries can be unit-tested in Node
- * without needing the DOM or fflate's import-map resolution. Only expandFiles
- * (the production entry point) imports fflate, and it does so dynamically.
+ * without needing the DOM or fflate's import-map resolution.
  */
 
+import { isDicomCandidate } from "../shared/folder-files.js";
 export type UnzipFn = (
   data: Uint8Array,
   cb: (err: Error | null, out: Record<string, Uint8Array>) => void,
 ) => void;
 
-const JUNK_NAMES = new Set(["dicomdir", "thumbs.db"]);
+export const MAX_CLIENT_ZIP_BYTES = 512 * 1024 * 1024;
 
 function isDicomEntry(entryPath: string): boolean {
+  if (entryPath.includes("..")) return false;
   const parts = entryPath.split(/[/\\]/);
   const base = parts[parts.length - 1] ?? "";
-  const lower = base.toLowerCase();
-
-  if (base.startsWith(".")) return false;
-  if (JUNK_NAMES.has(lower)) return false;
-  if (entryPath.includes("..")) return false;
-
-  if (lower.endsWith(".dcm")) return true;
-  const hasExtension = /\.[^.]+$/.test(base);
-  return !hasExtension;
+  if (base === "") return false;
+  return isDicomCandidate(base);
 }
 
 /**
@@ -42,11 +36,18 @@ export async function extractZipEntries(
     });
   });
 
+  const seen = new Set<string>();
   return Object.entries(out)
     .filter(([path]) => isDicomEntry(path))
     .map(([path, buf]) => {
       const parts = path.split(/[/\\]/);
-      return { name: parts[parts.length - 1] ?? path, data: buf };
+      let name = parts[parts.length - 1] ?? path;
+      if (seen.has(name)) {
+        const parent = parts.length >= 2 ? (parts[parts.length - 2] ?? "") : "";
+        name = parent ? `${parent}_${name}` : `${name}_${seen.size + 1}`;
+      }
+      seen.add(name);
+      return { name, data: buf };
     });
 }
 
@@ -61,13 +62,21 @@ export async function extractZipEntries(
 export async function expandFiles(
   files: readonly File[],
   statusEl: HTMLElement | null,
-): Promise<File[]> {
-  const { unzip } = (await import("fflate")) as { unzip: UnzipFn };
+  unzipFnOverride?: UnzipFn,
+): Promise<{ files: File[]; corruptZips: string[]; tooBigZips: string[] }> {
   const result: File[] = [];
+  const corruptZips: string[] = [];
+  const tooBigZips: string[] = [];
+  let unzip: UnzipFn | undefined = unzipFnOverride;
 
   for (const file of files) {
     if (!file.name.toLowerCase().endsWith(".zip")) {
       result.push(file);
+      continue;
+    }
+
+    if (file.size > MAX_CLIENT_ZIP_BYTES) {
+      tooBigZips.push(file.name);
       continue;
     }
 
@@ -76,19 +85,20 @@ export async function expandFiles(
     }
 
     try {
+      if (!unzip) {
+        unzip = ((await import("fflate")) as { unzip: UnzipFn }).unzip;
+      }
       const buf = new Uint8Array(await file.arrayBuffer());
       const entries = await extractZipEntries(buf, unzip);
       for (const entry of entries) {
-        // Copy into a fresh ArrayBuffer so the File constructor's type is satisfied
         result.push(new File([new Uint8Array(entry.data)], entry.name));
       }
     } catch {
-      // Corrupt or unreadable zip — skip silently; startUpload will show
-      // "No se encontraron archivos DICOM." if nothing was extracted.
+      corruptZips.push(file.name);
     } finally {
       if (statusEl) statusEl.textContent = "";
     }
   }
 
-  return result;
+  return { files: result, corruptZips, tooBigZips };
 }

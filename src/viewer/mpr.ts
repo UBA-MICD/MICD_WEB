@@ -741,21 +741,46 @@ void main() {
     const boxMin = [-scaleX / 2, -scaleY / 2, -scaleZ / 2];
     const boxMax = [scaleX / 2, scaleY / 2, scaleZ / 2];
 
-    // Compute Orbit Camera Matrices
-    const dist = 2.0 / (this.camera.zoom * state.viewport.zoom);
-    const eyeX = dist * Math.cos(this.camera.theta) * Math.sin(this.camera.phi);
-    const eyeY = dist * Math.sin(this.camera.theta);
+    // Compute Orbit Camera & Dynamic Clipping Range
+    const totalZoom = Math.max(
+      0.1,
+      Math.min(10, this.camera.zoom * state.viewport.zoom),
+    );
+
+    // Bounding sphere radius to guarantee camera stays outside geometry
+    const maxBoxDim = Math.sqrt(
+      scaleX * scaleX + scaleY * scaleY + scaleZ * scaleZ,
+    );
+    const boundingRadius = maxBoxDim * 0.5;
+    const minSafeDist = boundingRadius + 0.2;
+    const distBase = Math.max(2.5, minSafeDist * 1.5);
+
+    const targetDist = distBase / totalZoom;
+    const dist = Math.max(minSafeDist, targetDist);
+
+    // Extra zoom beyond minSafeDist is handled by adjusting camera view angle (FOV)
+    const extraZoom = targetDist < minSafeDist ? minSafeDist / targetDist : 1.0;
+    const baseFov = Math.PI / 4;
+    const fov = 2.0 * Math.atan(Math.tan(baseFov / 2.0) / extraZoom);
+
+    // Recalculate dynamic clipping range (near/far) so camera never clips planes
+    const near = Math.max(0.01, dist - boundingRadius);
+    const far = dist + boundingRadius + 2.0;
+
+    const panOffsetX = -(this.camera.panX + state.viewport.panX) * 0.002;
+    const panOffsetY = (this.camera.panY + state.viewport.panY) * 0.002;
+
+    const eyeX =
+      dist * Math.cos(this.camera.theta) * Math.sin(this.camera.phi) +
+      panOffsetX;
+    const eyeY = dist * Math.sin(this.camera.theta) + panOffsetY;
     const eyeZ = dist * Math.cos(this.camera.theta) * Math.cos(this.camera.phi);
 
     const aspect = width / height;
-    const proj = Matrix4.perspective(Math.PI / 4, aspect, 0.1, 100.0);
+    const proj = Matrix4.perspective(fov, aspect, near, far);
     const view = Matrix4.lookAt(
-      [
-        eyeX - (this.camera.panX + state.viewport.panX) * 0.002,
-        eyeY + (this.camera.panY + state.viewport.panY) * 0.002,
-        eyeZ,
-      ],
-      [0, 0, 0],
+      [eyeX, eyeY, eyeZ],
+      [panOffsetX, panOffsetY, 0],
       [0, 1, 0],
     );
 

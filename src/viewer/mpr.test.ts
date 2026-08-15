@@ -335,3 +335,33 @@ test("updateToolbarUI disables Pan in 3D mode and Crosshair in 2D mode", () => {
     (globalThis as any).document = originalDoc;
   }
 });
+
+test("MPR3DViewer renders cleanly under high zoom levels with dynamic clipping", () => {
+  const viewer = new MPR3DViewer();
+  viewer.volume = {
+    depth: 5,
+    rows: 64,
+    cols: 64,
+    data: new Int16Array(5 * 64 * 64),
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    rescaleSlope: 1,
+    rescaleIntercept: 0,
+    windowCenter: 0,
+    windowWidth: 100,
+  };
+  viewer.camera.zoom = 5.0;
+
+  const mockCtx = createMockWebGL2Context();
+  const mockCanvas: any = {
+    getContext: (type: string) => (type === "webgl2" ? mockCtx : null),
+    clientWidth: 500,
+    clientHeight: 500,
+    width: 500,
+    height: 500,
+  };
+
+  assert.doesNotThrow(() => {
+    viewer.render(mockCanvas);
+  });
+});

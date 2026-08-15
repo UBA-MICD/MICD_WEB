@@ -59,7 +59,7 @@ function getTitleForIndex(index: number): string {
   if (state.files.length > 0 && index < state.files.length) {
     return state.files[index].name;
   }
-  return "DICOM Viewer";
+  return "Visualizador DICOM";
 }
 
 export function resetViewerToDropZone(): void {
@@ -71,7 +71,7 @@ export function resetViewerToDropZone(): void {
   state.currentIndex = 0;
   state.parsed = null;
   $("series-nav").classList.add("hidden");
-  $("topbar-title").textContent = "DICOM Viewer";
+  $("topbar-title").textContent = "Visualizador DICOM";
   $("topbar-title").title = "";
   // Otherwise the canvas keeps describing the study that is no longer shown.
   // cspell:disable-next-line
@@ -174,7 +174,8 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
 
   if (!parsed.pixelData) {
     showError(
-      "No pixel data found. The file may use compressed transfer syntax.",
+      // cspell:disable-next-line
+      "No se encontraron datos de píxeles. El archivo puede usar sintaxis de transferencia comprimida.",
     );
     return;
   }

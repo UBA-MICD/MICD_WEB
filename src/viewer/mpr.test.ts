@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Matrix4, MPR3DViewer, VoxelVolume } from "./mpr.js";
 import { state } from "./state.js";
+import { updateToolbarUI } from "./interaction.js";
 
 // ── WebGL2 Context Mock ──────────────────────────────────────────────────────
 
@@ -275,4 +276,62 @@ test("MPR3DViewer renderGizmo draws axes on 2D context", () => {
   assert.doesNotThrow(() => {
     viewer.renderGizmo(mockGizmoCanvas);
   });
+});
+
+test("updateToolbarUI disables Pan in 3D mode and Crosshair in 2D mode", () => {
+  const mockPanBtn: any = {
+    disabled: false,
+    classList: { toggle: () => {} },
+    setAttribute: () => {},
+  };
+  const mockCrosshairBtn: any = {
+    disabled: false,
+    classList: { toggle: () => {} },
+    setAttribute: () => {},
+  };
+  const mockWlBtn: any = {
+    disabled: false,
+    classList: { toggle: () => {} },
+    setAttribute: () => {},
+  };
+  const mockZoomBtn: any = {
+    disabled: false,
+    classList: { toggle: () => {} },
+    setAttribute: () => {},
+  };
+  const mockExportBtn: any = { disabled: false };
+  const mockViewport: any = { className: "", classList: { add: () => {} } };
+
+  const originalDoc = (globalThis as any).document;
+  (globalThis as any).document = {
+    getElementById: (id: string) => {
+      if (id === "tool-pan") return mockPanBtn;
+      if (id === "tool-crosshair") return mockCrosshairBtn;
+      if (id === "tool-wl") return mockWlBtn;
+      if (id === "tool-zoom") return mockZoomBtn;
+      if (id === "btn-export-menu") return mockExportBtn;
+      if (id === "viewport-container") return mockViewport;
+      return null;
+    },
+  };
+
+  try {
+    // Test 2D mode (state.is3DMode = false)
+    state.is3DMode = false;
+    state.activeTool = "crosshair";
+    updateToolbarUI();
+    assert.equal(state.activeTool, "wl");
+    assert.equal(mockPanBtn.disabled, false);
+    assert.equal(mockCrosshairBtn.disabled, true);
+
+    // Test 3D mode (state.is3DMode = true)
+    state.is3DMode = true;
+    state.activeTool = "pan";
+    updateToolbarUI();
+    assert.equal(state.activeTool, "wl");
+    assert.equal(mockPanBtn.disabled, true);
+    assert.equal(mockCrosshairBtn.disabled, false);
+  } finally {
+    (globalThis as any).document = originalDoc;
+  }
 });

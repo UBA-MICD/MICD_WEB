@@ -26,6 +26,8 @@ export function initToolbar(): void {
     const btn = $(`tool-${tool}`);
     if (btn) {
       btn.addEventListener("click", () => {
+        if (tool === "pan" && state.is3DMode) return;
+        if (tool === "crosshair" && !state.is3DMode) return;
         if (tool === "wl") {
           if (state.activeTool === "wl") {
             state.isWlPanelOpen = !state.isWlPanelOpen;
@@ -93,6 +95,7 @@ export function initToolbar(): void {
     if (btn && !btn.disabled) {
       await mpr3DViewer.toggle3DMode();
       updateSeriesNav();
+      updateToolbarUI();
       render();
     }
   });
@@ -167,11 +170,27 @@ function initWlControlsInteraction(): void {
 }
 
 export function updateToolbarUI(): void {
+  if (state.is3DMode && state.activeTool === "pan") {
+    state.activeTool = "wl";
+  } else if (!state.is3DMode && state.activeTool === "crosshair") {
+    state.activeTool = "wl";
+  }
+
+  const panBtn = $("tool-pan") as HTMLButtonElement | null;
+  if (panBtn) {
+    panBtn.disabled = state.is3DMode;
+  }
+
+  const crosshairBtn = $("tool-crosshair") as HTMLButtonElement | null;
+  if (crosshairBtn) {
+    crosshairBtn.disabled = !state.is3DMode;
+  }
+
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
   // would also strip the metadata toggle's state, leaving its class and
   // aria-expanded disagreeing with the open panel.
   (["wl", "zoom", "pan", "crosshair"] as const).forEach((tool) => {
-    const btn = $(`tool-${tool}`);
+    const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
     if (!btn) return;
     const isActive = tool === state.activeTool;
     btn.classList.toggle("active", isActive);
@@ -195,8 +214,10 @@ export function updateToolbarUI(): void {
   }
 
   const viewport = $("viewport-container");
-  viewport.className = "viewport-container";
-  viewport.classList.add(`cursor-${state.activeTool}`);
+  if (viewport) {
+    viewport.className = "viewport-container";
+    viewport.classList.add(`cursor-${state.activeTool}`);
+  }
 }
 
 // ── Viewport Mouse Interaction ───────────────────────────────────────────────
@@ -585,17 +606,21 @@ export function initKeyboardShortcuts(): void {
     }
 
     if (e.key === "w" || e.key === "W") {
-      $("tool-wl").click();
+      $("tool-wl")?.click();
     } else if (e.key === "z" || e.key === "Z") {
-      $("tool-zoom").click();
+      $("tool-zoom")?.click();
     } else if (e.key === "p" || e.key === "P") {
-      $("tool-pan").click();
+      if (!state.is3DMode) {
+        $("tool-pan")?.click();
+      }
     } else if (e.key === "c" || e.key === "C") {
-      $("tool-crosshair").click();
+      if (state.is3DMode) {
+        $("tool-crosshair")?.click();
+      }
     } else if (e.key === "r" || e.key === "R") {
-      $("tool-reset").click();
+      $("tool-reset")?.click();
     } else if (e.key === "m" || e.key === "M") {
-      $("tool-metadata").click();
+      $("tool-metadata")?.click();
     }
   });
 }

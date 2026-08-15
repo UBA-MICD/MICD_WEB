@@ -25,9 +25,9 @@ RUN rm -rf /usr/share/nginx/html/*
 # JS compilado
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# HTML y CSS
 COPY src/index.html /usr/share/nginx/html/index.html
 COPY src/styles.css /usr/share/nginx/html/styles.css
+COPY src/favicon.svg /usr/share/nginx/html/favicon.svg
 
 # dicom-parser UMD bundle
 COPY --from=deps /app/node_modules/dicom-parser/dist/dicomParser.min.js /usr/share/nginx/html/dicomParser.min.js

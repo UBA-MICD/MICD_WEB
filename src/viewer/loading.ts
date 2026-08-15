@@ -90,6 +90,7 @@ export function initFileInputs(): void {
     dicomCache.clear();
     state.files = collectDicomFiles(Array.from(filesInput.files));
     state.currentIndex = 0;
+    state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
     await loadCurrent();
     filesInput.value = "";
   });
@@ -108,6 +109,7 @@ export function initFileInputs(): void {
     dicomCache.clear();
     state.files = dcmFiles;
     state.currentIndex = 0;
+    state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
     await loadCurrent();
     folderInput.value = "";
   });
@@ -142,6 +144,7 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
   state.serverInstances = [];
   state.files = [];
   state.currentIndex = 0;
+  state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
 
   try {
     const res = await authFetch(
@@ -198,7 +201,7 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
   }
 
   const container = $("viewport-container");
-  if (state.viewport.zoom <= 0 || state.currentIndex === 0) {
+  if (state.viewport.zoom <= 0) {
     state.viewport.zoom = fitToContainer(
       container.clientWidth,
       container.clientHeight,
@@ -259,6 +262,7 @@ export function initDropZone(): void {
       dicomCache.clear();
       state.files = dcmFiles.sort((a, b) => a.name.localeCompare(b.name));
       state.currentIndex = 0;
+      state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
       await loadCurrent();
     }
   });

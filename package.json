@@ -1,0 +1,17 @@
+{
+  "name": "micd-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npx tsx --test 'src/**/*.test.ts'",
+    "test:coverage": "mkdir -p coverage && npx tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "dicom-parser": "^1.8.21",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

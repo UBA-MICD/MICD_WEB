@@ -18,7 +18,8 @@
         }
       }
     </script>
-    <title>MICD — DICOM Viewer</title>
+    <title>MICD — Visualizador DICOM</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
@@ -96,7 +97,7 @@
             </svg>
           </span>
           <span class="logo-text">MICD</span>
-          <h1 class="topbar__title" id="topbar-title">DICOM Viewer</h1>
+          <h1 class="topbar__title" id="topbar-title">Visualizador DICOM</h1>
         </div>
 
         <div class="topbar__actions">
@@ -533,7 +534,7 @@
                 <button class="btn-orient" id="btn-view-coronal">
                   Coronal
                 </button>
-                <button class="btn-orient" id="btn-view-3d">3D Volume</button>
+                <button class="btn-orient" id="btn-view-3d">Vista Volumétrica</button>
               </div>
               <div class="mpr-gizmo-wrap">
                 <canvas id="mpr-gizmo-canvas" width="60" height="60"></canvas>
@@ -650,7 +651,7 @@
                 <div class="wl-section">
                   <div class="slider-control">
                     <div class="slider-header">
-                      <label for="slider-ww">Window Width (WW)</label>
+                      <label for="slider-ww">Ancho de Ventana (WW)</label>
                       <span class="slider-val" id="val-ww">0</span>
                     </div>
                     <input
@@ -666,7 +667,7 @@
 
                   <div class="slider-control">
                     <div class="slider-header">
-                      <label for="slider-wl">Window Level (WL)</label>
+                      <label for="slider-wl">Nivel de Ventana (WL)</label>
                       <span class="slider-val" id="val-wl">0</span>
                     </div>
                     <input
@@ -1119,8 +1120,8 @@
               <button class="filter-chip" data-type="zip">ZIP</button>
             </div>
             <div class="z-env-toggle" id="z-env-toggle">
-              <button class="z-env-btn active" data-env="sandbox">SBX</button>
-              <button class="z-env-btn" data-env="production">PROD</button>
+              <button class="z-env-btn active" data-env="sandbox">Sandbox</button>
+              <button class="z-env-btn" data-env="production">Producción</button>
             </div>
           </div>
           <div id="z-results" class="z-results">

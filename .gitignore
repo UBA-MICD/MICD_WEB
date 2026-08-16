@@ -37,3 +37,6 @@ docker-compose.override.yml
 # ── Coverage / Temp ───────────────────────────────────────────────────────────
 coverage/
 dist-test/
+
+# ── Generated vendor assets (built from node_modules, see Dockerfile) ─────────
+src/vendor/fflate.js

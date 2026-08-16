@@ -1,3 +1,21 @@
+/* ── Fonts ──────────────────────────────────────────────────────────────────── */
+/* Vendored (latin subset, variable weight) so the app works offline under
+   Electron's file:// + default-src 'self' CSP — see vendor/fonts/. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("./vendor/fonts/Inter-latin-variable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("./vendor/fonts/JetBrainsMono-latin-variable.woff2") format("woff2");
+}
+
 /* ── Reset & Tokens ─────────────────────────────────────────────────────────── */
 *,
 *::before,

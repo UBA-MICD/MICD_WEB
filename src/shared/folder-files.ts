@@ -31,7 +31,7 @@ function baseName(path: string): string {
   return segments[segments.length - 1] ?? path;
 }
 
-function isDicomCandidate(path: string): boolean {
+export function isDicomCandidate(path: string): boolean {
   const base = baseName(path);
   const lower = base.toLowerCase();
 
@@ -46,6 +46,32 @@ function isDicomCandidate(path: string): boolean {
   // (.txt, .png, .jpg, .json, …) which are sidecar files.
   const hasExtension = /\.[^.]+$/.test(base);
   return !hasExtension;
+}
+
+export interface ServerUploadSelection {
+  valid: File[];
+  rejected: File[];
+}
+
+/**
+ * Split a drag-and-drop file list into files the server upload accepts
+ * (.dcm / no-extension DICOM candidates and .zip archives) and those it
+ * doesn't. Pure: never mutates the input.
+ */
+export function collectServerUploadFiles(
+  files: readonly File[],
+): ServerUploadSelection {
+  const valid: File[] = [];
+  const rejected: File[] = [];
+  for (const file of files) {
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".zip") || isDicomCandidate(file.name)) {
+      valid.push(file);
+    } else {
+      rejected.push(file);
+    }
+  }
+  return { valid, rejected };
 }
 
 /**

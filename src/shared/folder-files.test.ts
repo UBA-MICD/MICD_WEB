@@ -1,12 +1,11 @@
 /**
- * Tests for collectDicomFiles — the logic that turns a folder selection
- * into the ordered list of DICOM images the viewer can walk through.
+ * Tests for collectDicomFiles and collectServerUploadFiles.
  *
  * Run: npm test   (uses Node's built-in test runner + TS type stripping)
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectDicomFiles, type FolderFile } from "./folder-files.ts";
+import { collectDicomFiles, collectServerUploadFiles, type FolderFile } from "./folder-files.ts";
 
 const f = (name: string, webkitRelativePath?: string): FolderFile => ({
   name,
@@ -110,4 +109,62 @@ test("works with real File objects from a folder <input>", () => {
     "image-1.dcm",
     "image-2.dcm",
   ]);
+});
+
+// ── collectServerUploadFiles ──────────────────────────────────────────────────
+
+const file = (name: string): File => new File([new Uint8Array([1])], name);
+
+test("collectServerUploadFiles: .dcm goes to valid", () => {
+  const { valid, rejected } = collectServerUploadFiles([file("scan.dcm")]);
+  assert.equal(valid.length, 1);
+  assert.equal(rejected.length, 0);
+  assert.equal(valid[0].name, "scan.dcm");
+});
+
+test("collectServerUploadFiles: .zip goes to valid", () => {
+  const { valid, rejected } = collectServerUploadFiles([file("study.zip")]);
+  assert.equal(valid.length, 1);
+  assert.equal(rejected.length, 0);
+  assert.equal(valid[0].name, "study.zip");
+});
+
+test("collectServerUploadFiles: .png goes to rejected", () => {
+  const { valid, rejected } = collectServerUploadFiles([file("photo.png")]);
+  assert.equal(valid.length, 0);
+  assert.equal(rejected.length, 1);
+});
+
+test("collectServerUploadFiles: mixed input splits correctly", () => {
+  const input = [
+    file("a.dcm"),
+    file("archive.zip"),
+    file("readme.txt"),
+    file("preview.jpg"),
+  ];
+  const { valid, rejected } = collectServerUploadFiles(input);
+  assert.equal(valid.length, 2);
+  assert.equal(rejected.length, 2);
+  assert.deepEqual(valid.map((x) => x.name), ["a.dcm", "archive.zip"]);
+});
+
+test("collectServerUploadFiles: extension-less files (DICOM candidates) are valid", () => {
+  const { valid } = collectServerUploadFiles([file("IM000001")]);
+  assert.equal(valid.length, 1);
+});
+
+test("collectServerUploadFiles: hidden dotfiles are rejected", () => {
+  const { rejected } = collectServerUploadFiles([file(".DS_Store")]);
+  assert.equal(rejected.length, 1);
+});
+
+test("collectServerUploadFiles: empty input returns empty selections", () => {
+  const { valid, rejected } = collectServerUploadFiles([]);
+  assert.equal(valid.length, 0);
+  assert.equal(rejected.length, 0);
+});
+
+test("collectServerUploadFiles: .ZIP uppercase is valid", () => {
+  const { valid } = collectServerUploadFiles([file("STUDY.ZIP")]);
+  assert.equal(valid.length, 1);
 });

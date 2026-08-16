@@ -1002,6 +1002,14 @@
             </button>
           </div>
 
+          <!-- Transient upload status shown while dropping files on the panel. -->
+          <div
+            id="explorer-upload-status"
+            class="explorer-upload-status hidden"
+            role="status"
+            aria-live="polite"
+          ></div>
+
           <!-- Session state lives here rather than behind a modal. -->
           <div class="explorer-footer" id="explorer-footer">
             <span id="explorer-session-line"
@@ -1605,11 +1613,11 @@
         tabindex="0"
       >
         <div class="server-panel__body">
-          <input type="file" id="upload-input" accept=".dcm" class="hidden" />
+          <input type="file" id="upload-input" accept=".dcm,.zip" class="hidden" />
           <input type="file" id="upload-folder-input" class="hidden" />
 
           <div class="upload-drop" id="upload-drop">
-            <p>Arrastrá archivos .dcm o una carpeta aquí</p>
+            <p>Arrastrá archivos .dcm, .zip o una carpeta aquí</p>
             <div class="upload-drop__actions">
               <button class="btn btn--accent" id="btn-upload-server">
                 Seleccionar archivos

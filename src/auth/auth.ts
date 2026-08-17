@@ -1,4 +1,5 @@
 import { t } from "../i18n/i18n.js";
+import { getRefreshToken, setRefreshToken, clearRefreshToken } from "../shared/token-store.js";
 
 // Origin the backend API + auth endpoints live on. Default: the backend's own
 // port, for local dev (page opened directly / served without nginx). In the
@@ -14,7 +15,6 @@ function resolveApiOrigin(): string {
 export const API_ORIGIN = resolveApiOrigin();
 
 const API_BASE = `${API_ORIGIN}/api`;
-const REFRESH_KEY = "micd_refresh_token";
 
 export interface AuthUser {
   id: number;
@@ -88,19 +88,19 @@ function decodeToken(token: string): {
   }
 }
 
-function setSession(token: string, refreshToken: string, user: AuthUser): void {
+async function setSession(token: string, refreshToken: string, user: AuthUser): Promise<void> {
   accessToken = token;
   currentUser = user;
   accessTokenExpiresAt = decodeToken(token).expiresAt;
-  localStorage.setItem(REFRESH_KEY, refreshToken);
+  await setRefreshToken(refreshToken);
   notifyAuthChange();
 }
 
-function clearSession(): void {
+async function clearSession(): Promise<void> {
   accessToken = null;
   currentUser = null;
   accessTokenExpiresAt = null;
-  localStorage.removeItem(REFRESH_KEY);
+  await clearRefreshToken();
   notifyAuthChange();
 }
 
@@ -132,12 +132,12 @@ export async function login(
   }
 
   const data = await res.json();
-  setSession(data.accessToken, data.refreshToken, data.user);
+  await setSession(data.accessToken, data.refreshToken, data.user);
   return { ok: true };
 }
 
 export async function logout(): Promise<void> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  const refreshToken = await getRefreshToken();
   if (refreshToken) {
     try {
       await fetch(`${API_ORIGIN}/auth/logout`, {
@@ -149,7 +149,7 @@ export async function logout(): Promise<void> {
       // best-effort — clear the local session regardless
     }
   }
-  clearSession();
+  await clearSession();
 }
 
 // ── Token refresh (single-flight) ─────────────────────────────────────────────
@@ -170,7 +170,7 @@ export function refreshAccessToken(): Promise<boolean> {
 }
 
 async function doRefresh(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  const refreshToken = await getRefreshToken();
   if (!refreshToken) return false;
 
   let res: Response;
@@ -185,7 +185,7 @@ async function doRefresh(): Promise<boolean> {
   }
 
   if (!res.ok) {
-    clearSession();
+    await clearSession();
     return false;
   }
 
@@ -194,7 +194,7 @@ async function doRefresh(): Promise<boolean> {
   accessToken = data.accessToken;
   currentUser = claims.user ?? currentUser;
   accessTokenExpiresAt = claims.expiresAt;
-  localStorage.setItem(REFRESH_KEY, data.refreshToken);
+  await setRefreshToken(data.refreshToken);
   notifyAuthChange();
   return true;
 }

@@ -237,6 +237,10 @@ test("concurrent refreshes are single-flight (rotation makes parallel refreshes 
     refreshAccessToken(),
     refreshAccessToken(),
   ];
+  // The refresh-token read is async (token-store.ts), so doRefresh() needs a
+  // microtask hop before it reaches fetch() and `release` gets assigned —
+  // let the queue drain rather than assuming the old synchronous timing.
+  await new Promise((resolve) => setTimeout(resolve, 0));
   release(json({ accessToken: adminToken, refreshToken: "refresh-2" }));
 
   assert.deepEqual(await Promise.all(results), [true, true, true]);

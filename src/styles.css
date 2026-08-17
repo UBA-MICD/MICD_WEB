@@ -267,6 +267,11 @@ body {
   line-height: 1.5;
   color: var(--text-secondary);
 }
+.auth-card--settings {
+  margin-top: 16px;
+  gap: 10px;
+  padding: 20px;
+}
 
 .server-panel {
   flex: 1;

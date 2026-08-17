@@ -35,6 +35,7 @@ import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
+import { initDesktopOnlyUI, initDesktopApiOriginSetting } from "./shared/desktop.js";
 import {
   currentLocale,
   setLocale,
@@ -71,6 +72,8 @@ function initI18n(): void {
 
 async function initApp(): Promise<void> {
   initI18n();
+  initDesktopOnlyUI();
+  void initDesktopApiOriginSetting();
 
   // One login surface in the app: the server screen's auth card. A session
   // that dies mid-operation brings the user here rather than throwing a modal

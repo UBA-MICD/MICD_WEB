@@ -1510,6 +1510,28 @@
             Ingresar
           </button>
         </form>
+
+        <!-- Desktop only: nginx already proxies /api and /auth same-origin
+             in the browser build, so there is nothing to configure there. -->
+        <div class="auth-card auth-card--settings hidden" data-desktop-only>
+          <label class="login-field">
+            <span data-i18n="server.apiOriginLabel">Servidor de la API</span>
+            <input
+              type="text"
+              id="desktop-api-origin-input"
+              data-i18n-attr="placeholder:server.apiOriginPlaceholder"
+              placeholder="http://localhost:3000"
+            />
+          </label>
+          <button
+            type="button"
+            class="btn btn--secondary btn--full"
+            id="desktop-api-origin-save"
+            data-i18n="server.apiOriginSave"
+          >
+            Guardar y reiniciar
+          </button>
+        </div>
       </div>
 
       <!-- Screen 03: this panel's only job is finding and opening a study. -->
@@ -1954,9 +1976,11 @@
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
-         must run before auth.ts's module-load-time resolveApiOrigin() call. -->
+         must run before auth.ts's module-load-time resolveApiOrigin() call.
+         `??=` rather than `=`: Electron's preload sets this synchronously
+         before any page script runs, and must win here. -->
     <script>
-      window.MICD_API_ORIGIN = "";
+      window.MICD_API_ORIGIN ??= "";
     </script>
     <!-- dicom-parser UMD bundle (loaded before our modules) -->
     <script src="./dicomParser.min.js"></script>

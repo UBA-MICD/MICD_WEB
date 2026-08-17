@@ -70,7 +70,11 @@ export function generateDescriptiveFilename(
 /**
  * Downloads a Blob using an invisible <a> link.
  */
-export function downloadBlob(blob: Blob, filename: string): void {
+export async function downloadBlob(blob: Blob, filename: string): Promise<void> {
+  if (typeof window !== "undefined" && window.api?.saveFile) {
+    await window.api.saveFile(filename, await blob.arrayBuffer());
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -113,13 +117,13 @@ export async function exportCurrentViewToPNG(
   showBanner(t("export.exportingPng"), "warning");
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
+    canvas.toBlob(async (blob) => {
       if (!blob) {
         showBanner(t("export.canvasBlobError"), "error");
         reject(new Error("Canvas toBlob failed"));
         return;
       }
-      downloadBlob(blob, filename);
+      await downloadBlob(blob, filename);
       showBanner(t("export.pngSuccess"), "success");
       resolve();
     }, "image/png");
@@ -141,7 +145,7 @@ export function exportStudyToZip(
 
   const compressed = zipSync(zipData, { level: 6 });
   const blob = new Blob([compressed], { type: "application/zip" });
-  downloadBlob(blob, zipFilename);
+  void downloadBlob(blob, zipFilename);
   return blob;
 }
 

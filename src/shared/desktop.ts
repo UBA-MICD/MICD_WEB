@@ -1,3 +1,6 @@
+import { showToast } from "./banner.js";
+import { t } from "../i18n/i18n.js";
+
 /** True when running inside the Electron shell (the preload bridge is present). */
 export function isDesktop(): boolean {
   return typeof window !== "undefined" && !!window.api;
@@ -33,8 +36,24 @@ export async function initDesktopApiOriginSetting(): Promise<void> {
   input.value = await window.api.getApiOrigin();
   saveBtn.addEventListener("click", () => {
     void (async () => {
-      const origin = input.value.trim();
-      if (!origin || !window.api) return;
+      if (!window.api) return;
+      const raw = input.value.trim();
+      if (!raw) return;
+
+      // A bare "host:port" (no scheme) is a relative URL to fetch(), not an
+      // absolute one — it silently resolves against the app's file:// origin
+      // instead of ever reaching the backend. Default to http:// so typing
+      // "localhost:3001" does what it looks like it should.
+      const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+      let origin: string;
+      try {
+        origin = new URL(withScheme).origin;
+      } catch {
+        showToast(t("server.apiOriginInvalid"), "error");
+        return;
+      }
+
+      input.value = origin;
       await window.api.setApiOrigin(origin);
       window.location.reload();
     })();

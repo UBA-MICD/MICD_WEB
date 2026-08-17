@@ -56,6 +56,7 @@ export const es: Record<string, string> = {
   "server.apiOriginLabel": "Servidor de la API",
   "server.apiOriginPlaceholder": "http://localhost:3000",
   "server.apiOriginSave": "Guardar y reiniciar",
+  "server.apiOriginInvalid": "Dirección de servidor inválida.",
   "dialog.activityTitle": "Historial de actividad",
   "server.studyLoadedBanner": "Estudio cargado · volviendo al visualizador",
   "server.studiesLoadedBanner":

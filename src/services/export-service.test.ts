@@ -3,7 +3,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   generateDescriptiveFilename,
-  exportStudyToZip,
+  buildStudyZip,
+  downloadBlob,
   exportCurrentViewToPNG,
   exportCurrentStudyAsZip,
   exportStudyByIdAsZip,
@@ -53,6 +54,32 @@ function setupBrowserEnvironment() {
   };
 
   return { bannerEl, elementsMap };
+}
+
+/**
+ * Stubs the Electron preload bridge's `saveFile` for one call.
+ *
+ * `false` is what the real bridge returns when the user dismisses the native
+ * save dialog, and a throw is what a failed disk write looks like. Both used
+ * to be reported to the user as a successful export.
+ */
+async function withDesktopSaveFile<T>(
+  saveFile: (filename: string, data: ArrayBuffer) => Promise<boolean>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  (globalThis as any).api = { saveFile };
+  try {
+    return await fn();
+  } finally {
+    delete (globalThis as any).api;
+  }
+}
+
+function oneLocalFile() {
+  return {
+    name: "slice1.dcm",
+    arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+  } as unknown as File;
 }
 
 function resetState() {
@@ -116,7 +143,7 @@ test("generateDescriptiveFilename handles invalid date, empty modality and long 
   assert.match(filename, /^\d{8}_STUDY_Study\.zip$/);
 });
 
-test("exportStudyToZip compresses files into a valid ZIP blob", () => {
+test("buildStudyZip compresses files into a valid ZIP blob", () => {
   setupBrowserEnvironment();
 
   const files = [
@@ -124,9 +151,114 @@ test("exportStudyToZip compresses files into a valid ZIP blob", () => {
     { name: "slice2.dcm", buffer: new Uint8Array([50, 60, 70, 80]).buffer },
   ];
 
-  const blob = exportStudyToZip(files, "test_study.zip");
+  const blob = buildStudyZip(files);
   assert.equal(blob.type, "application/zip");
   assert.ok(blob.size > 0);
+});
+
+// ── Desktop save-dialog seam ────────────────────────────────────────────────
+
+test("downloadBlob reports whether the desktop save dialog wrote a file", async () => {
+  setupBrowserEnvironment();
+  const blob = new Blob(["zip-bytes"], { type: "application/zip" });
+
+  const saved = await withDesktopSaveFile(
+    async () => true,
+    () => downloadBlob(blob, "study.zip"),
+  );
+  assert.equal(saved, true);
+
+  const canceled = await withDesktopSaveFile(
+    async () => false,
+    () => downloadBlob(blob, "study.zip"),
+  );
+  assert.equal(canceled, false);
+});
+
+test("downloadBlob reports success on the browser's <a download> path", async () => {
+  setupBrowserEnvironment();
+  const blob = new Blob(["png-bytes"], { type: "image/png" });
+  assert.equal(await downloadBlob(blob, "view.png"), true);
+});
+
+test("exportCurrentViewToPNG reports cancellation, not success, when the save dialog is dismissed", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  const mockCanvas = {
+    toBlob: (cb: (blob: Blob | null) => void) => {
+      cb(new Blob(["png-binary-content"], { type: "image/png" }));
+    },
+  } as unknown as HTMLCanvasElement;
+
+  await withDesktopSaveFile(
+    async () => false,
+    () => exportCurrentViewToPNG(mockCanvas, "custom_view.png"),
+  );
+
+  assert.equal(
+    bannerEl.textContent,
+    "Exportación cancelada: no se guardó ningún archivo.",
+  );
+  assert.equal(bannerEl.className, "app-banner app-banner--warning");
+});
+
+test("exportCurrentViewToPNG rejects and reports an error when the disk write fails", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+
+  const mockCanvas = {
+    toBlob: (cb: (blob: Blob | null) => void) => {
+      cb(new Blob(["png-binary-content"], { type: "image/png" }));
+    },
+  } as unknown as HTMLCanvasElement;
+
+  await assert.rejects(
+    () =>
+      withDesktopSaveFile(
+        async () => {
+          throw new Error("EACCES: permission denied");
+        },
+        () => exportCurrentViewToPNG(mockCanvas, "custom_view.png"),
+      ),
+    /EACCES/,
+  );
+
+  assert.match(bannerEl.textContent, /EACCES/);
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
+});
+
+test("exportCurrentStudyAsZip reports cancellation, not success, when the save dialog is dismissed", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+  state.files = [oneLocalFile()];
+
+  await withDesktopSaveFile(
+    async () => false,
+    () => exportCurrentStudyAsZip({ anonymize: false }),
+  );
+
+  assert.equal(
+    bannerEl.textContent,
+    "Exportación cancelada: no se guardó ningún archivo.",
+  );
+  assert.equal(bannerEl.className, "app-banner app-banner--warning");
+});
+
+test("exportCurrentStudyAsZip surfaces a failed disk write as an error", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+  state.files = [oneLocalFile()];
+
+  await withDesktopSaveFile(
+    async () => {
+      throw new Error("ENOSPC: no space left on device");
+    },
+    () => exportCurrentStudyAsZip({ anonymize: false }),
+  );
+
+  assert.match(bannerEl.textContent, /ENOSPC/);
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
 });
 
 // ── Anonymizer Unit Tests ───────────────────────────────────────────────────

@@ -68,12 +68,21 @@ export function generateDescriptiveFilename(
 }
 
 /**
- * Downloads a Blob using an invisible <a> link.
+ * Saves a Blob: the native save dialog under Electron, an invisible <a> link
+ * in the browser.
+ *
+ * Returns whether a file was actually written. The browser path always
+ * reports `true` — `<a download>` cannot fail or be declined from here — but
+ * the desktop path returns `false` when the user dismisses the save dialog,
+ * and callers must not announce success without checking. Rejects if the
+ * write itself fails.
  */
-export async function downloadBlob(blob: Blob, filename: string): Promise<void> {
+export async function downloadBlob(
+  blob: Blob,
+  filename: string,
+): Promise<boolean> {
   if (typeof window !== "undefined" && window.api?.saveFile) {
-    await window.api.saveFile(filename, await blob.arrayBuffer());
-    return;
+    return await window.api.saveFile(filename, await blob.arrayBuffer());
   }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -83,6 +92,7 @@ export async function downloadBlob(blob: Blob, filename: string): Promise<void> 
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return true;
 }
 
 /**
@@ -117,25 +127,40 @@ export async function exportCurrentViewToPNG(
   showBanner(t("export.exportingPng"), "warning");
 
   return new Promise((resolve, reject) => {
+    // The callback is async, so anything thrown inside it lands nowhere —
+    // this promise would simply never settle. Everything after toBlob() is
+    // wrapped so a failed save rejects the caller instead.
     canvas.toBlob(async (blob) => {
       if (!blob) {
         showBanner(t("export.canvasBlobError"), "error");
         reject(new Error("Canvas toBlob failed"));
         return;
       }
-      await downloadBlob(blob, filename);
-      showBanner(t("export.pngSuccess"), "success");
-      resolve();
+      try {
+        const saved = await downloadBlob(blob, filename);
+        showBanner(
+          saved ? t("export.pngSuccess") : t("export.saveCanceled"),
+          saved ? "success" : "warning",
+        );
+        resolve();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        showBanner(t("export.genericError", { message }), "error");
+        reject(err instanceof Error ? err : new Error(message));
+      }
     }, "image/png");
   });
 }
 
 /**
- * Packages multiple files into a single .zip file using fflate and triggers download.
+ * Packages multiple files into a single .zip Blob using fflate.
+ *
+ * Building the archive and saving it are separate steps on purpose: saving is
+ * async and can be declined (see `downloadBlob`), so the caller owns it and
+ * reports the outcome.
  */
-export function exportStudyToZip(
+export function buildStudyZip(
   files: Array<{ name: string; buffer: ArrayBuffer }>,
-  zipFilename: string,
 ): Blob {
   const zipData: Record<string, Uint8Array> = {};
 
@@ -144,9 +169,7 @@ export function exportStudyToZip(
   });
 
   const compressed = zipSync(zipData, { level: 6 });
-  const blob = new Blob([compressed], { type: "application/zip" });
-  void downloadBlob(blob, zipFilename);
-  return blob;
+  return new Blob([compressed], { type: "application/zip" });
 }
 
 /**
@@ -235,8 +258,13 @@ export async function exportCurrentStudyAsZip(
     }
 
     const zipFilename = generateDescriptiveFilename(meta, "zip");
-    exportStudyToZip(filesToZip, zipFilename);
-    showBanner(t("export.zipSuccess", { filename: zipFilename }), "success");
+    const saved = await downloadBlob(buildStudyZip(filesToZip), zipFilename);
+    showBanner(
+      saved
+        ? t("export.zipSuccess", { filename: zipFilename })
+        : t("export.saveCanceled"),
+      saved ? "success" : "warning",
+    );
   } catch (err: any) {
     console.error("Export Error:", err);
     showBanner(t("export.genericError", { message: err.message || err }), "error");
@@ -292,8 +320,13 @@ export async function exportStudyByIdAsZip(
     }
 
     const zipFilename = generateDescriptiveFilename(studyMeta, "zip");
-    exportStudyToZip(filesToZip, zipFilename);
-    showBanner(t("export.zipSuccess", { filename: zipFilename }), "success");
+    const saved = await downloadBlob(buildStudyZip(filesToZip), zipFilename);
+    showBanner(
+      saved
+        ? t("export.zipSuccess", { filename: zipFilename })
+        : t("export.saveCanceled"),
+      saved ? "success" : "warning",
+    );
   } catch (err: any) {
     console.error("Export study by ID error:", err);
     showBanner(t("export.genericError", { message: err.message || err }), "error");

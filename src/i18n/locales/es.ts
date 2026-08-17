@@ -203,6 +203,7 @@ export const es: Record<string, string> = {
   "export.instanceDownloadError": "Error descargando instancia {{index}}",
   "export.noStudyLoaded": "No hay ningún estudio cargado para exportar.",
   "export.zipSuccess": "Estudio exportado exitosamente como '{{filename}}'.",
+  "export.saveCanceled": "Exportación cancelada: no se guardó ningún archivo.",
   "export.genericError": "Error al exportar estudio: {{message}}",
   "export.preparingZip": "Preparando exportación de estudio .zip…",
   "export.fetchingStudyInfo": "Obteniendo información del estudio en el servidor…",

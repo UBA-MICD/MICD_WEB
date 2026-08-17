@@ -1,3 +1,15 @@
+/**
+ * Menu events the Electron main process broadcasts to the renderer. Mirrored
+ * by `MenuChannel` in desktop/src/main/preload.ts — the two are separate
+ * repos, so nothing but this comment ties them together: add a channel there
+ * and it must be added here too, or the renderer can't subscribe to it.
+ *
+ * It's a union rather than `string` so that a typo'd channel is a compile
+ * error here instead of a subscription preload silently drops (its own
+ * whitelist check rejects anything not on this list).
+ */
+type MenuChannel = "menu:open-files" | "menu:open-folder" | "menu:api-server";
+
 declare global {
   interface Window {
     /**
@@ -9,8 +21,10 @@ declare global {
     MICD_API_ORIGIN?: string;
 
     api?: {
-      /** Electron menu events (`menu:open-files`, `menu:open-folder`). */
-      on: (channel: string, callback: () => void) => void;
+      /** Subscribe to an Electron menu event. See `MenuChannel` above. */
+      on: (channel: MenuChannel, callback: () => void) => void;
+      /** Drop every subscription to a menu channel. */
+      removeAllListeners: (channel: MenuChannel) => void;
       /** safeStorage-backed persistence for the refresh token. See shared/token-store.ts. */
       secureStore: {
         get: (key: string) => Promise<string | undefined>;

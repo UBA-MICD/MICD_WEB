@@ -195,6 +195,7 @@ export const en: Record<string, string> = {
   "export.instanceDownloadError": "Error downloading instance {{index}}",
   "export.noStudyLoaded": "No study loaded to export.",
   "export.zipSuccess": "Study exported successfully as '{{filename}}'.",
+  "export.saveCanceled": "Export canceled: no file was saved.",
   "export.genericError": "Error exporting study: {{message}}",
   "export.preparingZip": "Preparing .zip study export…",
   "export.fetchingStudyInfo": "Fetching study information from the server…",

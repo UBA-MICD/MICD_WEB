@@ -6,6 +6,7 @@
  */
 
 import { isDicomCandidate } from "../shared/folder-files.js";
+import { t } from "../i18n/i18n.js";
 export type UnzipFn = (
   data: Uint8Array,
   cb: (err: Error | null, out: Record<string, Uint8Array>) => void,
@@ -81,7 +82,7 @@ export async function expandFiles(
     }
 
     if (statusEl) {
-      statusEl.textContent = `Descomprimiendo ${file.name}…`;
+      statusEl.textContent = t("upload.unzippingNamed", { name: file.name });
     }
 
     try {

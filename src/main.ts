@@ -35,6 +35,14 @@ import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
+import {
+  currentLocale,
+  setLocale,
+  onLocaleChange,
+  applyTranslations,
+  initLocaleFromBrowser,
+  type Locale,
+} from "./i18n/i18n.js";
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -42,7 +50,28 @@ document.addEventListener("DOMContentLoaded", () => {
   void initApp();
 });
 
+function initI18n(): void {
+  initLocaleFromBrowser();
+  document.documentElement.lang = currentLocale();
+  applyTranslations(document);
+  onLocaleChange(() => {
+    document.documentElement.lang = currentLocale();
+    applyTranslations(document);
+  });
+
+  const select = $("locale-select") as HTMLSelectElement;
+  select.value = currentLocale();
+  select.addEventListener("change", () => {
+    setLocale(select.value as Locale);
+  });
+  onLocaleChange((locale) => {
+    select.value = locale;
+  });
+}
+
 async function initApp(): Promise<void> {
+  initI18n();
+
   // One login surface in the app: the server screen's auth card. A session
   // that dies mid-operation brings the user here rather than throwing a modal
   // over the image they are reading.

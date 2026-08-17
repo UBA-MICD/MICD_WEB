@@ -7,6 +7,7 @@
 // visual reward.
 
 import { $, escapeHtml } from "./dom.js";
+import { t } from "../i18n/i18n.js";
 
 export type BannerKind = "success" | "error" | "warning";
 
@@ -49,7 +50,7 @@ export function showToast(
   toast.className = `toast toast--${kind}`;
   toast.innerHTML = `
     <span class="toast__msg">${escapeHtml(text)}</span>
-    <button class="toast__close" aria-label="Cerrar">✕</button>`;
+    <button class="toast__close" aria-label="${escapeHtml(t("common.close"))}">✕</button>`;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
 

@@ -28,6 +28,7 @@ import { $ } from "../shared/dom.js";
 import { showBanner } from "../shared/banner.js";
 import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
 import { initRovingTabindex, nextRovingIndex } from "../shared/roving.js";
+import { t } from "../i18n/i18n.js";
 
 export type ServerTab = "buscar" | "cargar";
 
@@ -175,7 +176,7 @@ export function initServerScreen(): void {
     openSelected.disabled = true;
     await openStudy(studyId);
     closeServerScreen();
-    showBanner("Estudio cargado · volviendo al visualizador");
+    showBanner(t("server.studyLoadedBanner"));
   };
 
   openSelected.addEventListener("click", () => {
@@ -211,8 +212,8 @@ export function initServerScreen(): void {
     closeServerScreen();
     showBanner(
       summary.ok === 1
-        ? "Estudio cargado · volviendo al visualizador"
-        : `${summary.ok} estudios cargados · volviendo al visualizador`,
+        ? t("server.studyLoadedBanner")
+        : t("server.studiesLoadedBanner", { count: summary.ok }),
     );
   });
 

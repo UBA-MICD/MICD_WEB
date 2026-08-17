@@ -7,6 +7,7 @@ import {
 } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
+import { t, currentLocale, onLocaleChange } from "../i18n/i18n.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -235,25 +236,35 @@ export function initZenodoPanel(): void {
         card.querySelector<HTMLElement>(".z-badge--muted")?.textContent ?? "";
       const bigWarning =
         totalBytes > 500 * 1024 * 1024
-          ? `<p class="z-zip-confirm__warn">⚠ Archivo grande — la descarga puede tardar varios minutos.</p>`
+          ? `<p class="z-zip-confirm__warn">${escapeHtml(t("zenodo.zipConfirmWarning"))}</p>`
           : "";
       const strip = document.createElement("div");
       strip.className = "z-zip-confirm";
       strip.dataset.recordId = btn.dataset.importId!;
       strip.innerHTML = `
         <span class="z-zip-confirm__msg">
-          ¿Descomprimír el ZIP (${escapeHtml(sizeLabel)}) e importar los DICOM que contenga?
+          ${t("zenodo.zipConfirmMessage", { size: escapeHtml(sizeLabel) })}
         </span>
         ${bigWarning}
         <div class="z-zip-confirm__actions">
-          <button class="btn btn--accent btn--xs z-zip-confirm__ok">Sí, importar</button>
-          <button class="btn btn--secondary btn--xs z-zip-confirm__cancel">Cancelar</button>
+          <button class="btn btn--accent btn--xs z-zip-confirm__ok">${escapeHtml(t("zenodo.confirmImportZip"))}</button>
+          <button class="btn btn--secondary btn--xs z-zip-confirm__cancel">${escapeHtml(t("common.cancel"))}</button>
         </div>`;
       card.appendChild(strip);
       return;
     }
 
     void importRecord(Number(btn.dataset.importId), btn);
+  });
+
+  // Static labels retranslate via the global applyTranslations() pass; the
+  // tabs that build their own markup from live data need to re-render it
+  // explicitly. Search results are left as-is — they're a query result, not
+  // UI chrome, and the next search naturally lands in the new locale.
+  onLocaleChange(() => {
+    if (state.tab === "config") void loadConfig();
+    else if (state.tab === "publish") renderPublishTab();
+    else if (state.tab === "logs") void loadActivityLog();
   });
 }
 
@@ -311,10 +322,7 @@ function switchTab(tab: Tab): void {
  */
 async function guardSession(): Promise<boolean> {
   if (isAuthenticated()) return true;
-  showToast(
-    "Tu sesión de MICD expiró. Iniciá sesión para continuar.",
-    "warning",
-  );
+  showToast(t("zenodo.sessionExpiredWarning"), "warning");
   return ensureAuthenticated();
 }
 
@@ -333,11 +341,11 @@ async function loadSearch(): Promise<void> {
 
   if (!(await guardSession())) {
     results.innerHTML = emptyState(
-      "Sesión requerida",
-      "Iniciá sesión para buscar en Zenodo",
+      t("zenodo.searchSessionRequired"),
+      t("zenodo.searchLoginToSearch"),
       true,
     );
-    showToast("Necesitás iniciar sesión para buscar en Zenodo.", "error");
+    showToast(t("zenodo.needLoginToast"), "error");
     return;
   }
 
@@ -375,18 +383,15 @@ async function loadSearch(): Promise<void> {
 
     results.innerHTML =
       total === 0
-        ? emptyState(
-            "Sin resultados",
-            "Probá términos más generales o quitá filtros",
-          )
+        ? emptyState(t("zenodo.noResultsTitle"), t("zenodo.noResultsSubtitle"))
         : data.records.map(recordCard).join("");
   } catch {
     results.innerHTML = emptyState(
-      "Error de conexión",
-      "No se pudo contactar al servidor. Revisá tu conexión e intentá de nuevo.",
+      t("zenodo.connectionErrorTitle"),
+      t("zenodo.connectionErrorSubtitle"),
       true,
     );
-    showToast("Error de conexión con el servidor.", "error");
+    showToast(t("zenodo.connectionErrorToast"), "error");
   }
 }
 
@@ -407,34 +412,30 @@ function searchErrorInfo(
 } {
   if (status === 401) {
     return {
-      title: "Sesión requerida",
-      subtitle:
-        "Tu sesión expiró. Volvé a iniciar sesión para buscar en Zenodo.",
-      toast: "Tu sesión expiró. Iniciá sesión de nuevo.",
+      title: t("zenodo.searchSessionRequired"),
+      subtitle: t("zenodo.error401Subtitle"),
+      toast: t("zenodo.error401Toast"),
     };
   }
   if (status === 429) {
     return {
-      title: "Límite de búsquedas alcanzado",
-      subtitle:
-        "Sin un token de Zenodo configurado, el límite de búsquedas es más bajo. Configurá uno en la pestaña Config o esperá unos minutos.",
-      toast: data.error ?? "Límite de requests a Zenodo alcanzado.",
+      title: t("zenodo.rateLimitTitle"),
+      subtitle: t("zenodo.rateLimitSubtitle"),
+      toast: data.error ?? t("zenodo.rateLimitToastFallback"),
       showConfigLink: true,
     };
   }
   if (status === 503) {
     return {
-      title: "Zenodo no disponible",
-      subtitle:
-        data.error ??
-        "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.",
-      toast: "Zenodo no está disponible en este momento.",
+      title: t("zenodo.unavailableTitle"),
+      subtitle: data.error ?? t("zenodo.unavailableLong"),
+      toast: t("zenodo.unavailableShort"),
     };
   }
   return {
-    title: "Error al buscar",
-    subtitle: data.error ?? "Ocurrió un error inesperado. Intentá de nuevo.",
-    toast: data.error ?? "Error al buscar en Zenodo.",
+    title: t("zenodo.searchErrorTitle"),
+    subtitle: data.error ?? t("zenodo.searchErrorSubtitleFallback"),
+    toast: data.error ?? t("zenodo.searchErrorToastFallback"),
   };
 }
 
@@ -468,9 +469,6 @@ function looksLikeZenodoInput(raw: string): boolean {
   );
 }
 
-const NOT_ZENODO_ERROR =
-  "Este DOI no pertenece a Zenodo — solo se soporta importación desde Zenodo";
-
 let doiVersions: ZenodoVersionInfo[] = [];
 
 function versionPickerHtml(versions: ZenodoVersionInfo[]): string {
@@ -479,13 +477,17 @@ function versionPickerHtml(versions: ZenodoVersionInfo[]): string {
     .slice()
     .reverse()
     .map((v) => {
-      const label = `v${v.version ?? "?"} · ${v.publicationDate ?? "—"}${v.isLatest ? " (más reciente)" : ""}`;
+      const label =
+        t("zenodo.versionOptionLabel", {
+          version: v.version ?? "?",
+          date: v.publicationDate ?? "—",
+        }) + (v.isLatest ? ` ${t("common.mostRecent")}` : "");
       return `<option value="${v.recordId}" ${v.isSelected ? "selected" : ""}>${escapeHtml(label)}</option>`;
     })
     .join("");
   return `
     <div class="z-doi-version-picker">
-      <label for="z-doi-version-select">Versión</label>
+      <label for="z-doi-version-select">${escapeHtml(t("zenodo.versionLabel"))}</label>
       <select id="z-doi-version-select">${options}</select>
     </div>`;
 }
@@ -507,10 +509,7 @@ async function selectDoiVersion(recordId: number): Promise<void> {
     );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}) as { error?: string });
-      showToast(
-        data.error ?? "No se pudo cargar la versión seleccionada.",
-        "error",
-      );
+      showToast(data.error ?? t("zenodo.versionSelectError"), "error");
       return;
     }
     const record: ZenodoRecord = await res.json();
@@ -525,7 +524,7 @@ async function selectDoiVersion(recordId: number): Promise<void> {
         void selectDoiVersion(Number((e.target as HTMLSelectElement).value));
       });
   } catch {
-    showToast("Error de conexión al cargar la versión.", "error");
+    showToast(t("zenodo.versionConnectionError"), "error");
   }
 }
 
@@ -534,13 +533,13 @@ async function resolveDoi(raw: string): Promise<void> {
   const btn = $("btn-z-resolve-doi") as HTMLButtonElement;
 
   if (!looksLikeZenodoInput(input)) {
-    showToast(NOT_ZENODO_ERROR, "error");
+    showToast(t("zenodo.notZenodoDoi"), "error");
     return;
   }
   if (!(await guardSession())) return;
 
   btn.disabled = true;
-  btn.textContent = "Resolviendo…";
+  btn.textContent = t("zenodo.resolving");
 
   try {
     const res = await authFetch(
@@ -549,7 +548,7 @@ async function resolveDoi(raw: string): Promise<void> {
     const data = await res.json().catch(() => ({}) as { error?: string });
     if (!res.ok) {
       showToast(
-        (data as { error?: string }).error ?? "No se pudo resolver el DOI.",
+        (data as { error?: string }).error ?? t("zenodo.doiResolveError"),
         "error",
       );
       return;
@@ -570,10 +569,10 @@ async function resolveDoi(raw: string): Promise<void> {
         void selectDoiVersion(Number((e.target as HTMLSelectElement).value));
       });
   } catch {
-    showToast("Error de conexión al resolver el DOI.", "error");
+    showToast(t("zenodo.doiConnectionError"), "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Importar por DOI";
+    btn.textContent = t("zenodo.importByDoi");
   }
 }
 
@@ -588,13 +587,13 @@ function recordCard(r: ZenodoRecord): string {
     ? hasOnlyZips
       ? `<span class="z-badge z-badge--zip">ZIP·DICOM</span>`
       : `<span class="z-badge z-badge--dicom">DICOM</span>`
-    : `<span class="z-badge z-badge--muted">No importable</span>`;
+    : `<span class="z-badge z-badge--muted">${escapeHtml(t("zenodo.notImportable"))}</span>`;
   const importBtn = r.importable
-    ? `<button class="btn btn--accent btn--xs" data-import-id="${r.id}" data-has-zip="${hasOnlyZips}">${hasOnlyZips ? "Importar ZIP" : "Importar"}</button>`
+    ? `<button class="btn btn--accent btn--xs" data-import-id="${r.id}" data-has-zip="${hasOnlyZips}">${escapeHtml(hasOnlyZips ? t("zenodo.importZip") : t("zenodo.import"))}</button>`
     : "";
 
   const zipNote = hasOnlyZips
-    ? `<p class="z-record-zip-note">El servidor descomprimirá el ZIP e importará los archivos DICOM que contenga.</p>`
+    ? `<p class="z-record-zip-note">${escapeHtml(t("zenodo.zipNote"))}</p>`
     : "";
 
   return `
@@ -606,7 +605,7 @@ function recordCard(r: ZenodoRecord): string {
       <div class="z-record-footer">
         ${importBadge}
         <span class="z-badge z-badge--muted">${formatBytes(r.totalSize)}</span>
-        <span class="z-badge z-badge--muted">${r.numFiles} arch.</span>
+        <span class="z-badge z-badge--muted">${escapeHtml(t("zenodo.filesCountLabel", { count: r.numFiles }))}</span>
         <div style="flex:1"></div>
         ${importBtn}
       </div>
@@ -615,11 +614,9 @@ function recordCard(r: ZenodoRecord): string {
 
 function importErrorMessage(status: number, error: unknown): string {
   if (typeof error === "string" && error) return error;
-  if (status === 404)
-    return "El dataset no existe en este entorno de Zenodo (sandbox/producción).";
-  if (status === 503)
-    return "Zenodo no está disponible en este momento. Intentá de nuevo más tarde.";
-  return `No se pudo importar el dataset (error ${status}).`;
+  if (status === 404) return t("zenodo.datasetNotFound");
+  if (status === 503) return t("zenodo.unavailableLong");
+  return t("zenodo.importFailedGeneric", { status });
 }
 
 async function importRecord(
@@ -628,7 +625,7 @@ async function importRecord(
 ): Promise<void> {
   if (!(await guardSession())) return;
 
-  const origLabel = btn.textContent ?? "Importar";
+  const origLabel = btn.textContent ?? t("zenodo.import");
   btn.disabled = true;
   btn.textContent = "…";
 
@@ -656,14 +653,11 @@ async function importRecord(
       .map((f) => ({ fileKey: f.key }));
 
     const hasZips = files.some((f) => f.fileKey.endsWith(".zip"));
-    if (hasZips) btn.textContent = "Descargando…";
+    if (hasZips) btn.textContent = t("zenodo.downloading");
 
     if (files.length === 0) {
-      showToast(
-        "Este dataset no tiene archivos .dcm ni .zip para importar.",
-        "warning",
-      );
-      btn.textContent = "Sin archivos";
+      showToast(t("zenodo.noImportableFiles"), "warning");
+      btn.textContent = t("zenodo.noFilesShort");
       setTimeout(() => {
         btn.disabled = false;
         btn.textContent = origLabel;
@@ -695,15 +689,18 @@ async function importRecord(
     if (n === 0 && dupes > 0) {
       const msg =
         dupes === 1
-          ? "Este archivo ya estaba importado."
-          : `${dupes} archivos ya estaban importados.`;
+          ? t("zenodo.alreadyImportedSingular")
+          : t("zenodo.alreadyImportedPlural", { count: dupes });
       showToast(msg, "warning");
       btn.disabled = false;
       btn.textContent = origLabel;
       return;
     }
 
-    btn.textContent = `✓ ${n} importado${n !== 1 ? "s" : ""}`;
+    btn.textContent = t("zenodo.importedCount", {
+      count: n,
+      plural: n !== 1 ? "s" : "",
+    });
     btn.classList.add("btn--success");
     setTimeout(() => {
       btn.disabled = false;
@@ -711,8 +708,8 @@ async function importRecord(
       btn.classList.remove("btn--success");
     }, 3000);
   } catch {
-    showToast("Error de conexión al importar el dataset.", "error");
-    btn.textContent = "Error";
+    showToast(t("zenodo.importConnectionError"), "error");
+    btn.textContent = t("common.error");
     setTimeout(() => {
       btn.disabled = false;
       btn.textContent = origLabel;
@@ -726,7 +723,7 @@ function setPaginationUI(
   total: number,
 ): void {
   $("z-pagination-info").textContent =
-    total > 0 ? `${page} / ${totalPages}  ·  ${total} resultados` : "—";
+    total > 0 ? t("zenodo.resultsCount", { page, totalPages, total }) : "—";
   ($("z-prev") as HTMLButtonElement).disabled = page <= 1;
   ($("z-next") as HTMLButtonElement).disabled = page >= totalPages;
 }
@@ -763,8 +760,8 @@ async function loadConfig(): Promise<void> {
     renderConfig(container, status, qS, qP, sync);
   } catch {
     container.innerHTML = emptyState(
-      "Error al cargar config",
-      "Intentá de nuevo",
+      t("zenodo.configLoadError"),
+      t("zenodo.retry"),
       true,
     );
   }

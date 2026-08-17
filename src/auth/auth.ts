@@ -1,3 +1,5 @@
+import { t } from "../i18n/i18n.js";
+
 // Origin the backend API + auth endpoints live on. Default: the backend's own
 // port, for local dev (page opened directly / served without nginx). In the
 // Docker/nginx deployment the page is served same-origin and nginx proxies
@@ -116,20 +118,17 @@ export async function login(
       body: JSON.stringify({ email, password }),
     });
   } catch {
-    // cspell:disable-next-line
-    return { ok: false, error: "No se pudo conectar con el servidor." };
+    return { ok: false, error: t("auth.error.networkError") };
   }
 
   if (res.status === 429) {
     return {
       ok: false,
-      // cspell:disable-next-line
-      error: "Demasiados intentos. Esperá unos minutos e intentá de nuevo.",
+      error: t("auth.error.tooManyAttempts"),
     };
   }
   if (!res.ok) {
-    // cspell:disable-next-line
-    return { ok: false, error: "Email o contraseña incorrectos." };
+    return { ok: false, error: t("auth.error.badCredentials") };
   }
 
   const data = await res.json();

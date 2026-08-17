@@ -954,6 +954,22 @@ body {
   gap: 12px;
 }
 
+.locale-switch__select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+
+.locale-switch__select:focus-visible {
+  border-color: var(--accent);
+}
+
 /* ── Series Navigation ────────────────────────────────────────────────────── */
 .series-nav {
   display: flex;

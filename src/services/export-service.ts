@@ -11,6 +11,7 @@ import { showBanner } from "../shared/banner.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { state } from "../viewer/state.js";
 import { dicomCache } from "../viewer/cache.js";
+import { t } from "../i18n/i18n.js";
 
 export interface StudyExportMetadata {
   studyDate?: string;
@@ -93,10 +94,7 @@ export async function exportCurrentViewToPNG(
       : canvasTarget;
 
   if (!canvas) {
-    showBanner(
-      "No se encontró el canvas de renderizado para exportar PNG.",
-      "error",
-    );
+    showBanner(t("export.canvasNotFound"), "error");
     return;
   }
 
@@ -112,17 +110,17 @@ export async function exportCurrentViewToPNG(
       "png",
     );
 
-  showBanner("Exportando imagen actual a PNG…", "warning");
+  showBanner(t("export.exportingPng"), "warning");
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        showBanner("Error al generar imagen PNG desde el canvas.", "error");
+        showBanner(t("export.canvasBlobError"), "error");
         reject(new Error("Canvas toBlob failed"));
         return;
       }
       downloadBlob(blob, filename);
-      showBanner("Imagen PNG descargada con éxito.", "success");
+      showBanner(t("export.pngSuccess"), "success");
       resolve();
     }, "image/png");
   });
@@ -154,7 +152,7 @@ export async function exportCurrentStudyAsZip(
   opts: { anonymize?: boolean } = {},
 ): Promise<void> {
   const anonymize = opts.anonymize !== false;
-  showBanner("Preparando exportación de estudio .zip…", "warning");
+  showBanner(t("export.preparingZip"), "warning");
 
   try {
     const filesToZip: Array<{ name: string; buffer: ArrayBuffer }> = [];
@@ -165,11 +163,11 @@ export async function exportCurrentStudyAsZip(
       const instances = state.serverInstances;
 
       if (instances.length === 0) {
-        throw new Error("El estudio no contiene imágenes.");
+        throw new Error(t("export.noImagesInStudy"));
       }
 
       showBanner(
-        `Descargando ${instances.length} imágenes del servidor…`,
+        t("export.downloadingServerImages", { count: instances.length }),
         "warning",
       );
 
@@ -185,7 +183,8 @@ export async function exportCurrentStudyAsZip(
           const res = await authFetch(
             `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instanceId)}/file`,
           );
-          if (!res.ok) throw new Error(`Error descargando instancia ${i + 1}`);
+          if (!res.ok)
+            throw new Error(t("export.instanceDownloadError", { index: i + 1 }));
           buf = await res.arrayBuffer();
         }
 
@@ -228,18 +227,15 @@ export async function exportCurrentStudyAsZip(
         };
       }
     } else {
-      throw new Error("No hay ningún estudio cargado para exportar.");
+      throw new Error(t("export.noStudyLoaded"));
     }
 
     const zipFilename = generateDescriptiveFilename(meta, "zip");
     exportStudyToZip(filesToZip, zipFilename);
-    showBanner(
-      `Estudio exportado exitosamente como '${zipFilename}'.`,
-      "success",
-    );
+    showBanner(t("export.zipSuccess", { filename: zipFilename }), "success");
   } catch (err: any) {
     console.error("Export Error:", err);
-    showBanner(`Error al exportar estudio: ${err.message || err}`, "error");
+    showBanner(t("export.genericError", { message: err.message || err }), "error");
   }
 }
 
@@ -252,7 +248,7 @@ export async function exportStudyByIdAsZip(
   opts: { anonymize?: boolean } = {},
 ): Promise<void> {
   const anonymize = opts.anonymize !== false;
-  showBanner("Obteniendo información del estudio en el servidor…", "warning");
+  showBanner(t("export.fetchingStudyInfo"), "warning");
 
   try {
     const res = await authFetch(
@@ -265,11 +261,11 @@ export async function exportStudyByIdAsZip(
     const instanceIds = data.instances.map((x) => x.instanceId);
 
     if (instanceIds.length === 0) {
-      throw new Error("El estudio seleccionado no contiene instancias.");
+      throw new Error(t("export.noInstancesInStudy"));
     }
 
     showBanner(
-      `Descargando ${instanceIds.length} archivos DICOM del estudio…`,
+      t("export.downloadingFiles", { count: instanceIds.length }),
       "warning",
     );
     const filesToZip: Array<{ name: string; buffer: ArrayBuffer }> = [];
@@ -279,7 +275,8 @@ export async function exportStudyByIdAsZip(
       const fRes = await authFetch(
         `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instId)}/file`,
       );
-      if (!fRes.ok) throw new Error(`Error recuperando archivo ${i + 1}`);
+      if (!fRes.ok)
+        throw new Error(t("export.fileFetchError", { index: i + 1 }));
       let buf = await fRes.arrayBuffer();
 
       if (anonymize) {
@@ -292,12 +289,9 @@ export async function exportStudyByIdAsZip(
 
     const zipFilename = generateDescriptiveFilename(studyMeta, "zip");
     exportStudyToZip(filesToZip, zipFilename);
-    showBanner(
-      `Estudio exportado exitosamente como '${zipFilename}'.`,
-      "success",
-    );
+    showBanner(t("export.zipSuccess", { filename: zipFilename }), "success");
   } catch (err: any) {
     console.error("Export study by ID error:", err);
-    showBanner(`Error al exportar estudio: ${err.message || err}`, "error");
+    showBanner(t("export.genericError", { message: err.message || err }), "error");
   }
 }

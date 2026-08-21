@@ -118,6 +118,19 @@ async function setSession(token: string, refreshToken: string, user: AuthUser): 
   notifyAuthChange();
 }
 
+/**
+ * Establish a session from an auth response that already carries tokens — the
+ * accept-invite flow, which mints a live session on the server and hands it back
+ * exactly like login does. Same effect as a successful login().
+ */
+export async function adoptSession(
+  accessToken: string,
+  refreshToken: string,
+  user: AuthUser,
+): Promise<void> {
+  await setSession(accessToken, refreshToken, user);
+}
+
 async function clearSession(): Promise<void> {
   accessToken = null;
   currentUser = null;

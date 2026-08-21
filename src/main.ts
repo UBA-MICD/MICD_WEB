@@ -6,6 +6,11 @@ import {
 } from "./auth/auth.js";
 import { updateAuthUI, initActivityHistory } from "./auth/session-ui.js";
 import {
+  initInviteScreen,
+  enterInviteFlowIfPresent,
+} from "./auth/accept-invite.js";
+import { showScreen } from "./shared/screen.js";
+import {
   initServerScreen,
   openServerScreen,
   promptLoginOnServerScreen,
@@ -94,6 +99,10 @@ async function initApp(): Promise<void> {
   // Local viewing works without a session — always start the app.
   startApp();
 
+  // An invite link takes over the landing: it strips the code from the URL,
+  // shows the accept-invite screen, and skips the normal signed-out flow.
+  if (await enterInviteFlowIfPresent()) return;
+
   // Silent session restore from the stored refresh token; never a popup here.
   const restored = await refreshAccessToken();
   updateAuthUI();
@@ -116,6 +125,13 @@ function startApp(): void {
   initUploadPanel();
   initStudyExplorer();
   initServerScreen();
+  initInviteScreen({
+    onAccepted: () => {
+      showScreen("viewer");
+      updateAuthUI();
+      void loadStudyExplorer();
+    },
+  });
   initActivityHistory();
   initZenodoPanel();
   initStudyDetailPanel();

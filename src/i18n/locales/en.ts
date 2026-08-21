@@ -436,4 +436,14 @@ export const en: Record<string, string> = {
   "users.error.nameRequired": "Name is required.",
   "users.error.emailRequired": "Enter a valid email.",
   "users.error.roleRequired": "Select a valid role.",
+
+  // ── accept-invite (US-H04) ──────────────────────────────────────────────────
+  "invite.title": "Create your account",
+  "invite.forEmail": "You're creating the account for {{email}}.",
+  "invite.password": "Password",
+  "invite.submit": "Create account and sign in",
+  "invite.invalid": "This invitation is invalid or has expired.",
+  "invite.error.tooShort": "Password must be at least 8 characters.",
+  "invite.error.network": "Couldn't connect to the server.",
+  "invite.error.generic": "The operation could not be completed.",
 };

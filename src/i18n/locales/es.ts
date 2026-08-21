@@ -457,4 +457,14 @@ export const es: Record<string, string> = {
   "users.error.nameRequired": "El nombre es obligatorio.",
   "users.error.emailRequired": "Ingresá un correo válido.",
   "users.error.roleRequired": "Seleccioná un rol válido.",
+
+  // ── accept-invite (US-H04) ──────────────────────────────────────────────────
+  "invite.title": "Crear tu cuenta",
+  "invite.forEmail": "Estás creando la cuenta para {{email}}.",
+  "invite.password": "Contraseña",
+  "invite.submit": "Crear cuenta e ingresar",
+  "invite.invalid": "Esta invitación no es válida o ya venció.",
+  "invite.error.tooShort": "La contraseña debe tener al menos 8 caracteres.",
+  "invite.error.network": "No se pudo conectar al servidor.",
+  "invite.error.generic": "No se pudo completar la operación.",
 };

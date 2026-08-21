@@ -1464,6 +1464,18 @@
           >
             Cargar
           </button>
+          <!-- Admin-only: shown/hidden by server-screen.ts renderForSession(). -->
+          <button
+            class="server-tab hidden"
+            id="tab-usuarios"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-usuarios"
+            tabindex="-1"
+            data-i18n="users.tab"
+          >
+            Usuarios
+          </button>
         </div>
       </header>
 
@@ -1835,6 +1847,66 @@
             Finalizar
           </button>
         </footer>
+      </div>
+
+      <!-- Screen: admin-only user management (US-H04). Tab + panel are shown
+           only for the admin role (server-screen.ts renderForSession()). -->
+      <div
+        class="server-panel hidden"
+        id="panel-usuarios"
+        role="tabpanel"
+        aria-labelledby="tab-usuarios"
+        tabindex="0"
+      >
+        <div class="server-panel__body">
+          <form class="user-create" data-user-create>
+            <div class="user-create__fields">
+              <label class="user-create__field">
+                <span data-i18n="users.form.name">Nombre</span>
+                <input type="text" data-user-new-name autocomplete="off" />
+              </label>
+              <label class="user-create__field">
+                <span data-i18n="users.form.email">Correo</span>
+                <input type="email" data-user-new-email autocomplete="off" />
+              </label>
+              <label class="user-create__field">
+                <span data-i18n="users.form.role">Rol</span>
+                <select data-user-new-role>
+                  <option value="medico" data-i18n="users.role.medico">Médico</option>
+                  <option value="investigador" data-i18n="users.role.investigador">
+                    Investigador
+                  </option>
+                  <option value="admin" data-i18n="users.role.admin">Administrador</option>
+                </select>
+              </label>
+              <button
+                class="btn btn--accent"
+                type="submit"
+                data-user-new-submit
+                data-i18n="users.action.create"
+              >
+                Crear usuario
+              </button>
+            </div>
+            <p class="form-error hidden" data-user-new-error role="alert"></p>
+          </form>
+
+          <p class="form-error hidden" data-users-error role="alert"></p>
+
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th data-i18n="users.col.name">Nombre</th>
+                <th data-i18n="users.col.email">Correo</th>
+                <th data-i18n="users.col.role">Rol</th>
+                <th data-i18n="users.col.status">Estado</th>
+                <th data-i18n="users.col.lastAccess">Último acceso</th>
+                <th data-i18n="users.col.actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody data-users-tbody></tbody>
+          </table>
+        </div>
       </div>
     </section>
 

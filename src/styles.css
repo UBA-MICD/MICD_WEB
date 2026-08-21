@@ -3057,3 +3057,68 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* ── Admin users panel (US-H04) ──────────────────────────────────────────── */
+.user-create {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.user-create__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+.user-create__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.user-create__field input,
+.user-create__field select {
+  padding: 0.4rem 0.5rem;
+}
+.form-error {
+  color: var(--color-danger, #c0392b);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+}
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.users-table th,
+.users-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-border, #dcdcdc);
+  vertical-align: middle;
+}
+.users-table th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.user-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.user-empty td {
+  text-align: center;
+  color: var(--color-text-muted, #777);
+  padding: 1.25rem;
+}
+.user-status {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid transparent;
+}
+.user-status--active { color: #1e7e34; border-color: #1e7e34; }
+.user-status--invited { color: #8a6d1a; border-color: #8a6d1a; }
+.user-status--blocked { color: #c0392b; border-color: #c0392b; }

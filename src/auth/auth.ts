@@ -16,9 +16,19 @@ export const API_ORIGIN = resolveApiOrigin();
 
 const API_BASE = `${API_ORIGIN}/api`;
 
+/** The three RBAC roles (mirrors the backend's shared/roles.ts). */
+export type Role = "admin" | "medico" | "investigador";
+
+const ROLES: readonly Role[] = ["admin", "medico", "investigador"];
+
+function isRole(x: unknown): x is Role {
+  return typeof x === "string" && (ROLES as readonly string[]).includes(x);
+}
+
 export interface AuthUser {
   id: number;
   email: string;
+  role: Role;
 }
 
 let accessToken: string | null = null;
@@ -46,6 +56,11 @@ export function getAccessToken(): string | null {
 
 export function getCurrentUser(): AuthUser | null {
   return currentUser;
+}
+
+/** The current user's role, or null when signed out. Drives admin-only UI. */
+export function getCurrentRole(): Role | null {
+  return currentUser?.role ?? null;
 }
 
 export function isAuthenticated(): boolean {
@@ -78,7 +93,14 @@ function decodeToken(token: string): {
     const claims = JSON.parse(atob(base64));
     const user =
       typeof claims.sub === "number" && typeof claims.email === "string"
-        ? { id: claims.sub, email: claims.email }
+        ? {
+            id: claims.sub,
+            email: claims.email,
+            // A token minted before RBAC deployed carries no role; default to a
+            // non-admin so the admin tab stays hidden until the next refresh
+            // (this is cosmetic — the server's 403 is the real boundary).
+            role: isRole(claims.role) ? claims.role : "medico",
+          }
         : null;
     // `exp` is in seconds since the epoch, per RFC 7519.
     const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : null;
@@ -251,6 +273,9 @@ export async function authFetch(
   });
 
   const res = await fetch(input, withAuth(accessToken));
+  // Only 401 escalates (refresh → interactive login). A 403 means the session
+  // is valid but the role is not permitted — return it as-is so the caller can
+  // surface a "forbidden" message; refreshing/re-logging would not help.
   if (res.status !== 401) return res;
 
   if (!(await refreshAccessToken()) && !(await promptLoginOnce())) return res;

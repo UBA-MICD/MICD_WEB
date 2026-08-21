@@ -9,8 +9,9 @@
 // A guest who opens this screen lands on the auth card, which states the rule
 // in plain language, instead of getting a modal thrown over their image.
 
-import { isAuthenticated } from "../auth/auth.js";
+import { isAuthenticated, getCurrentRole, onAuthChange } from "../auth/auth.js";
 import { mountLoginForm } from "../auth/login-form.js";
+import { mountUsersPanel } from "../admin/users-panel.js";
 import {
   loadStudyExplorer,
   getSelectedStudyId,
@@ -30,14 +31,25 @@ import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
 import { initRovingTabindex, nextRovingIndex } from "../shared/roving.js";
 import { t } from "../i18n/i18n.js";
 
-export type ServerTab = "buscar" | "cargar";
+export type ServerTab = "buscar" | "cargar" | "usuarios";
 
 let activeTab: ServerTab = "buscar";
 let loginForm: ReturnType<typeof mountLoginForm> | null = null;
+let usersPanel: ReturnType<typeof mountUsersPanel> | null = null;
 /** Resolves the pending ensureAuthenticated() gate, if one sent us here. */
 let pendingGate: ((ok: boolean) => void) | null = null;
 
-const TABS: ServerTab[] = ["buscar", "cargar"];
+const TABS: ServerTab[] = ["buscar", "cargar", "usuarios"];
+
+/** The "usuarios" tab is admin-only; everything else is for any signed-in user. */
+function isAdmin(): boolean {
+  return getCurrentRole() === "admin";
+}
+
+/** Tabs visible for the current session (drops "usuarios" for non-admins). */
+function visibleTabs(): ServerTab[] {
+  return TABS.filter((tab) => tab !== "usuarios" || isAdmin());
+}
 
 function tabButton(tab: ServerTab): HTMLElement {
   return $(`tab-${tab}`);
@@ -61,6 +73,7 @@ function showTab(tab: ServerTab): void {
   });
 
   if (tab === "buscar") void loadStudyExplorer();
+  if (tab === "usuarios") void usersPanel?.reload();
 }
 
 /**
@@ -78,6 +91,11 @@ function renderForSession(): void {
     loginForm?.reset();
     return;
   }
+
+  // Reveal the admin-only tab only for admins; if a non-admin somehow lands on
+  // it (e.g. a role change on refresh), fall back to the default tab.
+  tabButton("usuarios").classList.toggle("hidden", !isAdmin());
+  if (activeTab === "usuarios" && !isAdmin()) activeTab = "buscar";
   showTab(activeTab);
 }
 
@@ -141,27 +159,38 @@ export function initServerScreen(): void {
       renderForSession();
     },
   });
+  usersPanel = mountUsersPanel($("panel-usuarios"));
+
+  // A role change (e.g. surfaced on the next token refresh) must re-evaluate the
+  // admin tab's visibility while the screen is already open.
+  onAuthChange(() => {
+    if (isAuthenticated()) renderForSession();
+  });
 
   $("btn-server-back").addEventListener("click", () => closeServerScreen());
 
-  // One tab stop for the tablist, arrow keys within it (WCAG tabs pattern).
+  // One tab stop for the tablist, arrow keys within it (WCAG tabs pattern). The
+  // :not(.hidden) selector keeps the admin-only tab out of the roving cycle for
+  // non-admins (it queries live, so it follows the tab's visibility).
   const tabs = $("server-tabs");
-  initRovingTabindex(tabs, '[role="tab"]', "horizontal");
+  initRovingTabindex(tabs, '[role="tab"]:not(.hidden)', "horizontal");
   tabs.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
     if (!btn) return;
-    showTab(btn.id === "tab-cargar" ? "cargar" : "buscar");
+    const tab = btn.id.replace(/^tab-/, "") as ServerTab;
+    if (visibleTabs().includes(tab)) showTab(tab);
   });
   // Arrow keys move focus (roving); they should select the focused tab too,
   // which is the "automatic activation" half of the tabs pattern.
   tabs.addEventListener("keydown", (e: KeyboardEvent) => {
-    const current = TABS.indexOf(activeTab);
-    if (nextRovingIndex(e.key, current, TABS.length, "horizontal") === null)
+    const nav = visibleTabs();
+    const current = nav.indexOf(activeTab);
+    if (nextRovingIndex(e.key, current, nav.length, "horizontal") === null)
       return;
     // The roving handler has already moved focus by the time this runs.
     queueMicrotask(() => {
       const focused = document.activeElement;
-      const tab = TABS.find((name) => tabButton(name) === focused);
+      const tab = nav.find((name) => tabButton(name) === focused);
       if (tab && tab !== activeTab) showTab(tab);
     });
   });

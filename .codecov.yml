@@ -5,16 +5,17 @@ coverage:
   status:
     project:
       default:
-        target: 70%
+        target: 80%
         threshold: 0%
     patch:
       default:
-        target: 70%
+        target: 80%
 
 ignore:
   - "node_modules"
   - "dist"
   - "src/**/*.test.ts"
+  - "test"
   - ".github"
   - "Dockerfile"
   - "docker-compose.yml"

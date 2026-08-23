@@ -1,16 +1,19 @@
-// ── Accept-invite screen ─────────────────────────────────────────────────────
+// ── Accept-invite: URL screen + activation dialog ────────────────────────────
 //
-// A public, session-less surface reached from an emailed ?invite=<code> link. It
-// validates the code (naming the account), takes a password, redeems the invite,
-// and drops the user straight into the authenticated app. The code is stripped
-// from the URL on entry so it doesn't leak via history or the Referer header.
+// Two public, session-less surfaces to redeem an invite:
+//   • the accept-invite *screen*, reached from an emailed ?invite=<code> link
+//     (the code is stripped from the URL on entry so it can't leak via history
+//     or the Referer header), and
+//   • the "Were you invited?" *dialog* on the login card, where the user pastes
+//     the email + code they received (the path the desktop app needs, since
+//     Electron loads from file:// and no email link can open it).
 //
-// Parsing and password validation are pure (unit-tested); the fetch/DOM wiring
-// is the rest.
+// Both share the same pure checks and the same fetch helpers below.
 
 import { API_ORIGIN, adoptSession, type AuthUser } from "./auth.js";
 import { t } from "../i18n/i18n.js";
 import { registerScreen, showScreen } from "../shared/screen.js";
+import { openDialog, closeDialog } from "../shared/dialog.js";
 import { $ } from "../shared/dom.js";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -36,12 +39,66 @@ interface InviteScreenDeps {
   onAccepted: () => void;
 }
 
-let deps: InviteScreenDeps | null = null;
+/** Look up the email a code belongs to. `invalid` distinguishes a bad/expired
+ *  code (404) from a network failure, so callers can word the error right. */
+export async function fetchInviteEmail(
+  code: string,
+): Promise<
+  | { ok: true; email: string }
+  | { ok: false; invalid: boolean; error: string }
+> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_ORIGIN}/auth/invite/${encodeURIComponent(code)}`);
+  } catch {
+    return { ok: false, invalid: false, error: t("invite.error.network") };
+  }
+  if (!res.ok) {
+    return { ok: false, invalid: true, error: t("invite.invalid") };
+  }
+  const { email } = await res.json();
+  return { ok: true, email };
+}
+
+/** Redeem a code + password: sets the password, activates the account, and
+ *  adopts the returned session so the app is signed in on success. */
+export async function redeemInvite(
+  code: string,
+  password: string,
+): Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_ORIGIN}/auth/accept-invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, password }),
+    });
+  } catch {
+    return { ok: false, error: t("invite.error.network") };
+  }
+  if (!res.ok) {
+    let error = t("invite.error.generic");
+    try {
+      const body = await res.json();
+      if (typeof body.error === "string") error = body.error;
+    } catch {
+      // keep the generic message
+    }
+    return { ok: false, error };
+  }
+  const data = await res.json();
+  await adoptSession(data.accessToken, data.refreshToken, data.user);
+  return { ok: true, user: data.user };
+}
+
+// ── Accept-invite screen (from the ?invite= link) ────────────────────────────
+
+let screenDeps: InviteScreenDeps | null = null;
 let currentCode: string | null = null;
 
 /** Mount + register the invite screen. Call once during app bootstrap. */
 export function initInviteScreen(d: InviteScreenDeps): void {
-  deps = d;
+  screenDeps = d;
   registerScreen("invite", $("invite-screen"));
 
   const form = $("invite-screen").querySelector<HTMLFormElement>("[data-invite-form]")!;
@@ -66,7 +123,7 @@ export function initInviteScreen(d: InviteScreenDeps): void {
     }
 
     submitEl.disabled = true;
-    const result = await acceptInvite(currentCode, passwordEl.value);
+    const result = await redeemInvite(currentCode, passwordEl.value);
     submitEl.disabled = false;
 
     if (!result.ok) {
@@ -74,7 +131,7 @@ export function initInviteScreen(d: InviteScreenDeps): void {
       return;
     }
     form.reset();
-    deps?.onAccepted();
+    screenDeps?.onAccepted();
   });
 }
 
@@ -102,55 +159,90 @@ async function loadInviteEmail(code: string): Promise<void> {
   const formEl = $("invite-screen").querySelector<HTMLElement>("[data-invite-form]")!;
   const invalidEl = $("invite-screen").querySelector<HTMLElement>("[data-invite-invalid]")!;
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_ORIGIN}/auth/invite/${encodeURIComponent(code)}`);
-  } catch {
-    showInvalid(t("invite.error.network"), formEl, invalidEl);
+  const info = await fetchInviteEmail(code);
+  if (!info.ok) {
+    currentCode = null;
+    formEl.classList.add("hidden");
+    invalidEl.textContent = info.error;
+    invalidEl.classList.remove("hidden");
     return;
   }
-  if (!res.ok) {
-    showInvalid(t("invite.invalid"), formEl, invalidEl);
-    return;
-  }
-  const { email } = await res.json();
-  emailEl.textContent = t("invite.forEmail", { email });
+  emailEl.textContent = t("invite.forEmail", { email: info.email });
   formEl.classList.remove("hidden");
   invalidEl.classList.add("hidden");
 }
 
-function showInvalid(msg: string, formEl: HTMLElement, invalidEl: HTMLElement): void {
-  currentCode = null;
-  formEl.classList.add("hidden");
-  invalidEl.textContent = msg;
-  invalidEl.classList.remove("hidden");
-}
+// ── Activation dialog (from the login card's "Were you invited?" link) ───────
 
-async function acceptInvite(
-  code: string,
-  password: string,
-): Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_ORIGIN}/auth/accept-invite`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, password }),
-    });
-  } catch {
-    return { ok: false, error: t("invite.error.network") };
-  }
-  if (!res.ok) {
-    let error = t("invite.error.generic");
-    try {
-      const body = await res.json();
-      if (typeof body.error === "string") error = body.error;
-    } catch {
-      // keep the generic message
+/** Wire the "Were you invited?" trigger and its modal. Call once at bootstrap. */
+export function initInviteDialog(d: InviteScreenDeps): void {
+  const overlay = $("invite-dialog");
+  const form = overlay.querySelector<HTMLFormElement>("[data-invite-dialog-form]")!;
+  const emailEl = form.querySelector<HTMLInputElement>("[data-invite-dialog-email]")!;
+  const codeEl = form.querySelector<HTMLInputElement>("[data-invite-dialog-code]")!;
+  const passwordEl = form.querySelector<HTMLInputElement>("[data-invite-dialog-password]")!;
+  const errorEl = form.querySelector<HTMLElement>("[data-invite-dialog-error]")!;
+  const submitEl = form.querySelector<HTMLButtonElement>("[data-invite-dialog-submit]")!;
+  const cancelEl = form.querySelector<HTMLButtonElement>("[data-invite-dialog-cancel]")!;
+
+  const showError = (msg: string): void => {
+    errorEl.textContent = msg;
+    errorEl.classList.remove("hidden");
+  };
+
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-invite-open]")
+    .forEach((opener) =>
+      opener.addEventListener("click", (e) => {
+        form.reset();
+        errorEl.classList.add("hidden");
+        openDialog(overlay, e.currentTarget as HTMLElement);
+      }),
+    );
+
+  cancelEl.addEventListener("click", () => closeDialog(overlay));
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorEl.classList.add("hidden");
+
+    const email = emailEl.value.trim();
+    const code = codeEl.value.trim();
+    if (!email || !code) {
+      showError(t("invite.dialog.missing"));
+      return;
     }
-    return { ok: false, error };
-  }
-  const data = await res.json();
-  await adoptSession(data.accessToken, data.refreshToken, data.user);
-  return { ok: true, user: data.user };
+    const pw = validateInvitePassword(passwordEl.value);
+    if (!pw.ok) {
+      showError(pw.error);
+      return;
+    }
+
+    overlay.dataset.dialogBusy = "true"; // block Escape while a request is out
+    submitEl.disabled = true;
+    try {
+      const info = await fetchInviteEmail(code);
+      if (!info.ok) {
+        showError(info.error);
+        return;
+      }
+      // The code identifies the account; the typed email is a guard against a
+      // mistyped or wrong code, and gives a clearer error than a blind redeem.
+      if (info.email.trim().toLowerCase() !== email.toLowerCase()) {
+        showError(t("invite.dialog.emailMismatch"));
+        return;
+      }
+      const result = await redeemInvite(code, passwordEl.value);
+      if (!result.ok) {
+        showError(result.error);
+        return;
+      }
+      form.reset();
+      closeDialog(overlay);
+      d.onAccepted();
+    } finally {
+      submitEl.disabled = false;
+      delete overlay.dataset.dialogBusy;
+    }
+  });
 }

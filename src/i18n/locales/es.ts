@@ -24,6 +24,7 @@ export const es: Record<string, string> = {
   "auth.logout": "Cerrar sesión",
   "auth.passwordLabel": "Contraseña",
   "auth.submitLogin": "Ingresar",
+  "auth.wereYouInvited": "¿Te invitaron? Activá tu cuenta",
   "auth.loginRequiredMsg":
     "Se requiere sesión para buscar o subir estudios en el servidor. La visualización local no la necesita.",
   "auth.sessionActive": "Sesión activa",
@@ -467,4 +468,12 @@ export const es: Record<string, string> = {
   "invite.error.tooShort": "La contraseña debe tener al menos 8 caracteres.",
   "invite.error.network": "No se pudo conectar al servidor.",
   "invite.error.generic": "No se pudo completar la operación.",
+  "invite.dialog.title": "Activá tu cuenta",
+  "invite.dialog.msg":
+    "Ingresá tu email y el código que recibiste por correo, y elegí una contraseña.",
+  "invite.dialog.emailLabel": "Email",
+  "invite.dialog.codeLabel": "Código de invitación",
+  "invite.dialog.missing": "Ingresá tu email y el código de invitación.",
+  "invite.dialog.emailMismatch":
+    "Ese código no corresponde a ese email. Revisá ambos.",
 };

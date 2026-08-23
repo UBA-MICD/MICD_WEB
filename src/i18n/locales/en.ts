@@ -23,6 +23,7 @@ export const en: Record<string, string> = {
   "auth.logout": "Log out",
   "auth.passwordLabel": "Password",
   "auth.submitLogin": "Sign in",
+  "auth.wereYouInvited": "Were you invited? Activate your account",
   "auth.loginRequiredMsg":
     "A session is required to search or upload studies on the server. Local viewing doesn't need one.",
   "auth.sessionActive": "Active session",
@@ -446,4 +447,12 @@ export const en: Record<string, string> = {
   "invite.error.tooShort": "Password must be at least 8 characters.",
   "invite.error.network": "Couldn't connect to the server.",
   "invite.error.generic": "The operation could not be completed.",
+  "invite.dialog.title": "Activate your account",
+  "invite.dialog.msg":
+    "Enter your email and the code you received by email, and choose a password.",
+  "invite.dialog.emailLabel": "Email",
+  "invite.dialog.codeLabel": "Invitation code",
+  "invite.dialog.missing": "Enter your email and invitation code.",
+  "invite.dialog.emailMismatch":
+    "That code doesn't match that email. Check both.",
 };

@@ -3,6 +3,9 @@ import {
   authFetch,
   ensureAuthenticated,
   isAuthenticated,
+  isAdmin,
+  isStaff,
+  onAuthChange,
   API_BASE,
 } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
@@ -132,6 +135,13 @@ export function initZenodoPanel(): void {
   document.querySelectorAll<HTMLElement>(".z-tab").forEach((tab) => {
     tab.addEventListener("click", () => switchTab(tab.dataset.tab as Tab));
   });
+
+  // Publish/Config/Logs are admin-only server-side; hide them for everyone else
+  // (a researcher or médico would only meet a 403). Re-run on auth change so a
+  // role that surfaces on token refresh repaints the tabs. Search stays open to
+  // all three roles.
+  applyRoleVisibility();
+  onAuthChange(() => applyRoleVisibility());
 
   // Search bar
   const input = $("z-search-input") as HTMLInputElement;
@@ -295,6 +305,24 @@ function setPanelOpen(open: boolean): void {
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
+
+/** Admin-only Zenodo tabs (search is open to all roles). */
+const ADMIN_TABS: readonly Tab[] = ["publish", "config", "logs"];
+
+/**
+ * Show the admin-only tabs to admins only, and if the current tab has just
+ * become off-limits, fall back to Search. Called at init and on every auth
+ * change so a role downgrade can't strand the user on a tab that 403s.
+ */
+function applyRoleVisibility(): void {
+  const admin = isAdmin();
+  ADMIN_TABS.forEach((tab) => {
+    document
+      .querySelector<HTMLElement>(`.z-tab[data-tab="${tab}"]`)
+      ?.classList.toggle("hidden", !admin);
+  });
+  if (!admin && ADMIN_TABS.includes(state.tab)) switchTab("search");
+}
 
 function switchTab(tab: Tab): void {
   state.tab = tab;
@@ -588,9 +616,12 @@ function recordCard(r: ZenodoRecord): string {
       ? `<span class="z-badge z-badge--zip">ZIP·DICOM</span>`
       : `<span class="z-badge z-badge--dicom">DICOM</span>`
     : `<span class="z-badge z-badge--muted">${escapeHtml(t("zenodo.notImportable"))}</span>`;
-  const importBtn = r.importable
-    ? `<button class="btn btn--accent btn--xs" data-import-id="${r.id}" data-has-zip="${hasOnlyZips}">${escapeHtml(hasOnlyZips ? t("zenodo.importZip") : t("zenodo.import"))}</button>`
-    : "";
+  // Import is a write (clinical staff only). A researcher can browse the public
+  // corpus but not pull it in, so drop the button rather than 403 on click.
+  const importBtn =
+    r.importable && isStaff()
+      ? `<button class="btn btn--accent btn--xs" data-import-id="${r.id}" data-has-zip="${hasOnlyZips}">${escapeHtml(hasOnlyZips ? t("zenodo.importZip") : t("zenodo.import"))}</button>`
+      : "";
 
   const zipNote = hasOnlyZips
     ? `<p class="z-record-zip-note">${escapeHtml(t("zenodo.zipNote"))}</p>`

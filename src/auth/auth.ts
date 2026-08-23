@@ -63,6 +63,27 @@ export function getCurrentRole(): Role | null {
   return currentUser?.role ?? null;
 }
 
+/**
+ * Role capability checks mirroring the backend's requireRole gates (see the
+ * `backend` repo's route files). The UI uses these to hide actions a role would
+ * only be refused server-side — an `investigador` (researcher) is read-only, so
+ * showing an Upload tab or a Publish button just to hand back a 403 reads as a
+ * bug. The server's 403 remains the real boundary; this is cosmetic.
+ *
+ *  - `isAdmin`  — user management, Zenodo config/publish, activity log.
+ *  - `isStaff`  — clinical staff (admin + medico): may write — upload, import,
+ *                 and the study Zenodo publish-check.
+ *  - researcher — `investigador`: read-only, neither of the above.
+ */
+export function isAdmin(): boolean {
+  return getCurrentRole() === "admin";
+}
+
+export function isStaff(): boolean {
+  const role = getCurrentRole();
+  return role === "admin" || role === "medico";
+}
+
 export function isAuthenticated(): boolean {
   return accessToken !== null;
 }

@@ -1521,6 +1521,17 @@
           >
             Ingresar
           </button>
+          <!-- Invited users activate here: no working email link is needed on
+               desktop (Electron loads from file://), so the code is entered by
+               hand in a modal. -->
+          <button
+            type="button"
+            class="btn btn--outline btn--full"
+            data-invite-open
+            data-i18n="auth.wereYouInvited"
+          >
+            ¿Te invitaron? Activá tu cuenta
+          </button>
         </form>
 
         <!-- Desktop only: nginx already proxies /api and /auth same-origin
@@ -2087,6 +2098,79 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Activate an invited account by entering the emailed code (US-H04).
+         The URL-based accept-invite screen still works; this modal is the path
+         for the desktop app and for anyone who has the code but no live link. -->
+    <div id="invite-dialog" class="dialog-overlay hidden">
+      <form
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invite-dialog-title"
+        data-invite-dialog-form
+      >
+        <h3
+          class="dialog__title"
+          id="invite-dialog-title"
+          data-i18n="invite.dialog.title"
+        >
+          Activá tu cuenta
+        </h3>
+        <p class="dialog__msg" data-i18n="invite.dialog.msg">
+          Ingresá tu email y el código que recibiste por correo, y elegí una
+          contraseña.
+        </p>
+        <label class="login-field">
+          <span data-i18n="invite.dialog.emailLabel">Email</span>
+          <input
+            type="email"
+            data-invite-dialog-email
+            data-dialog-autofocus
+            required
+            autocomplete="username"
+          />
+        </label>
+        <label class="login-field">
+          <span data-i18n="invite.dialog.codeLabel">Código de invitación</span>
+          <input
+            type="text"
+            data-invite-dialog-code
+            required
+            autocomplete="one-time-code"
+            spellcheck="false"
+          />
+        </label>
+        <label class="login-field">
+          <span data-i18n="invite.password">Contraseña</span>
+          <input
+            type="password"
+            data-invite-dialog-password
+            required
+            autocomplete="new-password"
+          />
+        </label>
+        <p class="login-error hidden" data-invite-dialog-error role="alert"></p>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--accent"
+            type="submit"
+            data-invite-dialog-submit
+            data-i18n="invite.submit"
+          >
+            Crear cuenta e ingresar
+          </button>
+          <button
+            class="btn btn--secondary"
+            type="button"
+            data-invite-dialog-cancel
+            data-i18n="common.cancel"
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
     </div>
 
     <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->

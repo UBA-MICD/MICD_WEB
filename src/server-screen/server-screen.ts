@@ -9,7 +9,7 @@
 // A guest who opens this screen lands on the auth card, which states the rule
 // in plain language, instead of getting a modal thrown over their image.
 
-import { isAuthenticated, getCurrentRole, onAuthChange } from "../auth/auth.js";
+import { isAuthenticated, isAdmin, isStaff, onAuthChange } from "../auth/auth.js";
 import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import {
@@ -41,14 +41,18 @@ let pendingGate: ((ok: boolean) => void) | null = null;
 
 const TABS: ServerTab[] = ["buscar", "cargar", "usuarios"];
 
-/** The "usuarios" tab is admin-only; everything else is for any signed-in user. */
-function isAdmin(): boolean {
-  return getCurrentRole() === "admin";
+/** Can the current session use a tab? "usuarios" is admin-only; "cargar"
+ *  (upload) is a write, so clinical staff only — a researcher is read-only and
+ *  would just get a 403, so we hide it rather than let it look broken. */
+function canUseTab(tab: ServerTab): boolean {
+  if (tab === "usuarios") return isAdmin();
+  if (tab === "cargar") return isStaff();
+  return true;
 }
 
-/** Tabs visible for the current session (drops "usuarios" for non-admins). */
+/** Tabs visible for the current session (drops the ones the role can't use). */
 function visibleTabs(): ServerTab[] {
-  return TABS.filter((tab) => tab !== "usuarios" || isAdmin());
+  return TABS.filter(canUseTab);
 }
 
 function tabButton(tab: ServerTab): HTMLElement {
@@ -92,10 +96,11 @@ function renderForSession(): void {
     return;
   }
 
-  // Reveal the admin-only tab only for admins; if a non-admin somehow lands on
-  // it (e.g. a role change on refresh), fall back to the default tab.
-  tabButton("usuarios").classList.toggle("hidden", !isAdmin());
-  if (activeTab === "usuarios" && !isAdmin()) activeTab = "buscar";
+  // Reveal each role-gated tab only where the role permits it; if the active
+  // tab is now off-limits (e.g. a role change surfaced on refresh), fall back
+  // to Buscar, which every signed-in role can use.
+  TABS.forEach((tab) => tabButton(tab).classList.toggle("hidden", !canUseTab(tab)));
+  if (!canUseTab(activeTab)) activeTab = "buscar";
   showTab(activeTab);
 }
 

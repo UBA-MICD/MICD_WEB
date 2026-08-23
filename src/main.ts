@@ -7,6 +7,7 @@ import {
 import { updateAuthUI, initActivityHistory } from "./auth/session-ui.js";
 import {
   initInviteScreen,
+  initInviteDialog,
   enterInviteFlowIfPresent,
 } from "./auth/accept-invite.js";
 import { showScreen } from "./shared/screen.js";
@@ -125,13 +126,13 @@ function startApp(): void {
   initUploadPanel();
   initStudyExplorer();
   initServerScreen();
-  initInviteScreen({
-    onAccepted: () => {
-      showScreen("viewer");
-      updateAuthUI();
-      void loadStudyExplorer();
-    },
-  });
+  const onInviteAccepted = (): void => {
+    showScreen("viewer");
+    updateAuthUI();
+    void loadStudyExplorer();
+  };
+  initInviteScreen({ onAccepted: onInviteAccepted });
+  initInviteDialog({ onAccepted: onInviteAccepted });
   initActivityHistory();
   initZenodoPanel();
   initStudyDetailPanel();

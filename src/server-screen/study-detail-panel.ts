@@ -1,5 +1,5 @@
 /* cspell:disable */
-import { authFetch, API_BASE } from "../auth/auth.js";
+import { authFetch, isStaff, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
 import { onSelectionChange } from "../explorer/explorer.js";
@@ -187,13 +187,18 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
       </button>`
     : "";
 
-  const actionsHtml = `
+  // "Check for updates" and "import latest" both write via staff-only Zenodo
+  // endpoints; a read-only researcher would only get a 403, so the whole action
+  // row is staff-only. The anonymized-ZIP export below stays — it's a read.
+  const actionsHtml = isStaff()
+    ? `
     <div class="study-detail-panel__actions">
       <button type="button" class="btn btn--secondary study-detail-panel__check-btn">
         ${escapeHtml(t("studyDetail.checkUpdate"))}
       </button>
       ${importButtonHtml}
-    </div>`;
+    </div>`
+    : "";
 
   content().innerHTML = `
     ${staleWarning}

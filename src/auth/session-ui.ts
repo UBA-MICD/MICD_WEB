@@ -1,5 +1,6 @@
 import {
   isAuthenticated,
+  isAdmin,
   getCurrentUser,
   getSessionExpiresAt,
   authFetch,
@@ -96,7 +97,9 @@ export function updateAuthUI(): void {
 
   $("btn-login").classList.toggle("hidden", authed);
   $("session-block").classList.toggle("hidden", !authed);
-  $("btn-activity").classList.toggle("hidden", !authed);
+  // The activity log is admin-only server-side; a non-admin who opened it only
+  // ever got a load error, so the button shows for admins alone.
+  $("btn-activity").classList.toggle("hidden", !(authed && isAdmin()));
 
   if (!authed) {
     stopTicking();

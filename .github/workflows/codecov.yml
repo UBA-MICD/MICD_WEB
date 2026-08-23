@@ -2,7 +2,7 @@ name: Code Coverage
 
 on:
   push:
-    branches: [dev]
+    branches: [main, dev]
   pull_request:
     branches: [ main, dev ]
 
@@ -13,6 +13,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Full history so Codecov can compute the real base->head diff. With
+          # the default shallow clone (fetch-depth: 1) it can't, and falls back
+          # to counting every uncovered line in each touched file as "the patch"
+          # — which is why a +5-line change to a 640-line file showed ~530
+          # "missing" lines. Patch coverage needs the actual diff.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

@@ -12,6 +12,7 @@ import {
   setUserRole,
   setUserStatus,
   deleteUser,
+  exportAuditLogCsv,
   usersTableHtml,
   validateNewUser,
   type AdminUser,
@@ -20,6 +21,7 @@ import { type Role } from "../auth/auth.js";
 import { t } from "../i18n/i18n.js";
 import { onLocaleChange } from "../i18n/i18n.js";
 import { showToast } from "../shared/banner.js";
+import { downloadBlob } from "../services/export-service.js";
 
 export interface UsersPanelHandle {
   /** (Re)load the list from the server and render it. */
@@ -34,6 +36,7 @@ export function mountUsersPanel(root: HTMLElement): UsersPanelHandle {
   const emailEl = form.querySelector<HTMLInputElement>("[data-user-new-email]")!;
   const roleEl = form.querySelector<HTMLSelectElement>("[data-user-new-role]")!;
   const formErr = form.querySelector<HTMLElement>("[data-user-new-error]")!;
+  const exportBtn = root.querySelector<HTMLButtonElement>("[data-users-export]")!;
 
   let users: AdminUser[] = [];
 
@@ -67,6 +70,23 @@ export function mountUsersPanel(root: HTMLElement): UsersPanelHandle {
 
   // Re-render (translated labels) when the language changes.
   onLocaleChange(() => render());
+
+  // ── Audit log CSV export (TK-06) ─────────────────────────────────────────────
+  exportBtn.addEventListener("click", async () => {
+    exportBtn.disabled = true;
+    const result = await exportAuditLogCsv();
+    exportBtn.disabled = false;
+
+    if (!result.ok) {
+      showToast(
+        result.status === 403 ? t("users.error.forbidden") : result.error,
+        "error",
+      );
+      return;
+    }
+    const saved = await downloadBlob(result.data, "audit-log.csv");
+    if (!saved) showToast(t("export.saveCanceled"), "warning");
+  });
 
   // ── Create ──────────────────────────────────────────────────────────────────
   form.addEventListener("submit", async (e) => {

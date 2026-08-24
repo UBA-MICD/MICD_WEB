@@ -25,6 +25,7 @@ beforeEach(() => {
 
   setBody(`
     <div id="panel-usuarios">
+      <button data-users-export type="button">Export</button>
       <div data-users-error class="hidden"></div>
       <table><tbody data-users-tbody></tbody></table>
       <form data-user-create>
@@ -280,6 +281,7 @@ test("clicking delete, when confirmed, deletes the user and reloads", async () =
 test("a failed delete shows a toast but does not throw, then reloads", async () => {
   setBody(`
     <div id="panel-usuarios">
+      <button data-users-export type="button">Export</button>
       <div data-users-error class="hidden"></div>
       <table><tbody data-users-tbody></tbody></table>
       <form data-user-create>
@@ -305,4 +307,80 @@ test("a failed delete shows a toast but does not throw, then reloads", async () 
     await new Promise((r) => setTimeout(r, 0));
     await new Promise((r) => setTimeout(r, 0));
   });
+});
+
+// ── Audit log CSV export (TK-06) ────────────────────────────────────────────
+
+test("clicking the export button fetches the admin-only CSV endpoint", async () => {
+  // downloadBlob()'s browser fallback calls the real global URL.createObjectURL,
+  // which (outside jsdom) rejects a jsdom-realm Blob as "not a Blob instance" —
+  // stub it the same way export-service.test.ts does for its own downloadBlob
+  // coverage, restoring afterwards so other tests keep the real one.
+  const realCreateObjectURL = URL.createObjectURL;
+  const realRevokeObjectURL = URL.revokeObjectURL;
+  URL.createObjectURL = () => "blob:mock-url";
+  URL.revokeObjectURL = () => {};
+
+  try {
+    let exportCalls = 0;
+    fetchImpl = async (url, init) => {
+      if (url === `${API_BASE}/v1/activity/export`) {
+        exportCalls++;
+        assert.equal(init?.method, undefined);
+        return {
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(["timestamp,action\n"], { type: "text/csv" }),
+        } as unknown as Response;
+      }
+      return jsonResponse(200, [sampleUser]);
+    };
+    mountUsersPanel(root());
+
+    const btn = root().querySelector("[data-users-export]") as HTMLButtonElement;
+    await assert.doesNotReject(async () => {
+      btn.dispatchEvent(new Event("click", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    assert.equal(exportCalls, 1);
+    assert.equal(btn.disabled, false);
+  } finally {
+    URL.createObjectURL = realCreateObjectURL;
+    URL.revokeObjectURL = realRevokeObjectURL;
+  }
+});
+
+test("a forbidden export shows a toast and does not throw", async () => {
+  setBody(`
+    <div id="panel-usuarios">
+      <button data-users-export type="button">Export</button>
+      <div data-users-error class="hidden"></div>
+      <table><tbody data-users-tbody></tbody></table>
+      <form data-user-create>
+        <input data-user-new-name /><input data-user-new-email />
+        <select data-user-new-role><option value="medico">M</option></select>
+        <div data-user-new-error class="hidden"></div>
+        <button data-user-new-submit type="submit">Create</button>
+      </form>
+    </div>
+    <div id="app-banner" class="hidden"></div>
+    <div id="toast-container"></div>
+  `);
+  fetchImpl = async (url) =>
+    url === `${API_BASE}/v1/activity/export`
+      ? jsonResponse(403, { error: "forbidden" })
+      : jsonResponse(200, []);
+  mountUsersPanel(root());
+
+  const btn = root().querySelector("[data-users-export]") as HTMLButtonElement;
+  await assert.doesNotReject(async () => {
+    btn.dispatchEvent(new Event("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  const toast = document.getElementById("toast-container")!;
+  assert.match(toast.innerHTML, /toast--error/);
 });

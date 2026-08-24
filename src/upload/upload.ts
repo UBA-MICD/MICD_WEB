@@ -628,7 +628,8 @@ function showDuplicateDialog(
 
   ($("duplicate-yes") as HTMLButtonElement).onclick = () => finish(true);
   ($("duplicate-no") as HTMLButtonElement).onclick = () => finish(false);
-  ($("duplicate-cancel-all") as HTMLButtonElement).onclick = () => finish(false, true);
+  const cancelAllBtn = document.getElementById("duplicate-cancel-all") as HTMLButtonElement | null;
+  if (cancelAllBtn) cancelAllBtn.onclick = () => finish(false, true);
   // Escape closes without replacing — the safe outcome for a destructive
   // confirmation, and the queue must not stall waiting on a promise.
   dialog.addEventListener("dialog:close", () => finish(false), { once: true });

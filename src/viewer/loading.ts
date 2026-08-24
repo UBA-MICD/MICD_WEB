@@ -9,6 +9,7 @@ import {
 } from "../dicom/dicom-renderer.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
+import { expandFiles } from "../upload/zip-expand.js";
 import { $, showLoading, showError } from "../shared/dom.js";
 import { state } from "./state.js";
 import { dicomCache } from "./cache.js";
@@ -87,12 +88,16 @@ export function initFileInputs(): void {
   const filesInput = $("open-files-input") as HTMLInputElement;
   filesInput.addEventListener("change", async () => {
     if (!filesInput.files || filesInput.files.length === 0) return;
+    const selected = Array.from(filesInput.files);
+    filesInput.value = "";
+    const { files: expanded } = await expandFiles(selected, null);
+    const dcmFiles = collectDicomFiles(expanded);
+    if (dcmFiles.length === 0) { showError(t("viewer.folderNoDicom")); return; }
     dicomCache.clear();
-    state.files = collectDicomFiles(Array.from(filesInput.files));
+    state.files = dcmFiles;
     state.currentIndex = 0;
     state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
     await loadCurrent();
-    filesInput.value = "";
   });
 
   // Folder picker — loads every DICOM image in the folder so you can walk through them

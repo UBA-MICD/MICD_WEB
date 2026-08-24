@@ -9,7 +9,7 @@ import {
   API_BASE,
 } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
-import { showToast } from "../shared/banner.js";
+import { showBanner, showToast } from "../shared/banner.js";
 import { t, currentLocale, onLocaleChange } from "../i18n/i18n.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -59,6 +59,16 @@ interface SyncConfig {
   interval_hours: number | null;
   last_run_at: string | null;
   valid_intervals: number[];
+}
+
+interface OrthancStats {
+  disk_used_mb: number;
+  disk_max_mb: number | null;
+  disk_used_pct: number | null;
+  alert: boolean | null;
+  count_studies: number;
+  count_series: number;
+  count_instances: number;
 }
 
 // ── State ──────────────────────────────────────────────────────────────────────
@@ -789,12 +799,53 @@ async function loadConfig(): Promise<void> {
         };
 
     renderConfig(container, status, qS, qP, sync);
+    showQuotaAlertBanner(qS, qP);
   } catch {
     container.innerHTML = emptyState(
       t("zenodo.configLoadError"),
       t("zenodo.retry"),
       true,
     );
+  }
+}
+
+function showQuotaAlertBanner(
+  qS: QuotaResponse | null,
+  qP: QuotaResponse | null,
+): void {
+  const alertQuota = [qS, qP].find((q) => q?.alert);
+  if (!alertQuota) return;
+  const msg = alertQuota.alert_message ?? t("zenodo.quotaAlertDefault");
+  showBanner(msg, "warning", 0);
+}
+
+export async function checkQuotaAlerts(): Promise<void> {
+  if (!isStaff()) return;
+  try {
+    const fetches: Promise<Response>[] = [
+      authFetch(`${API_BASE}/v1/zenodo/quota?environment=sandbox`),
+      authFetch(`${API_BASE}/v1/zenodo/quota?environment=production`),
+    ];
+    if (isAdmin()) fetches.push(authFetch(`${API_BASE}/v1/orthanc/statistics`));
+
+    const [qSRes, qPRes, orthancRes] = await Promise.all(fetches);
+
+    const qS: QuotaResponse | null = qSRes.ok ? await qSRes.json() : null;
+    const qP: QuotaResponse | null = qPRes.ok ? await qPRes.json() : null;
+    showQuotaAlertBanner(qS, qP);
+
+    if (orthancRes?.ok) {
+      const stats: OrthancStats = await orthancRes.json();
+      if (stats.alert) {
+        showBanner(
+          t("orthanc.storageAlertDefault", { pct: (stats.disk_used_pct ?? 0).toFixed(1) }),
+          "warning",
+          0,
+        );
+      }
+    }
+  } catch {
+    // non-critical — silently ignore
   }
 }
 
@@ -874,10 +925,11 @@ function envCard(
 function quotaBar(q: QuotaResponse): string {
   const pct = Math.min(100, q.percent_used);
   const color = pct > 90 ? "#e74c3c" : pct > 70 ? "#f39c12" : "var(--accent)";
+  const alertClass = q.alert ? " z-quota--alert" : "";
   return `
-    <div class="z-quota">
+    <div class="z-quota${alertClass}">
       <div class="z-quota-track"><div class="z-quota-fill" style="width:${pct}%;background:${color}"></div></div>
-      <span class="z-quota-text">${formatBytes(q.used_bytes)} / ${formatBytes(q.limit_bytes)} · ${pct.toFixed(1)}%${q.alert ? " ⚠️" : ""}</span>
+      <span class="z-quota-text">${formatBytes(q.used_bytes)} / ${formatBytes(q.limit_bytes)} · ${pct.toFixed(1)}%${q.alert ? " ⚠️ " + escapeHtml(q.alert_message ?? "") : ""}</span>
     </div>`;
 }
 

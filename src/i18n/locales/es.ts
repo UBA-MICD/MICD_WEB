@@ -443,6 +443,7 @@ export const es: Record<string, string> = {
   "users.action.enable": "Habilitar",
   "users.action.delete": "Eliminar",
   "users.action.create": "Crear usuario",
+  "users.action.exportAuditLog": "Descargar log de auditoría (CSV)",
   "users.form.name": "Nombre",
   "users.form.email": "Correo",
   "users.form.role": "Rol",

@@ -12,6 +12,7 @@ import {
   setUserRole,
   setUserStatus,
   deleteUser,
+  exportAuditLogCsv,
 } from "./users-admin.ts";
 import { API_BASE } from "../auth/auth.ts";
 
@@ -125,4 +126,26 @@ test("deleteUser DELETEs /:id and resolves null on success", async () => {
   };
   const result = await deleteUser(7);
   assert.deepEqual(result, { ok: true, data: null });
+});
+
+test("exportAuditLogCsv GETs /v1/activity/export and resolves a blob on success", async () => {
+  const csv = "timestamp,action,result,resource_id,user_id,ip,detail\n";
+  fetchImpl = async (url, init) => {
+    assert.equal(url, `${API_BASE}/v1/activity/export`);
+    assert.equal(init?.method, undefined);
+    return {
+      ok: true,
+      status: 200,
+      blob: async () => new Blob([csv], { type: "text/csv" }),
+    } as unknown as Response;
+  };
+  const result = await exportAuditLogCsv();
+  assert.equal(result.ok, true);
+  assert.equal(await (result as { data: Blob }).data.text(), csv);
+});
+
+test("exportAuditLogCsv surfaces 403 for a non-admin caller", async () => {
+  fetchImpl = async () => jsonResponse(403, { error: "forbidden" });
+  const result = await exportAuditLogCsv();
+  assert.deepEqual(result, { ok: false, status: 403, error: "forbidden" });
 });

@@ -104,6 +104,11 @@ export function deleteUser(id: number): Promise<ApiResult<null>> {
   );
 }
 
+/** Audit log CSV export (TK-06) — admin-only server route, gated the same way. */
+export function exportAuditLogCsv(): Promise<ApiResult<Blob>> {
+  return request(`${API_BASE}/v1/activity/export`, {}, (res) => res.blob());
+}
+
 // ── Pure helpers ───────────────────────────────────────────────────────────────
 
 export const ROLE_OPTIONS: readonly Role[] = ["admin", "medico", "investigador"];

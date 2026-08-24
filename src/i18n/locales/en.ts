@@ -422,6 +422,7 @@ export const en: Record<string, string> = {
   "users.action.enable": "Enable",
   "users.action.delete": "Delete",
   "users.action.create": "Create user",
+  "users.action.exportAuditLog": "Download audit log (CSV)",
   "users.form.name": "Name",
   "users.form.email": "Email",
   "users.form.role": "Role",

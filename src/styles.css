@@ -251,29 +251,12 @@ body {
   max-width: 420px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 36px;
+  gap: 16px;
+  padding: 32px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-}
-.auth-card__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.auth-card__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--accent);
-  flex-shrink: 0;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.35);
 }
 .auth-card__title {
   font-size: 22px;
@@ -285,6 +268,17 @@ body {
   font-size: 14px;
   line-height: 1.55;
   color: var(--text-secondary);
+}
+.auth-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-bottom: 4px;
 }
 .auth-card__fields {
   display: flex;
@@ -2108,8 +2102,8 @@ body {
 .login-field input {
   background: var(--bg-base);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
   color: var(--text-primary);
   font-size: 14px;
   font-family: inherit;
@@ -2120,7 +2114,7 @@ body {
 }
 .login-field input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .login-error {
   font-size: 13px;
@@ -2128,6 +2122,12 @@ body {
   background: var(--danger-soft);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
+}
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 24px 20px;
+    border-radius: var(--radius-md);
+  }
 }
 
 .session-email {

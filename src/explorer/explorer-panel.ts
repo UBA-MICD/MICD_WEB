@@ -3,6 +3,7 @@ import { exportCurrentStudyAsZip } from "../services/export-service.js";
 import { collectServerUploadFiles } from "../shared/folder-files.js";
 import { startExplorerUpload } from "../upload/upload.js";
 import { showToast } from "../shared/banner.js";
+import { t } from "../i18n/i18n.js";
 
 // ── Explorer panel toggle + drag-resize ──────────────────────────────────────
 // Manages the "Estudios en servidor" panel's open/closed state and its
@@ -117,15 +118,15 @@ function initExplorerDropZone(): void {
     const { valid, rejected } = collectServerUploadFiles(all);
 
     if (rejected.length > 0 && valid.length === 0) {
-      showToast(
-        `Tipo de archivo no soportado. Solo se aceptan .dcm y .zip.`,
-        "error",
-      );
+      showToast(t("explorerPanel.unsupportedFileType"), "error");
       return;
     }
     if (rejected.length > 0) {
       showToast(
-        `${rejected.length} archivo${rejected.length !== 1 ? "s" : ""} ignorado${rejected.length !== 1 ? "s" : ""} (tipo no soportado).`,
+        t("explorerPanel.filesIgnored", {
+          count: rejected.length,
+          plural: rejected.length !== 1 ? "s" : "",
+        }),
         "warning",
       );
     }

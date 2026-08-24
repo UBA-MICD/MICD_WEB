@@ -9,7 +9,7 @@
 // back. It is marked `inert` as well as hidden, so nothing in it stays
 // reachable by Tab or a screen reader.
 
-export type ScreenName = "viewer" | "server";
+export type ScreenName = "viewer" | "server" | "invite";
 
 const screens = new Map<ScreenName, HTMLElement>();
 let active: ScreenName = "viewer";

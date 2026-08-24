@@ -4,31 +4,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Tighten CSP: no inline scripts, only local resources + fonts.
+    <!-- Tighten CSP: no inline scripts, only local resources.
          blob: is required for study thumbnails, which are fetched with an
-         Authorization header and shown via URL.createObjectURL. -->
+         Authorization header and shown via URL.createObjectURL. Vendored
+         assets (fflate, fonts) keep everything same-origin, which is also
+         what Electron's file:// CSP requires. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
     />
     <script type="importmap">
       {
         "imports": {
-          "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+          "fflate": "./vendor/fflate.js"
         }
       }
     </script>
-    <title>MICD — Visualizador DICOM</title>
+    <title data-i18n="app.title">MICD — Visualizador DICOM</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Saltar al visualizador</a>
+    <a class="skip-link" href="#main-content" data-i18n="app.skipLink"
+      >Saltar al visualizador</a
+    >
 
     <!-- Action-confirmation strip; also a live region so it is announced. -->
     <div
@@ -97,13 +96,29 @@
             </svg>
           </span>
           <span class="logo-text">MICD</span>
-          <h1 class="topbar__title" id="topbar-title">Visualizador DICOM</h1>
+          <h1 class="topbar__title" id="topbar-title" data-i18n="viewer.defaultTitle">
+            Visualizador DICOM
+          </h1>
         </div>
 
         <div class="topbar__actions">
+          <div class="locale-switch">
+            <label class="sr-only" for="locale-select" data-i18n="app.locale.label"
+              >Idioma</label
+            >
+            <select id="locale-select" class="locale-switch__select">
+              <option value="es" data-i18n="app.locale.es">Español</option>
+              <option value="en" data-i18n="app.locale.en">English</option>
+            </select>
+          </div>
           <!-- Series navigation -->
           <div class="series-nav hidden" id="series-nav">
-            <button class="nav-btn" id="nav-prev" title="Anterior (PageUp)">
+            <button
+              class="nav-btn"
+              id="nav-prev"
+              data-i18n-attr="title:viewer.nav.prevTitle"
+              title="Anterior (PageUp)"
+            >
               <svg
                 width="14"
                 height="14"
@@ -124,7 +139,12 @@
               value="0"
             />
             <span class="nav-counter" id="nav-counter">1 / 1</span>
-            <button class="nav-btn" id="nav-next" title="Siguiente (PageDown)">
+            <button
+              class="nav-btn"
+              id="nav-next"
+              data-i18n-attr="title:viewer.nav.nextTitle"
+              title="Siguiente (PageDown)"
+            >
               <svg
                 width="14"
                 height="14"
@@ -148,12 +168,14 @@
             class="sidebar__tools"
             id="viewer-toolbar"
             role="toolbar"
+            data-i18n-attr="aria-label:viewer.toolbar.ariaLabel"
             aria-label="Herramientas de visualización"
             aria-orientation="vertical"
           >
             <button
               class="toolbar__tool active"
               id="tool-wl"
+              data-i18n-attr="title:viewer.tool.wlTitle"
               title="Brillo / contraste (W)"
               aria-pressed="true"
               aria-expanded="false"
@@ -179,6 +201,7 @@
             <button
               class="toolbar__tool"
               id="tool-zoom"
+              data-i18n-attr="title:viewer.tool.zoomTitle"
               title="Zoom (Z)"
               aria-pressed="false"
             >
@@ -200,6 +223,7 @@
             <button
               class="toolbar__tool"
               id="tool-pan"
+              data-i18n-attr="title:viewer.tool.panTitle"
               title="Desplazar (P)"
               aria-pressed="false"
             >
@@ -220,6 +244,7 @@
             <button
               class="toolbar__tool"
               id="tool-crosshair"
+              data-i18n-attr="title:viewer.tool.crosshairTitle"
               title="Navegación Crosshair 3D (C)"
               aria-pressed="false"
             >
@@ -240,6 +265,7 @@
             <button
               class="toolbar__tool"
               id="tool-reset"
+              data-i18n-attr="title:viewer.tool.resetTitle"
               title="Restablecer (R)"
             >
               <svg
@@ -258,6 +284,7 @@
             <button
               class="toolbar__tool"
               id="tool-metadata"
+              data-i18n-attr="title:viewer.tool.metadataTitle"
               title="Etiquetas DICOM (M)"
               aria-expanded="false"
               aria-controls="metadata-panel"
@@ -283,6 +310,7 @@
             <button
               class="toolbar__tool toolbar__tool--explorer"
               id="btn-toggle-explorer"
+              data-i18n-attr="title:explorer.panelTitle"
               title="Estudios en servidor"
               aria-expanded="true"
               aria-controls="explorer-panel"
@@ -300,12 +328,13 @@
                 <line x1="3" y1="12" x2="8" y2="12" />
                 <line x1="16" y1="12" x2="21" y2="12" />
               </svg>
-              <span>Estudios</span>
+              <span data-i18n="explorer.toolbarLabel">Estudios</span>
             </button>
 
             <button
               class="toolbar__tool toolbar__tool--zenodo"
               id="btn-open-zenodo"
+              data-i18n-attr="title:viewer.tool.zenodoTitle"
               title="Zenodo — repositorio de ciencia abierta"
               aria-expanded="false"
               aria-controls="zenodo-panel"
@@ -329,6 +358,7 @@
             <button
               class="toolbar__tool"
               id="tool-mpr"
+              data-i18n-attr="title:viewer.tool.mprStaticTitle"
               title="Reconstrucción Multiplanar (MPR)"
               disabled
             >
@@ -376,7 +406,7 @@
                 />
                 <polyline points="13 2 13 9 20 9" />
               </svg>
-              Abrir archivo
+              <span data-i18n="viewer.openFile">Abrir archivo</span>
             </button>
 
             <!-- Secondary actions -->
@@ -395,7 +425,7 @@
                     d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
                   />
                 </svg>
-                <span>Abrir carpeta</span>
+                <span data-i18n="viewer.openFolder">Abrir carpeta</span>
               </button>
               <button
                 class="sidebar-action sidebar-action--server"
@@ -415,7 +445,7 @@
                   <line x1="6" y1="6" x2="6.01" y2="6" />
                   <line x1="6" y1="18" x2="6.01" y2="18" />
                 </svg>
-                <span>Servidor</span>
+                <span data-i18n="server.navLabel">Servidor</span>
                 <svg
                   class="sidebar-action__chevron"
                   width="12"
@@ -436,6 +466,7 @@
               <button
                 class="sidebar-action"
                 id="btn-export-menu"
+                data-i18n-attr="title:export.menuTitle"
                 title="Exportar estudio o imagen"
                 disabled
               >
@@ -452,7 +483,7 @@
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                <span>Exportar</span>
+                <span data-i18n="export.menuLabel">Exportar</span>
               </button>
             </div>
 
@@ -466,13 +497,17 @@
               >
               <div class="session__info">
                 <span class="session__email" id="session-email"></span>
-                <span class="session__expiry" id="session-expiry"
+                <span
+                  class="session__expiry"
+                  id="session-expiry"
+                  data-i18n="auth.sessionActive"
                   >Sesión activa</span
                 >
               </div>
               <button
                 class="session-card__logout"
                 id="btn-logout"
+                data-i18n-attr="title:auth.logout; aria-label:auth.logout"
                 title="Cerrar sesión"
                 aria-label="Cerrar sesión"
               >
@@ -491,7 +526,11 @@
                 </svg>
               </button>
             </div>
-            <button class="btn btn--outline btn--full" id="btn-login">
+            <button
+              class="btn btn--outline btn--full"
+              id="btn-login"
+              data-i18n="auth.login"
+            >
               Iniciar sesión
             </button>
           </div>
@@ -528,13 +567,23 @@
                 <button class="btn-orient active" id="btn-view-axial">
                   Axial
                 </button>
-                <button class="btn-orient" id="btn-view-sagittal">
+                <button
+                  class="btn-orient"
+                  id="btn-view-sagittal"
+                  data-i18n="viewer.mpr.sagittal"
+                >
                   Sagital
                 </button>
                 <button class="btn-orient" id="btn-view-coronal">
                   Coronal
                 </button>
-                <button class="btn-orient" id="btn-view-3d">Vista Volumétrica</button>
+                <button
+                  class="btn-orient"
+                  id="btn-view-3d"
+                  data-i18n="viewer.mpr.volumetricView"
+                >
+                  Vista Volumétrica
+                </button>
               </div>
               <div class="mpr-gizmo-wrap">
                 <canvas id="mpr-gizmo-canvas" width="60" height="60"></canvas>
@@ -547,6 +596,7 @@
               <canvas
                 id="dicom-canvas"
                 role="img"
+                data-i18n-attr="aria-label:viewer.canvasEmptyLabel"
                 aria-label="Sin imagen cargada"
               ></canvas>
 
@@ -600,16 +650,25 @@
                       />
                     </svg>
                   </div>
-                  <h2>Abrir archivo DICOM</h2>
-                  <p>Arrastrá y soltá archivos .dcm aquí, o</p>
-                  <button class="btn btn--accent" id="drop-zone-open">
+                  <h2 data-i18n="viewer.dropZone.title">Abrir archivo DICOM</h2>
+                  <p data-i18n="viewer.dropZone.instructions">
+                    Arrastrá y soltá archivos .dcm aquí, o
+                  </p>
+                  <button
+                    class="btn btn--accent"
+                    id="drop-zone-open"
+                    data-i18n="viewer.selectFiles"
+                  >
                     Seleccionar archivos
                   </button>
-                  <p class="drop-zone__note">
+                  <p class="drop-zone__note" data-i18n="viewer.dropZone.note">
                     Ver archivos locales no requiere iniciar sesión. Usá
-                    <strong>Servidor</strong> para buscar o subir estudios.
+                    Servidor para buscar o subir estudios.
                   </p>
-                  <p class="drop-zone__shortcuts">
+                  <p
+                    class="drop-zone__shortcuts"
+                    data-i18n-html="viewer.dropZone.shortcutsHtml"
+                  >
                     <kbd>W</kbd> <kbd>Z</kbd> <kbd>P</kbd> eligen la herramienta
                     · <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> la
                     ajustan (<kbd>Shift</kbd> para saltos grandes) ·
@@ -626,7 +685,7 @@
                 role="status"
               >
                 <div class="spinner"></div>
-                <span>Cargando DICOM…</span>
+                <span data-i18n="viewer.loading">Cargando DICOM…</span>
               </div>
 
               <!-- Error message -->
@@ -641,17 +700,20 @@
             <aside
               class="wl-panel"
               id="wl-panel"
+              data-i18n-attr="aria-label:viewer.wl.panelTitle"
               aria-label="Ajuste de Ventana (WL/WW)"
             >
               <div class="wl-header">
-                <h2>Ajuste de Ventana (WL/WW)</h2>
+                <h2 data-i18n="viewer.wl.panelTitle">Ajuste de Ventana (WL/WW)</h2>
               </div>
               <div class="wl-body">
                 <!-- Sliders Section -->
                 <div class="wl-section">
                   <div class="slider-control">
                     <div class="slider-header">
-                      <label for="slider-ww">Ancho de Ventana (WW)</label>
+                      <label for="slider-ww" data-i18n="viewer.wl.widthLabel"
+                        >Ancho de Ventana (WW)</label
+                      >
                       <span class="slider-val" id="val-ww">0</span>
                     </div>
                     <input
@@ -667,7 +729,9 @@
 
                   <div class="slider-control">
                     <div class="slider-header">
-                      <label for="slider-wl">Nivel de Ventana (WL)</label>
+                      <label for="slider-wl" data-i18n="viewer.wl.levelLabel"
+                        >Nivel de Ventana (WL)</label
+                      >
                       <span class="slider-val" id="val-wl">0</span>
                     </div>
                     <input
@@ -684,13 +748,16 @@
 
                 <!-- Presets Section -->
                 <div class="wl-section">
-                  <span class="wl-section-title">Presets Predefinidos</span>
+                  <span class="wl-section-title" data-i18n="viewer.wl.presetsTitle"
+                    >Presets Predefinidos</span
+                  >
                   <div class="preset-grid" id="preset-grid">
                     <button
                       type="button"
                       class="btn btn--outline preset-btn"
                       id="btn-preset-lung"
                       data-preset="lung"
+                      data-i18n="viewer.wl.presetLung"
                     >
                       Pulmón
                     </button>
@@ -699,6 +766,7 @@
                       class="btn btn--outline preset-btn"
                       id="btn-preset-bone"
                       data-preset="bone"
+                      data-i18n="viewer.wl.presetBone"
                     >
                       Hueso
                     </button>
@@ -707,6 +775,7 @@
                       class="btn btn--outline preset-btn"
                       id="btn-preset-soft"
                       data-preset="softTissue"
+                      data-i18n="viewer.wl.presetSoftTissue"
                     >
                       Tejido Blando
                     </button>
@@ -715,6 +784,7 @@
                       class="btn btn--outline preset-btn"
                       id="btn-preset-brain"
                       data-preset="brain"
+                      data-i18n="viewer.wl.presetBrain"
                     >
                       Cerebro
                     </button>
@@ -726,7 +796,7 @@
             <!-- Metadata panel (slide-out) -->
             <aside class="metadata-panel" id="metadata-panel">
               <div class="metadata-header">
-                <h2>Etiquetas DICOM</h2>
+                <h2 data-i18n="viewer.metadata.panelTitle">Etiquetas DICOM</h2>
               </div>
               <div class="metadata-body">
                 <table class="metadata-table">
@@ -745,11 +815,12 @@
             aria-hidden="true"
           ></div>
           <div class="explorer-panel__header">
-            <h2>Estudios en servidor</h2>
+            <h2 data-i18n="explorer.panelTitle">Estudios en servidor</h2>
             <div class="explorer-panel__header-actions">
               <button
                 class="icon-btn"
                 id="btn-export-explorer"
+                data-i18n-attr="title:export.studyZipTitle; aria-label:export.studyZipTitle"
                 title="Exportar estudio (.zip anonimizado)"
                 aria-label="Exportar estudio (.zip anonimizado)"
               >
@@ -769,6 +840,7 @@
               <button
                 class="icon-btn hidden"
                 id="btn-activity"
+                data-i18n-attr="title:dialog.activityTitle; aria-label:dialog.activityTitle"
                 title="Historial de actividad"
                 aria-label="Historial de actividad"
               >
@@ -787,6 +859,7 @@
               <button
                 class="icon-btn"
                 id="btn-refresh-studies"
+                data-i18n-attr="title:explorer.reload"
                 title="Recargar"
               >
                 <svg
@@ -819,7 +892,10 @@
                 <circle cx="10" cy="10" r="7" />
                 <line x1="15" y1="15" x2="21" y2="21" />
               </svg>
-              <label class="sr-only" for="search-studies"
+              <label
+                class="sr-only"
+                for="search-studies"
+                data-i18n="explorer.searchLabel"
                 >Buscar paciente o ID</label
               >
               <input
@@ -827,6 +903,7 @@
                 id="search-studies"
                 class="filter-search__input"
                 data-explorer-search
+                data-i18n-attr="placeholder:explorer.searchLabel"
                 placeholder="Buscar paciente o ID"
                 autocomplete="off"
               />
@@ -834,6 +911,7 @@
                 class="filter-search__clear hidden"
                 id="btn-clear-search"
                 data-explorer-search-clear
+                data-i18n-attr="aria-label:explorer.clearSearch"
                 aria-label="Limpiar búsqueda"
               >
                 <svg
@@ -855,12 +933,14 @@
               id="filter-modality-chips"
               data-explorer-chips
               role="group"
+              data-i18n-attr="aria-label:explorer.modalityLabel"
               aria-label="Modalidad"
             >
               <button
                 class="filter-chip filter-chip--active"
                 data-modality=""
                 aria-pressed="true"
+                data-i18n="explorer.modalityAll"
               >
                 Todas
               </button>
@@ -931,32 +1011,39 @@
                 class="filter-chip filter-chip--zenodo"
                 data-zenodo-linked
                 aria-pressed="false"
+                data-i18n="zenodo.linkedFilter"
               >
                 Vinculado a Zenodo
               </button>
             </div>
 
             <div class="filter-dates">
-              <label class="sr-only" for="filter-date-from">Desde</label>
+              <label class="sr-only" for="filter-date-from" data-i18n="explorer.dateFromLabel"
+                >Desde</label
+              >
               <input
                 type="date"
                 id="filter-date-from"
                 class="filter-date"
                 data-explorer-date-from
+                data-i18n-attr="title:explorer.dateFromLabel"
                 title="Desde"
               />
-              <label class="sr-only" for="filter-date-to">Hasta</label>
+              <label class="sr-only" for="filter-date-to" data-i18n="explorer.dateToLabel"
+                >Hasta</label
+              >
               <input
                 type="date"
                 id="filter-date-to"
                 class="filter-date"
                 data-explorer-date-to
+                data-i18n-attr="title:explorer.dateToLabel"
                 title="Hasta"
               />
             </div>
 
             <div class="filter-clear-wrap hidden" data-explorer-clear-wrap>
-              <button data-explorer-clear class="filter-clear-btn">
+              <button data-explorer-clear class="filter-clear-btn" data-i18n="explorer.clearFilters">
                 Limpiar filtros
               </button>
             </div>
@@ -969,6 +1056,7 @@
             <button
               class="icon-btn"
               data-explorer-prev
+              data-i18n-attr="title:explorer.prevPage; aria-label:explorer.prevPage"
               title="Página anterior"
               aria-label="Página anterior"
             >
@@ -987,6 +1075,7 @@
             <button
               class="icon-btn"
               data-explorer-next
+              data-i18n-attr="title:explorer.nextPage; aria-label:explorer.nextPage"
               title="Página siguiente"
               aria-label="Página siguiente"
             >
@@ -1013,7 +1102,7 @@
 
           <!-- Session state lives here rather than behind a modal. -->
           <div class="explorer-footer" id="explorer-footer">
-            <span id="explorer-session-line"
+            <span id="explorer-session-line" data-i18n="auth.noSessionReadOnly"
               >Sin sesión · solo lectura local</span
             >
           </div>
@@ -1044,16 +1133,23 @@
             <span>Zenodo</span>
           </div>
           <div class="z-tabs">
-            <button class="z-tab z-tab--active" data-tab="search">
+            <button
+              class="z-tab z-tab--active"
+              data-tab="search"
+              data-i18n="common.search"
+            >
               Buscar
             </button>
-            <button class="z-tab" data-tab="publish">Publicar</button>
+            <button class="z-tab" data-tab="publish" data-i18n="zenodo.tabPublish">
+              Publicar
+            </button>
             <button class="z-tab" data-tab="config">Config</button>
             <button class="z-tab" data-tab="logs">Logs</button>
           </div>
           <button
             class="icon-btn z-panel-close"
             id="btn-close-zenodo"
+            data-i18n-attr="title:common.close"
             title="Cerrar"
           >
             <svg
@@ -1077,10 +1173,15 @@
               type="text"
               id="z-doi-input"
               class="z-search-input"
+              data-i18n-attr="placeholder:zenodo.doiPlaceholder"
               placeholder="DOI o URL de Zenodo (ej: 10.5281/zenodo.1234567)"
               autocomplete="off"
             />
-            <button class="btn btn--secondary btn--sm" id="btn-z-resolve-doi">
+            <button
+              class="btn btn--secondary btn--sm"
+              id="btn-z-resolve-doi"
+              data-i18n="zenodo.importByDoi"
+            >
               Importar por DOI
             </button>
           </div>
@@ -1089,6 +1190,7 @@
               type="text"
               id="z-search-input"
               class="z-search-input"
+              data-i18n-attr="placeholder:zenodo.searchPlaceholder"
               placeholder="CT lung DICOM…"
               autocomplete="off"
             />
@@ -1104,7 +1206,7 @@
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              Buscar
+              <span data-i18n="common.search">Buscar</span>
             </button>
           </div>
           <div class="z-search-filters">
@@ -1113,7 +1215,7 @@
               id="z-filter-chips"
               style="border: none; padding: 0; flex-shrink: 0"
             >
-              <button class="filter-chip filter-chip--active" data-type="">
+              <button class="filter-chip filter-chip--active" data-type="" data-i18n="zenodo.fileTypeAll">
                 Todos
               </button>
               <button class="filter-chip" data-type="dcm">DCM</button>
@@ -1121,7 +1223,7 @@
             </div>
             <div class="z-env-toggle" id="z-env-toggle">
               <button class="z-env-btn active" data-env="sandbox">Sandbox</button>
-              <button class="z-env-btn" data-env="production">Producción</button>
+              <button class="z-env-btn" data-env="production" data-i18n="zenodo.envProduction">Producción</button>
             </div>
           </div>
           <div id="z-results" class="z-results">
@@ -1138,12 +1240,20 @@
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <p>Buscá datasets</p>
-              <span>Ingresá términos como "CT lung" o "DICOM MRI"</span>
+              <p data-i18n="zenodo.searchEmptyTitle">Buscá datasets</p>
+              <span data-i18n="zenodo.searchEmptyHint"
+                >Ingresá términos como "CT lung" o "DICOM MRI"</span
+              >
             </div>
           </div>
           <div class="z-pagination">
-            <button class="icon-btn" id="z-prev" disabled title="Anterior">
+            <button
+              class="icon-btn"
+              id="z-prev"
+              disabled
+              data-i18n-attr="title:zenodo.paginationPrev"
+              title="Anterior"
+            >
               <svg
                 width="13"
                 height="13"
@@ -1156,7 +1266,13 @@
               </svg>
             </button>
             <span id="z-pagination-info" class="z-pagination-info">—</span>
-            <button class="icon-btn" id="z-next" disabled title="Siguiente">
+            <button
+              class="icon-btn"
+              id="z-next"
+              disabled
+              data-i18n-attr="title:zenodo.paginationNext"
+              title="Siguiente"
+            >
               <svg
                 width="13"
                 height="13"
@@ -1187,8 +1303,10 @@
                 <rect x="3" y="3" width="18" height="18" rx="3" />
                 <circle cx="12" cy="12" r="4" />
               </svg>
-              <p>Seleccioná un estudio</p>
-              <span
+              <p data-i18n="zenodo.publish.selectStudyTitle">
+                Seleccioná un estudio
+              </p>
+              <span data-i18n="zenodo.publish.selectStudyHint"
                 >Cerrá este panel, hacé click en un estudio y volvé a
                 Publicar</span
               >
@@ -1214,7 +1332,9 @@
                   d="M19.07 4.93a10 10 0 0 0-14.14 0M4.93 19.07a10 10 0 0 0 14.14 0"
                 />
               </svg>
-              <span>Abrí este tab para cargar la configuración</span>
+              <span data-i18n="zenodo.config.loadHint"
+                >Abrí este tab para cargar la configuración</span
+              >
             </div>
           </div>
         </div>
@@ -1223,10 +1343,13 @@
         <div class="z-tab-panel hidden" id="z-tab-logs">
           <div class="activity-log-toolbar" id="activity-filters">
             <div class="activity-log-toolbar-row">
-              <span class="activity-filter-label">Tipo</span>
+              <span class="activity-filter-label" data-i18n="zenodo.logs.typeLabel"
+                >Tipo</span
+              >
               <button
                 class="btn btn--secondary activity-export-btn"
                 id="btn-export-activity"
+                data-i18n="zenodo.logs.downloadCsv"
               >
                 Descargar CSV
               </button>
@@ -1235,18 +1358,21 @@
               <button
                 class="filter-chip filter-chip--active"
                 data-filter-action=""
+                data-i18n="zenodo.logs.filterAll"
               >
                 Todos
               </button>
               <button
                 class="filter-chip"
                 data-filter-action="ZENODO_STUDY_PUBLISHED,ZENODO_PUBLISH_FAILED"
+                data-i18n="zenodo.logs.filterPublish"
               >
                 Publicación
               </button>
               <button
                 class="filter-chip"
                 data-filter-action="ZENODO_IMPORT_STARTED,ZENODO_IMPORT_COMPLETED"
+                data-i18n="zenodo.logs.filterImport"
               >
                 Importación
               </button>
@@ -1264,24 +1390,29 @@
               </button>
             </div>
             <div class="activity-log-filters">
-              <span class="activity-filter-label">Resultado</span>
+              <span class="activity-filter-label" data-i18n="zenodo.logs.resultLabel"
+                >Resultado</span
+              >
               <button
                 class="filter-chip filter-chip--active"
                 data-filter-result=""
+                data-i18n="zenodo.logs.filterAll"
               >
                 Todos
               </button>
-              <button class="filter-chip" data-filter-result="success">
+              <button class="filter-chip" data-filter-result="success" data-i18n="common.success">
                 Éxito
               </button>
-              <button class="filter-chip" data-filter-result="error">
+              <button class="filter-chip" data-filter-result="error" data-i18n="common.error">
                 Error
               </button>
             </div>
           </div>
           <div class="activity-log-scroll" id="activity-log-content">
             <div class="z-empty-state">
-              <span>Abrí este tab para cargar el historial</span>
+              <span data-i18n="zenodo.logs.loadHint"
+                >Abrí este tab para cargar el historial</span
+              >
             </div>
           </div>
         </div>
@@ -1294,13 +1425,15 @@
     <section id="server-screen" class="screen server-screen hidden">
       <header class="server-screen__header">
         <button class="btn-back" id="btn-server-back">
-          <span aria-hidden="true">‹</span> Volver al visualizador
+          <span aria-hidden="true">‹</span>
+          <span data-i18n="server.backToViewer">Volver al visualizador</span>
         </button>
         <h2
           class="server-screen__title"
           id="server-title"
           data-screen-heading
           tabindex="-1"
+          data-i18n="server.title"
         >
           Servidor
         </h2>
@@ -1308,6 +1441,7 @@
           class="server-tabs hidden"
           id="server-tabs"
           role="tablist"
+          data-i18n-attr="aria-label:server.tabsAriaLabel"
           aria-label="Acciones del servidor"
         >
           <button
@@ -1316,6 +1450,7 @@
             role="tab"
             aria-selected="true"
             aria-controls="panel-buscar"
+            data-i18n="common.search"
           >
             Buscar
           </button>
@@ -1325,8 +1460,21 @@
             role="tab"
             aria-selected="false"
             aria-controls="panel-cargar"
+            data-i18n="server.tabUpload"
           >
             Cargar
+          </button>
+          <!-- Admin-only: shown/hidden by server-screen.ts renderForSession(). -->
+          <button
+            class="server-tab hidden"
+            id="tab-usuarios"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-usuarios"
+            tabindex="-1"
+            data-i18n="users.tab"
+          >
+            Usuarios
           </button>
         </div>
       </header>
@@ -1334,8 +1482,8 @@
       <!-- Screen 02: the only thing a guest sees here. -->
       <div class="server-auth" id="server-auth">
         <form class="auth-card" id="server-login-form">
-          <h3 class="auth-card__title">Iniciar sesión</h3>
-          <p class="auth-card__msg">
+          <h3 class="auth-card__title" data-i18n="auth.login">Iniciar sesión</h3>
+          <p class="auth-card__msg" data-i18n="auth.loginRequiredMsg">
             Se requiere sesión para buscar o subir estudios en el servidor. La
             visualización local no la necesita.
           </p>
@@ -1350,7 +1498,7 @@
             />
           </label>
           <label class="login-field">
-            <span>Contraseña</span>
+            <span data-i18n="auth.passwordLabel">Contraseña</span>
             <input
               type="password"
               id="server-login-password"
@@ -1369,10 +1517,44 @@
             class="btn btn--accent btn--full"
             id="server-login-submit"
             data-login-submit
+            data-i18n="auth.submitLogin"
           >
             Ingresar
           </button>
+          <!-- Invited users activate here: no working email link is needed on
+               desktop (Electron loads from file://), so the code is entered by
+               hand in a modal. -->
+          <button
+            type="button"
+            class="btn btn--outline btn--full"
+            data-invite-open
+            data-i18n="auth.wereYouInvited"
+          >
+            ¿Te invitaron? Activá tu cuenta
+          </button>
         </form>
+
+        <!-- Desktop only: nginx already proxies /api and /auth same-origin
+             in the browser build, so there is nothing to configure there. -->
+        <div class="auth-card auth-card--settings hidden" data-desktop-only>
+          <label class="login-field">
+            <span data-i18n="server.apiOriginLabel">Servidor de la API</span>
+            <input
+              type="text"
+              id="desktop-api-origin-input"
+              data-i18n-attr="placeholder:server.apiOriginPlaceholder"
+              placeholder="http://localhost:3000"
+            />
+          </label>
+          <button
+            type="button"
+            class="btn btn--secondary btn--full"
+            id="desktop-api-origin-save"
+            data-i18n="server.apiOriginSave"
+          >
+            Guardar y reiniciar
+          </button>
+        </div>
       </div>
 
       <!-- Screen 03: this panel's only job is finding and opening a study. -->
@@ -1399,7 +1581,7 @@
                   <circle cx="10" cy="10" r="7" />
                   <line x1="15" y1="15" x2="21" y2="21" />
                 </svg>
-                <label class="sr-only" for="server-search-studies"
+                <label class="sr-only" for="server-search-studies" data-i18n="explorer.searchLabel"
                   >Buscar paciente o ID</label
                 >
                 <input
@@ -1407,12 +1589,14 @@
                   id="server-search-studies"
                   class="filter-search__input"
                   data-explorer-search
+                  data-i18n-attr="placeholder:explorer.searchLabel"
                   placeholder="Buscar paciente o ID"
                   autocomplete="off"
                 />
                 <button
                   class="filter-search__clear hidden"
                   data-explorer-search-clear
+                  data-i18n-attr="aria-label:explorer.clearSearch"
                   aria-label="Limpiar búsqueda"
                 >
                   <svg
@@ -1428,20 +1612,22 @@
                   </svg>
                 </button>
               </div>
-              <label class="sr-only" for="server-date-from">Desde</label>
+              <label class="sr-only" for="server-date-from" data-i18n="explorer.dateFromLabel">Desde</label>
               <input
                 type="date"
                 id="server-date-from"
                 class="filter-date"
                 data-explorer-date-from
+                data-i18n-attr="title:explorer.dateFromLabel"
                 title="Desde"
               />
-              <label class="sr-only" for="server-date-to">Hasta</label>
+              <label class="sr-only" for="server-date-to" data-i18n="explorer.dateToLabel">Hasta</label>
               <input
                 type="date"
                 id="server-date-to"
                 class="filter-date"
                 data-explorer-date-to
+                data-i18n-attr="title:explorer.dateToLabel"
                 title="Hasta"
               />
             </div>
@@ -1450,12 +1636,14 @@
               class="filter-chips"
               data-explorer-chips
               role="group"
+              data-i18n-attr="aria-label:explorer.modalityLabel"
               aria-label="Modalidad"
             >
               <button
                 class="filter-chip filter-chip--active"
                 data-modality=""
                 aria-pressed="true"
+                data-i18n="explorer.modalityAll"
               >
                 Todas
               </button>
@@ -1526,6 +1714,7 @@
                 class="filter-chip filter-chip--zenodo"
                 data-zenodo-linked
                 aria-pressed="false"
+                data-i18n="zenodo.linkedFilter"
               >
                 Vinculado a Zenodo
               </button>
@@ -1537,6 +1726,7 @@
               class="study-grid"
               data-explorer-list
               role="listbox"
+              data-i18n-attr="aria-label:explorer.panelTitle"
               aria-label="Estudios en servidor"
               tabindex="0"
             ></ul>
@@ -1545,6 +1735,7 @@
               <button
                 class="icon-btn"
                 data-explorer-prev
+                data-i18n-attr="title:explorer.prevPage; aria-label:explorer.prevPage"
                 title="Página anterior"
                 aria-label="Página anterior"
               >
@@ -1565,6 +1756,7 @@
               <button
                 class="icon-btn"
                 data-explorer-next
+                data-i18n-attr="title:explorer.nextPage; aria-label:explorer.nextPage"
                 title="Página siguiente"
                 aria-label="Página siguiente"
               >
@@ -1585,6 +1777,7 @@
           <aside
             class="study-detail-panel hidden"
             id="study-detail-panel"
+            data-i18n-attr="aria-label:studyDetail.ariaLabel"
             aria-label="Detalle del estudio en Zenodo"
           >
             <div
@@ -1596,10 +1789,15 @@
         <!-- /.buscar-layout -->
 
         <footer class="server-panel__actions">
-          <button class="btn btn--secondary" id="btn-buscar-cancel">
+          <button class="btn btn--secondary" id="btn-buscar-cancel" data-i18n="common.cancel">
             Cancelar
           </button>
-          <button class="btn btn--accent" id="btn-open-selected" disabled>
+          <button
+            class="btn btn--accent"
+            id="btn-open-selected"
+            disabled
+            data-i18n="explorer.openSelected"
+          >
             Abrir estudio seleccionado
           </button>
         </footer>
@@ -1618,12 +1816,12 @@
           <input type="file" id="upload-folder-input" class="hidden" />
 
           <div class="upload-drop" id="upload-drop">
-            <p>Arrastrá archivos .dcm, .zip o una carpeta aquí</p>
+            <p data-i18n="upload.dropHint">Arrastrá archivos .dcm, .zip o una carpeta aquí</p>
             <div class="upload-drop__actions">
-              <button class="btn btn--accent" id="btn-upload-server">
+              <button class="btn btn--accent" id="btn-upload-server" data-i18n="viewer.selectFiles">
                 Seleccionar archivos
               </button>
-              <button class="btn btn--outline" id="btn-upload-folder">
+              <button class="btn btn--outline" id="btn-upload-folder" data-i18n="upload.selectFolder">
                 Seleccionar carpeta
               </button>
             </div>
@@ -1653,13 +1851,118 @@
         </div>
 
         <footer class="server-panel__actions">
-          <button class="btn btn--secondary" id="btn-upload-cancel">
+          <button class="btn btn--secondary" id="btn-upload-cancel" data-i18n="common.cancel">
             Cancelar
           </button>
-          <button class="btn btn--accent" id="btn-upload-finish">
+          <button class="btn btn--accent" id="btn-upload-finish" data-i18n="upload.finish">
             Finalizar
           </button>
         </footer>
+      </div>
+
+      <!-- Screen: admin-only user management (US-H04). Tab + panel are shown
+           only for the admin role (server-screen.ts renderForSession()). -->
+      <div
+        class="server-panel hidden"
+        id="panel-usuarios"
+        role="tabpanel"
+        aria-labelledby="tab-usuarios"
+        tabindex="0"
+      >
+        <div class="server-panel__body">
+          <form class="user-create" data-user-create>
+            <div class="user-create__fields">
+              <label class="user-create__field">
+                <span data-i18n="users.form.name">Nombre</span>
+                <input type="text" data-user-new-name autocomplete="off" />
+              </label>
+              <label class="user-create__field">
+                <span data-i18n="users.form.email">Correo</span>
+                <input type="email" data-user-new-email autocomplete="off" />
+              </label>
+              <label class="user-create__field">
+                <span data-i18n="users.form.role">Rol</span>
+                <select data-user-new-role>
+                  <option value="medico" data-i18n="users.role.medico">Médico</option>
+                  <option value="investigador" data-i18n="users.role.investigador">
+                    Investigador
+                  </option>
+                  <option value="admin" data-i18n="users.role.admin">Administrador</option>
+                </select>
+              </label>
+              <button
+                class="btn btn--accent"
+                type="submit"
+                data-user-new-submit
+                data-i18n="users.action.create"
+              >
+                Crear usuario
+              </button>
+            </div>
+            <p class="form-error hidden" data-user-new-error role="alert"></p>
+          </form>
+
+          <p class="form-error hidden" data-users-error role="alert"></p>
+
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th data-i18n="users.col.name">Nombre</th>
+                <th data-i18n="users.col.email">Correo</th>
+                <th data-i18n="users.col.role">Rol</th>
+                <th data-i18n="users.col.status">Estado</th>
+                <th data-i18n="users.col.lastAccess">Último acceso</th>
+                <th data-i18n="users.col.actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody data-users-tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Public accept-invite screen (US-H04), entered from ?invite=<code>. -->
+    <section
+      id="invite-screen"
+      class="screen server-screen hidden"
+      aria-labelledby="invite-heading"
+    >
+      <div class="server-auth">
+        <div class="auth-card">
+          <h2
+            class="auth-card__title"
+            id="invite-heading"
+            data-screen-heading
+            tabindex="-1"
+            data-i18n="invite.title"
+          >
+            Crear tu cuenta
+          </h2>
+          <p class="auth-card__msg" data-invite-email></p>
+
+          <form data-invite-form class="hidden">
+            <label class="auth-field">
+              <span data-i18n="invite.password">Contraseña</span>
+              <input type="password" data-invite-password autocomplete="new-password" />
+            </label>
+            <p class="form-error hidden" data-invite-error role="alert"></p>
+            <button
+              class="btn btn--accent"
+              type="submit"
+              data-invite-submit
+              data-i18n="invite.submit"
+            >
+              Crear cuenta e ingresar
+            </button>
+          </form>
+
+          <p
+            class="form-error hidden"
+            data-invite-invalid
+            role="alert"
+            data-i18n="invite.invalid"
+          ></p>
+        </div>
       </div>
     </section>
 
@@ -1680,7 +1983,7 @@
         aria-modal="true"
         aria-labelledby="activity-title"
       >
-        <h3 class="dialog__title" id="activity-title">
+        <h3 class="dialog__title" id="activity-title" data-i18n="dialog.activityTitle">
           Historial de actividad
         </h3>
         <div id="activity-body" class="activity-body"></div>
@@ -1689,6 +1992,7 @@
             class="btn btn--secondary"
             id="activity-close"
             data-dialog-autofocus
+            data-i18n="common.close"
           >
             Cerrar
           </button>
@@ -1704,10 +2008,12 @@
         aria-modal="true"
         aria-labelledby="export-dialog-title"
       >
-        <h3 class="dialog__title" id="export-dialog-title">
+        <h3 class="dialog__title" id="export-dialog-title" data-i18n="export.dialogTitle">
           Opciones de Exportación
         </h3>
-        <p class="dialog__msg">Seleccioná el formato de exportación deseado:</p>
+        <p class="dialog__msg" data-i18n="export.dialogPrompt">
+          Seleccioná el formato de exportación deseado:
+        </p>
         <div
           class="dialog__actions"
           style="
@@ -1732,7 +2038,7 @@
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
             </svg>
-            Exportar vista actual (PNG)
+            <span data-i18n="export.currentViewPng">Exportar vista actual (PNG)</span>
           </button>
           <button class="btn btn--outline btn--full" id="btn-export-dialog-zip">
             <svg
@@ -1749,13 +2055,14 @@
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Exportar estudio completo (ZIP)
+            <span data-i18n="export.fullStudyZip">Exportar estudio completo (ZIP)</span>
           </button>
           <button
             class="btn btn--secondary btn--full"
             id="export-dialog-cancel"
             data-dialog-autofocus
             style="margin-top: 4px"
+            data-i18n="common.cancel"
           >
             Cancelar
           </button>
@@ -1771,16 +2078,21 @@
         aria-modal="true"
         aria-labelledby="duplicate-title"
       >
-        <h3 class="dialog__title" id="duplicate-title">Estudio duplicado</h3>
+        <h3 class="dialog__title" id="duplicate-title" data-i18n="upload.duplicateTitle">
+          Estudio duplicado
+        </h3>
         <p id="duplicate-msg" class="dialog__msg"></p>
         <div class="dialog__actions">
-          <button class="btn btn--danger" id="duplicate-yes">Reemplazar</button>
+          <button class="btn btn--danger" id="duplicate-yes" data-i18n="upload.replace">
+            Reemplazar
+          </button>
           <!-- Focus lands on the safe option, not on "Reemplazar", which
                overwrites an existing study. -->
           <button
             class="btn btn--secondary"
             id="duplicate-no"
             data-dialog-autofocus
+            data-i18n="common.cancel"
           >
             Cancelar
           </button>
@@ -1788,13 +2100,88 @@
       </div>
     </div>
 
+    <!-- Activate an invited account by entering the emailed code (US-H04).
+         The URL-based accept-invite screen still works; this modal is the path
+         for the desktop app and for anyone who has the code but no live link. -->
+    <div id="invite-dialog" class="dialog-overlay hidden">
+      <form
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invite-dialog-title"
+        data-invite-dialog-form
+      >
+        <h3
+          class="dialog__title"
+          id="invite-dialog-title"
+          data-i18n="invite.dialog.title"
+        >
+          Activá tu cuenta
+        </h3>
+        <p class="dialog__msg" data-i18n="invite.dialog.msg">
+          Ingresá tu email y el código que recibiste por correo, y elegí una
+          contraseña.
+        </p>
+        <label class="login-field">
+          <span data-i18n="invite.dialog.emailLabel">Email</span>
+          <input
+            type="email"
+            data-invite-dialog-email
+            data-dialog-autofocus
+            required
+            autocomplete="username"
+          />
+        </label>
+        <label class="login-field">
+          <span data-i18n="invite.dialog.codeLabel">Código de invitación</span>
+          <input
+            type="text"
+            data-invite-dialog-code
+            required
+            autocomplete="one-time-code"
+            spellcheck="false"
+          />
+        </label>
+        <label class="login-field">
+          <span data-i18n="invite.password">Contraseña</span>
+          <input
+            type="password"
+            data-invite-dialog-password
+            required
+            autocomplete="new-password"
+          />
+        </label>
+        <p class="login-error hidden" data-invite-dialog-error role="alert"></p>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--accent"
+            type="submit"
+            data-invite-dialog-submit
+            data-i18n="invite.submit"
+          >
+            Crear cuenta e ingresar
+          </button>
+          <button
+            class="btn btn--secondary"
+            type="button"
+            data-invite-dialog-cancel
+            data-i18n="common.cancel"
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>
+
     <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
-         must run before auth.ts's module-load-time resolveApiOrigin() call. -->
+         must run before auth.ts's module-load-time resolveApiOrigin() call.
+         `??=` rather than `=`: Electron's preload sets this synchronously
+         before any page script runs, and must win here. -->
     <script>
-      window.MICD_API_ORIGIN = "";
+      window.MICD_API_ORIGIN ??= "";
     </script>
     <!-- dicom-parser UMD bundle (loaded before our modules) -->
     <script src="./dicomParser.min.js"></script>

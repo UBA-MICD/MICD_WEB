@@ -1,9 +1,10 @@
 /* cspell:disable */
-import { authFetch, API_BASE } from "../auth/auth.js";
+import { authFetch, isStaff, API_BASE } from "../auth/auth.js";
 import { $, escapeHtml, escapeAttr } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
 import { onSelectionChange } from "../explorer/explorer.js";
 import { exportStudyByIdAsZip } from "../services/export-service.js";
+import { t, onLocaleChange, currentLocale } from "../i18n/i18n.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("es-AR", {
+  return d.toLocaleDateString(currentLocale() === "en" ? "en-US" : "es-AR", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -77,12 +78,12 @@ function statusBadgeHtml(status: StudyZenodoDetail["status"]): string {
   const badges: string[] = [];
   if (status === "published" || status === "both") {
     badges.push(
-      `<span class="study-item__zenodo-badge study-item__zenodo-badge--published">📤 Publicado</span>`,
+      `<span class="study-item__zenodo-badge study-item__zenodo-badge--published">📤 ${escapeHtml(t("studyDetail.published"))}</span>`,
     );
   }
   if (status === "imported" || status === "both") {
     badges.push(
-      `<span class="study-item__zenodo-badge study-item__zenodo-badge--imported">📥 Importado</span>`,
+      `<span class="study-item__zenodo-badge study-item__zenodo-badge--imported">📥 ${escapeHtml(t("studyDetail.imported"))}</span>`,
     );
   }
   return badges.join(" ");
@@ -91,7 +92,7 @@ function statusBadgeHtml(status: StudyZenodoDetail["status"]): string {
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function renderLoading(): void {
-  content().innerHTML = `<p class="study-detail-panel__loading" aria-live="polite">Cargando datos de Zenodo…</p>`;
+  content().innerHTML = `<p class="study-detail-panel__loading" aria-live="polite">${escapeHtml(t("studyDetail.loadingZenodo"))}</p>`;
 }
 
 function renderError(message: string): void {
@@ -111,7 +112,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
           <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
           <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        Datos locales — Zenodo no disponible${detail.lastSyncedAt ? ` (última sync: ${formatDate(detail.lastSyncedAt)})` : ""}
+        ${escapeHtml(t("studyDetail.staleWarning"))}${detail.lastSyncedAt ? escapeHtml(t("studyDetail.lastSync", { date: formatDate(detail.lastSyncedAt) })) : ""}
       </div>`
     : "";
 
@@ -126,21 +127,21 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
 
   const authorsHtml = detail.record?.authors?.length
     ? `<p class="study-detail-panel__meta-row">
-        <span class="study-detail-panel__label">Autores</span>
+        <span class="study-detail-panel__label">${escapeHtml(t("studyDetail.authors"))}</span>
         <span>${escapeHtml(detail.record.authors.map((a) => a.name).join(", "))}</span>
       </p>`
     : "";
 
   const licenseHtml = detail.record?.license
     ? `<p class="study-detail-panel__meta-row">
-        <span class="study-detail-panel__label">Licencia</span>
+        <span class="study-detail-panel__label">${escapeHtml(t("common.license"))}</span>
         <span>${escapeHtml(detail.record.license)}</span>
       </p>`
     : "";
 
   const dateHtml = detail.record?.publicationDate
     ? `<p class="study-detail-panel__meta-row">
-        <span class="study-detail-panel__label">Fecha</span>
+        <span class="study-detail-panel__label">${escapeHtml(t("studyDetail.date"))}</span>
         <span>${escapeHtml(formatDate(detail.record.publicationDate))}</span>
       </p>`
     : "";
@@ -148,7 +149,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
   const downloadsHtml =
     detail.downloads !== null
       ? `<p class="study-detail-panel__meta-row">
-        <span class="study-detail-panel__label">Descargas</span>
+        <span class="study-detail-panel__label">${escapeHtml(t("studyDetail.downloads"))}</span>
         <span>${escapeHtml(String(detail.downloads))}</span>
       </p>`
       : "";
@@ -156,7 +157,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
   const versionsHtml =
     detail.versions.length > 0
       ? `<section class="study-detail-panel__section">
-        <h3 class="study-detail-panel__section-title">Historial de versiones</h3>
+        <h3 class="study-detail-panel__section-title">${escapeHtml(t("studyDetail.versionHistory"))}</h3>
         <ol class="study-detail-panel__versions">
           ${detail.versions
             .slice()
@@ -167,7 +168,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
               const vUrl = v.url;
               return `<li class="study-detail-panel__version${isLatest ? " study-detail-panel__version--latest" : ""}">
                 <a href="${escapeAttr(vUrl)}" target="_blank" rel="noopener noreferrer" class="study-detail-panel__version-doi">${escapeHtml(vDoi || `#${v.id}`)}</a>
-                <span class="study-detail-panel__version-date">${escapeHtml(formatDate(v.publicationDate))}${isLatest ? " <em>(más reciente)</em>" : ""}</span>
+                <span class="study-detail-panel__version-date">${escapeHtml(formatDate(v.publicationDate))}${isLatest ? ` <em>${escapeHtml(t("common.mostRecent"))}</em>` : ""}</span>
               </li>`;
             })
             .join("")}
@@ -182,17 +183,22 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
         data-study-id="${escapeAttr(studyId)}"
         data-zenodo-doi="${escapeAttr(detail.versions[detail.versions.length - 1]?.doi ?? detail.doi)}"
       >
-        Importar versión más reciente
+        ${escapeHtml(t("studyDetail.importLatestVersion"))}
       </button>`
     : "";
 
-  const actionsHtml = `
+  // "Check for updates" and "import latest" both write via staff-only Zenodo
+  // endpoints; a read-only researcher would only get a 403, so the whole action
+  // row is staff-only. The anonymized-ZIP export below stays — it's a read.
+  const actionsHtml = isStaff()
+    ? `
     <div class="study-detail-panel__actions">
       <button type="button" class="btn btn--secondary study-detail-panel__check-btn">
-        Verificar actualización en Zenodo
+        ${escapeHtml(t("studyDetail.checkUpdate"))}
       </button>
       ${importButtonHtml}
-    </div>`;
+    </div>`
+    : "";
 
   content().innerHTML = `
     ${staleWarning}
@@ -204,7 +210,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
         rel="noopener noreferrer"
         class="study-detail-panel__doi"
         title="${escapeAttr(detail.doi)}"
-        aria-label="Abrir en Zenodo — ${escapeAttr(detail.doi)}"
+        aria-label="${escapeAttr(t("studyDetail.openInZenodo", { doi: detail.doi }))}"
       >${escapeHtml(detail.doi)}</a>
     </div>
 
@@ -234,7 +240,7 @@ function renderDetail(studyId: string, detail: StudyZenodoDetail): void {
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        Exportar .zip anonimizado
+        ${escapeHtml(t("studyDetail.exportAnonymizedZip"))}
       </button>
     </div>`;
 
@@ -268,7 +274,7 @@ async function showDetail(studyId: string): Promise<void> {
       return;
     }
     if (!res.ok) {
-      renderError("No se pudieron obtener los datos de Zenodo.");
+      renderError(t("studyDetail.zenodoDataError"));
       return;
     }
 
@@ -276,7 +282,7 @@ async function showDetail(studyId: string): Promise<void> {
     renderDetail(studyId, detail);
   } catch (err: any) {
     if (err?.name === "AbortError") return;
-    renderError("Error al conectar con el servidor.");
+    renderError(t("studyDetail.connectionError"));
   }
 }
 
@@ -287,7 +293,7 @@ async function checkForUpdate(studyId: string): Promise<void> {
   if (!btn) return;
   const original = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "Verificando…";
+  btn.textContent = t("common.checking");
 
   try {
     const res = await authFetch(
@@ -297,8 +303,7 @@ async function checkForUpdate(studyId: string): Promise<void> {
     const data = await res.json().catch(() => ({}) as { error?: string });
     if (!res.ok) {
       showToast(
-        (data as { error?: string }).error ??
-          "No se pudo verificar la actualización.",
+        (data as { error?: string }).error ?? t("studyDetail.checkUpdateError"),
         "error",
       );
       return;
@@ -310,18 +315,20 @@ async function checkForUpdate(studyId: string): Promise<void> {
         ? formatDate(result.latestPublishedAt)
         : null;
       showToast(
-        `Nueva versión disponible: v${result.latestVersion ?? "?"}${dateStr ? ` (publicada el ${dateStr})` : ""}`,
+        t("studyDetail.newVersionAvailable", {
+          version: result.latestVersion ?? "?",
+        }) + (dateStr ? t("studyDetail.publishedOn", { date: dateStr }) : ""),
         "warning",
       );
     } else {
-      showToast("Al día", "success");
+      showToast(t("studyDetail.upToDate"), "success");
     }
 
     // Force a re-fetch so the badge/flag reflects the fresh check immediately.
     currentStudyId = null;
     await showDetail(studyId);
   } catch {
-    showToast("Error de conexión al verificar la actualización.", "error");
+    showToast(t("studyDetail.checkConnectionError"), "error");
   } finally {
     if (btn.isConnected) {
       btn.disabled = false;
@@ -347,6 +354,13 @@ export function initStudyDetailPanel(): void {
     } else {
       hideDetail();
     }
+  });
+
+  onLocaleChange(() => {
+    if (!currentStudyId) return;
+    const studyId = currentStudyId;
+    currentStudyId = null; // showDetail() no-ops when studyId === currentStudyId
+    void showDetail(studyId);
   });
 
   content().addEventListener("click", (e) => {

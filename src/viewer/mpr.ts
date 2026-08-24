@@ -2,6 +2,7 @@ import { ParsedDicom } from "../dicom/dicom-parser-util.js";
 import { dicomCache } from "./cache.js";
 import { $, showLoading, showError } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
+import { t } from "../i18n/i18n.js";
 
 /**
  * MPR 3D WebGL2 Volume Ray Marching Module
@@ -170,11 +171,7 @@ export class MPR3DViewer {
 
     const totalSlices = itemCount();
     if (totalSlices <= 1) {
-      /* cspell:disable */
-      showError(
-        "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
-      );
-      /* cspell:enable */
+      showError(t("viewer.mpr.needTwoSlices"));
       return false;
     }
 
@@ -247,8 +244,7 @@ export class MPR3DViewer {
 
       return true;
     } catch (err: any) {
-      // cspell:disable-next-line
-      showError(`Error al cargar el volumen 3D: ${err.message || err}`);
+      showError(t("viewer.mpr.volumeLoadError", { message: err.message || err }));
       return false;
     } finally {
       showLoading(false);

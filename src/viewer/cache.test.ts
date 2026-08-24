@@ -94,3 +94,70 @@ test("DicomCache prefetchNext triggers fetches for future indices without throwi
     cache.prefetchNext(0, 2);
   });
 });
+
+test("DicomCache getOrFetch dedupes concurrent misses via the pending map", async () => {
+  const cache = new DicomCache();
+  state.source = "local";
+  state.files = [];
+
+  // Index is out of range, so fetchIndex resolves to null quickly, but the
+  // two calls below still race before either promise settles: the second
+  // must be served from `pending` rather than starting a second fetch.
+  const first = cache.getOrFetch(0);
+  const second = cache.getOrFetch(0);
+  assert.equal(await first, null);
+  assert.equal(await second, null);
+});
+
+test("DicomCache fetchIndex (local) returns null when the index is out of range", async () => {
+  const cache = new DicomCache();
+  state.source = "local";
+  state.files = [];
+  assert.equal(await cache.getOrFetch(0), null);
+});
+
+test("DicomCache fetchIndex (server) returns null without a serverStudyId or in-range index", async () => {
+  const cache = new DicomCache();
+  state.source = "server";
+  state.serverStudyId = null;
+  state.serverInstances = ["a", "b"];
+  assert.equal(await cache.getOrFetch(0), null);
+
+  state.serverStudyId = "study-1";
+  state.serverInstances = [];
+  assert.equal(await cache.getOrFetch(0), null);
+});
+
+test("DicomCache fetchIndex (server) returns null on a non-ok response", async () => {
+  const cache = new DicomCache();
+  state.source = "server";
+  state.serverStudyId = "study-1";
+  state.serverInstances = ["instance-a"];
+
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async () => ({ ok: false, status: 404 });
+  try {
+    assert.equal(await cache.getOrFetch(0), null);
+  } finally {
+    (globalThis as any).fetch = originalFetch;
+  }
+});
+
+test("DicomCache getOrFetch catches a rejected fetch and logs a warning instead of throwing", async (t) => {
+  const cache = new DicomCache();
+  state.source = "server";
+  state.serverStudyId = "study-1";
+  state.serverInstances = ["instance-a"];
+
+  t.mock.method(console, "warn", () => {});
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async () => {
+    throw new Error("network down");
+  };
+  try {
+    assert.equal(await cache.getOrFetch(0), null);
+    assert.equal((console.warn as any).mock.calls.length, 1);
+  } finally {
+    (globalThis as any).fetch = originalFetch;
+  }
+});

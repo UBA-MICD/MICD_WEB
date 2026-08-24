@@ -1,3 +1,6 @@
+import { t } from "../i18n/i18n.js";
+import { getRefreshToken, setRefreshToken, clearRefreshToken } from "../shared/token-store.js";
+
 // Origin the backend API + auth endpoints live on. Default: the backend's own
 // port, for local dev (page opened directly / served without nginx). In the
 // Docker/nginx deployment the page is served same-origin and nginx proxies
@@ -12,11 +15,20 @@ function resolveApiOrigin(): string {
 export const API_ORIGIN = resolveApiOrigin();
 
 const API_BASE = `${API_ORIGIN}/api`;
-const REFRESH_KEY = "micd_refresh_token";
+
+/** The three RBAC roles (mirrors the backend's shared/roles.ts). */
+export type Role = "admin" | "medico" | "investigador";
+
+const ROLES: readonly Role[] = ["admin", "medico", "investigador"];
+
+function isRole(x: unknown): x is Role {
+  return typeof x === "string" && (ROLES as readonly string[]).includes(x);
+}
 
 export interface AuthUser {
   id: number;
   email: string;
+  role: Role;
 }
 
 let accessToken: string | null = null;
@@ -44,6 +56,32 @@ export function getAccessToken(): string | null {
 
 export function getCurrentUser(): AuthUser | null {
   return currentUser;
+}
+
+/** The current user's role, or null when signed out. Drives admin-only UI. */
+export function getCurrentRole(): Role | null {
+  return currentUser?.role ?? null;
+}
+
+/**
+ * Role capability checks mirroring the backend's requireRole gates (see the
+ * `backend` repo's route files). The UI uses these to hide actions a role would
+ * only be refused server-side — an `investigador` (researcher) is read-only, so
+ * showing an Upload tab or a Publish button just to hand back a 403 reads as a
+ * bug. The server's 403 remains the real boundary; this is cosmetic.
+ *
+ *  - `isAdmin`  — user management, Zenodo config/publish, activity log.
+ *  - `isStaff`  — clinical staff (admin + medico): may write — upload, import,
+ *                 and the study Zenodo publish-check.
+ *  - researcher — `investigador`: read-only, neither of the above.
+ */
+export function isAdmin(): boolean {
+  return getCurrentRole() === "admin";
+}
+
+export function isStaff(): boolean {
+  const role = getCurrentRole();
+  return role === "admin" || role === "medico";
 }
 
 export function isAuthenticated(): boolean {
@@ -76,7 +114,14 @@ function decodeToken(token: string): {
     const claims = JSON.parse(atob(base64));
     const user =
       typeof claims.sub === "number" && typeof claims.email === "string"
-        ? { id: claims.sub, email: claims.email }
+        ? {
+            id: claims.sub,
+            email: claims.email,
+            // A token minted before RBAC deployed carries no role; default to a
+            // non-admin so the admin tab stays hidden until the next refresh
+            // (this is cosmetic — the server's 403 is the real boundary).
+            role: isRole(claims.role) ? claims.role : "medico",
+          }
         : null;
     // `exp` is in seconds since the epoch, per RFC 7519.
     const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : null;
@@ -86,19 +131,32 @@ function decodeToken(token: string): {
   }
 }
 
-function setSession(token: string, refreshToken: string, user: AuthUser): void {
+async function setSession(token: string, refreshToken: string, user: AuthUser): Promise<void> {
   accessToken = token;
   currentUser = user;
   accessTokenExpiresAt = decodeToken(token).expiresAt;
-  localStorage.setItem(REFRESH_KEY, refreshToken);
+  await setRefreshToken(refreshToken);
   notifyAuthChange();
 }
 
-function clearSession(): void {
+/**
+ * Establish a session from an auth response that already carries tokens — the
+ * accept-invite flow, which mints a live session on the server and hands it back
+ * exactly like login does. Same effect as a successful login().
+ */
+export async function adoptSession(
+  accessToken: string,
+  refreshToken: string,
+  user: AuthUser,
+): Promise<void> {
+  await setSession(accessToken, refreshToken, user);
+}
+
+async function clearSession(): Promise<void> {
   accessToken = null;
   currentUser = null;
   accessTokenExpiresAt = null;
-  localStorage.removeItem(REFRESH_KEY);
+  await clearRefreshToken();
   notifyAuthChange();
 }
 
@@ -116,29 +174,26 @@ export async function login(
       body: JSON.stringify({ email, password }),
     });
   } catch {
-    // cspell:disable-next-line
-    return { ok: false, error: "No se pudo conectar con el servidor." };
+    return { ok: false, error: t("auth.error.networkError") };
   }
 
   if (res.status === 429) {
     return {
       ok: false,
-      // cspell:disable-next-line
-      error: "Demasiados intentos. Esperá unos minutos e intentá de nuevo.",
+      error: t("auth.error.tooManyAttempts"),
     };
   }
   if (!res.ok) {
-    // cspell:disable-next-line
-    return { ok: false, error: "Email o contraseña incorrectos." };
+    return { ok: false, error: t("auth.error.badCredentials") };
   }
 
   const data = await res.json();
-  setSession(data.accessToken, data.refreshToken, data.user);
+  await setSession(data.accessToken, data.refreshToken, data.user);
   return { ok: true };
 }
 
 export async function logout(): Promise<void> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  const refreshToken = await getRefreshToken();
   if (refreshToken) {
     try {
       await fetch(`${API_ORIGIN}/auth/logout`, {
@@ -150,7 +205,7 @@ export async function logout(): Promise<void> {
       // best-effort — clear the local session regardless
     }
   }
-  clearSession();
+  await clearSession();
 }
 
 // ── Token refresh (single-flight) ─────────────────────────────────────────────
@@ -171,7 +226,7 @@ export function refreshAccessToken(): Promise<boolean> {
 }
 
 async function doRefresh(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  const refreshToken = await getRefreshToken();
   if (!refreshToken) return false;
 
   let res: Response;
@@ -186,7 +241,7 @@ async function doRefresh(): Promise<boolean> {
   }
 
   if (!res.ok) {
-    clearSession();
+    await clearSession();
     return false;
   }
 
@@ -195,7 +250,7 @@ async function doRefresh(): Promise<boolean> {
   accessToken = data.accessToken;
   currentUser = claims.user ?? currentUser;
   accessTokenExpiresAt = claims.expiresAt;
-  localStorage.setItem(REFRESH_KEY, data.refreshToken);
+  await setRefreshToken(data.refreshToken);
   notifyAuthChange();
   return true;
 }
@@ -252,6 +307,9 @@ export async function authFetch(
   });
 
   const res = await fetch(input, withAuth(accessToken));
+  // Only 401 escalates (refresh → interactive login). A 403 means the session
+  // is valid but the role is not permitted — return it as-is so the caller can
+  // surface a "forbidden" message; refreshing/re-logging would not help.
   if (res.status !== 401) return res;
 
   if (!(await refreshAccessToken()) && !(await promptLoginOnce())) return res;

@@ -11,10 +11,12 @@
     ".env.*",
     ".git",
     "docs/*",
-    "*.md"
+    "*.md",
+    "src/i18n/locales/es.ts"
   ],
   "words": [
     "micd",
+    "doi",
     "gihub",
     "codecov",
     "kubuntu",

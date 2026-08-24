@@ -17,6 +17,7 @@ import {
   exportCurrentViewToPNG,
   exportCurrentStudyAsZip,
 } from "../services/export-service.js";
+import { openServerScreen } from "../server-screen/server-screen.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -487,6 +488,10 @@ export function initMenuListeners(): void {
   if (!window.api) return;
   window.api.on("menu:open-files", () => void openFiles());
   window.api.on("menu:open-folder", () => void openFolder());
+  // Desktop-only "File > API Server…": the setting lives on the server
+  // screen's auth card (shared/desktop.ts unhides it there), so this just
+  // navigates — nothing new to render.
+  window.api.on("menu:api-server", () => openServerScreen("buscar"));
 }
 
 // ── Keyboard Shortcuts ───────────────────────────────────────────────────────

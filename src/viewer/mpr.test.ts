@@ -258,12 +258,16 @@ test("MPR3DViewer renderGizmo draws axes on 2D context", () => {
   const viewer = new MPR3DViewer();
   const mock2dCtx: any = {
     clearRect: () => {},
+    save: () => {},
+    restore: () => {},
     strokeStyle: "",
     lineWidth: 1,
     beginPath: () => {},
     moveTo: () => {},
     lineTo: () => {},
+    rect: () => {},
     stroke: () => {},
+    fill: () => {},
     fillStyle: "",
     fillText: () => {},
   };

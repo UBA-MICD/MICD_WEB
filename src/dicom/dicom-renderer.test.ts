@@ -69,7 +69,13 @@ const baseMeta: DicomMetadata = {
   transferSyntaxUid: "",
 };
 
-const baseViewport = { windowCenter: 128, windowWidth: 256, zoom: 1, panX: 0, panY: 0 };
+const baseViewport = {
+  windowCenter: 128,
+  windowWidth: 256,
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+};
 
 test("renderDicom does nothing when getContext returns null", () => {
   const canvas = fakeCanvas(null);
@@ -137,7 +143,7 @@ test("renderDicom maps monochrome pixels through window/level with clamping", ()
   // window center 128, width 256 -> range [0, 256]
   renderDicom({
     canvas,
-    pixelData: new Uint16Array([-1000 >>> 0 & 0xffff, 0, 128, 5000]),
+    pixelData: new Uint16Array([(-1000 >>> 0) & 0xffff, 0, 128, 5000]),
     metadata: baseMeta,
     viewport: baseViewport,
   });
@@ -238,12 +244,25 @@ test("applyCanvasTransform sets a translate+scale CSS transform", () => {
     panX: 10,
     panY: -5,
   });
-  assert.equal(imageCanvas.style.transform, "translate(10px, -5px) scale(2.5)");
+  assert.equal(
+    imageCanvas.style.transform,
+    "translate(10px, -5px) scale(2.5) scaleY(-1)",
+  );
 });
 
 test("createDefaultViewport reads window center/width from metadata with zoom 1 and no pan", () => {
-  const vp = createDefaultViewport({ ...baseMeta, windowCenter: 40, windowWidth: 400 });
-  assert.deepEqual(vp, { windowCenter: 40, windowWidth: 400, zoom: 1, panX: 0, panY: 0 });
+  const vp = createDefaultViewport({
+    ...baseMeta,
+    windowCenter: 40,
+    windowWidth: 400,
+  });
+  assert.deepEqual(vp, {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  });
 });
 
 test("resetViewport is equivalent to createDefaultViewport", () => {

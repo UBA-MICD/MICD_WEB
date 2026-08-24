@@ -1709,6 +1709,26 @@
         <!-- Desktop only: nginx already proxies /api and /auth same-origin
              in the browser build, so there is nothing to configure there. -->
         <div class="auth-card auth-card--settings hidden" data-desktop-only>
+          <p class="auth-settings__label" aria-hidden="true">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"
+              ></path>
+            </svg>
+            <span data-i18n="server.advancedSettings"
+              >Configuración avanzada</span
+            >
+          </p>
           <label class="login-field">
             <span data-i18n="server.apiOriginLabel">Servidor de la API</span>
             <input

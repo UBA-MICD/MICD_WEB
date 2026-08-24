@@ -36,7 +36,7 @@ import {
   loadStudyExplorer,
   renderLoggedOutExplorer,
 } from "./explorer/explorer.js";
-import { initZenodoPanel } from "./zenodo/zenodo-panel.js";
+import { initZenodoPanel, checkQuotaAlerts } from "./zenodo/zenodo-panel.js";
 import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { $ } from "./shared/dom.js";
@@ -109,6 +109,7 @@ async function initApp(): Promise<void> {
   updateAuthUI();
   if (restored) {
     void loadStudyExplorer();
+    void checkQuotaAlerts();
   } else {
     renderLoggedOutExplorer();
   }

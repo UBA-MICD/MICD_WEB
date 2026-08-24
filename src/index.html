@@ -8,10 +8,13 @@
          blob: is required for study thumbnails, which are fetched with an
          Authorization header and shown via URL.createObjectURL. Vendored
          assets (fflate, fonts) keep everything same-origin, which is also
-         what Electron's file:// CSP requires. -->
+         what Electron's file:// CSP requires.
+         worker-src blob: is required for fflate's off-thread ZIP decompression;
+         without an explicit worker-src it falls back to script-src which doesn't
+         allow blob:, causing the worker creation to be blocked. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
     />
     <script type="importmap">
       {
@@ -385,7 +388,7 @@
               type="file"
               id="open-files-input"
               multiple
-              accept=".dcm"
+              accept=".dcm,.zip"
               class="hidden"
             />
             <input type="file" id="open-folder-input" class="hidden" />
@@ -1476,6 +1479,18 @@
           >
             Usuarios
           </button>
+          <!-- Admin-only: system status panel. -->
+          <button
+            class="server-tab hidden"
+            id="tab-sistema"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-sistema"
+            tabindex="-1"
+            data-i18n="system.tab"
+          >
+            Sistema
+          </button>
         </div>
       </header>
 
@@ -1930,6 +1945,16 @@
           </table>
         </div>
       </div>
+      <!-- Admin-only: system status panel. -->
+      <div
+        class="server-panel hidden"
+        id="panel-sistema"
+        role="tabpanel"
+        aria-labelledby="tab-sistema"
+        tabindex="0"
+      >
+        <div class="server-panel__body" id="system-panel-body"></div>
+      </div>
     </section>
 
     <!-- Public accept-invite screen (US-H04), entered from ?invite=<code>. -->
@@ -2106,6 +2131,9 @@
             data-i18n="common.cancel"
           >
             Cancelar
+          </button>
+          <button class="btn btn--secondary" id="duplicate-cancel-all" data-i18n="upload.cancelAll">
+            Cancelar todo
           </button>
         </div>
       </div>

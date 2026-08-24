@@ -488,9 +488,10 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
 
   // In the listbox each <li> IS the option; in the panel each row is a button,
   // because there a click acts immediately rather than selecting.
+  const hasZenodo = s.zenodo_doi || s.zenodo_source_doi ? "true" : "false";
   return mode === "select"
-    ? `<li class="study-item" role="option" data-id="${id}" aria-selected="false" tabindex="-1">${body}</li>`
-    : `<li><button type="button" class="study-item" data-id="${id}">${body}</button></li>`;
+    ? `<li class="study-item" role="option" data-id="${id}" data-has-zenodo="${hasZenodo}" aria-selected="false" tabindex="-1">${body}</li>`
+    : `<li><button type="button" class="study-item" data-id="${id}" data-has-zenodo="${hasZenodo}">${body}</button></li>`;
 }
 
 function emptyState(message: string): string {

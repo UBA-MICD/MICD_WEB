@@ -210,6 +210,7 @@ export const en: Record<string, string> = {
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",
   "upload.replace": "Replace",
+  "upload.cancelAll": "Cancel all",
   "upload.zipReadError": "Couldn't read: {{files}}",
   "upload.zipTooBig":
     'ZIP too large for the browser — drag it onto the "Studies on server" panel: {{files}}',
@@ -401,6 +402,8 @@ export const en: Record<string, string> = {
   "zenodo.logs.previousPage": "← Previous",
   "zenodo.logs.nextPage": "Next →",
   "zenodo.logs.pageInfo": "Page {{page}} / {{totalPages}}",
+  "zenodo.quotaAlertDefault": "Zenodo storage almost full. Check the Zenodo configuration.",
+  "orthanc.storageAlertDefault": "Orthanc server storage almost full ({{pct}}% used). Free up space or expand capacity.",
 
   // ── users (admin panel, US-H04) ─────────────────────────────────────────────
   "users.tab": "Users",
@@ -456,4 +459,15 @@ export const en: Record<string, string> = {
   "invite.dialog.missing": "Enter your email and invitation code.",
   "invite.dialog.emailMismatch":
     "That code doesn't match that email. Check both.",
+
+  // ── System panel (admin) ────────────────────────────────────────────────────
+  "system.tab": "System",
+  "system.orthancStorage": "Orthanc Storage",
+  "system.free": "Free",
+  "system.of": "of",
+  "system.studies": "Studies",
+  "system.series": "Series",
+  "system.instances": "Instances",
+  "system.used": "used",
+  "system.loadError": "Could not load server status.",
 };

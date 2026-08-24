@@ -345,7 +345,8 @@ function uploadOne(
         showDuplicateDialog(
           file,
           safeMessage(xhr.responseText),
-          async (replace) => {
+          async (replace, cancelAll) => {
+            if (cancelAll) { cancelled = true; setRowState(row, "aborted"); resolve("aborted"); return; }
             resolve(replace ? await uploadOne(file, row, true) : "duplicate");
           },
         );
@@ -611,22 +612,24 @@ function uploadOneExplorer(
 function showDuplicateDialog(
   file: File,
   message: string,
-  done: (replace: boolean) => void,
+  done: (replace: boolean, cancelAll?: boolean) => void,
 ): void {
   const dialog = $("duplicate-dialog");
   $("duplicate-msg").textContent =
     message || t("upload.duplicateMessage", { name: file.name });
 
   let settled = false;
-  const finish = (replace: boolean): void => {
+  const finish = (replace: boolean, cancelAll = false): void => {
     if (settled) return;
     settled = true;
     closeDialog(dialog);
-    done(replace);
+    done(replace, cancelAll);
   };
 
   ($("duplicate-yes") as HTMLButtonElement).onclick = () => finish(true);
   ($("duplicate-no") as HTMLButtonElement).onclick = () => finish(false);
+  const cancelAllBtn = document.getElementById("duplicate-cancel-all") as HTMLButtonElement | null;
+  if (cancelAllBtn) cancelAllBtn.onclick = () => finish(false, true);
   // Escape closes without replacing — the safe outcome for a destructive
   // confirmation, and the queue must not stall waiting on a promise.
   dialog.addEventListener("dialog:close", () => finish(false), { once: true });

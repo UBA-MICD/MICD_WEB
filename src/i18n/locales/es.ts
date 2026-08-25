@@ -23,7 +23,10 @@ export const es: Record<string, string> = {
   "auth.login": "Iniciar sesión",
   "auth.logout": "Cerrar sesión",
   "auth.emailLabel": "Email",
+  "auth.emailPlaceholder": "tu@email.com",
   "auth.passwordLabel": "Contraseña",
+  "auth.showPassword": "Mostrar contraseña",
+  "auth.hidePassword": "Ocultar contraseña",
   "auth.submitLogin": "Ingresar",
   "auth.wereYouInvited": "¿Te invitaron? Activá tu cuenta",
   "auth.loginRequiredMsg":

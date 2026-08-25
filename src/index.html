@@ -1665,17 +1665,43 @@
                 data-login-email
                 required
                 autocomplete="username"
+                data-i18n-attr="placeholder:auth.emailPlaceholder"
+                placeholder="tu@email.com"
               />
             </label>
             <label class="login-field">
               <span data-i18n="auth.passwordLabel">Contraseña</span>
-              <input
-                type="password"
-                id="server-login-password"
-                data-login-password
-                required
-                autocomplete="current-password"
-              />
+              <div class="input-wrap">
+                <input
+                  type="password"
+                  id="server-login-password"
+                  data-login-password
+                  required
+                  autocomplete="current-password"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  class="input-wrap__toggle"
+                  data-login-toggle
+                  data-i18n-attr="aria-label:auth.showPassword"
+                  aria-label="Mostrar contraseña"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
+              </div>
             </label>
           </div>
           <p
@@ -1698,7 +1724,7 @@
                hand in a modal. -->
           <button
             type="button"
-            class="btn btn--outline btn--full"
+            class="auth-card__invite-link"
             data-invite-open
             data-i18n="auth.wereYouInvited"
           >

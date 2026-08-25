@@ -2120,13 +2120,56 @@ body {
   font-size: 14px;
   font-family: inherit;
   outline: none;
+  width: 100%;
   transition:
     border-color var(--transition),
     box-shadow var(--transition);
 }
+.login-field input::placeholder {
+  color: var(--text-dim);
+}
 .login-field input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-wrap input {
+  padding-right: 40px;
+}
+.input-wrap__toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition);
+  flex-shrink: 0;
+}
+.input-wrap__toggle:hover {
+  color: var(--text-secondary);
+}
+.auth-card__invite-link {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: center;
+  padding: 4px;
+  font-family: inherit;
+  transition: color var(--transition);
+  margin-top: 4px;
+}
+.auth-card__invite-link:hover {
+  color: var(--accent);
 }
 .login-error {
   font-size: 13px;

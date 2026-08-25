@@ -22,7 +22,10 @@ export const en: Record<string, string> = {
   "auth.login": "Log in",
   "auth.logout": "Log out",
   "auth.emailLabel": "Email",
+  "auth.emailPlaceholder": "you@email.com",
   "auth.passwordLabel": "Password",
+  "auth.showPassword": "Show password",
+  "auth.hidePassword": "Hide password",
   "auth.submitLogin": "Sign in",
   "auth.wereYouInvited": "Were you invited? Activate your account",
   "auth.loginRequiredMsg":

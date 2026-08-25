@@ -21,6 +21,7 @@ export const en: Record<string, string> = {
   // ── auth ─────────────────────────────────────────────────────────────────
   "auth.login": "Log in",
   "auth.logout": "Log out",
+  "auth.emailLabel": "Email",
   "auth.passwordLabel": "Password",
   "auth.submitLogin": "Sign in",
   "auth.wereYouInvited": "Were you invited? Activate your account",
@@ -37,7 +38,8 @@ export const en: Record<string, string> = {
     "Your session expired. The next action will ask you to log in.",
   "auth.announceExpiringSoon": "Your session expires in less than a minute.",
   "auth.error.networkError": "Couldn't connect to the server.",
-  "auth.error.tooManyAttempts": "Too many attempts. Wait a few minutes and try again.",
+  "auth.error.tooManyAttempts":
+    "Too many attempts. Wait a few minutes and try again.",
   "auth.error.badCredentials": "Incorrect email or password.",
   "auth.activity.loading": "Loading…",
   "auth.activity.notAvailable": "History not available on this server yet.",
@@ -57,7 +59,8 @@ export const en: Record<string, string> = {
   "server.apiOriginInvalid": "Invalid server address.",
   "dialog.activityTitle": "Activity history",
   "server.studyLoadedBanner": "Study loaded · returning to viewer",
-  "server.studiesLoadedBanner": "{{count}} studies loaded · returning to viewer",
+  "server.studiesLoadedBanner":
+    "{{count}} studies loaded · returning to viewer",
   "common.search": "Search",
 
   // ── explorer (study list, both views) ──────────────────────────────────
@@ -87,7 +90,8 @@ export const en: Record<string, string> = {
   "explorer.zenodoBadge": "Zenodo · {{doi}}",
   "explorer.importedBadge": "Imported · {{doi}}",
   "explorer.loggedOutHintLine1": "Log in to see the server's studies.",
-  "explorer.loggedOutHintLine2": "Opening local files doesn't require a session.",
+  "explorer.loggedOutHintLine2":
+    "Opening local files doesn't require a session.",
 
   // ── zenodo linked filter (shared across explorer + server panel chips) ──
   "zenodo.linkedFilter": "Linked to Zenodo",
@@ -134,7 +138,8 @@ export const en: Record<string, string> = {
     "No pixel data found. The file may use a compressed transfer syntax.",
   "viewer.folderNoDicom": "No DICOM files found in the selected folder.",
   "viewer.serverStudyNoImages": "The study has no images.",
-  "viewer.serverStudyLoadError": "Error loading the study from the server: {{message}}",
+  "viewer.serverStudyLoadError":
+    "Error loading the study from the server: {{message}}",
   "viewer.mpr.sliceCounter": "Slice: {{current}}/{{total}}",
   "viewer.mpr.notCompatibleSlices":
     "Study not compatible with MPR: requires a series with more than 1 slice.",
@@ -148,6 +153,12 @@ export const en: Record<string, string> = {
   "viewer.mpr.needTwoSlices":
     "The study needs at least 2 slices for the 3D volumetric view.",
   "viewer.mpr.volumeLoadError": "Error loading the 3D volume: {{message}}",
+  "viewer.zoom.panelTitle": "Zoom Adjustment",
+  "viewer.zoom.levelLabel": "Zoom Level",
+  "viewer.zoom.presetsTitle": "Presets",
+  "viewer.zoom.fit": "Fit to screen",
+  "viewer.zoom.100": "100%",
+  "viewer.zoom.200": "200%",
   "viewer.mpr.sagittal": "Sagittal",
   "viewer.mpr.volumetricView": "Volumetric View",
   "viewer.metadata.patientName": "Patient Name",
@@ -187,12 +198,14 @@ export const en: Record<string, string> = {
   "export.dialogPrompt": "Choose the export format you want:",
   "export.currentViewPng": "Export current view (PNG)",
   "export.fullStudyZip": "Export full study (ZIP)",
-  "export.canvasNotFound": "Couldn't find the rendering canvas to export as PNG.",
+  "export.canvasNotFound":
+    "Couldn't find the rendering canvas to export as PNG.",
   "export.exportingPng": "Exporting current image to PNG…",
   "export.canvasBlobError": "Error generating PNG image from the canvas.",
   "export.pngSuccess": "PNG image downloaded successfully.",
   "export.noImagesInStudy": "The study contains no images.",
-  "export.downloadingServerImages": "Downloading {{count}} images from the server…",
+  "export.downloadingServerImages":
+    "Downloading {{count}} images from the server…",
   "export.instanceDownloadError": "Error downloading instance {{index}}",
   "export.noStudyLoaded": "No study loaded to export.",
   "export.zipSuccess": "Study exported successfully as '{{filename}}'.",
@@ -201,7 +214,8 @@ export const en: Record<string, string> = {
   "export.preparingZip": "Preparing .zip study export…",
   "export.fetchingStudyInfo": "Fetching study information from the server…",
   "export.noInstancesInStudy": "The selected study contains no instances.",
-  "export.downloadingFiles": "Downloading {{count}} DICOM files from the study…",
+  "export.downloadingFiles":
+    "Downloading {{count}} DICOM files from the study…",
   "export.fileFetchError": "Error retrieving file {{index}}",
 
   // ── upload ───────────────────────────────────────────────────────────────
@@ -218,9 +232,11 @@ export const en: Record<string, string> = {
   "upload.unzippingNamed": "Unzipping {{name}}…",
   "upload.noDicomFound": "No DICOM files found.",
   "upload.transportEncrypted": "Encrypted transmission (HTTPS){{owner}}",
-  "upload.transportUnencrypted": "Unencrypted connection (HTTP) — local use only{{owner}}",
+  "upload.transportUnencrypted":
+    "Unencrypted connection (HTTP) — local use only{{owner}}",
   "upload.ownerSuffix": " · linked to {{email}}",
-  "upload.inProgress": "An upload is already in progress. Wait for it to finish.",
+  "upload.inProgress":
+    "An upload is already in progress. Wait for it to finish.",
   "upload.needLogin": "You need to log in to upload studies.",
   "upload.needLoginExplorer": "Log in to upload studies.",
   "upload.uploadingProgress": "Uploading {{current}} of {{total}} files",
@@ -241,10 +257,12 @@ export const en: Record<string, string> = {
   "upload.explorerSummaryDuplicates": "{{count}} already existed",
   "upload.duplicateOnServer":
     "{{name}} already exists on the server. Use the Upload tab to replace it.",
-  "upload.duplicateMessage": "The study from {{name}} already exists on the server.",
+  "upload.duplicateMessage":
+    "The study from {{name}} already exists on the server.",
   "explorerPanel.unsupportedFileType":
     "Unsupported file type. Only .dcm and .zip are accepted.",
-  "explorerPanel.filesIgnored": "{{count}} file{{plural}} ignored (unsupported type).",
+  "explorerPanel.filesIgnored":
+    "{{count}} file{{plural}} ignored (unsupported type).",
 
   // ── study detail panel (Zenodo info for the selected study) ────────────
   "studyDetail.ariaLabel": "Study detail on Zenodo",
@@ -267,7 +285,8 @@ export const en: Record<string, string> = {
   "studyDetail.newVersionAvailable": "New version available: v{{version}}",
   "studyDetail.publishedOn": " (published on {{date}})",
   "studyDetail.upToDate": "Up to date",
-  "studyDetail.checkConnectionError": "Connection error while checking for an update.",
+  "studyDetail.checkConnectionError":
+    "Connection error while checking for an update.",
 
   // ── zenodo panel ─────────────────────────────────────────────────────────
   "zenodo.tabPublish": "Publish",
@@ -288,11 +307,13 @@ export const en: Record<string, string> = {
   "zenodo.logs.filterImport": "Import",
   "zenodo.logs.resultLabel": "Result",
   "zenodo.logs.loadHint": "Open this tab to load the history",
-  "zenodo.sessionExpiredWarning": "Your MICD session expired. Log in to continue.",
+  "zenodo.sessionExpiredWarning":
+    "Your MICD session expired. Log in to continue.",
   "zenodo.searchSessionRequired": "Session required",
   "zenodo.searchLoginToSearch": "Log in to search Zenodo",
   "zenodo.needLoginToast": "You need to log in to search Zenodo.",
-  "zenodo.error401Subtitle": "Your session expired. Log in again to search Zenodo.",
+  "zenodo.error401Subtitle":
+    "Your session expired. Log in again to search Zenodo.",
   "zenodo.error401Toast": "Your session expired. Log in again.",
   "zenodo.rateLimitTitle": "Search limit reached",
   "zenodo.rateLimitSubtitle":
@@ -302,7 +323,8 @@ export const en: Record<string, string> = {
   "zenodo.unavailableLong": "Zenodo is unavailable right now. Try again later.",
   "zenodo.unavailableShort": "Zenodo is unavailable right now.",
   "zenodo.searchErrorTitle": "Search error",
-  "zenodo.searchErrorSubtitleFallback": "An unexpected error occurred. Try again.",
+  "zenodo.searchErrorSubtitleFallback":
+    "An unexpected error occurred. Try again.",
   "zenodo.searchErrorToastFallback": "Error searching Zenodo.",
   "zenodo.noResultsTitle": "No results",
   "zenodo.noResultsSubtitle": "Try broader terms or remove filters",
@@ -323,7 +345,8 @@ export const en: Record<string, string> = {
   "zenodo.importZip": "Import ZIP",
   "zenodo.import": "Import",
   "zenodo.confirmImportZip": "Yes, import",
-  "zenodo.zipNote": "The server will unzip the file and import the DICOM files it contains.",
+  "zenodo.zipNote":
+    "The server will unzip the file and import the DICOM files it contains.",
   "zenodo.filesCountLabel": "{{count}} files",
   "zenodo.zipConfirmMessage":
     "Unzip the file ({{size}}) and import the DICOM files it contains?",
@@ -331,9 +354,11 @@ export const en: Record<string, string> = {
     "⚠ Large file — the download may take several minutes.",
   "zenodo.datasetNotFound":
     "The dataset doesn't exist in this Zenodo environment (sandbox/production).",
-  "zenodo.importFailedGeneric": "Couldn't import the dataset (error {{status}}).",
+  "zenodo.importFailedGeneric":
+    "Couldn't import the dataset (error {{status}}).",
   "zenodo.downloading": "Downloading…",
-  "zenodo.noImportableFiles": "This dataset has no .dcm or .zip files to import.",
+  "zenodo.noImportableFiles":
+    "This dataset has no .dcm or .zip files to import.",
   "zenodo.noFilesShort": "No files",
   "zenodo.importConnectionError": "Connection error importing the dataset.",
   "zenodo.alreadyImportedSingular": "This file was already imported.",
@@ -349,8 +374,10 @@ export const en: Record<string, string> = {
   "zenodo.saving": "Saving…",
   "zenodo.tokenErrorInvalid":
     "Invalid token. Check that you copied it in full and that it hasn't been revoked.",
-  "zenodo.tokenErrorPermissions": "The token doesn't have the required permissions on Zenodo.",
-  "zenodo.tokenErrorTimeout": "Zenodo didn't respond in time. Try again in a few minutes.",
+  "zenodo.tokenErrorPermissions":
+    "The token doesn't have the required permissions on Zenodo.",
+  "zenodo.tokenErrorTimeout":
+    "Zenodo didn't respond in time. Try again in a few minutes.",
   "zenodo.tokenSaveFallbackError": "Couldn't save the token.",
   "zenodo.enterTokenFirst": "Enter a Zenodo token before saving.",
   "zenodo.sessionExpiredSaveToken":
@@ -362,8 +389,10 @@ export const en: Record<string, string> = {
   "zenodo.intervalDisabled": "Disabled",
   "zenodo.syncNow": "Sync now",
   "zenodo.syncIntervalError": "Couldn't update the sync schedule.",
-  "zenodo.syncIntervalConnectionError": "Connection error updating the sync schedule.",
-  "zenodo.rateLimitPaused": "Rate limit reached — will continue in {{seconds}} seconds",
+  "zenodo.syncIntervalConnectionError":
+    "Connection error updating the sync schedule.",
+  "zenodo.rateLimitPaused":
+    "Rate limit reached — will continue in {{seconds}} seconds",
   "zenodo.checkingProgress": "Checking {{checked}}/{{total}} records…",
   "zenodo.syncCompleteToast":
     "Sync complete — {{checked}} records checked, {{newVersions}} with new versions available",
@@ -388,8 +417,10 @@ export const en: Record<string, string> = {
   "zenodo.publish.publishing": "Publishing…",
   "zenodo.publish.hintNotAnonymized": " The study must be anonymized first.",
   "zenodo.publish.hintNoCredentials": " Set up a token in the Config tab.",
-  "zenodo.publish.hintStudyNotFound": " The study wasn't found in the database.",
-  "zenodo.publish.successMessage": "✓ Published · DOI: {{doi}} · {{count}} file(s)",
+  "zenodo.publish.hintStudyNotFound":
+    " The study wasn't found in the database.",
+  "zenodo.publish.successMessage":
+    "✓ Published · DOI: {{doi}} · {{count}} file(s)",
   "zenodo.publish.connectionError": "Connection error.",
   "zenodo.publish.errorFallback": "Error {{status}}",
   "zenodo.logs.loading": "Loading history…",
@@ -402,8 +433,10 @@ export const en: Record<string, string> = {
   "zenodo.logs.previousPage": "← Previous",
   "zenodo.logs.nextPage": "Next →",
   "zenodo.logs.pageInfo": "Page {{page}} / {{totalPages}}",
-  "zenodo.quotaAlertDefault": "Zenodo storage almost full. Check the Zenodo configuration.",
-  "orthanc.storageAlertDefault": "Orthanc server storage almost full ({{pct}}% used). Free up space or expand capacity.",
+  "zenodo.quotaAlertDefault":
+    "Zenodo storage almost full. Check the Zenodo configuration.",
+  "orthanc.storageAlertDefault":
+    "Orthanc server storage almost full ({{pct}}% used). Free up space or expand capacity.",
 
   // ── users (admin panel, US-H04) ─────────────────────────────────────────────
   "users.tab": "Users",

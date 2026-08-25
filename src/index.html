@@ -99,14 +99,21 @@
             </svg>
           </span>
           <span class="logo-text">MICD</span>
-          <h1 class="topbar__title" id="topbar-title" data-i18n="viewer.defaultTitle">
+          <h1
+            class="topbar__title"
+            id="topbar-title"
+            data-i18n="viewer.defaultTitle"
+          >
             Visualizador DICOM
           </h1>
         </div>
 
         <div class="topbar__actions">
           <div class="locale-switch">
-            <label class="sr-only" for="locale-select" data-i18n="app.locale.label"
+            <label
+              class="sr-only"
+              for="locale-select"
+              data-i18n="app.locale.label"
               >Idioma</label
             >
             <select id="locale-select" class="locale-switch__select">
@@ -175,211 +182,217 @@
             aria-label="Herramientas de visualización"
             aria-orientation="vertical"
           >
-            <button
-              class="toolbar__tool active"
-              id="tool-wl"
-              data-i18n-attr="title:viewer.tool.wlTitle"
-              title="Brillo / contraste (W)"
-              aria-pressed="true"
-              aria-expanded="false"
-              aria-controls="wl-panel"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+            <!-- Grupo 1: Interacción -->
+            <div class="toolbar-group">
+              <button
+                class="toolbar__tool active"
+                id="tool-wl"
+                data-i18n-attr="title:viewer.tool.wlTitle"
+                title="Brillo / contraste (W)"
+                aria-pressed="true"
+                aria-expanded="false"
+                aria-controls="wl-panel"
               >
-                <circle cx="12" cy="12" r="9" />
-                <path
-                  d="M12 3a9 9 0 0 1 0 18"
-                  fill="currentColor"
-                  opacity="0.3"
-                />
-              </svg>
-              <span>W/L</span>
-            </button>
-            <button
-              class="toolbar__tool"
-              id="tool-zoom"
-              data-i18n-attr="title:viewer.tool.zoomTitle"
-              title="Zoom (Z)"
-              aria-pressed="false"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path
+                    d="M12 3a9 9 0 0 1 0 18"
+                    fill="currentColor"
+                    opacity="0.3"
+                  />
+                </svg>
+                <span>W/L</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-zoom"
+                data-i18n-attr="title:viewer.tool.zoomTitle"
+                title="Zoom (Z)"
+                aria-pressed="false"
+                aria-expanded="false"
+                aria-controls="zoom-panel"
               >
-                <circle cx="10" cy="10" r="7" />
-                <line x1="15" y1="15" x2="21" y2="21" />
-                <line x1="7" y1="10" x2="13" y2="10" />
-                <line x1="10" y1="7" x2="10" y2="13" />
-              </svg>
-              <span>Zoom</span>
-            </button>
-            <button
-              class="toolbar__tool"
-              id="tool-pan"
-              data-i18n-attr="title:viewer.tool.panTitle"
-              title="Desplazar (P)"
-              aria-pressed="false"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="10" cy="10" r="7" />
+                  <line x1="15" y1="15" x2="21" y2="21" />
+                  <line x1="7" y1="10" x2="13" y2="10" />
+                  <line x1="10" y1="7" x2="10" y2="13" />
+                </svg>
+                <span>Zoom</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-pan"
+                data-i18n-attr="title:viewer.tool.panTitle"
+                title="Desplazar (P)"
+                aria-pressed="false"
               >
-                <path
-                  d="M12 2l0 20M2 12l20 0M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"
-                />
-              </svg>
-              <span>Pan</span>
-            </button>
-            <button
-              class="toolbar__tool"
-              id="tool-crosshair"
-              data-i18n-attr="title:viewer.tool.crosshairTitle"
-              title="Navegación Crosshair 3D (C)"
-              aria-pressed="false"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M12 2l0 20M2 12l20 0M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"
+                  />
+                </svg>
+                <span>Pan</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-crosshair"
+                data-i18n-attr="title:viewer.tool.crosshairTitle"
+                title="Navegación Crosshair 3D (C)"
+                aria-pressed="false"
               >
-                <circle cx="12" cy="12" r="9" />
-                <line x1="12" y1="3" x2="12" y2="21" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-              </svg>
-              <span>Crosshair</span>
-            </button>
-            <button
-              class="toolbar__tool"
-              id="tool-reset"
-              data-i18n-attr="title:viewer.tool.resetTitle"
-              title="Restablecer (R)"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M3 12a9 9 0 1 1 3 7" />
-                <path d="M3 22v-7h7" />
-              </svg>
-              <span>Reset</span>
-            </button>
-            <button
-              class="toolbar__tool"
-              id="tool-metadata"
-              data-i18n-attr="title:viewer.tool.metadataTitle"
-              title="Etiquetas DICOM (M)"
-              aria-expanded="false"
-              aria-controls="metadata-panel"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="7" y1="8" x2="17" y2="8" />
-                <line x1="7" y1="12" x2="17" y2="12" />
-                <line x1="7" y1="16" x2="13" y2="16" />
-              </svg>
-              <span>Tags</span>
-            </button>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <line x1="12" y1="3" x2="12" y2="21" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                </svg>
+                <span>Crosshair</span>
+              </button>
+            </div>
 
-            <div class="tool-divider"></div>
-
-            <button
-              class="toolbar__tool toolbar__tool--explorer"
-              id="btn-toggle-explorer"
-              data-i18n-attr="title:explorer.panelTitle"
-              title="Estudios en servidor"
-              aria-expanded="true"
-              aria-controls="explorer-panel"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+            <!-- Grupo 2: Vistas y Capas -->
+            <div class="toolbar-group">
+              <button
+                class="toolbar__tool"
+                id="tool-metadata"
+                data-i18n-attr="title:viewer.tool.metadataTitle"
+                title="Etiquetas DICOM (M)"
+                aria-expanded="false"
+                aria-controls="metadata-panel"
               >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="12" cy="12" r="4" />
-                <line x1="3" y1="12" x2="8" y2="12" />
-                <line x1="16" y1="12" x2="21" y2="12" />
-              </svg>
-              <span data-i18n="explorer.toolbarLabel">Estudios</span>
-            </button>
-
-            <button
-              class="toolbar__tool toolbar__tool--zenodo"
-              id="btn-open-zenodo"
-              data-i18n-attr="title:viewer.tool.zenodoTitle"
-              title="Zenodo — repositorio de ciencia abierta"
-              aria-expanded="false"
-              aria-controls="zenodo-panel"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="7" y1="8" x2="17" y2="8" />
+                  <line x1="7" y1="12" x2="17" y2="12" />
+                  <line x1="7" y1="16" x2="13" y2="16" />
+                </svg>
+                <span>Tags</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-mpr"
+                data-i18n-attr="title:viewer.tool.mprStaticTitle"
+                title="Reconstrucción Multiplanar (MPR)"
+                disabled
               >
-                <circle cx="12" cy="12" r="9" />
-                <path d="M8 12h8M12 8l4 4-4 4" />
-              </svg>
-              <span>Zenodo</span>
-            </button>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="8" height="8" rx="1" />
+                  <rect x="13" y="3" width="8" height="8" rx="1" />
+                  <rect x="3" y="13" width="8" height="8" rx="1" />
+                  <rect x="13" y="13" width="8" height="8" rx="1" />
+                </svg>
+                <span>MPR</span>
+              </button>
+            </div>
 
-            <div class="tool-divider"></div>
-
-            <button
-              class="toolbar__tool"
-              id="tool-mpr"
-              data-i18n-attr="title:viewer.tool.mprStaticTitle"
-              title="Reconstrucción Multiplanar (MPR)"
-              disabled
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+            <!-- Grupo 3: Datos y Sistema -->
+            <div class="toolbar-group">
+              <button
+                class="toolbar__tool"
+                id="tool-reset"
+                data-i18n-attr="title:viewer.tool.resetTitle"
+                title="Restablecer (R)"
               >
-                <rect x="3" y="3" width="8" height="8" rx="1" />
-                <rect x="13" y="3" width="8" height="8" rx="1" />
-                <rect x="3" y="13" width="8" height="8" rx="1" />
-                <rect x="13" y="13" width="8" height="8" rx="1" />
-              </svg>
-              <span>MPR</span>
-            </button>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M3 12a9 9 0 1 1 3 7" />
+                  <path d="M3 22v-7h7" />
+                </svg>
+                <span>Reset</span>
+              </button>
+              <button
+                class="toolbar__tool toolbar__tool--explorer"
+                id="btn-toggle-explorer"
+                data-i18n-attr="title:explorer.panelTitle"
+                title="Estudios en servidor"
+                aria-expanded="true"
+                aria-controls="explorer-panel"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="12" cy="12" r="4" />
+                  <line x1="3" y1="12" x2="8" y2="12" />
+                  <line x1="16" y1="12" x2="21" y2="12" />
+                </svg>
+                <span data-i18n="explorer.toolbarLabel">Estudios</span>
+              </button>
+              <button
+                class="toolbar__tool toolbar__tool--zenodo"
+                id="btn-open-zenodo"
+                data-i18n-attr="title:viewer.tool.zenodoTitle"
+                title="Zenodo — repositorio de ciencia abierta"
+                aria-expanded="false"
+                aria-controls="zenodo-panel"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M8 12h8M12 8l4 4-4 4" />
+                </svg>
+                <span>Zenodo</span>
+              </button>
+            </div>
           </div>
 
           <div class="sidebar__footer">
@@ -588,12 +601,17 @@
                   Vista Volumétrica
                 </button>
               </div>
-              <div class="mpr-gizmo-wrap">
-                <canvas id="mpr-gizmo-canvas" width="60" height="60"></canvas>
-              </div>
             </div>
 
             <div class="viewport-container cursor-wl" id="viewport-container">
+              <!-- Anatomical Reference Cube (2D) -->
+              <canvas
+                id="mpr-reference-cube"
+                class="hidden"
+                width="120"
+                height="120"
+              ></canvas>
+
               <!-- role="img" + a label written from the DICOM metadata; this
                  was an unlabelled black box to assistive tech. -->
               <canvas
@@ -602,6 +620,12 @@
                 data-i18n-attr="aria-label:viewer.canvasEmptyLabel"
                 aria-label="Sin imagen cargada"
               ></canvas>
+
+              <!-- 2D Cardinal Orientation Labels -->
+              <div id="mpr-orient-top" class="mpr-orient-label"></div>
+              <div id="mpr-orient-bottom" class="mpr-orient-label"></div>
+              <div id="mpr-orient-left" class="mpr-orient-label"></div>
+              <div id="mpr-orient-right" class="mpr-orient-label"></div>
 
               <!-- Info overlays (HUD) -->
               <div class="overlay overlay--tl" id="overlay-tl"></div>
@@ -707,7 +731,9 @@
               aria-label="Ajuste de Ventana (WL/WW)"
             >
               <div class="wl-header">
-                <h2 data-i18n="viewer.wl.panelTitle">Ajuste de Ventana (WL/WW)</h2>
+                <h2 data-i18n="viewer.wl.panelTitle">
+                  Ajuste de Ventana (WL/WW)
+                </h2>
               </div>
               <div class="wl-body">
                 <!-- Sliders Section -->
@@ -751,7 +777,9 @@
 
                 <!-- Presets Section -->
                 <div class="wl-section">
-                  <span class="wl-section-title" data-i18n="viewer.wl.presetsTitle"
+                  <span
+                    class="wl-section-title"
+                    data-i18n="viewer.wl.presetsTitle"
                     >Presets Predefinidos</span
                   >
                   <div class="preset-grid" id="preset-grid">
@@ -790,6 +818,77 @@
                       data-i18n="viewer.wl.presetBrain"
                     >
                       Cerebro
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <!-- Zoom Panel -->
+            <aside
+              class="wl-panel"
+              id="zoom-panel"
+              data-i18n-attr="aria-label:viewer.zoom.panelTitle"
+              aria-label="Ajuste de Zoom"
+            >
+              <div class="wl-header">
+                <h2 data-i18n="viewer.zoom.panelTitle">Ajuste de Zoom</h2>
+              </div>
+              <div class="wl-body">
+                <!-- Sliders Section -->
+                <div class="wl-section">
+                  <div class="slider-control">
+                    <div class="slider-header">
+                      <label
+                        for="slider-zoom"
+                        data-i18n="viewer.zoom.levelLabel"
+                        >Nivel de Zoom</label
+                      >
+                      <span class="slider-val" id="val-zoom">1.0x</span>
+                    </div>
+                    <input
+                      type="range"
+                      id="slider-zoom"
+                      class="wl-slider"
+                      min="0.1"
+                      max="5.0"
+                      step="0.1"
+                      value="1.0"
+                    />
+                  </div>
+                </div>
+
+                <!-- Presets Section -->
+                <div class="wl-section">
+                  <span
+                    class="wl-section-title"
+                    data-i18n="viewer.zoom.presetsTitle"
+                    >Accesos Rápidos</span
+                  >
+                  <div class="presets preset-grid">
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-zoom-fit"
+                      data-i18n="viewer.zoom.fit"
+                    >
+                      Ajustar a pantalla
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-zoom-100"
+                      data-i18n="viewer.zoom.100"
+                    >
+                      100%
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-zoom-200"
+                      data-i18n="viewer.zoom.200"
+                    >
+                      200%
                     </button>
                   </div>
                 </div>
@@ -1021,7 +1120,10 @@
             </div>
 
             <div class="filter-dates">
-              <label class="sr-only" for="filter-date-from" data-i18n="explorer.dateFromLabel"
+              <label
+                class="sr-only"
+                for="filter-date-from"
+                data-i18n="explorer.dateFromLabel"
                 >Desde</label
               >
               <input
@@ -1032,7 +1134,10 @@
                 data-i18n-attr="title:explorer.dateFromLabel"
                 title="Desde"
               />
-              <label class="sr-only" for="filter-date-to" data-i18n="explorer.dateToLabel"
+              <label
+                class="sr-only"
+                for="filter-date-to"
+                data-i18n="explorer.dateToLabel"
                 >Hasta</label
               >
               <input
@@ -1046,7 +1151,11 @@
             </div>
 
             <div class="filter-clear-wrap hidden" data-explorer-clear-wrap>
-              <button data-explorer-clear class="filter-clear-btn" data-i18n="explorer.clearFilters">
+              <button
+                data-explorer-clear
+                class="filter-clear-btn"
+                data-i18n="explorer.clearFilters"
+              >
                 Limpiar filtros
               </button>
             </div>
@@ -1143,7 +1252,11 @@
             >
               Buscar
             </button>
-            <button class="z-tab" data-tab="publish" data-i18n="zenodo.tabPublish">
+            <button
+              class="z-tab"
+              data-tab="publish"
+              data-i18n="zenodo.tabPublish"
+            >
               Publicar
             </button>
             <button class="z-tab" data-tab="config">Config</button>
@@ -1218,15 +1331,27 @@
               id="z-filter-chips"
               style="border: none; padding: 0; flex-shrink: 0"
             >
-              <button class="filter-chip filter-chip--active" data-type="" data-i18n="zenodo.fileTypeAll">
+              <button
+                class="filter-chip filter-chip--active"
+                data-type=""
+                data-i18n="zenodo.fileTypeAll"
+              >
                 Todos
               </button>
               <button class="filter-chip" data-type="dcm">DCM</button>
               <button class="filter-chip" data-type="zip">ZIP</button>
             </div>
             <div class="z-env-toggle" id="z-env-toggle">
-              <button class="z-env-btn active" data-env="sandbox">Sandbox</button>
-              <button class="z-env-btn" data-env="production" data-i18n="zenodo.envProduction">Producción</button>
+              <button class="z-env-btn active" data-env="sandbox">
+                Sandbox
+              </button>
+              <button
+                class="z-env-btn"
+                data-env="production"
+                data-i18n="zenodo.envProduction"
+              >
+                Producción
+              </button>
             </div>
           </div>
           <div id="z-results" class="z-results">
@@ -1346,7 +1471,9 @@
         <div class="z-tab-panel hidden" id="z-tab-logs">
           <div class="activity-log-toolbar" id="activity-filters">
             <div class="activity-log-toolbar-row">
-              <span class="activity-filter-label" data-i18n="zenodo.logs.typeLabel"
+              <span
+                class="activity-filter-label"
+                data-i18n="zenodo.logs.typeLabel"
                 >Tipo</span
               >
               <button
@@ -1393,7 +1520,9 @@
               </button>
             </div>
             <div class="activity-log-filters">
-              <span class="activity-filter-label" data-i18n="zenodo.logs.resultLabel"
+              <span
+                class="activity-filter-label"
+                data-i18n="zenodo.logs.resultLabel"
                 >Resultado</span
               >
               <button
@@ -1403,10 +1532,18 @@
               >
                 Todos
               </button>
-              <button class="filter-chip" data-filter-result="success" data-i18n="common.success">
+              <button
+                class="filter-chip"
+                data-filter-result="success"
+                data-i18n="common.success"
+              >
                 Éxito
               </button>
-              <button class="filter-chip" data-filter-result="error" data-i18n="common.error">
+              <button
+                class="filter-chip"
+                data-filter-result="error"
+                data-i18n="common.error"
+              >
                 Error
               </button>
             </div>
@@ -1497,35 +1634,57 @@
       <!-- Screen 02: the only thing a guest sees here. -->
       <div class="server-auth" id="server-auth">
         <form class="auth-card" id="server-login-form">
-          <h3 class="auth-card__title" data-i18n="auth.login">Iniciar sesión</h3>
+          <div class="auth-card__header">
+            <span class="auth-card__icon" aria-hidden="true">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </span>
+            <h3 class="auth-card__title" data-i18n="auth.login">
+              Iniciar sesión
+            </h3>
+          </div>
           <p class="auth-card__msg" data-i18n="auth.loginRequiredMsg">
             Se requiere sesión para buscar o subir estudios en el servidor. La
             visualización local no la necesita.
           </p>
-          <label class="login-field">
-            <span>Email</span>
-            <input
-              type="email"
-              id="server-login-email"
-              data-login-email
-              required
-              autocomplete="username"
-            />
-          </label>
-          <label class="login-field">
-            <span data-i18n="auth.passwordLabel">Contraseña</span>
-            <input
-              type="password"
-              id="server-login-password"
-              data-login-password
-              required
-              autocomplete="current-password"
-            />
-          </label>
+          <div class="auth-card__fields">
+            <label class="login-field">
+              <span data-i18n="auth.emailLabel">Email</span>
+              <input
+                type="email"
+                id="server-login-email"
+                data-login-email
+                required
+                autocomplete="username"
+              />
+            </label>
+            <label class="login-field">
+              <span data-i18n="auth.passwordLabel">Contraseña</span>
+              <input
+                type="password"
+                id="server-login-password"
+                data-login-password
+                required
+                autocomplete="current-password"
+              />
+            </label>
+          </div>
           <p
             id="server-login-error"
             class="login-error hidden"
             data-login-error
+            role="alert"
           ></p>
           <button
             type="submit"
@@ -1596,7 +1755,10 @@
                   <circle cx="10" cy="10" r="7" />
                   <line x1="15" y1="15" x2="21" y2="21" />
                 </svg>
-                <label class="sr-only" for="server-search-studies" data-i18n="explorer.searchLabel"
+                <label
+                  class="sr-only"
+                  for="server-search-studies"
+                  data-i18n="explorer.searchLabel"
                   >Buscar paciente o ID</label
                 >
                 <input
@@ -1627,7 +1789,12 @@
                   </svg>
                 </button>
               </div>
-              <label class="sr-only" for="server-date-from" data-i18n="explorer.dateFromLabel">Desde</label>
+              <label
+                class="sr-only"
+                for="server-date-from"
+                data-i18n="explorer.dateFromLabel"
+                >Desde</label
+              >
               <input
                 type="date"
                 id="server-date-from"
@@ -1636,7 +1803,12 @@
                 data-i18n-attr="title:explorer.dateFromLabel"
                 title="Desde"
               />
-              <label class="sr-only" for="server-date-to" data-i18n="explorer.dateToLabel">Hasta</label>
+              <label
+                class="sr-only"
+                for="server-date-to"
+                data-i18n="explorer.dateToLabel"
+                >Hasta</label
+              >
               <input
                 type="date"
                 id="server-date-to"
@@ -1804,7 +1976,11 @@
         <!-- /.buscar-layout -->
 
         <footer class="server-panel__actions">
-          <button class="btn btn--secondary" id="btn-buscar-cancel" data-i18n="common.cancel">
+          <button
+            class="btn btn--secondary"
+            id="btn-buscar-cancel"
+            data-i18n="common.cancel"
+          >
             Cancelar
           </button>
           <button
@@ -1827,16 +2003,31 @@
         tabindex="0"
       >
         <div class="server-panel__body">
-          <input type="file" id="upload-input" accept=".dcm,.zip" class="hidden" />
+          <input
+            type="file"
+            id="upload-input"
+            accept=".dcm,.zip"
+            class="hidden"
+          />
           <input type="file" id="upload-folder-input" class="hidden" />
 
           <div class="upload-drop" id="upload-drop">
-            <p data-i18n="upload.dropHint">Arrastrá archivos .dcm, .zip o una carpeta aquí</p>
+            <p data-i18n="upload.dropHint">
+              Arrastrá archivos .dcm, .zip o una carpeta aquí
+            </p>
             <div class="upload-drop__actions">
-              <button class="btn btn--accent" id="btn-upload-server" data-i18n="viewer.selectFiles">
+              <button
+                class="btn btn--accent"
+                id="btn-upload-server"
+                data-i18n="viewer.selectFiles"
+              >
                 Seleccionar archivos
               </button>
-              <button class="btn btn--outline" id="btn-upload-folder" data-i18n="upload.selectFolder">
+              <button
+                class="btn btn--outline"
+                id="btn-upload-folder"
+                data-i18n="upload.selectFolder"
+              >
                 Seleccionar carpeta
               </button>
             </div>
@@ -1866,10 +2057,18 @@
         </div>
 
         <footer class="server-panel__actions">
-          <button class="btn btn--secondary" id="btn-upload-cancel" data-i18n="common.cancel">
+          <button
+            class="btn btn--secondary"
+            id="btn-upload-cancel"
+            data-i18n="common.cancel"
+          >
             Cancelar
           </button>
-          <button class="btn btn--accent" id="btn-upload-finish" data-i18n="upload.finish">
+          <button
+            class="btn btn--accent"
+            id="btn-upload-finish"
+            data-i18n="upload.finish"
+          >
             Finalizar
           </button>
         </footer>
@@ -1909,11 +2108,18 @@
               <label class="user-create__field">
                 <span data-i18n="users.form.role">Rol</span>
                 <select data-user-new-role>
-                  <option value="medico" data-i18n="users.role.medico">Médico</option>
-                  <option value="investigador" data-i18n="users.role.investigador">
+                  <option value="medico" data-i18n="users.role.medico">
+                    Médico
+                  </option>
+                  <option
+                    value="investigador"
+                    data-i18n="users.role.investigador"
+                  >
                     Investigador
                   </option>
-                  <option value="admin" data-i18n="users.role.admin">Administrador</option>
+                  <option value="admin" data-i18n="users.role.admin">
+                    Administrador
+                  </option>
                 </select>
               </label>
               <button
@@ -1979,7 +2185,11 @@
           <form data-invite-form class="hidden">
             <label class="auth-field">
               <span data-i18n="invite.password">Contraseña</span>
-              <input type="password" data-invite-password autocomplete="new-password" />
+              <input
+                type="password"
+                data-invite-password
+                autocomplete="new-password"
+              />
             </label>
             <p class="form-error hidden" data-invite-error role="alert"></p>
             <button
@@ -2019,7 +2229,11 @@
         aria-modal="true"
         aria-labelledby="activity-title"
       >
-        <h3 class="dialog__title" id="activity-title" data-i18n="dialog.activityTitle">
+        <h3
+          class="dialog__title"
+          id="activity-title"
+          data-i18n="dialog.activityTitle"
+        >
           Historial de actividad
         </h3>
         <div id="activity-body" class="activity-body"></div>
@@ -2044,7 +2258,11 @@
         aria-modal="true"
         aria-labelledby="export-dialog-title"
       >
-        <h3 class="dialog__title" id="export-dialog-title" data-i18n="export.dialogTitle">
+        <h3
+          class="dialog__title"
+          id="export-dialog-title"
+          data-i18n="export.dialogTitle"
+        >
           Opciones de Exportación
         </h3>
         <p class="dialog__msg" data-i18n="export.dialogPrompt">
@@ -2074,7 +2292,9 @@
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
             </svg>
-            <span data-i18n="export.currentViewPng">Exportar vista actual (PNG)</span>
+            <span data-i18n="export.currentViewPng"
+              >Exportar vista actual (PNG)</span
+            >
           </button>
           <button class="btn btn--outline btn--full" id="btn-export-dialog-zip">
             <svg
@@ -2091,7 +2311,9 @@
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span data-i18n="export.fullStudyZip">Exportar estudio completo (ZIP)</span>
+            <span data-i18n="export.fullStudyZip"
+              >Exportar estudio completo (ZIP)</span
+            >
           </button>
           <button
             class="btn btn--secondary btn--full"
@@ -2114,12 +2336,20 @@
         aria-modal="true"
         aria-labelledby="duplicate-title"
       >
-        <h3 class="dialog__title" id="duplicate-title" data-i18n="upload.duplicateTitle">
+        <h3
+          class="dialog__title"
+          id="duplicate-title"
+          data-i18n="upload.duplicateTitle"
+        >
           Estudio duplicado
         </h3>
         <p id="duplicate-msg" class="dialog__msg"></p>
         <div class="dialog__actions">
-          <button class="btn btn--danger" id="duplicate-yes" data-i18n="upload.replace">
+          <button
+            class="btn btn--danger"
+            id="duplicate-yes"
+            data-i18n="upload.replace"
+          >
             Reemplazar
           </button>
           <!-- Focus lands on the safe option, not on "Reemplazar", which
@@ -2132,7 +2362,11 @@
           >
             Cancelar
           </button>
-          <button class="btn btn--secondary" id="duplicate-cancel-all" data-i18n="upload.cancelAll">
+          <button
+            class="btn btn--secondary"
+            id="duplicate-cancel-all"
+            data-i18n="upload.cancelAll"
+          >
             Cancelar todo
           </button>
         </div>

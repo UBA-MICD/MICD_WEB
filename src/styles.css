@@ -251,26 +251,53 @@ body {
   max-width: 420px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 28px;
+  gap: 20px;
+  padding: 36px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--accent);
   border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.auth-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
 }
 .auth-card__title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.3px;
 }
 .auth-card__msg {
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text-secondary);
+}
+.auth-card__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 .auth-card--settings {
   margin-top: 16px;
   gap: 10px;
   padding: 20px;
+  border-top-width: 1px;
+  border-top-color: var(--border);
+  box-shadow: none;
 }
 
 .server-panel {
@@ -639,6 +666,17 @@ body {
   gap: 4px;
   flex: 1;
   overflow-y: auto;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
 }
 
 .toolbar__tool {
@@ -1054,6 +1092,45 @@ body {
   image-rendering: auto;
   transform-origin: center center;
   transition: transform 0.05s linear;
+}
+
+/* ── 2D Cardinal Orientation Labels (A, P, L, R) ────────────────────────── */
+.mpr-orient-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow:
+    1px 1px 3px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 6;
+  user-select: none;
+}
+
+#mpr-orient-top {
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#mpr-orient-bottom {
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#mpr-orient-left {
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#mpr-orient-right {
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* ── Info Overlays (HUD) ──────────────────────────────────────────────────── */
@@ -2024,25 +2101,33 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 .login-field input {
   background: var(--bg-base);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   outline: none;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 .login-field input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .login-error {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
 }
 
 .session-email {
@@ -3013,11 +3098,20 @@ body {
 }
 
 /* Bottom-Right Orientation Widget */
+/* Anatomical Reference Cube */
+#mpr-reference-cube {
+  position: absolute;
+  bottom: 80px;
+  left: 16px;
+  z-index: 50;
+  pointer-events: none;
+}
+
 .mpr-orientation-widget {
   position: absolute;
   bottom: 16px;
   right: 16px;
-  z-index: 10;
+  z-index: 50;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -3134,9 +3228,18 @@ body {
   font-size: 0.78rem;
   border: 1px solid transparent;
 }
-.user-status--active { color: #1e7e34; border-color: #1e7e34; }
-.user-status--invited { color: #8a6d1a; border-color: #8a6d1a; }
-.user-status--blocked { color: #c0392b; border-color: #c0392b; }
+.user-status--active {
+  color: #1e7e34;
+  border-color: #1e7e34;
+}
+.user-status--invited {
+  color: #8a6d1a;
+  border-color: #8a6d1a;
+}
+.user-status--blocked {
+  color: #c0392b;
+  border-color: #c0392b;
+}
 
 /* ── System panel ────────────────────────────────────────────────────────── */
 .sys-section {

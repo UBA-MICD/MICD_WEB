@@ -86,7 +86,11 @@ function jwt(payload: Record<string, unknown>): string {
 }
 
 const adminUser: AuthUser = { id: 1, email: "admin@micd.local", role: "admin" };
-const adminToken = jwt({ sub: adminUser.id, email: adminUser.email, role: "admin" });
+const adminToken = jwt({
+  sub: adminUser.id,
+  email: adminUser.email,
+  role: "admin",
+});
 
 function bearerOf(call: FetchCall): string | undefined {
   return (call.init?.headers as Record<string, string> | undefined)
@@ -270,7 +274,12 @@ test("authFetch sends no Authorization header when there is no session", async (
 
 test("authFetch on 401 refreshes and retries with the new token", async () => {
   await loginAsAdmin();
-  const newToken = jwt({ sub: adminUser.id, email: adminUser.email, role: "admin", iat: 2 });
+  const newToken = jwt({
+    sub: adminUser.id,
+    email: adminUser.email,
+    role: "admin",
+    iat: 2,
+  });
   respondBy({
     "/api/x": (init) =>
       (init?.headers as Record<string, string>).Authorization ===
@@ -305,7 +314,12 @@ test("authFetch on 401 + dead refresh + cancelled login returns the original 401
 
 test("authFetch on 401 + dead refresh + interactive login retries with the new session", async () => {
   await loginAsAdmin();
-  const newToken = jwt({ sub: adminUser.id, email: adminUser.email, role: "admin", iat: 3 });
+  const newToken = jwt({
+    sub: adminUser.id,
+    email: adminUser.email,
+    role: "admin",
+    iat: 3,
+  });
   respondBy({
     "/api/x": (init) =>
       (init?.headers as Record<string, string>).Authorization ===
@@ -404,7 +418,12 @@ test("logout posts the refresh token and clears the session even if the network 
 test("login records the access token's exp claim in epoch ms", async () => {
   const expSeconds = Math.floor(Date.now() / 1000) + 900; // the backend's 15m
   await loginAsAdmin(
-    jwt({ sub: adminUser.id, email: adminUser.email, role: "admin", exp: expSeconds }),
+    jwt({
+      sub: adminUser.id,
+      email: adminUser.email,
+      role: "admin",
+      exp: expSeconds,
+    }),
   );
   assert.equal(getSessionExpiresAt(), expSeconds * 1000);
 });
@@ -417,7 +436,12 @@ test("a token with no exp claim reports no expiry rather than 0", () => {
 
 test("refresh replaces the expiry with the new token's", async () => {
   await loginAsAdmin(
-    jwt({ sub: adminUser.id, email: adminUser.email, role: "admin", exp: 1000 }),
+    jwt({
+      sub: adminUser.id,
+      email: adminUser.email,
+      role: "admin",
+      exp: 1000,
+    }),
   );
   assert.equal(getSessionExpiresAt(), 1_000_000);
 
@@ -439,7 +463,12 @@ test("refresh replaces the expiry with the new token's", async () => {
 
 test("logout clears the expiry along with the session", async () => {
   await loginAsAdmin(
-    jwt({ sub: adminUser.id, email: adminUser.email, role: "admin", exp: 1000 }),
+    jwt({
+      sub: adminUser.id,
+      email: adminUser.email,
+      role: "admin",
+      exp: 1000,
+    }),
   );
   await logout();
   assert.equal(getSessionExpiresAt(), null);

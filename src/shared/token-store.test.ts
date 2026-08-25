@@ -5,7 +5,11 @@
  */
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { getRefreshToken, setRefreshToken, clearRefreshToken } from "./token-store.ts";
+import {
+  getRefreshToken,
+  setRefreshToken,
+  clearRefreshToken,
+} from "./token-store.ts";
 
 const REFRESH_KEY = "micd_refresh_token";
 

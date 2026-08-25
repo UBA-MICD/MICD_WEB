@@ -33,10 +33,14 @@ export function mountUsersPanel(root: HTMLElement): UsersPanelHandle {
   const errorEl = root.querySelector<HTMLElement>("[data-users-error]")!;
   const form = root.querySelector<HTMLFormElement>("[data-user-create]")!;
   const nameEl = form.querySelector<HTMLInputElement>("[data-user-new-name]")!;
-  const emailEl = form.querySelector<HTMLInputElement>("[data-user-new-email]")!;
+  const emailEl = form.querySelector<HTMLInputElement>(
+    "[data-user-new-email]",
+  )!;
   const roleEl = form.querySelector<HTMLSelectElement>("[data-user-new-role]")!;
   const formErr = form.querySelector<HTMLElement>("[data-user-new-error]")!;
-  const exportBtn = root.querySelector<HTMLButtonElement>("[data-users-export]")!;
+  const exportBtn = root.querySelector<HTMLButtonElement>(
+    "[data-users-export]",
+  )!;
 
   let users: AdminUser[] = [];
 
@@ -104,7 +108,9 @@ export function mountUsersPanel(root: HTMLElement): UsersPanelHandle {
       return;
     }
 
-    const submit = form.querySelector<HTMLButtonElement>("[data-user-new-submit]");
+    const submit = form.querySelector<HTMLButtonElement>(
+      "[data-user-new-submit]",
+    );
     if (submit) submit.disabled = true;
     const result = await createUser(check.value);
     if (submit) submit.disabled = false;
@@ -143,7 +149,8 @@ export function mountUsersPanel(root: HTMLElement): UsersPanelHandle {
 
     const toggle = target.closest<HTMLElement>("[data-user-toggle]");
     if (toggle) {
-      const status = toggle.dataset.userToggle === "enable" ? "active" : "blocked";
+      const status =
+        toggle.dataset.userToggle === "enable" ? "active" : "blocked";
       const result = await setUserStatus(rowId(toggle), status);
       if (!result.ok) showToast(result.error, "error");
       await reload();

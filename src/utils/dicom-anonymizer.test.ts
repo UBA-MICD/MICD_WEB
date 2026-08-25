@@ -68,7 +68,10 @@ test("anonymizeDicomBuffer skips elements with out-of-range or missing offsets",
     }),
   };
   const result = new Uint8Array(
-    anonymizeDicomBuffer(buffer, { customParser: parser, tagsToScrub: ["a", "b", "c", "d"] }),
+    anonymizeDicomBuffer(buffer, {
+      customParser: parser,
+      tagsToScrub: ["a", "b", "c", "d"],
+    }),
   );
   assert.deepEqual(Array.from(result), [0xff, 0xff, 0xff, 0xff]);
 });
@@ -125,7 +128,8 @@ test("getParserInstance falls back to window.dicomParser, then globalThis.dicomP
     };
     assert.doesNotThrow(() => anonymizeDicomBuffer(buffer));
   } finally {
-    if (originalWindow !== undefined) (globalThis as any).window = originalWindow;
+    if (originalWindow !== undefined)
+      (globalThis as any).window = originalWindow;
     if (originalGlobalParser !== undefined) {
       (globalThis as any).dicomParser = originalGlobalParser;
     } else {

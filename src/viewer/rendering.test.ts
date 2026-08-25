@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { viewerFixtureHtml, stubCanvas2DContext } from "../../test/viewer-fixture.ts";
+import {
+  viewerFixtureHtml,
+  stubCanvas2DContext,
+} from "../../test/viewer-fixture.ts";
 import {
   render,
   update3DControls,
@@ -28,7 +31,13 @@ function resetState(): void {
   state.serverInstances = [];
   state.currentIndex = 0;
   state.parsed = null;
-  state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 1, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
   state.activeTool = "wl";
   state.is3DMode = false;
   mpr3DViewer.isActive = false;
@@ -77,7 +86,11 @@ test("render() does nothing when there is no parsed pixel data (and hides 3D con
 });
 
 test("render() draws the 2D slice and updates the info overlay when pixel data is present", () => {
-  state.parsed = { metadata: baseMeta, pixelData: new Uint16Array([0, 1, 2, 3]), rawDataSet: {} } as any;
+  state.parsed = {
+    metadata: baseMeta,
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
   render();
   const canvas = document.getElementById("dicom-canvas") as HTMLCanvasElement;
   assert.equal(canvas.width, 2);
@@ -96,7 +109,12 @@ test("render() delegates to mpr3DViewer when in active 3D mode", () => {
   try {
     render();
     assert.equal(rendered, true);
-    assert.equal(document.getElementById("mpr-depth-slider-wrap")!.classList.contains("hidden"), false);
+    assert.equal(
+      document
+        .getElementById("mpr-depth-slider-wrap")!
+        .classList.contains("hidden"),
+      false,
+    );
   } finally {
     (mpr3DViewer as any).render = orig;
   }
@@ -107,11 +125,16 @@ test("update3DControls sets the depth slider range/value and the depth counter t
   (mpr3DViewer as any).getDepthInfo = () => ({ current: 2, total: 5 });
   try {
     update3DControls();
-    const slider = document.getElementById("mpr-depth-slider") as HTMLInputElement;
+    const slider = document.getElementById(
+      "mpr-depth-slider",
+    ) as HTMLInputElement;
     assert.equal(slider.min, "0");
     assert.equal(slider.max, "4");
     assert.equal(slider.value, "2");
-    assert.notEqual(document.getElementById("mpr-depth-counter")!.textContent, "");
+    assert.notEqual(
+      document.getElementById("mpr-depth-counter")!.textContent,
+      "",
+    );
   } finally {
     (mpr3DViewer as any).getDepthInfo = orig;
   }
@@ -129,30 +152,49 @@ test("hide3DControls hides the depth slider and orientation widget", () => {
 
 test("updateSeriesNav hides the nav when there's 0-1 items or in 3D mode", () => {
   updateSeriesNav();
-  assert.equal(document.getElementById("series-nav")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("series-nav")!.classList.contains("hidden"),
+    true,
+  );
 
   state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
   state.is3DMode = true;
   updateSeriesNav();
-  assert.equal(document.getElementById("series-nav")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("series-nav")!.classList.contains("hidden"),
+    true,
+  );
 });
 
 test("updateSeriesNav shows and wires the nav for a multi-item series", () => {
-  state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm"), new File(["c"], "c.dcm")];
+  state.files = [
+    new File(["a"], "a.dcm"),
+    new File(["b"], "b.dcm"),
+    new File(["c"], "c.dcm"),
+  ];
   state.currentIndex = 0;
   updateSeriesNav();
 
   const nav = document.getElementById("series-nav")!;
   assert.equal(nav.classList.contains("hidden"), false);
-  assert.equal((document.getElementById("nav-prev") as HTMLButtonElement).disabled, true);
-  assert.equal((document.getElementById("nav-next") as HTMLButtonElement).disabled, false);
+  assert.equal(
+    (document.getElementById("nav-prev") as HTMLButtonElement).disabled,
+    true,
+  );
+  assert.equal(
+    (document.getElementById("nav-next") as HTMLButtonElement).disabled,
+    false,
+  );
   const slider = document.getElementById("nav-slider") as HTMLInputElement;
   assert.equal(slider.max, "2");
   assert.notEqual(document.getElementById("nav-counter")!.textContent, "");
 
   state.currentIndex = 2;
   updateSeriesNav();
-  assert.equal((document.getElementById("nav-next") as HTMLButtonElement).disabled, true);
+  assert.equal(
+    (document.getElementById("nav-next") as HTMLButtonElement).disabled,
+    true,
+  );
 });
 
 test("updateMprButtonState disables with a reason for <=1 items, missing metadata, bad pixelSpacing, and bad imagePosition", () => {
@@ -167,12 +209,20 @@ test("updateMprButtonState disables with a reason for <=1 items, missing metadat
   updateMprButtonState(); // no parsed metadata
   assert.equal(btn.disabled, true);
 
-  state.parsed = { metadata: { ...baseMeta, pixelSpacing: undefined }, pixelData: null, rawDataSet: {} } as any;
+  state.parsed = {
+    metadata: { ...baseMeta, pixelSpacing: undefined },
+    pixelData: null,
+    rawDataSet: {},
+  } as any;
   updateMprButtonState(); // bad pixel spacing
   assert.equal(btn.disabled, true);
 
   state.parsed = {
-    metadata: { ...baseMeta, pixelSpacing: [0.5, 0.5] as [number, number], imagePositionPatient: undefined },
+    metadata: {
+      ...baseMeta,
+      pixelSpacing: [0.5, 0.5] as [number, number],
+      imagePositionPatient: undefined,
+    },
     pixelData: null,
     rawDataSet: {},
   } as any;
@@ -220,7 +270,7 @@ test("updateMetadataPanel renders rows and separators, and returns early with no
 
 test("updateMetadataPanel escapes DICOM-derived values", () => {
   state.parsed = {
-    metadata: { ...baseMeta, patientName: '<img src=x onerror=alert(1)>' },
+    metadata: { ...baseMeta, patientName: "<img src=x onerror=alert(1)>" },
     pixelData: null,
     rawDataSet: {},
   } as any;
@@ -246,30 +296,52 @@ test("updateInfoOverlay is a no-op with no parsed study, and escapes untrusted c
     pixelData: null,
     rawDataSet: {},
   } as any;
-  state.viewport = { windowCenter: 40, windowWidth: 400, zoom: 1.5, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1.5,
+    panX: 0,
+    panY: 0,
+  };
   updateInfoOverlay();
 
   assert.match(document.getElementById("overlay-tl")!.innerHTML, /DOE/);
-  assert.match(document.getElementById("overlay-tr")!.innerHTML, /&lt;script&gt;/);
+  assert.match(
+    document.getElementById("overlay-tr")!.innerHTML,
+    /&lt;script&gt;/,
+  );
   assert.match(document.getElementById("overlay-bl")!.innerHTML, /150%/);
-  assert.notEqual(document.getElementById("dicom-canvas")!.getAttribute("aria-label"), null);
+  assert.notEqual(
+    document.getElementById("dicom-canvas")!.getAttribute("aria-label"),
+    null,
+  );
 });
 
 test("updateInfoOverlay's canvas label mentions slice position only for multi-item series", () => {
   state.parsed = { metadata: baseMeta, pixelData: null, rawDataSet: {} } as any;
   updateInfoOverlay();
-  const single = document.getElementById("dicom-canvas")!.getAttribute("aria-label")!;
+  const single = document
+    .getElementById("dicom-canvas")!
+    .getAttribute("aria-label")!;
 
   state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
   state.currentIndex = 1;
   updateInfoOverlay();
-  const multi = document.getElementById("dicom-canvas")!.getAttribute("aria-label")!;
+  const multi = document
+    .getElementById("dicom-canvas")!
+    .getAttribute("aria-label")!;
 
   assert.notEqual(single, multi);
 });
 
 test("updateWlControlsUI syncs displayed values and widens slider ranges as needed", () => {
-  state.viewport = { windowCenter: -2000, windowWidth: 9000, zoom: 1, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: -2000,
+    windowWidth: 9000,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
   updateWlControlsUI();
 
   assert.equal(document.getElementById("val-ww")!.textContent, "9000");
@@ -287,7 +359,13 @@ test("updateWlControlsUI does not fight the user while a slider is focused", () 
   const sliderWW = document.getElementById("slider-ww") as HTMLInputElement;
   sliderWW.focus();
   sliderWW.value = "77";
-  state.viewport = { windowCenter: 0, windowWidth: 999, zoom: 1, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 0,
+    windowWidth: 999,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
   updateWlControlsUI();
   assert.equal(sliderWW.value, "77");
 });

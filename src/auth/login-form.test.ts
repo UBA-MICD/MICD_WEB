@@ -26,8 +26,10 @@ beforeEach(() => {
       store.delete(k);
     },
   };
-  (globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) =>
-    fetchImpl(url, init);
+  (globalThis as { fetch?: unknown }).fetch = (
+    url: string,
+    init?: RequestInit,
+  ) => fetchImpl(url, init);
 });
 
 afterEach(() => {
@@ -100,7 +102,12 @@ test("successful submit clears the form, calls onSuccess, and de-busies", async 
     assert.equal(submit.disabled, true);
     assert.equal(cancel.disabled, true);
     return jsonResponse(200, {
-      accessToken: fakeJwt({ sub: "u1", email: "user@example.com", role: "medico", exp: 9999999999 }),
+      accessToken: fakeJwt({
+        sub: "u1",
+        email: "user@example.com",
+        role: "medico",
+        exp: 9999999999,
+      }),
       refreshToken: "refresh-abc",
       user: { id: "u1", email: "user@example.com" },
     });
@@ -205,7 +212,9 @@ test("mountLoginForm works without an optional cancel button", async () => {
   `);
   const form = document.getElementById("no-cancel") as HTMLFormElement;
   const email = form.querySelector("[data-login-email]") as HTMLInputElement;
-  const password = form.querySelector("[data-login-password]") as HTMLInputElement;
+  const password = form.querySelector(
+    "[data-login-password]",
+  ) as HTMLInputElement;
   email.value = "a@b.com";
   password.value = "x";
 

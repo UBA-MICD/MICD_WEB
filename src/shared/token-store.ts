@@ -33,7 +33,8 @@ export async function setRefreshToken(token: string): Promise<void> {
     return;
   }
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(REFRESH_KEY, token);
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(REFRESH_KEY, token);
   } catch {
     // best-effort persistence only — a session that resets on reload is fine
   }
@@ -46,7 +47,8 @@ export async function clearRefreshToken(): Promise<void> {
     return;
   }
   try {
-    if (typeof localStorage !== "undefined") localStorage.removeItem(REFRESH_KEY);
+    if (typeof localStorage !== "undefined")
+      localStorage.removeItem(REFRESH_KEY);
   } catch {
     // best-effort only
   }

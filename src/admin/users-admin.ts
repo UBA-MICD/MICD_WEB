@@ -26,8 +26,7 @@ const USERS_URL = `${API_BASE}/v1/users`;
 
 /** Discriminated result so callers can show a 403/forbidden message distinctly. */
 export type ApiResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; error: string };
+  { ok: true; data: T } | { ok: false; status: number; error: string };
 
 async function readError(res: Response): Promise<string> {
   try {
@@ -97,11 +96,7 @@ export function setUserStatus(
 }
 
 export function deleteUser(id: number): Promise<ApiResult<null>> {
-  return request(
-    `${USERS_URL}/${id}`,
-    { method: "DELETE" },
-    async () => null,
-  );
+  return request(`${USERS_URL}/${id}`, { method: "DELETE" }, async () => null);
 }
 
 /** Audit log CSV export (TK-06) — admin-only server route, gated the same way. */
@@ -111,7 +106,11 @@ export function exportAuditLogCsv(): Promise<ApiResult<Blob>> {
 
 // ── Pure helpers ───────────────────────────────────────────────────────────────
 
-export const ROLE_OPTIONS: readonly Role[] = ["admin", "medico", "investigador"];
+export const ROLE_OPTIONS: readonly Role[] = [
+  "admin",
+  "medico",
+  "investigador",
+];
 
 /** Format last_login_at as "YYYY-MM-DD HH:MM" (UTC), or a dash when never. */
 export function formatLastAccess(iso: string | null): string {
@@ -126,10 +125,12 @@ export function validateNewUser(input: {
   name: string;
   email: string;
   role: string;
-}): { ok: true; value: { name: string; email: string; role: Role } } | {
-  ok: false;
-  error: string;
-} {
+}):
+  | { ok: true; value: { name: string; email: string; role: Role } }
+  | {
+      ok: false;
+      error: string;
+    } {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!name) return { ok: false, error: t("users.error.nameRequired") };

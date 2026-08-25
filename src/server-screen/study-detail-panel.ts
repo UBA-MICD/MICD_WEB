@@ -255,7 +255,9 @@ async function showDetail(studyId: string): Promise<void> {
   if (studyId === currentStudyId) return;
   currentStudyId = studyId;
 
- const selectedEl = document.querySelector<HTMLElement>(`[data-id="${CSS.escape(studyId)}"]`);
+  const selectedEl = document.querySelector<HTMLElement>(
+    `[data-id="${CSS.escape(studyId)}"]`,
+  );
   if (selectedEl?.dataset.hasZenodo === "false") {
     hideDetail();
     return;

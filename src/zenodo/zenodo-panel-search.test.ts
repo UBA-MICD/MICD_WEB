@@ -5,18 +5,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { jwt, zenodoPanelHtml, createMockFetch } from "../../test/zenodo-fixture.ts";
+import {
+  jwt,
+  zenodoPanelHtml,
+  createMockFetch,
+} from "../../test/zenodo-fixture.ts";
 import { adoptSession, logout, type AuthUser } from "../auth/auth.ts";
 import { initZenodoPanel } from "./zenodo-panel.ts";
 
 test.before(() => installDom());
 test.after(() => uninstallDom());
 
-const staffUser: AuthUser = { id: 1, email: "medico@micd.local", role: "medico" };
-const researcherUser: AuthUser = { id: 2, email: "investigador@micd.local", role: "investigador" };
+const staffUser: AuthUser = {
+  id: 1,
+  email: "medico@micd.local",
+  role: "medico",
+};
+const researcherUser: AuthUser = {
+  id: 2,
+  email: "investigador@micd.local",
+  role: "investigador",
+};
 
 async function loginAs(user: AuthUser): Promise<void> {
-  await adoptSession(jwt({ sub: user.id, email: user.email, role: user.role }), "refresh-fake", user);
+  await adoptSession(
+    jwt({ sub: user.id, email: user.email, role: user.role }),
+    "refresh-fake",
+    user,
+  );
 }
 
 let mock: ReturnType<typeof createMockFetch>;
@@ -41,7 +57,11 @@ test.beforeEach(async () => {
   // previous test's login left a refresh token stored — use a throwaway
   // fetch for that so it doesn't pollute the fresh mock's call log that
   // this test's assertions inspect.
-  (globalThis as any).fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
+  (globalThis as any).fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+  });
   await logout().catch(() => {});
 
   mock = createMockFetch();
@@ -72,7 +92,10 @@ test("runSearch with a blank query is a no-op", async () => {
   await loginAs(staffUser);
   search("   ");
   await Promise.resolve();
-  assert.equal(document.getElementById("z-results")!.querySelector(".z-skeleton-card"), null);
+  assert.equal(
+    document.getElementById("z-results")!.querySelector(".z-skeleton-card"),
+    null,
+  );
 });
 
 test("loadSearch shows a login-required empty state and toast when the session can't be established", async () => {
@@ -86,7 +109,10 @@ test("loadSearch shows a login-required empty state and toast when the session c
 test("loadSearch renders record cards on a successful search with results", async () => {
   mock.on(
     (url) => url.includes("/v1/zenodo/search"),
-    () => ({ status: 200, body: { records: [sampleRecord], total: 1, page: 1, size: 8 } }),
+    () => ({
+      status: 200,
+      body: { records: [sampleRecord], total: 1, page: 1, size: 8 },
+    }),
   );
   await loginAs(staffUser);
   search("lung ct");
@@ -104,12 +130,18 @@ test("loadSearch renders record cards on a successful search with results", asyn
 test("loadSearch hides the import button for a researcher (read-only role)", async () => {
   mock.on(
     (url) => url.includes("/v1/zenodo/search"),
-    () => ({ status: 200, body: { records: [sampleRecord], total: 1, page: 1, size: 8 } }),
+    () => ({
+      status: 200,
+      body: { records: [sampleRecord], total: 1, page: 1, size: 8 },
+    }),
   );
   await loginAs(researcherUser);
   search("lung ct");
   await flush();
-  assert.doesNotMatch(document.getElementById("z-results")!.innerHTML, /data-import-id/);
+  assert.doesNotMatch(
+    document.getElementById("z-results")!.innerHTML,
+    /data-import-id/,
+  );
 });
 
 test("loadSearch renders a not-importable badge when the record isn't importable", async () => {
@@ -117,13 +149,21 @@ test("loadSearch renders a not-importable badge when the record isn't importable
     (url) => url.includes("/v1/zenodo/search"),
     () => ({
       status: 200,
-      body: { records: [{ ...sampleRecord, importable: false }], total: 1, page: 1, size: 8 },
+      body: {
+        records: [{ ...sampleRecord, importable: false }],
+        total: 1,
+        page: 1,
+        size: 8,
+      },
     }),
   );
   await loginAs(staffUser);
   search("lung ct");
   await flush();
-  assert.match(document.getElementById("z-results")!.innerHTML, /z-badge--muted/);
+  assert.match(
+    document.getElementById("z-results")!.innerHTML,
+    /z-badge--muted/,
+  );
 });
 
 test("loadSearch renders a ZIP·DICOM badge when every file is a .zip", async () => {
@@ -132,7 +172,15 @@ test("loadSearch renders a ZIP·DICOM badge when every file is a .zip", async ()
     () => ({
       status: 200,
       body: {
-        records: [{ ...sampleRecord, files: [{ key: "a.zip", size: 10 }, { key: "b.zip", size: 10 }] }],
+        records: [
+          {
+            ...sampleRecord,
+            files: [
+              { key: "a.zip", size: 10 },
+              { key: "b.zip", size: 10 },
+            ],
+          },
+        ],
         total: 1,
         page: 1,
         size: 8,
@@ -174,7 +222,10 @@ for (const [status, expectMarker] of [
     await loginAs(staffUser);
     search("lung ct");
     await flush();
-    assert.match(document.getElementById("z-results")!.innerHTML, /z-empty-state--error/);
+    assert.match(
+      document.getElementById("z-results")!.innerHTML,
+      /z-empty-state--error/,
+    );
   });
 }
 
@@ -190,7 +241,10 @@ test("a 429 search error shows the 'go to Config' link, and clicking it switches
   const link = document.getElementById("z-empty-config-link");
   assert.ok(link);
   link!.click();
-  assert.equal(document.getElementById("z-tab-config")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("z-tab-config")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("loadSearch renders a connection-error empty state when fetch throws", async () => {
@@ -203,7 +257,10 @@ test("loadSearch renders a connection-error empty state when fetch throws", asyn
   await loginAs(staffUser);
   search("lung ct");
   await flush();
-  assert.match(document.getElementById("z-results")!.innerHTML, /z-empty-state--error/);
+  assert.match(
+    document.getElementById("z-results")!.innerHTML,
+    /z-empty-state--error/,
+  );
 });
 
 test("pagination buttons page the search forward and back", async () => {
@@ -213,14 +270,20 @@ test("pagination buttons page the search forward and back", async () => {
     (url) => {
       const page = Number(new URL(url).searchParams.get("page"));
       seenPage = page;
-      return { status: 200, body: { records: [sampleRecord], total: 20, page, size: 8 } };
+      return {
+        status: 200,
+        body: { records: [sampleRecord], total: 20, page, size: 8 },
+      };
     },
   );
   await loginAs(staffUser);
   search("lung ct");
   await flush();
   assert.equal(seenPage, 1);
-  assert.equal((document.getElementById("z-next") as HTMLButtonElement).disabled, false);
+  assert.equal(
+    (document.getElementById("z-next") as HTMLButtonElement).disabled,
+    false,
+  );
 
   document.getElementById("z-next")!.click();
   await flush();
@@ -229,13 +292,19 @@ test("pagination buttons page the search forward and back", async () => {
   document.getElementById("z-prev")!.click();
   await flush();
   assert.equal(seenPage, 1);
-  assert.equal((document.getElementById("z-prev") as HTMLButtonElement).disabled, true);
+  assert.equal(
+    (document.getElementById("z-prev") as HTMLButtonElement).disabled,
+    true,
+  );
 });
 
 test("z-prev is a no-op on page 1 and z-next is a no-op on the last page", async () => {
   mock.on(
     (url) => url.includes("/v1/zenodo/search"),
-    () => ({ status: 200, body: { records: [sampleRecord], total: 1, page: 1, size: 8 } }),
+    () => ({
+      status: 200,
+      body: { records: [sampleRecord], total: 1, page: 1, size: 8 },
+    }),
   );
   await loginAs(staffUser);
   search("lung ct");
@@ -261,7 +330,9 @@ test("filter chips set state.fileType, re-search when a query exists, and toggle
   search("lung ct");
   await flush();
 
-  const dcmChip = document.querySelector<HTMLElement>('.filter-chip[data-type="dcm"]')!;
+  const dcmChip = document.querySelector<HTMLElement>(
+    '.filter-chip[data-type="dcm"]',
+  )!;
   dcmChip.click();
   await flush();
 
@@ -289,7 +360,9 @@ test("environment toggle sets state.environment and re-searches when a query exi
   search("lung ct");
   await flush();
 
-  const prodBtn = document.querySelector<HTMLElement>('[data-env="production"]')!;
+  const prodBtn = document.querySelector<HTMLElement>(
+    '[data-env="production"]',
+  )!;
   prodBtn.click();
   await flush();
 
@@ -314,7 +387,16 @@ test("resolveDoi resolves a valid DOI, renders the record, and syncs the env tog
       status: 200,
       body: {
         record: sampleRecord,
-        versions: [{ recordId: 42, doi: "10.5281/zenodo.42", version: "1.0", publicationDate: "2024-05-01", isLatest: true, isSelected: true }],
+        versions: [
+          {
+            recordId: 42,
+            doi: "10.5281/zenodo.42",
+            version: "1.0",
+            publicationDate: "2024-05-01",
+            isLatest: true,
+            isSelected: true,
+          },
+        ],
         environment: "production",
       },
     }),
@@ -325,8 +407,16 @@ test("resolveDoi resolves a valid DOI, renders the record, and syncs the env tog
   document.getElementById("btn-z-resolve-doi")!.click();
   await flush();
 
-  assert.match(document.getElementById("z-results")!.innerHTML, /CT lung dataset/);
-  assert.equal(document.querySelector('[data-env="production"]')!.classList.contains("active"), true);
+  assert.match(
+    document.getElementById("z-results")!.innerHTML,
+    /CT lung dataset/,
+  );
+  assert.equal(
+    document
+      .querySelector('[data-env="production"]')!
+      .classList.contains("active"),
+    true,
+  );
 });
 
 test("resolveDoi via Enter key on the doi input triggers the same flow", async () => {
@@ -340,9 +430,14 @@ test("resolveDoi via Enter key on the doi input triggers the same flow", async (
   await loginAs(staffUser);
   const doiInput = document.getElementById("z-doi-input") as HTMLInputElement;
   doiInput.value = "https://zenodo.org/records/42";
-  doiInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  doiInput.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+  );
   await flush();
-  assert.match(document.getElementById("z-results")!.innerHTML, /CT lung dataset/);
+  assert.match(
+    document.getElementById("z-results")!.innerHTML,
+    /CT lung dataset/,
+  );
 });
 
 test("resolveDoi shows a toast and resets the button on a non-ok response", async () => {
@@ -383,8 +478,22 @@ test("selectDoiVersion switches to another version via the rendered <select>", a
       body: {
         record: sampleRecord,
         versions: [
-          { recordId: 42, doi: "d1", version: "2.0", publicationDate: "2024-05-01", isLatest: true, isSelected: true },
-          { recordId: 41, doi: "d0", version: "1.0", publicationDate: "2023-01-01", isLatest: false, isSelected: false },
+          {
+            recordId: 42,
+            doi: "d1",
+            version: "2.0",
+            publicationDate: "2024-05-01",
+            isLatest: true,
+            isSelected: true,
+          },
+          {
+            recordId: 41,
+            doi: "d0",
+            version: "1.0",
+            publicationDate: "2023-01-01",
+            isLatest: false,
+            isSelected: false,
+          },
         ],
         environment: "sandbox",
       },
@@ -400,7 +509,9 @@ test("selectDoiVersion switches to another version via the rendered <select>", a
   document.getElementById("btn-z-resolve-doi")!.click();
   await flush();
 
-  const select = document.getElementById("z-doi-version-select") as HTMLSelectElement;
+  const select = document.getElementById(
+    "z-doi-version-select",
+  ) as HTMLSelectElement;
   assert.ok(select);
   select.value = "41";
   select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -417,8 +528,22 @@ test("selectDoiVersion shows a toast on a failed version fetch", async () => {
       body: {
         record: sampleRecord,
         versions: [
-          { recordId: 42, doi: "d1", version: "2.0", publicationDate: null, isLatest: true, isSelected: true },
-          { recordId: 41, doi: "d0", version: "1.0", publicationDate: null, isLatest: false, isSelected: false },
+          {
+            recordId: 42,
+            doi: "d1",
+            version: "2.0",
+            publicationDate: null,
+            isLatest: true,
+            isSelected: true,
+          },
+          {
+            recordId: 41,
+            doi: "d0",
+            version: "1.0",
+            publicationDate: null,
+            isLatest: false,
+            isSelected: false,
+          },
         ],
         environment: "sandbox",
       },
@@ -434,20 +559,30 @@ test("selectDoiVersion shows a toast on a failed version fetch", async () => {
   document.getElementById("btn-z-resolve-doi")!.click();
   await flush();
 
-  const select = document.getElementById("z-doi-version-select") as HTMLSelectElement;
+  const select = document.getElementById(
+    "z-doi-version-select",
+  ) as HTMLSelectElement;
   select.value = "41";
   select.dispatchEvent(new Event("change", { bubbles: true }));
   await flush();
   // still shows the previously-resolved record, not a crash
-  assert.match(document.getElementById("z-results")!.innerHTML, /CT lung dataset|d1/);
+  assert.match(
+    document.getElementById("z-results")!.innerHTML,
+    /CT lung dataset|d1/,
+  );
 });
 
 // ── Import flow ──────────────────────────────────────────────────────────────
 
-async function renderOneRecord(record: typeof sampleRecord = sampleRecord): Promise<void> {
+async function renderOneRecord(
+  record: typeof sampleRecord = sampleRecord,
+): Promise<void> {
   mock.on(
     (url) => url.includes("/v1/zenodo/search"),
-    () => ({ status: 200, body: { records: [record], total: 1, page: 1, size: 8 } }),
+    () => ({
+      status: 200,
+      body: { records: [record], total: 1, page: 1, size: 8 },
+    }),
   );
   await loginAs(staffUser);
   search("lung ct");
@@ -514,10 +649,16 @@ test("importRecord shows an error and resets when the import call fails", async 
 
 test("importRecord shows a warning and re-enables when the detail has no importable files", async () => {
   const { fetchImpl, on } = mock;
-  await renderOneRecord({ ...sampleRecord, files: [{ key: "readme.txt", size: 1 }] });
+  await renderOneRecord({
+    ...sampleRecord,
+    files: [{ key: "readme.txt", size: 1 }],
+  });
   on(
     (url) => /\/v1\/zenodo\/records\/42\?/.test(url),
-    () => ({ status: 200, body: { ...sampleRecord, files: [{ key: "readme.txt", size: 1 }] } }),
+    () => ({
+      status: 200,
+      body: { ...sampleRecord, files: [{ key: "readme.txt", size: 1 }] },
+    }),
   );
 
   const btn = document.querySelector<HTMLButtonElement>("[data-import-id]")!;
@@ -561,7 +702,10 @@ test("importRecord shows a connection-error toast and resets when the request th
 });
 
 test("a ZIP-only record shows a confirm strip first; cancel removes it without importing", async () => {
-  await renderOneRecord({ ...sampleRecord, files: [{ key: "a.zip", size: 600 * 1024 * 1024 }] });
+  await renderOneRecord({
+    ...sampleRecord,
+    files: [{ key: "a.zip", size: 600 * 1024 * 1024 }],
+  });
   const btn = document.querySelector<HTMLButtonElement>("[data-import-id]")!;
   assert.equal(btn.dataset.hasZip, "true");
 
@@ -572,11 +716,17 @@ test("a ZIP-only record shows a confirm strip first; cancel removes it without i
 
   document.querySelector<HTMLElement>(".z-zip-confirm__cancel")!.click();
   assert.equal(document.querySelector(".z-zip-confirm"), null);
-  assert.equal(mock.calls.filter((c) => c.url.endsWith("/v1/zenodo/import")).length, 0);
+  assert.equal(
+    mock.calls.filter((c) => c.url.endsWith("/v1/zenodo/import")).length,
+    0,
+  );
 });
 
 test("clicking the ZIP import button twice does not stack a second confirm strip", async () => {
-  await renderOneRecord({ ...sampleRecord, files: [{ key: "a.zip", size: 10 }] });
+  await renderOneRecord({
+    ...sampleRecord,
+    files: [{ key: "a.zip", size: 10 }],
+  });
   const btn = document.querySelector<HTMLButtonElement>("[data-import-id]")!;
   btn.click();
   btn.click();
@@ -584,10 +734,16 @@ test("clicking the ZIP import button twice does not stack a second confirm strip
 });
 
 test("confirming a ZIP import strip removes it and proceeds to importRecord", async () => {
-  await renderOneRecord({ ...sampleRecord, files: [{ key: "a.zip", size: 10 }] });
+  await renderOneRecord({
+    ...sampleRecord,
+    files: [{ key: "a.zip", size: 10 }],
+  });
   mock.on(
     (url) => /\/v1\/zenodo\/records\/42\?/.test(url),
-    () => ({ status: 200, body: { ...sampleRecord, files: [{ key: "a.zip", size: 10 }] } }),
+    () => ({
+      status: 200,
+      body: { ...sampleRecord, files: [{ key: "a.zip", size: 10 }] },
+    }),
   );
   mock.on(
     (url) => url.endsWith("/v1/zenodo/import"),
@@ -599,5 +755,8 @@ test("confirming a ZIP import strip removes it and proceeds to importRecord", as
   await flush();
 
   assert.equal(document.querySelector(".z-zip-confirm"), null);
-  assert.equal(mock.calls.some((c) => c.url.endsWith("/v1/zenodo/import")), true);
+  assert.equal(
+    mock.calls.some((c) => c.url.endsWith("/v1/zenodo/import")),
+    true,
+  );
 });

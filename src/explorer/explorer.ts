@@ -388,7 +388,9 @@ export async function loadStudyExplorer(): Promise<void> {
         explorerState.zenodoLinked;
       views.forEach((v) => {
         v.list.innerHTML = emptyState(
-          filtered ? t("explorer.noStudiesFiltered") : t("explorer.noStudiesLoaded"),
+          filtered
+            ? t("explorer.noStudiesFiltered")
+            : t("explorer.noStudiesLoaded"),
         );
       });
       setSelected(null);

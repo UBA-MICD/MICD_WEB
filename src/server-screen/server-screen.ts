@@ -9,7 +9,12 @@
 // A guest who opens this screen lands on the auth card, which states the rule
 // in plain language, instead of getting a modal thrown over their image.
 
-import { isAuthenticated, isAdmin, isStaff, onAuthChange } from "../auth/auth.js";
+import {
+  isAuthenticated,
+  isAdmin,
+  isStaff,
+  onAuthChange,
+} from "../auth/auth.js";
 import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
@@ -101,7 +106,9 @@ function renderForSession(): void {
   // Reveal each role-gated tab only where the role permits it; if the active
   // tab is now off-limits (e.g. a role change surfaced on refresh), fall back
   // to Buscar, which every signed-in role can use.
-  TABS.forEach((tab) => tabButton(tab).classList.toggle("hidden", !canUseTab(tab)));
+  TABS.forEach((tab) =>
+    tabButton(tab).classList.toggle("hidden", !canUseTab(tab)),
+  );
   if (!canUseTab(activeTab)) activeTab = "buscar";
   showTab(activeTab);
 }

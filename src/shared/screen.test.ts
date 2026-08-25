@@ -36,7 +36,8 @@ test("showScreen with an unregistered name is a no-op", async () => {
 });
 
 test("showScreen hides all but the target and moves focus to its heading", async () => {
-  const { registerScreen, showScreen, currentScreen } = await freshScreenModule();
+  const { registerScreen, showScreen, currentScreen } =
+    await freshScreenModule();
   const { viewer, server } = fixture();
   registerScreen("viewer", viewer);
   registerScreen("server", server);
@@ -48,7 +49,10 @@ test("showScreen hides all but the target and moves focus to its heading", async
   assert.equal(server.inert, false);
   assert.equal(viewer.classList.contains("hidden"), true);
   assert.equal(viewer.inert, true);
-  assert.equal(document.activeElement, server.querySelector("[data-screen-heading]"));
+  assert.equal(
+    document.activeElement,
+    server.querySelector("[data-screen-heading]"),
+  );
 });
 
 test("showScreen falls back to the screen root when there is no heading", async () => {
@@ -66,7 +70,8 @@ test("showScreen falls back to the screen root when there is no heading", async 
 });
 
 test("showScreen(name, from) remembers the opener, and returning to viewer restores its focus", async () => {
-  const { registerScreen, showScreen, currentScreen } = await freshScreenModule();
+  const { registerScreen, showScreen, currentScreen } =
+    await freshScreenModule();
   const { viewer, server } = fixture();
   registerScreen("viewer", viewer);
   registerScreen("server", server);
@@ -93,5 +98,8 @@ test("showScreen(viewer) with a disconnected opener falls back to focusing the h
   showScreen("server", trigger);
   showScreen("viewer");
 
-  assert.equal(document.activeElement, viewer.querySelector("[data-screen-heading]"));
+  assert.equal(
+    document.activeElement,
+    viewer.querySelector("[data-screen-heading]"),
+  );
 });

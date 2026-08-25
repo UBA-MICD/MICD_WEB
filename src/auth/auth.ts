@@ -1,5 +1,9 @@
 import { t } from "../i18n/i18n.js";
-import { getRefreshToken, setRefreshToken, clearRefreshToken } from "../shared/token-store.js";
+import {
+  getRefreshToken,
+  setRefreshToken,
+  clearRefreshToken,
+} from "../shared/token-store.js";
 
 // Origin the backend API + auth endpoints live on. Default: the backend's own
 // port, for local dev (page opened directly / served without nginx). In the
@@ -131,7 +135,11 @@ function decodeToken(token: string): {
   }
 }
 
-async function setSession(token: string, refreshToken: string, user: AuthUser): Promise<void> {
+async function setSession(
+  token: string,
+  refreshToken: string,
+  user: AuthUser,
+): Promise<void> {
   accessToken = token;
   currentUser = user;
   accessTokenExpiresAt = decodeToken(token).expiresAt;

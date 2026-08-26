@@ -478,4 +478,5 @@ export const en: Record<string, string> = {
   "tour.controls.finish": "Finish",
   "tour.controls.close": "Close tour",
   "tour.progress": "Step {{n}} of {{total}}",
+  "tour.help.label": "Guided tour",
 };

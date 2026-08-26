@@ -491,4 +491,12 @@ export const es: Record<string, string> = {
   "system.instances": "Instancias",
   "system.used": "usados",
   "system.loadError": "No se pudo cargar el estado del servidor.",
+
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Siguiente",
+  "tour.controls.back": "Atrás",
+  "tour.controls.skip": "Omitir tutorial",
+  "tour.controls.finish": "Finalizar",
+  "tour.controls.close": "Cerrar tutorial",
+  "tour.progress": "Paso {{n}} de {{total}}",
 };

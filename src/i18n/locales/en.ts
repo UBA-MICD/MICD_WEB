@@ -470,4 +470,12 @@ export const en: Record<string, string> = {
   "system.instances": "Instances",
   "system.used": "used",
   "system.loadError": "Could not load server status.",
+
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Next",
+  "tour.controls.back": "Back",
+  "tour.controls.skip": "Skip tour",
+  "tour.controls.finish": "Finish",
+  "tour.controls.close": "Close tour",
+  "tour.progress": "Step {{n}} of {{total}}",
 };

@@ -28,11 +28,13 @@ test("each role gets the common core plus its own branch", () => {
       `${role} should see at least the common core`,
     );
   }
-  // investigador has role-specific steps beyond the core.
-  const invOnly = tourSteps.filter(
-    (s) => s.roles.includes("investigador") && !isCommonStep(s),
-  );
-  assert.ok(invOnly.length > 0, "investigador branch is present");
+  // Every role has role-specific steps beyond the common core.
+  for (const role of ROLES) {
+    const roleOnly = tourSteps.filter(
+      (s) => s.roles.includes(role) && !isCommonStep(s),
+    );
+    assert.ok(roleOnly.length > 0, `${role} branch is present`);
+  }
 });
 
 test("step ids are unique", () => {

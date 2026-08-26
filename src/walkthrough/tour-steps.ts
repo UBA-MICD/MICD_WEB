@@ -209,4 +209,133 @@ const investigadorSteps: TourStep[] = [
   },
 ];
 
-export const tourSteps: TourStep[] = [...coreSteps, ...investigadorSteps];
+// ── C. Staff — medico & admin (write access, full PHI) ──────────────────────────
+//
+// Clinical staff see the same search/view/export as a researcher but with full
+// patient details (no anonymization), and additionally can upload studies and
+// import public datasets. `admin` is a superset of `medico`, so these steps are
+// tagged for both; the closing note is medico-only (admin has its own).
+
+const staffSteps: TourStep[] = [
+  {
+    id: "staff.search",
+    roles: ["medico", "admin"],
+    target: "#server-search-studies",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.search.title",
+    bodyKey: "tour.staff.search.body",
+    placement: "bottom",
+    advance: { on: "event", event: "input" },
+  },
+  {
+    id: "staff.results",
+    roles: ["medico", "admin"],
+    target: "#study-list",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.results.title",
+    bodyKey: "tour.staff.results.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "staff.open",
+    roles: ["medico", "admin"],
+    target: "#btn-open-selected",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.open.title",
+    bodyKey: "tour.staff.open.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "event", event: "click" },
+  },
+  {
+    id: "staff.export",
+    roles: ["medico", "admin"],
+    target: "#btn-export-explorer",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.export.title",
+    bodyKey: "tour.staff.export.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "staff.uploadTab",
+    roles: ["medico", "admin"],
+    target: "#tab-cargar",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.uploadTab.title",
+    bodyKey: "tour.staff.uploadTab.body",
+    placement: "bottom",
+    // Follow-along: switch to the upload tab. If the user clicks Next instead,
+    // the next step's tab:"cargar" opens it anyway.
+    advance: { on: "event", event: "click" },
+  },
+  {
+    id: "staff.uploadDrop",
+    roles: ["medico", "admin"],
+    target: "#upload-drop",
+    screen: "server",
+    tab: "cargar",
+    titleKey: "tour.staff.uploadDrop.title",
+    bodyKey: "tour.staff.uploadDrop.body",
+    placement: "top",
+    advance: { on: "next" },
+  },
+  {
+    id: "staff.uploadFolder",
+    roles: ["medico", "admin"],
+    target: "#btn-upload-folder",
+    screen: "server",
+    tab: "cargar",
+    titleKey: "tour.staff.uploadFolder.title",
+    bodyKey: "tour.staff.uploadFolder.body",
+    placement: "bottom",
+    advance: { on: "next" },
+  },
+  {
+    id: "staff.uploadStatus",
+    roles: ["medico", "admin"],
+    target: "#upload-rows",
+    screen: "server",
+    tab: "cargar",
+    titleKey: "tour.staff.uploadStatus.title",
+    bodyKey: "tour.staff.uploadStatus.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "staff.zenodoImport",
+    roles: ["medico", "admin"],
+    target: "#btn-open-zenodo",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.zenodoImport.title",
+    bodyKey: "tour.staff.zenodoImport.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "medico.done",
+    roles: ["medico"],
+    target: "center",
+    titleKey: "tour.medico.done.title",
+    bodyKey: "tour.medico.done.body",
+    placement: "center",
+    advance: { on: "next" },
+  },
+];
+
+export const tourSteps: TourStep[] = [
+  ...coreSteps,
+  ...investigadorSteps,
+  ...staffSteps,
+];

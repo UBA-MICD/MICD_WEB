@@ -530,4 +530,34 @@ export const en: Record<string, string> = {
   "tour.investigador.done.title": "You're set",
   "tour.investigador.done.body":
     "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
+  "tour.staff.search.title": "Search studies",
+  "tour.staff.search.body":
+    "Find studies by patient, modality or date. As clinical staff you see full patient details.",
+  "tour.staff.results.title": "Results",
+  "tour.staff.results.body":
+    "Matching studies appear here with full patient information.",
+  "tour.staff.open.title": "Open a study",
+  "tour.staff.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.staff.export.title": "Export a study",
+  "tour.staff.export.body":
+    "Export images (PNG) or a full study package (ZIP), with complete metadata.",
+  "tour.staff.uploadTab.title": "Upload studies",
+  "tour.staff.uploadTab.body":
+    "Open the Upload tab to add new studies to the server.",
+  "tour.staff.uploadDrop.title": "Drag & drop",
+  "tour.staff.uploadDrop.body":
+    "Drop DICOM files here to upload them. Each file uploads with its own progress row.",
+  "tour.staff.uploadFolder.title": "Upload a folder",
+  "tour.staff.uploadFolder.body":
+    "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
+  "tour.staff.uploadStatus.title": "Progress & status",
+  "tour.staff.uploadStatus.body":
+    "Track per-file progress and status here as your studies upload.",
+  "tour.staff.zenodoImport.title": "Zenodo datasets",
+  "tour.staff.zenodoImport.body":
+    "Search Zenodo's public corpus and import datasets straight into the server.",
+  "tour.medico.done.title": "You're set",
+  "tour.medico.done.body":
+    "That's your clinical toolkit — search, review, upload, import and export with full metadata. User management, Zenodo publishing/config and the activity log are admin-only. Reopen this tour anytime from the ? button.",
 };

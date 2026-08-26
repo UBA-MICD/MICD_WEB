@@ -551,4 +551,34 @@ export const es: Record<string, string> = {
   "tour.investigador.done.title": "Todo listo",
   "tour.investigador.done.body":
     "Ese es tu kit de investigador — buscar, revisar y exportar anonimizado. Subir estudios, la administración de usuarios y la publicación no forman parte de este rol. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.staff.search.title": "Buscar estudios",
+  "tour.staff.search.body":
+    "Encuentra estudios por paciente, modalidad o fecha. Como personal clínico ves los datos completos del paciente.",
+  "tour.staff.results.title": "Resultados",
+  "tour.staff.results.body":
+    "Los estudios coincidentes aparecen aquí con la información completa del paciente.",
+  "tour.staff.open.title": "Abrir un estudio",
+  "tour.staff.open.body":
+    "Selecciona un estudio y ábrelo en el visor para revisar sus imágenes.",
+  "tour.staff.export.title": "Exportar un estudio",
+  "tour.staff.export.body":
+    "Exporta imágenes (PNG) o un paquete completo del estudio (ZIP), con todos los metadatos.",
+  "tour.staff.uploadTab.title": "Subir estudios",
+  "tour.staff.uploadTab.body":
+    "Abre la pestaña Cargar para añadir nuevos estudios al servidor.",
+  "tour.staff.uploadDrop.title": "Arrastrar y soltar",
+  "tour.staff.uploadDrop.body":
+    "Suelta archivos DICOM aquí para subirlos. Cada archivo se sube con su propia fila de progreso.",
+  "tour.staff.uploadFolder.title": "Subir una carpeta",
+  "tour.staff.uploadFolder.body":
+    "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
+  "tour.staff.uploadStatus.title": "Progreso y estado",
+  "tour.staff.uploadStatus.body":
+    "Sigue aquí el progreso y el estado de cada archivo mientras se suben tus estudios.",
+  "tour.staff.zenodoImport.title": "Conjuntos de datos de Zenodo",
+  "tour.staff.zenodoImport.body":
+    "Busca en el corpus público de Zenodo e importa conjuntos de datos directamente al servidor.",
+  "tour.medico.done.title": "Todo listo",
+  "tour.medico.done.body":
+    "Ese es tu kit clínico — buscar, revisar, subir, importar y exportar con todos los metadatos. La gestión de usuarios, la configuración/publicación en Zenodo y el registro de actividad son solo para administradores. Reabre este tutorial cuando quieras desde el botón ?.",
 };

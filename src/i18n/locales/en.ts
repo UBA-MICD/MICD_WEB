@@ -479,4 +479,34 @@ export const en: Record<string, string> = {
   "tour.controls.close": "Close tour",
   "tour.progress": "Step {{n}} of {{total}}",
   "tour.help.label": "Guided tour",
+  "tour.core.welcome.title": "Welcome to MICD",
+  "tour.core.welcome.body":
+    "A quick tour of the viewer and, if you sign in, your server features. Press Esc or Skip to leave at any time — reopen it later from the ? button.",
+  "tour.core.open.title": "Open a study",
+  "tour.core.open.body":
+    "Open a local DICOM file or folder straight from your computer — no sign-in needed. You can also drag files onto the viewer.",
+  "tour.core.wl.title": "Window / Level",
+  "tour.core.wl.body":
+    "Adjust brightness and contrast by dragging on the image, or apply a preset (bone, brain, lung, soft tissue).",
+  "tour.core.zoompan.title": "Zoom & pan",
+  "tour.core.zoompan.body":
+    "Zoom to inspect detail and pan to move around the image. The scroll wheel zooms too.",
+  "tour.core.mpr.title": "MPR & 3D",
+  "tour.core.mpr.body":
+    "For volume series, reconstruct axial, coronal and sagittal planes, or switch to a 3D view.",
+  "tour.core.metadata.title": "DICOM metadata",
+  "tour.core.metadata.body":
+    "Inspect the study's DICOM tags — patient, series and acquisition details.",
+  "tour.core.reset.title": "Reset the view",
+  "tour.core.reset.body":
+    "Return window/level, zoom and pan to their defaults in one click.",
+  "tour.core.explorer.title": "Study explorer",
+  "tour.core.explorer.body":
+    "Toggle the explorer rail to browse the series and studies you have open.",
+  "tour.core.language.title": "Language",
+  "tour.core.language.body":
+    "Switch the interface between Spanish and English at any time.",
+  "tour.core.signin.title": "Server features",
+  "tour.core.signin.body":
+    "Sign in to reach the server: search shared studies, and — depending on your role — upload, publish and manage users.",
 };

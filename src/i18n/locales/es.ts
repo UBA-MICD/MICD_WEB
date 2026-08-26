@@ -500,4 +500,34 @@ export const es: Record<string, string> = {
   "tour.controls.close": "Cerrar tutorial",
   "tour.progress": "Paso {{n}} de {{total}}",
   "tour.help.label": "Tutorial guiado",
+  "tour.core.welcome.title": "Bienvenido a MICD",
+  "tour.core.welcome.body":
+    "Un recorrido breve por el visor y, si inicias sesión, por las funciones del servidor. Pulsa Esc u Omitir para salir cuando quieras — puedes reabrirlo desde el botón ?.",
+  "tour.core.open.title": "Abrir un estudio",
+  "tour.core.open.body":
+    "Abre un archivo o carpeta DICOM local desde tu equipo — sin iniciar sesión. También puedes arrastrar archivos al visor.",
+  "tour.core.wl.title": "Ventana / Nivel",
+  "tour.core.wl.body":
+    "Ajusta brillo y contraste arrastrando sobre la imagen, o aplica un preset (hueso, cerebro, pulmón, tejido blando).",
+  "tour.core.zoompan.title": "Zoom y desplazamiento",
+  "tour.core.zoompan.body":
+    "Haz zoom para ver el detalle y desplázate para moverte por la imagen. La rueda del ratón también hace zoom.",
+  "tour.core.mpr.title": "MPR y 3D",
+  "tour.core.mpr.body":
+    "Para series volumétricas, reconstruye los planos axial, coronal y sagital, o cambia a la vista 3D.",
+  "tour.core.metadata.title": "Metadatos DICOM",
+  "tour.core.metadata.body":
+    "Consulta las etiquetas DICOM del estudio — paciente, serie y detalles de adquisición.",
+  "tour.core.reset.title": "Restablecer la vista",
+  "tour.core.reset.body":
+    "Devuelve ventana/nivel, zoom y desplazamiento a sus valores por defecto con un clic.",
+  "tour.core.explorer.title": "Explorador de estudios",
+  "tour.core.explorer.body":
+    "Muestra u oculta el panel del explorador para navegar por las series y estudios que tienes abiertos.",
+  "tour.core.language.title": "Idioma",
+  "tour.core.language.body":
+    "Cambia la interfaz entre español e inglés en cualquier momento.",
+  "tour.core.signin.title": "Funciones del servidor",
+  "tour.core.signin.body":
+    "Inicia sesión para acceder al servidor: busca estudios compartidos y — según tu rol — sube, publica y gestiona usuarios.",
 };

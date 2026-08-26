@@ -5,16 +5,34 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { Role } from "../auth/auth.ts";
 import { tourSteps } from "./tour-steps.ts";
 import { applicableSteps, isCommonStep } from "./walkthrough.ts";
 import { en } from "../i18n/locales/en.ts";
 import { es } from "../i18n/locales/es.ts";
 
-test("the catalog is non-empty and every step is common core", () => {
-  assert.ok(tourSteps.length > 0);
-  for (const s of tourSteps) assert.equal(isCommonStep(s), true, s.id);
-  // A guest (null) therefore sees the whole current catalog.
-  assert.equal(applicableSteps(tourSteps, null).length, tourSteps.length);
+const ROLES: Role[] = ["admin", "medico", "investigador"];
+
+test("a guest sees exactly the common-core steps", () => {
+  const guest = applicableSteps(tourSteps, null);
+  assert.ok(guest.length > 0);
+  for (const s of guest) assert.equal(isCommonStep(s), true, s.id);
+  assert.equal(guest.length, tourSteps.filter(isCommonStep).length);
+});
+
+test("each role gets the common core plus its own branch", () => {
+  const guestCount = applicableSteps(tourSteps, null).length;
+  for (const role of ROLES) {
+    assert.ok(
+      applicableSteps(tourSteps, role).length >= guestCount,
+      `${role} should see at least the common core`,
+    );
+  }
+  // investigador has role-specific steps beyond the core.
+  const invOnly = tourSteps.filter(
+    (s) => s.roles.includes("investigador") && !isCommonStep(s),
+  );
+  assert.ok(invOnly.length > 0, "investigador branch is present");
 });
 
 test("step ids are unique", () => {

@@ -509,4 +509,25 @@ export const en: Record<string, string> = {
   "tour.core.signin.title": "Server features",
   "tour.core.signin.body":
     "Sign in to reach the server: search shared studies, and — depending on your role — upload, publish and manage users.",
+  "tour.investigador.search.title": "Search studies",
+  "tour.investigador.search.body":
+    "Find studies by patient, modality or date. Start typing to search the shared repository.",
+  "tour.investigador.dates.title": "Filter by date",
+  "tour.investigador.dates.body":
+    "Narrow results to an acquisition date range with the from/to fields.",
+  "tour.investigador.results.title": "Results",
+  "tour.investigador.results.body":
+    "Matching studies appear here. For your role, patient identity is anonymized — you work with de-identified data.",
+  "tour.investigador.open.title": "Open a study",
+  "tour.investigador.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.investigador.export.title": "Export",
+  "tour.investigador.export.body":
+    "Export images or a study package. Downloads for your role are anonymized.",
+  "tour.investigador.zenodo.title": "Zenodo public corpus",
+  "tour.investigador.zenodo.body":
+    "Search Zenodo's public research corpus for openly published datasets.",
+  "tour.investigador.done.title": "You're set",
+  "tour.investigador.done.body":
+    "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
 };

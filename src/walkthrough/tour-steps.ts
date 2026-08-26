@@ -121,4 +121,92 @@ const coreSteps: TourStep[] = [
   },
 ];
 
-export const tourSteps: TourStep[] = [...coreSteps];
+// ── B. investigador — read-only, PHI-free researcher ────────────────────────────
+//
+// Everything in the core, then the server's Buscar tab framed for a researcher:
+// results are anonymized and exports are PHI-free. Upload, user admin and Zenodo
+// publishing/config are not part of the role, so they are simply never listed.
+
+const investigadorSteps: TourStep[] = [
+  {
+    id: "inv.search",
+    roles: ["investigador"],
+    target: "#server-search-studies",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.investigador.search.title",
+    bodyKey: "tour.investigador.search.body",
+    placement: "bottom",
+    advance: { on: "event", event: "input" },
+  },
+  {
+    id: "inv.dates",
+    roles: ["investigador"],
+    target: "#server-date-from",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.investigador.dates.title",
+    bodyKey: "tour.investigador.dates.body",
+    placement: "bottom",
+    advance: { on: "next" },
+  },
+  {
+    id: "inv.results",
+    roles: ["investigador"],
+    target: "#study-list",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.investigador.results.title",
+    bodyKey: "tour.investigador.results.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inv.open",
+    roles: ["investigador"],
+    target: "#btn-open-selected",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.investigador.open.title",
+    bodyKey: "tour.investigador.open.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "event", event: "click" },
+  },
+  {
+    id: "inv.export",
+    roles: ["investigador"],
+    target: "#btn-export-explorer",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.investigador.export.title",
+    bodyKey: "tour.investigador.export.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inv.zenodo",
+    roles: ["investigador"],
+    target: "#btn-open-zenodo",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.investigador.zenodo.title",
+    bodyKey: "tour.investigador.zenodo.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inv.done",
+    roles: ["investigador"],
+    target: "center",
+    titleKey: "tour.investigador.done.title",
+    bodyKey: "tour.investigador.done.body",
+    placement: "center",
+    advance: { on: "next" },
+  },
+];
+
+export const tourSteps: TourStep[] = [...coreSteps, ...investigadorSteps];

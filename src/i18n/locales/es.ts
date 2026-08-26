@@ -530,4 +530,25 @@ export const es: Record<string, string> = {
   "tour.core.signin.title": "Funciones del servidor",
   "tour.core.signin.body":
     "Inicia sesión para acceder al servidor: busca estudios compartidos y — según tu rol — sube, publica y gestiona usuarios.",
+  "tour.investigador.search.title": "Buscar estudios",
+  "tour.investigador.search.body":
+    "Encuentra estudios por paciente, modalidad o fecha. Empieza a escribir para buscar en el repositorio compartido.",
+  "tour.investigador.dates.title": "Filtrar por fecha",
+  "tour.investigador.dates.body":
+    "Acota los resultados a un rango de fechas de adquisición con los campos desde/hasta.",
+  "tour.investigador.results.title": "Resultados",
+  "tour.investigador.results.body":
+    "Los estudios coincidentes aparecen aquí. Para tu rol, la identidad del paciente está anonimizada — trabajas con datos sin identificar.",
+  "tour.investigador.open.title": "Abrir un estudio",
+  "tour.investigador.open.body":
+    "Selecciona un estudio y ábrelo en el visor para revisar sus imágenes.",
+  "tour.investigador.export.title": "Exportar",
+  "tour.investigador.export.body":
+    "Exporta imágenes o un paquete del estudio. Las descargas para tu rol están anonimizadas.",
+  "tour.investigador.zenodo.title": "Corpus público de Zenodo",
+  "tour.investigador.zenodo.body":
+    "Busca en el corpus público de investigación de Zenodo conjuntos de datos publicados abiertamente.",
+  "tour.investigador.done.title": "Todo listo",
+  "tour.investigador.done.body":
+    "Ese es tu kit de investigador — buscar, revisar y exportar anonimizado. Subir estudios, la administración de usuarios y la publicación no forman parte de este rol. Reabre este tutorial cuando quieras desde el botón ?.",
 };

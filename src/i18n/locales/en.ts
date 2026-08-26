@@ -560,4 +560,31 @@ export const en: Record<string, string> = {
   "tour.medico.done.title": "You're set",
   "tour.medico.done.body":
     "That's your clinical toolkit — search, review, upload, import and export with full metadata. User management, Zenodo publishing/config and the activity log are admin-only. Reopen this tour anytime from the ? button.",
+  "tour.admin.usersTab.title": "User management",
+  "tour.admin.usersTab.body":
+    "Open the Users tab to manage accounts — only administrators see it.",
+  "tour.admin.create.title": "Create a user",
+  "tour.admin.create.body":
+    "Add a user with a name, email and role. An email invitation is sent to them.",
+  "tour.admin.role.title": "Assign roles",
+  "tour.admin.role.body":
+    "Change a user's role here — researcher, clinician or administrator.",
+  "tour.admin.block.title": "Block & enable",
+  "tour.admin.block.body":
+    "Block an account to suspend access, and re-enable it later.",
+  "tour.admin.delete.title": "Delete a user",
+  "tour.admin.delete.body":
+    "Deleting is a soft-delete — the account is removed but the audit history is preserved.",
+  "tour.admin.lastAccess.title": "Last access",
+  "tour.admin.lastAccess.body":
+    "Each user's last login is tracked in this column.",
+  "tour.admin.activity.title": "Activity log",
+  "tour.admin.activity.body":
+    "Open the audit log to review actions across the system, and export it as CSV.",
+  "tour.admin.zenodo.title": "Zenodo administration",
+  "tour.admin.zenodo.body":
+    "Configure Zenodo credentials and sync, review sync logs and quota, and publish studies. Publishing is irreversible and makes data publicly available — check carefully before you publish.",
+  "tour.admin.help.title": "Reopen anytime",
+  "tour.admin.help.body":
+    "That's the full administrator toolkit. Relaunch this tour whenever you like from this ? button.",
 };

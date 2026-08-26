@@ -581,4 +581,31 @@ export const es: Record<string, string> = {
   "tour.medico.done.title": "Todo listo",
   "tour.medico.done.body":
     "Ese es tu kit clínico — buscar, revisar, subir, importar y exportar con todos los metadatos. La gestión de usuarios, la configuración/publicación en Zenodo y el registro de actividad son solo para administradores. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.admin.usersTab.title": "Gestión de usuarios",
+  "tour.admin.usersTab.body":
+    "Abre la pestaña Usuarios para gestionar cuentas — solo la ven los administradores.",
+  "tour.admin.create.title": "Crear un usuario",
+  "tour.admin.create.body":
+    "Añade un usuario con nombre, correo y rol. Se le envía una invitación por correo.",
+  "tour.admin.role.title": "Asignar roles",
+  "tour.admin.role.body":
+    "Cambia aquí el rol de un usuario — investigador, médico o administrador.",
+  "tour.admin.block.title": "Bloquear y habilitar",
+  "tour.admin.block.body":
+    "Bloquea una cuenta para suspender el acceso y vuelve a habilitarla más tarde.",
+  "tour.admin.delete.title": "Eliminar un usuario",
+  "tour.admin.delete.body":
+    "La eliminación es un borrado lógico — la cuenta se retira pero se conserva el historial de auditoría.",
+  "tour.admin.lastAccess.title": "Último acceso",
+  "tour.admin.lastAccess.body":
+    "El último inicio de sesión de cada usuario se registra en esta columna.",
+  "tour.admin.activity.title": "Registro de actividad",
+  "tour.admin.activity.body":
+    "Abre el registro de auditoría para revisar las acciones del sistema y expórtalo como CSV.",
+  "tour.admin.zenodo.title": "Administración de Zenodo",
+  "tour.admin.zenodo.body":
+    "Configura las credenciales y la sincronización de Zenodo, revisa los registros de sincronización y la cuota, y publica estudios. La publicación es irreversible y hace los datos públicos — verifica con cuidado antes de publicar.",
+  "tour.admin.help.title": "Reábrelo cuando quieras",
+  "tour.admin.help.body":
+    "Ese es el kit completo de administrador. Relanza este tutorial cuando quieras desde este botón ?.",
 };

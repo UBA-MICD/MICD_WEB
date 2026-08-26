@@ -171,7 +171,7 @@ export function userRowHtml(u: AdminUser): string {
     <td><span class="user-status user-status--${u.status}">${escapeHtml(
       statusLabel(u.status),
     )}</span></td>
-    <td>${escapeHtml(formatLastAccess(u.last_login_at))}</td>
+    <td data-user-last-access>${escapeHtml(formatLastAccess(u.last_login_at))}</td>
     <td class="user-actions">
       <button type="button" class="btn btn--outline btn--sm" data-user-toggle="${toggleAction}">${escapeHtml(
         toggleLabel,

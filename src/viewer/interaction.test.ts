@@ -753,3 +753,110 @@ test("initMenuListeners wires menu:open-files/open-folder/api-server when window
 test("initResizeObserver observes the viewport container without throwing", () => {
   assert.doesNotThrow(() => initResizeObserver());
 });
+
+// ── Zoom controls ─────────────────────────────────────────────────────────────
+
+test("zoom slider input sets viewport zoom in 2D mode and clamps to [0.1, 5]", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.is3DMode = false;
+
+  const slider = document.getElementById("slider-zoom") as HTMLInputElement;
+  slider.value = "2.5";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(state.viewport.zoom, 2.5);
+
+  const valZoom = document.getElementById("val-zoom")!;
+  assert.equal(valZoom.textContent, "2.5x");
+});
+
+test("zoom slider input sets mpr camera zoom in 3D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.is3DMode = true;
+
+  const slider = document.getElementById("slider-zoom") as HTMLInputElement;
+  slider.value = "1.5";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(mpr3DViewer.camera.zoom, 1.5);
+  state.is3DMode = false;
+});
+
+test("btn-zoom-fit in 2D mode sets zoom to fit the container and resets pan", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.parsed = mockParsed();
+  state.viewport.zoom = 3;
+  state.viewport.panX = 50;
+  state.viewport.panY = 50;
+
+  document
+    .getElementById("btn-zoom-fit")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.panX, 0);
+  assert.equal(state.viewport.panY, 0);
+});
+
+test("btn-zoom-fit in 3D mode resets camera zoom to 1", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.parsed = mockParsed();
+  state.is3DMode = true;
+  mpr3DViewer.camera.zoom = 3.0;
+
+  document
+    .getElementById("btn-zoom-fit")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(mpr3DViewer.camera.zoom, 1);
+  state.is3DMode = false;
+});
+
+test("btn-zoom-fit with no parsed study resets viewport zoom to 1 in 2D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.parsed = null;
+  state.viewport.zoom = 3;
+
+  document
+    .getElementById("btn-zoom-fit")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.zoom, 1);
+});
+
+test("btn-zoom-100 sets zoom to 1 in 2D mode and 3D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.is3DMode = false;
+  state.viewport.zoom = 3;
+  document
+    .getElementById("btn-zoom-100")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.zoom, 1);
+
+  state.is3DMode = true;
+  mpr3DViewer.camera.zoom = 3;
+  document
+    .getElementById("btn-zoom-100")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(mpr3DViewer.camera.zoom, 1);
+  state.is3DMode = false;
+});
+
+test("btn-zoom-200 sets zoom to 2 in 2D mode and 3D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.is3DMode = false;
+  document
+    .getElementById("btn-zoom-200")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.zoom, 2);
+
+  state.is3DMode = true;
+  document
+    .getElementById("btn-zoom-200")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(mpr3DViewer.camera.zoom, 2);
+  state.is3DMode = false;
+});

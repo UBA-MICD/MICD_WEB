@@ -14,6 +14,7 @@ import {
   updateMetadataPanel,
   updateInfoOverlay,
   updateWlControlsUI,
+  updateOrientationLabels,
 } from "./rendering.ts";
 import { state, itemCount } from "./state.ts";
 import { mpr3DViewer } from "./mpr.ts";
@@ -368,6 +369,41 @@ test("updateWlControlsUI does not fight the user while a slider is focused", () 
   };
   updateWlControlsUI();
   assert.equal(sliderWW.value, "77");
+});
+
+test("updateOrientationLabels clears labels when there is no pixel data or in 3D mode", () => {
+  state.parsed = null;
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-left")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-right")!.textContent, "");
+
+  state.parsed = {
+    metadata: baseMeta,
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
+  state.is3DMode = true;
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "");
+
+  state.is3DMode = false;
+});
+
+test("updateOrientationLabels shows A/P/R/L in 2D mode with pixel data", () => {
+  state.parsed = {
+    metadata: baseMeta,
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
+  state.is3DMode = false;
+
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "A");
+  assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "P");
+  assert.equal(document.getElementById("mpr-orient-left")!.textContent, "R");
+  assert.equal(document.getElementById("mpr-orient-right")!.textContent, "L");
 });
 
 test("a locale change re-renders the metadata panel, series nav, and info overlay", async () => {

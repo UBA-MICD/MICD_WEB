@@ -79,6 +79,8 @@ export const es: Record<string, string> = {
   "explorer.modalityAll": "Todas",
   "explorer.dateFromLabel": "Desde",
   "explorer.dateToLabel": "Hasta",
+  "explorer.descriptionLabel": "Descripción",
+  "explorer.descriptionPlaceholder": "Filtrar por descripción",
   "explorer.clearFilters": "Limpiar filtros",
   "explorer.prevPage": "Página anterior",
   "explorer.nextPage": "Página siguiente",
@@ -160,6 +162,8 @@ export const es: Record<string, string> = {
   "viewer.mpr.needTwoSlices":
     "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
   "viewer.mpr.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
+  "viewer.mpr.webglUnavailable":
+    "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",

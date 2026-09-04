@@ -238,7 +238,9 @@ export class MPR3DViewer {
         canvas.parentNode.replaceChild(newCanvas, canvas);
         canvas = newCanvas; // Update reference to newly created canvas
 
-        this.initGL(canvas);
+        if (!this.initGL(canvas)) {
+          throw new Error(t("viewer.mpr.webglUnavailable"));
+        }
         this.uploadVolumeTexture();
       }
 

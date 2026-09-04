@@ -224,3 +224,29 @@ test("mountLoginForm works without an optional cancel button", async () => {
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 });
+
+test("password toggle button switches input type and updates aria-label", () => {
+  setBody(`
+    <form id="toggle-form">
+      <input data-login-email />
+      <input data-login-password type="password" />
+      <div data-login-error class="hidden"></div>
+      <button data-login-submit type="submit">Go</button>
+      <button data-login-toggle type="button" aria-label="Show password"></button>
+    </form>
+  `);
+  const form = document.getElementById("toggle-form") as HTMLFormElement;
+  const password = form.querySelector(
+    "[data-login-password]",
+  ) as HTMLInputElement;
+  const toggle = form.querySelector("[data-login-toggle]") as HTMLButtonElement;
+
+  mountLoginForm(form, { onSuccess: () => {} });
+
+  assert.equal(password.type, "password");
+  toggle.dispatchEvent(new MouseEvent("click"));
+  assert.equal(password.type, "text");
+
+  toggle.dispatchEvent(new MouseEvent("click"));
+  assert.equal(password.type, "password");
+});

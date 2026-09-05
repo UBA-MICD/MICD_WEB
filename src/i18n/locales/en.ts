@@ -511,4 +511,36 @@ export const en: Record<string, string> = {
   "system.instances": "Instances",
   "system.used": "used",
   "system.loadError": "Could not load server status.",
+
+  // ── validation (US-26) ───────────────────────────────────────────────────────
+  "validation.barAriaLabel": "Diagnostic validation",
+  "validation.approve": "Approve",
+  "validation.reject": "Reject",
+  "validation.review": "Flag for review",
+  "validation.correctionNotice":
+    "This will record a correction over the prior validation.",
+  "validation.dialog.title": "Confirm action",
+  "validation.dialog.titleCorrection": "Record correction",
+  "validation.dialog.msg.approved": "Confirm approval of this study?",
+  "validation.dialog.msg.rejected":
+    "Confirm rejection of this study? A comment is required.",
+  "validation.dialog.msg.review": "Flag this study for later review?",
+  "validation.dialog.msg.correctionApproved":
+    "Record a correction approving this study?",
+  "validation.dialog.msg.correctionRejected":
+    "Record a correction rejecting this study? A comment is required.",
+  "validation.dialog.msg.correctionReview":
+    "Record a correction flagging this study for review?",
+  "validation.dialog.commentLabel": "Comment",
+  "validation.dialog.commentRequired": "A comment is required when rejecting.",
+  "validation.dialog.confirm": "Confirm",
+  "validation.status.approved": "Approved",
+  "validation.status.rejected": "Rejected",
+  "validation.status.review": "Flagged for review",
+  "validation.status.none": "Not validated",
+  "validation.toast.success.approved": "Study approved.",
+  "validation.toast.success.rejected": "Study rejected.",
+  "validation.toast.success.review": "Study flagged for review.",
+  "validation.toast.success.correction": "Correction recorded.",
+  "validation.toast.error": "Could not record validation.",
 };

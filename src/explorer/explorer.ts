@@ -34,6 +34,9 @@ interface StudyRecord {
   num_instances: number;
   zenodo_doi: string | null;
   zenodo_source_doi: string | null;
+  validation_status?: string | null;
+  validated_by?: string | null;
+  validated_at?: string | null;
 }
 
 interface StudiesResponse {

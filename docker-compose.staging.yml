@@ -1,0 +1,80 @@
+# Staging edge + frontend. This stack owns the PUBLIC entrypoint.
+#
+#   caddy  — TLS termination (Let's Encrypt) + routing; the only service with
+#            host ports (80/443). Routes /api,/auth -> backend:3000 and / -> web.
+#   web    — the static SPA (nginx), reached only via caddy (no host ports).
+#
+# Both join the shared external `micd` network so caddy can reach `backend:3000`
+# from the backend repo's stack. See docs/staging-deployment/plan.md §1-2.
+#
+# Prerequisites (one-time on the VPS — plan §6):
+#   docker network create micd
+#   cp .env.staging.example .env.staging   # fill in STAGING_DOMAIN + ACME_EMAIL
+#   # point the DNS A record for $STAGING_DOMAIN at this VPS (needed for ACME)
+#
+# Usage:
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging pull
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --no-build
+
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: micd-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      STAGING_DOMAIN: ${STAGING_DOMAIN:?STAGING_DOMAIN must be set in .env.staging}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set in .env.staging}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data      # certificates — survives redeploys, do not delete
+      - caddy-config:/config
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: ${CADDY_MEM_LIMIT:-64M}
+        reservations:
+          memory: ${CADDY_MEM_RESERVE:-32M}
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE:-10m}"
+        max-file: "${LOG_MAX_FILES:-3}"
+    networks:
+      - micd
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/uba-micd/micd_web:staging}
+    container_name: micd-frontend
+    restart: unless-stopped
+    # No host ports — reachable only through caddy on the internal network.
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: ${WEB_MEM_LIMIT:-48M}
+        reservations:
+          memory: ${WEB_MEM_RESERVE:-16M}
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE:-10m}"
+        max-file: "${LOG_MAX_FILES:-3}"
+    networks:
+      - micd
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+# Shared, externally-created network (docker network create micd). The backend
+# stack (postgres/orthanc/backend) lives on the same network.
+networks:
+  micd:
+    external: true

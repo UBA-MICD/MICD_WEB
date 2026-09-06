@@ -1,0 +1,26 @@
+# Caddy edge for staging — the ONLY public entrypoint.
+#
+# Terminates HTTPS (automatic Let's Encrypt for $STAGING_DOMAIN, auto-renew) and
+# routes: API/auth paths to the backend, everything else to the static frontend.
+# HTTP:80 -> HTTPS is automatic in Caddy. See docs/staging-deployment/plan.md §1.
+#
+# $STAGING_DOMAIN and $ACME_EMAIL are provided from .env.staging at run time.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$STAGING_DOMAIN} {
+	encode zstd gzip
+
+	# API and auth calls -> backend (reached by service name over the `micd` network).
+	@api path /api/* /auth/*
+	handle @api {
+		reverse_proxy backend:3000
+	}
+
+	# Everything else -> the static SPA (nginx).
+	handle {
+		reverse_proxy web:80
+	}
+}

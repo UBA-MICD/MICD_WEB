@@ -1,0 +1,126 @@
+name: Deploy to Staging
+
+# Chains off CI: runs only after the "CI" workflow completes successfully on the
+# `staging` branch (a PR merged into staging). One merge = one CI run + one
+# deploy. See docs/staging-deployment/plan.md §4.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  build-push:
+    name: Build & push image (GitHub runner)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.sha_tag }}
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Compute lowercase image tags
+        id: meta
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          SHORT=$(git rev-parse --short HEAD)
+          echo "staging_tag=ghcr.io/${OWNER}/micd_web:staging" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=ghcr.io/${OWNER}/micd_web:sha-${SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.staging
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ steps.meta.outputs.staging_tag }}
+            ${{ steps.meta.outputs.sha_tag }}
+
+  deploy:
+    name: Deploy to VPS (pull & run)
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Copy compose file and Caddyfile to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_VPS_HOST }}
+          username: ${{ secrets.STAGING_VPS_USER }}
+          key: ${{ secrets.STAGING_VPS_KEYS }}
+          port: ${{ secrets.STAGING_VPS_PORT }}
+          source: "docker-compose.staging.yml,Caddyfile"
+          target: ${{ secrets.STAGING_VPS_PATH }}/web
+          strip_components: 0
+
+      - name: Pull image and (re)start the edge + frontend
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          WEB_IMAGE: ${{ needs.build-push.outputs.image }}
+          DEPLOY_PATH: ${{ secrets.STAGING_VPS_PATH }}/web
+        with:
+          host: ${{ secrets.STAGING_VPS_HOST }}
+          username: ${{ secrets.STAGING_VPS_USER }}
+          key: ${{ secrets.STAGING_VPS_KEYS }}
+          port: ${{ secrets.STAGING_VPS_PORT }}
+          envs: GHCR_TOKEN,GHCR_USER,WEB_IMAGE,DEPLOY_PATH
+          script: |
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+
+            docker network create micd 2>/dev/null || true
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            export WEB_IMAGE
+            docker compose -f docker-compose.staging.yml --env-file .env.staging pull
+            docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --no-build
+
+            docker image prune -f
+
+      - name: Health check (public HTTPS)
+        env:
+          STAGING_DOMAIN: ${{ vars.STAGING_DOMAIN }}
+        run: |
+          set -euo pipefail
+          DOMAIN="${STAGING_DOMAIN:-dicomviewermed.online}"
+          for i in $(seq 1 18); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://${DOMAIN}/" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "Frontend is serving over HTTPS (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/18 (HTTP $code) — waiting 10s (first run also issues the TLS cert)..."
+            sleep 10
+          done
+          echo "Public health check failed after ~3min" >&2
+          exit 1

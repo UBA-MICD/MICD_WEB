@@ -48,6 +48,7 @@ export function showToast(
 
   const toast = document.createElement("div");
   toast.className = `toast toast--${kind}`;
+  if (kind === "error") toast.setAttribute("role", "alert");
   toast.innerHTML = `
     <span class="toast__msg">${escapeHtml(text)}</span>
     <button class="toast__close" aria-label="${escapeHtml(t("common.close"))}">✕</button>`;

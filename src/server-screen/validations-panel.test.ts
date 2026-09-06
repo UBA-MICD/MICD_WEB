@@ -5,13 +5,16 @@
  *
  * Run: npm test
  */
-import test from "node:test";
+import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   filterToQueryParam,
   buildBadgeHtml,
   formatDate,
+  mountValidationsPanel,
 } from "./validations-panel.ts";
+import { installDom, uninstallDom } from "../../test/dom-setup.ts";
+import { adoptSession, logout } from "../auth/auth.ts";
 
 // ── filterToQueryParam ────────────────────────────────────────────────────────
 
@@ -151,4 +154,210 @@ test("formatDate returns the original string for an invalid date", () => {
   const bad = "not-a-date";
   const result = formatDate(bad);
   assert.equal(result, bad);
+});
+
+// ── DOM tests: mountValidationsPanel ─────────────────────────────────────────
+
+test.describe("mountValidationsPanel", () => {
+  test.before(() => installDom());
+  test.after(() => uninstallDom());
+
+  let fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
+
+  beforeEach(async () => {
+    (globalThis as { fetch?: unknown }).fetch = (
+      url: string,
+      init?: RequestInit,
+    ) => fetchImpl(url, init);
+    fetchImpl = async () => {
+      throw new Error("unexpected fetch");
+    };
+    const enc = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj)).toString("base64url");
+    const header = enc({ alg: "HS256", typ: "JWT" });
+    const payload = enc({
+      sub: 1,
+      email: "medico@micd.local",
+      role: "medico",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    await adoptSession(`${header}.${payload}.sig`, "rt", {
+      id: 1,
+      email: "medico@micd.local",
+      role: "medico",
+    });
+  });
+
+  afterEach(async () => {
+    delete (globalThis as { fetch?: unknown }).fetch;
+    await logout();
+  });
+
+  function jsonResponse(status: number, body: unknown): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+    } as Response;
+  }
+
+  function makeRoot(): HTMLElement {
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <div data-validations-filters></div>
+      <table>
+        <thead data-validations-thead></thead>
+        <tbody data-validations-tbody></tbody>
+      </table>
+      <div data-validations-empty class="hidden"></div>
+      <div data-validations-error class="hidden"></div>
+    `;
+    document.body.innerHTML =
+      '<div id="toast-container"></div>' + root.outerHTML;
+    return document.body.querySelector("div:last-child") as HTMLElement;
+  }
+
+  const STUDY_ROW = {
+    orthanc_study_id: "study-abc",
+    patient_name: "García, María",
+    modality: "CT",
+    study_date: "2026-09-01T00:00:00Z",
+    validation_status: null as null | "approved" | "rejected" | "review",
+    validated_by: null,
+    validated_at: null,
+  };
+
+  test("renders filter chips on mount", async () => {
+    fetchImpl = async () => jsonResponse(200, { studies: [] });
+    const root = makeRoot();
+    mountValidationsPanel(root, () => {});
+    const chips = root.querySelectorAll("[data-filter]");
+    assert.ok(chips.length >= 5, "should render at least 5 filter chips");
+  });
+
+  test("reload() fetches studies and renders table rows", async () => {
+    fetchImpl = async () => jsonResponse(200, { studies: [STUDY_ROW] });
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+    const rows = root.querySelectorAll("[data-validations-tbody] tr");
+    assert.equal(rows.length, 1, "should render one table row");
+    assert.ok(
+      root
+        .querySelector("[data-validations-tbody]")!
+        .innerHTML.includes("García"),
+    );
+  });
+
+  test("reload() shows empty state when API returns no studies", async () => {
+    fetchImpl = async () => jsonResponse(200, { studies: [] });
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+    const emptyEl = root.querySelector<HTMLElement>(
+      "[data-validations-empty]",
+    )!;
+    assert.ok(!emptyEl.classList.contains("hidden"), "empty state should show");
+  });
+
+  test("reload() shows error state when API fails", async () => {
+    fetchImpl = async () => jsonResponse(500, { error: "internal" });
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+    const errorEl = root.querySelector<HTMLElement>(
+      "[data-validations-error]",
+    )!;
+    assert.ok(!errorEl.classList.contains("hidden"), "error state should show");
+  });
+
+  test("reload() shows error state on network failure", async () => {
+    fetchImpl = async () => {
+      throw new Error("offline");
+    };
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+    const errorEl = root.querySelector<HTMLElement>(
+      "[data-validations-error]",
+    )!;
+    assert.ok(
+      !errorEl.classList.contains("hidden"),
+      "error state should show on network error",
+    );
+  });
+
+  test("clicking Open button calls onOpenStudy with the study id", async () => {
+    fetchImpl = async () => jsonResponse(200, { studies: [STUDY_ROW] });
+    const root = makeRoot();
+    const opened: string[] = [];
+    const handle = mountValidationsPanel(root, (id) => opened.push(id));
+    await handle.reload();
+
+    const openBtn = root.querySelector<HTMLElement>(
+      "[data-action='open'][data-study='study-abc']",
+    )!;
+    assert.ok(openBtn, "open button should exist");
+    openBtn.click();
+    assert.deepEqual(opened, ["study-abc"]);
+  });
+
+  test("clicking Approve button calls submitValidation and updates the row badge", async () => {
+    const updatedRecord = {
+      validationId: 10,
+      status: "approved",
+      validatedBy: "medico@micd.local",
+      validatedAt: new Date().toISOString(),
+    };
+    let callCount = 0;
+    fetchImpl = async (url, init) => {
+      callCount++;
+      if (init?.method === "POST") {
+        return jsonResponse(201, updatedRecord);
+      }
+      return jsonResponse(200, { studies: [STUDY_ROW] });
+    };
+
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+
+    const approveBtn = root.querySelector<HTMLElement>(
+      "[data-action='approve'][data-study='study-abc']",
+    )!;
+    assert.ok(approveBtn, "approve button should exist");
+    approveBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    const tbody = root.querySelector("[data-validations-tbody]")!;
+    assert.ok(
+      tbody.innerHTML.includes("validation-badge--approved"),
+      "row badge should update to approved",
+    );
+  });
+
+  test("filter chip click re-fetches with the filter param", async () => {
+    const requestedUrls: string[] = [];
+    fetchImpl = async (url) => {
+      requestedUrls.push(url as string);
+      return jsonResponse(200, { studies: [] });
+    };
+
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+
+    const approvedChip = root.querySelector<HTMLElement>(
+      "[data-filter='approved']",
+    )!;
+    assert.ok(approvedChip, "approved chip should exist");
+    approvedChip.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    const lastUrl = requestedUrls[requestedUrls.length - 1];
+    assert.ok(
+      lastUrl.includes("validation_status=approved"),
+      "filter param should appear in URL after chip click",
+    );
+  });
 });

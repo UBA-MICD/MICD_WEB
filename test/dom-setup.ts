@@ -49,6 +49,7 @@ const GLOBAL_KEYS = [
   "matchMedia",
   "ResizeObserver",
   "IntersectionObserver",
+  "CSS",
 ] as const;
 
 /**

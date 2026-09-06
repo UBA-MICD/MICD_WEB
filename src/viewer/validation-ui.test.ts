@@ -95,7 +95,7 @@ function setupFixture(): void {
         <h3 id="validation-dialog-title">Confirmar acción</h3>
         <p id="validation-dialog-msg"></p>
         <label for="validation-comment">Comentario</label>
-        <textarea id="validation-comment"></textarea>
+        <textarea id="validation-comment" data-dialog-autofocus></textarea>
         <p id="validation-comment-required" class="hidden"></p>
         <button id="validation-dialog-cancel">Cancelar</button>
         <button id="validation-dialog-confirm">Confirmar</button>
@@ -429,5 +429,132 @@ test("API error shows a toast and does not update state", async () => {
   assert.ok(
     toast.classList.contains("toast--error"),
     "toast should be error variant",
+  );
+});
+
+// ── Test: Marcar para revisión (TC-UI review) ─────────────────────────────────
+
+test("clicking Marcar para revisión and confirming submits action:review and updates state", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const REVIEW_RECORD = { ...MOCK_RECORD, status: "review" };
+  let capturedBody: unknown;
+  fetchImpl = async (_url, init) => {
+    capturedBody = JSON.parse(init!.body as string);
+    return jsonResponse(201, REVIEW_RECORD);
+  };
+
+  const { initValidation, notifyStudyLoaded } = await freshUi();
+  initValidation();
+  notifyStudyLoaded("study-001");
+
+  document.getElementById("btn-validate-review")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+  document.getElementById("validation-dialog-confirm")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.deepEqual(
+    capturedBody,
+    { action: "review" },
+    "fetch must include action:review without comment",
+  );
+  assert.deepEqual(
+    state.serverValidation,
+    REVIEW_RECORD,
+    "state should update with review record",
+  );
+});
+
+// ── Tests: Accessibility ──────────────────────────────────────────────────────
+
+test("dialog textarea receives focus when dialog opens (data-dialog-autofocus)", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  fetchImpl = async () => jsonResponse(201, MOCK_RECORD);
+
+  const { initValidation, notifyStudyLoaded } = await freshUi();
+  initValidation();
+  notifyStudyLoaded("study-001");
+
+  document.getElementById("btn-validate-approve")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(
+    document.activeElement?.id,
+    "validation-comment",
+    "focus must move to the comment textarea when dialog opens",
+  );
+});
+
+test("Escape key closes the dialog without calling the API", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  let fetchCalled = false;
+  fetchImpl = async () => {
+    fetchCalled = true;
+    return jsonResponse(201, MOCK_RECORD);
+  };
+
+  const { initValidation, notifyStudyLoaded } = await freshUi();
+  initValidation();
+  notifyStudyLoaded("study-001");
+
+  document.getElementById("btn-validate-approve")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+
+  const dialog = document.getElementById("validation-dialog")!;
+  assert.ok(
+    !dialog.classList.contains("hidden"),
+    "dialog should be open before Escape",
+  );
+
+  dialog.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.ok(
+    dialog.classList.contains("hidden"),
+    "dialog should close after Escape",
+  );
+  assert.ok(
+    !fetchCalled,
+    "API must not be called when dialog is dismissed via Escape",
+  );
+});
+
+test("error toast has role=alert for screen reader interruption", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  fetchImpl = async () => jsonResponse(500, { error: "Error interno" });
+
+  const { initValidation, notifyStudyLoaded } = await freshUi();
+  initValidation();
+  notifyStudyLoaded("study-001");
+
+  document.getElementById("btn-validate-approve")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+  document.getElementById("validation-dialog-confirm")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+
+  const toastContainer = document.getElementById("toast-container")!;
+  assert.ok(toastContainer.children.length > 0, "error toast should exist");
+  const toast = toastContainer.children[0] as HTMLElement;
+  assert.equal(
+    toast.getAttribute("role"),
+    "alert",
+    "error toast must have role=alert",
   );
 });

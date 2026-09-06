@@ -1,11 +1,16 @@
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { submitValidation, submitCorrection } from "./validation-api.ts";
+import {
+  submitValidation,
+  submitCorrection,
+  fetchValidation,
+} from "./validation-api.ts";
 import { API_BASE } from "../auth/auth.ts";
 
 const STUDY_ID = "1.2.3.4.5";
 const VALIDATE_URL = `${API_BASE}/v1/studies/${encodeURIComponent(STUDY_ID)}/validate`;
 const CORRECTION_URL = `${API_BASE}/v1/studies/${encodeURIComponent(STUDY_ID)}/validation-correction`;
+const FETCH_URL = `${API_BASE}/v1/studies/${encodeURIComponent(STUDY_ID)}/validation`;
 
 const MOCK_RECORD = {
   validationId: 1,
@@ -146,6 +151,62 @@ test("submitCorrection returns status 0 on network failure", async () => {
     throw new Error("offline");
   };
   const result = await submitCorrection(STUDY_ID, "review");
+  assert.equal(result.ok, false);
+  assert.equal((result as { status: number }).status, 0);
+});
+
+// ── fetchValidation ───────────────────────────────────────────────────────────
+
+test("fetchValidation GETs the correct URL and returns the record", async () => {
+  const record = {
+    validationId: 2,
+    status: "approved",
+    validatedBy: "dr.strange",
+    validatedAt: "2026-09-05T08:00:00Z",
+  };
+  fetchImpl = async (url, init) => {
+    assert.equal(url, FETCH_URL);
+    assert.equal(init?.method, undefined);
+    return jsonResponse(200, record);
+  };
+  const result = await fetchValidation(STUDY_ID);
+  assert.deepEqual(result, { ok: true, data: record });
+});
+
+test("fetchValidation returns ok:true with null data when study has no validation", async () => {
+  fetchImpl = async () => jsonResponse(200, null);
+  const result = await fetchValidation(STUDY_ID);
+  assert.deepEqual(result, { ok: true, data: null });
+});
+
+test("fetchValidation returns ok:false with status on 404", async () => {
+  fetchImpl = async () => jsonResponse(404, { error: "Estudio no encontrado" });
+  const result = await fetchValidation(STUDY_ID);
+  assert.equal(result.ok, false);
+  assert.equal((result as { status: number }).status, 404);
+  assert.equal((result as { error: string }).error, "Estudio no encontrado");
+});
+
+test("fetchValidation returns ok:false with generic message on non-JSON error", async () => {
+  fetchImpl = async () =>
+    ({
+      ok: false,
+      status: 503,
+      json: async () => {
+        throw new Error("not json");
+      },
+    }) as Response;
+  const result = await fetchValidation(STUDY_ID);
+  assert.equal(result.ok, false);
+  assert.equal((result as { status: number }).status, 503);
+  assert.notEqual((result as { error: string }).error, "");
+});
+
+test("fetchValidation returns status 0 on network failure", async () => {
+  fetchImpl = async () => {
+    throw new Error("offline");
+  };
+  const result = await fetchValidation(STUDY_ID);
   assert.equal(result.ok, false);
   assert.equal((result as { status: number }).status, 0);
 });

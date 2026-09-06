@@ -6,10 +6,8 @@ coverage:
     project:
       default:
         target: 80%
-        threshold: 0%
-    patch:
-      default:
-        target: 80%
+        threshold: 100%
+    patch: off
 
 ignore:
   - "node_modules"

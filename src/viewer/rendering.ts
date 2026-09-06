@@ -3,6 +3,7 @@ import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 import { mpr3DViewer } from "./mpr.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
+import { getViewportManager } from "./viewport-registry.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
@@ -26,11 +27,18 @@ export function render(): void {
     return;
   }
 
+  const manager = getViewportManager();
+  const activeVp = manager?.activeViewport;
+  const overlay = activeVp?.data.overlay;
+
   renderDicom({
     canvas,
     pixelData: state.parsed.pixelData,
     metadata: state.parsed.metadata,
     viewport: state.viewport,
+    overlayPixelData: overlay?.parsed?.pixelData,
+    overlayMetadata: overlay?.parsed?.metadata,
+    overlayViewport: overlay?.viewport,
   });
 
   applyCanvasTransform(
@@ -94,6 +102,29 @@ export function update3DControls(): void {
   }
 
   updateMprButtonState();
+
+  // Update Tri-Planar sliders
+  if (mpr3DViewer.volume) {
+    const scrollAxial = $("mpr-scroll-axial") as HTMLInputElement | null;
+    const scrollCoronal = $("mpr-scroll-coronal") as HTMLInputElement | null;
+    const scrollSagittal = $("mpr-scroll-sagittal") as HTMLInputElement | null;
+
+    if (scrollAxial && document.activeElement !== scrollAxial) {
+      scrollAxial.min = "0";
+      scrollAxial.max = String(Math.max(0, mpr3DViewer.volume.depth - 1));
+      scrollAxial.value = String(mpr3DViewer.crosshair.z);
+    }
+    if (scrollCoronal && document.activeElement !== scrollCoronal) {
+      scrollCoronal.min = "0";
+      scrollCoronal.max = String(Math.max(0, mpr3DViewer.volume.rows - 1));
+      scrollCoronal.value = String(mpr3DViewer.crosshair.y);
+    }
+    if (scrollSagittal && document.activeElement !== scrollSagittal) {
+      scrollSagittal.min = "0";
+      scrollSagittal.max = String(Math.max(0, mpr3DViewer.volume.cols - 1));
+      scrollSagittal.value = String(mpr3DViewer.crosshair.x);
+    }
+  }
 }
 
 export function hide3DControls(): void {
@@ -264,20 +295,27 @@ export function updateInfoOverlay(): void {
       .map((part) => escapeHtml(String(part)))
       .join("<br>");
 
-  $("overlay-tl").innerHTML = lines([m.patientName, m.patientId]);
-  $("overlay-tr").innerHTML = lines([
-    m.studyDate,
-    m.modality,
-    m.studyDescription,
-  ]);
-  $("overlay-bl").innerHTML = lines([
-    `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
-    `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
-  ]);
-  $("overlay-br").innerHTML = lines([
-    `${m.columns} × ${m.rows}`,
-    `${m.bitsStored}bit`,
-  ]);
+  const overlayTl = document.getElementById("overlay-tl");
+  const overlayTr = document.getElementById("overlay-tr");
+  const overlayBl = document.getElementById("overlay-bl");
+  const overlayBr = document.getElementById("overlay-br");
+
+  if (overlayTl) overlayTl.innerHTML = lines([m.patientName, m.patientId]);
+  if (overlayTr) {
+    overlayTr.innerHTML = lines([m.studyDate, m.modality, m.studyDescription]);
+  }
+  if (overlayBl) {
+    overlayBl.innerHTML = lines([
+      `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
+      `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
+    ]);
+  }
+  if (overlayBr) {
+    overlayBr.innerHTML = lines([
+      `${m.columns} × ${m.rows}`,
+      `${m.bitsStored}bit`,
+    ]);
+  }
 
   updateCanvasLabel();
   updateWlControlsUI();

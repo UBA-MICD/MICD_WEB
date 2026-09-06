@@ -23,6 +23,8 @@ import {
   type ValidationAction,
   type ValidationRecord,
 } from "./validation-api.js";
+import { triggerAnalysis } from "./prediction-api.js";
+import { notifyPredictionLoaded } from "./ml-view.js";
 
 // ── Internal state ────────────────────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ function refreshBar(): void {
   if (shouldShow) {
     renderBadge();
     renderCorrectionNotice();
+    renderAIButton();
   }
 }
 
@@ -115,6 +118,12 @@ function formatValidationDate(iso: string): string {
 
 // ── Button wiring ─────────────────────────────────────────────────────────────
 
+function renderAIButton(): void {
+  const btn = document.getElementById("btn-validate-analyze-ai");
+  if (!btn) return;
+  btn.classList.toggle("hidden", !isAdmin());
+}
+
 function wireButtons(): void {
   document
     .getElementById("btn-validate-approve")
@@ -125,6 +134,37 @@ function wireButtons(): void {
   document
     .getElementById("btn-validate-review")
     ?.addEventListener("click", () => handleAction("review"));
+  document
+    .getElementById("btn-validate-analyze-ai")
+    ?.addEventListener("click", () => void handleAIAnalysis());
+}
+
+async function handleAIAnalysis(): Promise<void> {
+  const studyId = currentStudyId;
+  if (!studyId || !isAdmin()) return;
+
+  const btn = document.getElementById(
+    "btn-validate-analyze-ai",
+  ) as HTMLButtonElement | null;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t("validation.analyzing");
+  }
+
+  try {
+    const res = await triggerAnalysis(studyId);
+    if (!res.ok) {
+      showToast(res.error, "error");
+      return;
+    }
+    notifyPredictionLoaded(res.data);
+    showToast(t("validation.analysisDone"), "success");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = t("validation.analyzeWithAI");
+    }
+  }
 }
 
 async function handleAction(action: ValidationAction): Promise<void> {

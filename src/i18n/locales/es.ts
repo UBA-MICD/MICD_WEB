@@ -558,6 +558,10 @@ export const es: Record<string, string> = {
   "validation.toast.success.review": "Estudio marcado para revisión.",
   "validation.toast.success.correction": "Corrección registrada.",
   "validation.toast.error": "No se pudo registrar la validación.",
+  "validation.analyzeWithAI": "Analizar con IA",
+  "validation.analyzing": "Analizando...",
+  "validation.analysisDone": "Análisis completado.",
+  "validation.analysisFailed": "Error en el análisis.",
 
   // ── Panel de Validaciones (US-26) ────────────────────────────────────────────
   "validations.tab": "Validaciones",

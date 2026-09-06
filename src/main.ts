@@ -42,6 +42,7 @@ import { initZenodoPanel, checkQuotaAlerts } from "./zenodo/zenodo-panel.js";
 import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { initValidation } from "./viewer/validation-ui.js";
+import { initMLView } from "./viewer/ml-view.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
 import {
@@ -150,6 +151,7 @@ function startApp(): void {
   initStudyDetailPanel();
   initExplorerPanel();
   initValidation();
+  initMLView();
   // Last: the rail is one tab stop, with the arrow keys moving between tools,
   // so reaching the viewport does not mean tabbing through every tool. It
   // reads the tool buttons at init, so it runs after they are all wired.

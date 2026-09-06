@@ -33,6 +33,7 @@ export interface ViewportData {
   parsed: ParsedDicom | null;
   viewport: ViewportState;
   overlay?: OverlayLayer | null;
+  mlLabel?: string | null;
 }
 
 // ── Viewport Class ────────────────────────────────────────────────────────────
@@ -276,7 +277,7 @@ export class Viewport {
     this.overlayTL.innerHTML = `<div>${patientName}</div><div>${modality} ${seriesDesc}</div>`;
     this.overlayTR.innerHTML = `<div>${escapeHtml(metadata.studyDate || "")}</div>`;
     this.overlayBL.innerHTML = `<div>W: ${Math.round(windowWidth)} L: ${Math.round(windowCenter)}</div>`;
-    this.overlayBR.innerHTML = `<div>Zoom: ${(zoom * 100).toFixed(0)}%</div><div>Slice: ${this.data.currentIndex + 1}/${totalItems}</div>`;
+    this.overlayBR.innerHTML = `<div>Zoom: ${(zoom * 100).toFixed(0)}%</div><div>Slice: ${this.data.currentIndex + 1}/${totalItems}</div>${this.data.mlLabel ? `<div class="vp-overlay__ai">${escapeHtml(this.data.mlLabel)}</div>` : ""}`;
   }
 
   public destroy(): void {

@@ -23,6 +23,8 @@ import { updateToolbarUI } from "./interaction.js";
 import { t } from "../i18n/i18n.js";
 import { notifyStudyLoaded } from "./validation-ui.js";
 import { fetchValidation } from "./validation-api.js";
+import { fetchPrediction } from "./prediction-api.js";
+import { notifyPredictionLoaded, clearMLView } from "./ml-view.js";
 import { getViewportManager } from "./viewport-registry.js";
 
 /**
@@ -123,6 +125,7 @@ export function resetViewerToDropZone(): void {
   updateToolbarUI();
   showDropZone();
   notifyStudyLoaded(null);
+  clearMLView();
 }
 
 // ── Browser File Inputs ──────────────────────────────────────────────────────
@@ -267,11 +270,15 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
       return;
     }
     await loadCurrent();
-    const validationResult = await fetchValidation(studyId);
+    const [validationResult, predictionResult] = await Promise.all([
+      fetchValidation(studyId),
+      fetchPrediction(studyId),
+    ]);
     notifyStudyLoaded(
       studyId,
       validationResult.ok ? validationResult.data : null,
     );
+    notifyPredictionLoaded(predictionResult.ok ? predictionResult.data : null);
   } catch (err: any) {
     showError(
       t("viewer.serverStudyLoadError", { message: err.message || err }),

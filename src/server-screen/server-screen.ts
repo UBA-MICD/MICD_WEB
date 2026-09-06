@@ -18,6 +18,7 @@ import {
 import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
+import { mountValidationsPanel } from "./validations-panel.js";
 import {
   loadStudyExplorer,
   getSelectedStudyId,
@@ -37,22 +38,30 @@ import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
 import { initRovingTabindex, nextRovingIndex } from "../shared/roving.js";
 import { t } from "../i18n/i18n.js";
 
-export type ServerTab = "buscar" | "cargar" | "usuarios" | "sistema";
+export type ServerTab =
+  "buscar" | "cargar" | "validaciones" | "usuarios" | "sistema";
 
 let activeTab: ServerTab = "buscar";
 let loginForm: ReturnType<typeof mountLoginForm> | null = null;
 let usersPanel: ReturnType<typeof mountUsersPanel> | null = null;
 let systemPanel: ReturnType<typeof mountSystemPanel> | null = null;
+let validationsPanel: ReturnType<typeof mountValidationsPanel> | null = null;
 /** Resolves the pending ensureAuthenticated() gate, if one sent us here. */
 let pendingGate: ((ok: boolean) => void) | null = null;
 
-const TABS: ServerTab[] = ["buscar", "cargar", "usuarios", "sistema"];
+const TABS: ServerTab[] = [
+  "buscar",
+  "cargar",
+  "validaciones",
+  "usuarios",
+  "sistema",
+];
 
 /** Can the current session use a tab? "usuarios" and "sistema" are admin-only;
- *  "cargar" (upload) is a write, so clinical staff only. */
+ *  "cargar" (upload) and "validaciones" are staff-only (medico + admin). */
 function canUseTab(tab: ServerTab): boolean {
   if (tab === "usuarios" || tab === "sistema") return isAdmin();
-  if (tab === "cargar") return isStaff();
+  if (tab === "cargar" || tab === "validaciones") return isStaff();
   return true;
 }
 
@@ -83,6 +92,7 @@ function showTab(tab: ServerTab): void {
   });
 
   if (tab === "buscar") void loadStudyExplorer();
+  if (tab === "validaciones") void validationsPanel?.reload();
   if (tab === "usuarios") void usersPanel?.reload();
   if (tab === "sistema") void systemPanel?.reload();
 }
@@ -175,6 +185,13 @@ export function initServerScreen(): void {
   });
   usersPanel = mountUsersPanel($("panel-usuarios"));
   systemPanel = mountSystemPanel($("system-panel-body"));
+  validationsPanel = mountValidationsPanel(
+    $("panel-validaciones"),
+    async (studyId: string) => {
+      await openStudy(studyId);
+      closeServerScreen();
+    },
+  );
 
   // A role change (e.g. surfaced on the next token refresh) must re-evaluate the
   // admin tab's visibility while the screen is already open.

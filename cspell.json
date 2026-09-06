@@ -12,7 +12,8 @@
     ".git",
     "docs/*",
     "*.md",
-    "src/i18n/locales/es.ts"
+    "src/i18n/locales/es.ts",
+    ".claude/skills/**"
   ],
   "words": [
     "micd",
@@ -88,6 +89,13 @@
     "Comentario",
     "validación",
     "defectuosa",
-    "interno"
+    "interno",
+    "affordances",
+    "torax",
+    "Unvalidated",
+    "Validaciones",
+    "estudio",
+    "Aprobado",
+    "Rechazado"
   ]
 }

@@ -63,6 +63,24 @@ export function submitValidation(
   );
 }
 
+/** Fetch the most recent validation for a study (null if never validated). */
+export async function fetchValidation(
+  studyId: string,
+): Promise<ApiResult<ValidationRecord | null>> {
+  let res: Response;
+  try {
+    res = await authFetch(
+      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/validation`,
+    );
+  } catch {
+    return { ok: false, status: 0, error: t("validation.toast.error") };
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: await readError(res) };
+  }
+  return { ok: true, data: await res.json() };
+}
+
 /** Register a correction over a prior validation (admin only). */
 export function submitCorrection(
   studyId: string,

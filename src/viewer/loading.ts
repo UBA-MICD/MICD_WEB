@@ -22,6 +22,7 @@ import {
 import { updateToolbarUI } from "./interaction.js";
 import { t } from "../i18n/i18n.js";
 import { notifyStudyLoaded } from "./validation-ui.js";
+import { fetchValidation } from "./validation-api.js";
 
 /** Load the image at state.currentIndex from whichever source is active. */
 export async function loadCurrent(): Promise<void> {
@@ -189,7 +190,11 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
       return;
     }
     await loadCurrent();
-    notifyStudyLoaded(studyId);
+    const validationResult = await fetchValidation(studyId);
+    notifyStudyLoaded(
+      studyId,
+      validationResult.ok ? validationResult.data : null,
+    );
   } catch (err: any) {
     showError(
       t("viewer.serverStudyLoadError", { message: err.message || err }),

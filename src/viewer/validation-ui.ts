@@ -21,6 +21,7 @@ import {
   submitValidation,
   submitCorrection,
   type ValidationAction,
+  type ValidationRecord,
 } from "./validation-api.js";
 
 // ── Internal state ────────────────────────────────────────────────────────────
@@ -39,9 +40,19 @@ export function initValidation(): void {
  * Called from loading.ts after loadStudyFromServer resolves (pass the studyId),
  * and from resetViewerToDropZone (pass null).
  */
-export function notifyStudyLoaded(studyId: string | null): void {
+export function notifyStudyLoaded(
+  studyId: string | null,
+  validation: ValidationRecord | null = null,
+): void {
   currentStudyId = studyId;
-  state.serverValidation = null;
+  state.serverValidation = validation
+    ? {
+        validationId: validation.validationId,
+        status: validation.status,
+        validatedBy: validation.validatedBy,
+        validatedAt: validation.validatedAt,
+      }
+    : null;
   refreshBar();
 }
 

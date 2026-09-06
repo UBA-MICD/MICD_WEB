@@ -6,7 +6,12 @@
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { applyTranslations, initLocaleFromBrowser, setLocale, currentLocale } from "./i18n.ts";
+import {
+  applyTranslations,
+  initLocaleFromBrowser,
+  setLocale,
+  currentLocale,
+} from "./i18n.ts";
 
 test.before(() => installDom());
 test.after(() => uninstallDom());

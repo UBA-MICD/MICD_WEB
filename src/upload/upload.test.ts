@@ -84,7 +84,11 @@ function stubFetchOk(): void {
   (globalThis as any).fetch = async () => new Response(null, { status: 200 });
 }
 
-const testUser: AuthUser = { id: 1, email: "radiologist@example.com", role: "medico" };
+const testUser: AuthUser = {
+  id: 1,
+  email: "radiologist@example.com",
+  role: "medico",
+};
 
 beforeEach(async () => {
   installFakeXhr();
@@ -132,7 +136,10 @@ test("startExplorerUpload rejects a concurrent call while one is in flight", asy
   // ensureAuthenticated() resolves via a microtask hop before uploadOneExplorer
   // creates the XHR, since it's already-authenticated but still an async fn.
   await new Promise((r) => setTimeout(r, 0));
-  FakeXHR.latest().respond(201, JSON.stringify({ study: { orthanc_study_id: "study-1" } }));
+  FakeXHR.latest().respond(
+    201,
+    JSON.stringify({ study: { orthanc_study_id: "study-1" } }),
+  );
   await p1;
   await p2;
 });
@@ -237,7 +244,10 @@ test("startExplorerUpload retries once on 401 after a successful silent refresh"
   (globalThis as any).fetch = async (input: string) => {
     if (String(input).includes("/auth/refresh")) {
       return new Response(
-        JSON.stringify({ accessToken: "new-token", refreshToken: "new-refresh" }),
+        JSON.stringify({
+          accessToken: "new-token",
+          refreshToken: "new-refresh",
+        }),
         { status: 200 },
       );
     }
@@ -249,7 +259,10 @@ test("startExplorerUpload retries once on 401 after a successful silent refresh"
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(FakeXHR.instances.length, 2);
-  FakeXHR.instances[1]!.respond(201, JSON.stringify({ study: { orthanc_study_id: "s2" } }));
+  FakeXHR.instances[1]!.respond(
+    201,
+    JSON.stringify({ study: { orthanc_study_id: "s2" } }),
+  );
 
   await done;
   assert.ok(document.querySelector(".toast--success"));
@@ -352,7 +365,9 @@ test("initUploadPanel: btn-upload-server gates the file picker on auth", async (
   input.addEventListener("click", () => {
     clicked = true;
   });
-  document.getElementById("btn-upload-server")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-upload-server")!
+    .dispatchEvent(new MouseEvent("click"));
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(clicked, true);
 });
@@ -376,14 +391,21 @@ test("initUploadPanel: file input change uploads via rows and reaches 100%", asy
   const row = document.querySelector(".upload-row") as HTMLElement;
   assert.equal(row.querySelector(".upload-row__pct")!.textContent, "50%");
 
-  xhr.respond(201, JSON.stringify({ study: { orthanc_study_id: "row-study" } }));
+  xhr.respond(
+    201,
+    JSON.stringify({ study: { orthanc_study_id: "row-study" } }),
+  );
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
   assert.equal(row.classList.contains("upload-row--ok"), true);
-  assert.equal(document.getElementById("upload-percent")!.textContent, " · 100%");
   assert.equal(
-    (document.getElementById("btn-upload-finish") as HTMLButtonElement).disabled,
+    document.getElementById("upload-percent")!.textContent,
+    " · 100%",
+  );
+  assert.equal(
+    (document.getElementById("btn-upload-finish") as HTMLButtonElement)
+      .disabled,
     false,
   );
 });
@@ -393,7 +415,9 @@ test("initUploadPanel: folder input change collects and uploads files", async ()
   await signIn();
   initUploadPanel();
 
-  const input = document.getElementById("upload-folder-input") as HTMLInputElement;
+  const input = document.getElementById(
+    "upload-folder-input",
+  ) as HTMLInputElement;
   setInputFiles(input, [dcmFile("folder-a.dcm")]);
   input.dispatchEvent(new Event("change"));
 
@@ -445,7 +469,10 @@ test("initUploadPanel: duplicate dialog 'replace' re-uploads with force=true", a
 
   const dialog = document.getElementById("duplicate-dialog")!;
   assert.equal(dialog.classList.contains("hidden"), false);
-  assert.equal(document.getElementById("duplicate-msg")!.textContent, "ya existe");
+  assert.equal(
+    document.getElementById("duplicate-msg")!.textContent,
+    "ya existe",
+  );
 
   (document.getElementById("duplicate-yes") as HTMLButtonElement).click();
   await new Promise((r) => setTimeout(r, 0));
@@ -579,7 +606,9 @@ test("initUploadPanel: btn-refresh-studies triggers loadStudyExplorer without th
   uploadPanelFixture();
   initUploadPanel();
   assert.doesNotThrow(() =>
-    document.getElementById("btn-refresh-studies")!.dispatchEvent(new MouseEvent("click")),
+    document
+      .getElementById("btn-refresh-studies")!
+      .dispatchEvent(new MouseEvent("click")),
   );
 });
 

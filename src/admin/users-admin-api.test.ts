@@ -21,8 +21,10 @@ const USERS_URL = `${API_BASE}/v1/users`;
 let fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
 
 beforeEach(() => {
-  (globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) =>
-    fetchImpl(url, init);
+  (globalThis as { fetch?: unknown }).fetch = (
+    url: string,
+    init?: RequestInit,
+  ) => fetchImpl(url, init);
 });
 
 afterEach(() => {
@@ -85,7 +87,11 @@ test("fetchUsers reports a network error when fetch throws", async () => {
 });
 
 test("createUser POSTs the input and returns the created user", async () => {
-  const input = { name: "Ada", email: "ada@micd.local", role: "medico" as const };
+  const input = {
+    name: "Ada",
+    email: "ada@micd.local",
+    role: "medico" as const,
+  };
   const created = { id: 9, ...input };
   fetchImpl = async (url, init) => {
     assert.equal(url, USERS_URL);

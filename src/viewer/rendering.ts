@@ -15,12 +15,16 @@ export function render(): void {
 
     // Show and update depth slider and orientation widget
     update3DControls();
+    updateOrientationLabels();
     return;
   }
 
   // Standard 2D Slice rendering
   hide3DControls();
-  if (!state.parsed?.pixelData) return;
+  if (!state.parsed?.pixelData) {
+    updateOrientationLabels();
+    return;
+  }
 
   renderDicom({
     canvas,
@@ -36,6 +40,29 @@ export function render(): void {
   );
 
   updateInfoOverlay();
+  updateOrientationLabels();
+}
+
+// ── 2D Orientation Labels (A, P, L, R) ───────────────────────────────────────
+
+export function updateOrientationLabels(): void {
+  const top = $("mpr-orient-top");
+  const bottom = $("mpr-orient-bottom");
+  const left = $("mpr-orient-left");
+  const right = $("mpr-orient-right");
+
+  if (!state.parsed?.pixelData || state.is3DMode) {
+    if (top) top.textContent = "";
+    if (bottom) bottom.textContent = "";
+    if (left) left.textContent = "";
+    if (right) right.textContent = "";
+    return;
+  }
+
+  if (top) top.textContent = "A";
+  if (bottom) bottom.textContent = "P";
+  if (left) left.textContent = "R";
+  if (right) right.textContent = "L";
 }
 
 // ── 3D Controls Update ───────────────────────────────────────────────────────
@@ -43,9 +70,11 @@ export function render(): void {
 export function update3DControls(): void {
   const depthWrap = $("mpr-depth-slider-wrap");
   const orientWidget = $("mpr-orientation-widget");
+  const refCube = $("mpr-reference-cube");
 
   if (depthWrap) depthWrap.classList.remove("hidden");
   if (orientWidget) orientWidget.classList.remove("hidden");
+  if (refCube) refCube.classList.remove("hidden");
 
   const depthInfo = mpr3DViewer.getDepthInfo();
   const depthSlider = $("mpr-depth-slider") as HTMLInputElement | null;
@@ -70,9 +99,11 @@ export function update3DControls(): void {
 export function hide3DControls(): void {
   const depthWrap = $("mpr-depth-slider-wrap");
   const orientWidget = $("mpr-orientation-widget");
+  const refCube = $("mpr-reference-cube");
 
   if (depthWrap) depthWrap.classList.add("hidden");
   if (orientWidget) orientWidget.classList.add("hidden");
+  if (refCube) refCube.classList.add("hidden");
 }
 
 // ── Series Navigation ────────────────────────────────────────────────────────

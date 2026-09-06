@@ -22,7 +22,11 @@ export const es: Record<string, string> = {
   // ── auth ─────────────────────────────────────────────────────────────────
   "auth.login": "Iniciar sesión",
   "auth.logout": "Cerrar sesión",
+  "auth.emailLabel": "Email",
+  "auth.emailPlaceholder": "tu@email.com",
   "auth.passwordLabel": "Contraseña",
+  "auth.showPassword": "Mostrar contraseña",
+  "auth.hidePassword": "Ocultar contraseña",
   "auth.submitLogin": "Ingresar",
   "auth.wereYouInvited": "¿Te invitaron? Activá tu cuenta",
   "auth.loginRequiredMsg":
@@ -54,6 +58,7 @@ export const es: Record<string, string> = {
   "server.backToViewer": "Volver al visualizador",
   "server.tabsAriaLabel": "Acciones del servidor",
   "server.tabUpload": "Cargar",
+  "server.advancedSettings": "Configuración avanzada",
   "server.apiOriginLabel": "Servidor de la API",
   "server.apiOriginPlaceholder": "http://localhost:3000",
   "server.apiOriginSave": "Guardar y reiniciar",
@@ -74,6 +79,8 @@ export const es: Record<string, string> = {
   "explorer.modalityAll": "Todas",
   "explorer.dateFromLabel": "Desde",
   "explorer.dateToLabel": "Hasta",
+  "explorer.descriptionLabel": "Descripción",
+  "explorer.descriptionPlaceholder": "Filtrar por descripción",
   "explorer.clearFilters": "Limpiar filtros",
   "explorer.prevPage": "Página anterior",
   "explorer.nextPage": "Página siguiente",
@@ -155,6 +162,14 @@ export const es: Record<string, string> = {
   "viewer.mpr.needTwoSlices":
     "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
   "viewer.mpr.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
+  "viewer.mpr.webglUnavailable":
+    "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.zoom.panelTitle": "Ajuste de Zoom",
+  "viewer.zoom.levelLabel": "Nivel de Zoom",
+  "viewer.zoom.presetsTitle": "Accesos Rápidos",
+  "viewer.zoom.fit": "Ajustar a pantalla",
+  "viewer.zoom.100": "100%",
+  "viewer.zoom.200": "200%",
   "viewer.mpr.sagittal": "Sagital",
   "viewer.mpr.volumetricView": "Vista Volumétrica",
   "viewer.metadata.patientName": "Nombre del Paciente",
@@ -200,16 +215,20 @@ export const es: Record<string, string> = {
   "export.canvasBlobError": "Error al generar imagen PNG desde el canvas.",
   "export.pngSuccess": "Imagen PNG descargada con éxito.",
   "export.noImagesInStudy": "El estudio no contiene imágenes.",
-  "export.downloadingServerImages": "Descargando {{count}} imágenes del servidor…",
+  "export.downloadingServerImages":
+    "Descargando {{count}} imágenes del servidor…",
   "export.instanceDownloadError": "Error descargando instancia {{index}}",
   "export.noStudyLoaded": "No hay ningún estudio cargado para exportar.",
   "export.zipSuccess": "Estudio exportado exitosamente como '{{filename}}'.",
   "export.saveCanceled": "Exportación cancelada: no se guardó ningún archivo.",
   "export.genericError": "Error al exportar estudio: {{message}}",
   "export.preparingZip": "Preparando exportación de estudio .zip…",
-  "export.fetchingStudyInfo": "Obteniendo información del estudio en el servidor…",
-  "export.noInstancesInStudy": "El estudio seleccionado no contiene instancias.",
-  "export.downloadingFiles": "Descargando {{count}} archivos DICOM del estudio…",
+  "export.fetchingStudyInfo":
+    "Obteniendo información del estudio en el servidor…",
+  "export.noInstancesInStudy":
+    "El estudio seleccionado no contiene instancias.",
+  "export.downloadingFiles":
+    "Descargando {{count}} archivos DICOM del estudio…",
   "export.fileFetchError": "Error recuperando archivo {{index}}",
 
   // ── upload ───────────────────────────────────────────────────────────────
@@ -238,7 +257,8 @@ export const es: Record<string, string> = {
   "upload.summaryDuplicates": "{{count}} ya existían (omitidos)",
   "upload.summaryErrors": "{{count}} errores",
   "upload.networkError": "Error de red al conectar con el servidor.",
-  "upload.sessionExpiredRetry": "Sesión expirada. Iniciá sesión para subir estudios.",
+  "upload.sessionExpiredRetry":
+    "Sesión expirada. Iniciá sesión para subir estudios.",
   "upload.unauthorizedRetry": "No autorizado. Iniciá sesión de nuevo.",
   "upload.fileTooLarge": "El archivo supera el límite de 2 GB.",
   "upload.genericError": "Error al cargar el archivo.",
@@ -299,7 +319,8 @@ export const es: Record<string, string> = {
   "zenodo.logs.filterImport": "Importación",
   "zenodo.logs.resultLabel": "Resultado",
   "zenodo.logs.loadHint": "Abrí este tab para cargar el historial",
-  "zenodo.sessionExpiredWarning": "Tu sesión de MICD expiró. Iniciá sesión para continuar.",
+  "zenodo.sessionExpiredWarning":
+    "Tu sesión de MICD expiró. Iniciá sesión para continuar.",
   "zenodo.searchSessionRequired": "Sesión requerida",
   "zenodo.searchLoginToSearch": "Iniciá sesión para buscar en Zenodo",
   "zenodo.needLoginToast": "Necesitás iniciar sesión para buscar en Zenodo.",
@@ -346,7 +367,8 @@ export const es: Record<string, string> = {
     "⚠ Archivo grande — la descarga puede tardar varios minutos.",
   "zenodo.datasetNotFound":
     "El dataset no existe en este entorno de Zenodo (sandbox/producción).",
-  "zenodo.importFailedGeneric": "No se pudo importar el dataset (error {{status}}).",
+  "zenodo.importFailedGeneric":
+    "No se pudo importar el dataset (error {{status}}).",
   "zenodo.downloading": "Descargando…",
   "zenodo.noImportableFiles":
     "Este dataset no tiene archivos .dcm ni .zip para importar.",
@@ -365,7 +387,8 @@ export const es: Record<string, string> = {
   "zenodo.saving": "Guardando…",
   "zenodo.tokenErrorInvalid":
     "Token inválido. Verificá que lo copiaste completo y que no esté revocado.",
-  "zenodo.tokenErrorPermissions": "El token no tiene los permisos necesarios en Zenodo.",
+  "zenodo.tokenErrorPermissions":
+    "El token no tiene los permisos necesarios en Zenodo.",
   "zenodo.tokenErrorTimeout":
     "Zenodo no respondió a tiempo. Intentá de nuevo en unos minutos.",
   "zenodo.tokenSaveFallbackError": "No se pudo guardar el token.",
@@ -405,8 +428,10 @@ export const es: Record<string, string> = {
   "zenodo.publish.envLabel": "Entorno",
   "zenodo.publish.submitButton": "Publicar en Zenodo",
   "zenodo.publish.publishing": "Publicando…",
-  "zenodo.publish.hintNotAnonymized": " El estudio debe estar anonimizado primero.",
-  "zenodo.publish.hintNoCredentials": " Configurá un token en la pestaña Config.",
+  "zenodo.publish.hintNotAnonymized":
+    " El estudio debe estar anonimizado primero.",
+  "zenodo.publish.hintNoCredentials":
+    " Configurá un token en la pestaña Config.",
   "zenodo.publish.hintStudyNotFound":
     " El estudio no se encontró en la base de datos.",
   "zenodo.publish.successMessage":
@@ -423,8 +448,10 @@ export const es: Record<string, string> = {
   "zenodo.logs.previousPage": "← Anterior",
   "zenodo.logs.nextPage": "Siguiente →",
   "zenodo.logs.pageInfo": "Pág. {{page}} / {{totalPages}}",
-  "zenodo.quotaAlertDefault": "Almacenamiento de Zenodo casi lleno. Revisá la configuración de Zenodo.",
-  "orthanc.storageAlertDefault": "Almacenamiento del servidor Orthanc casi lleno ({{pct}}% usado). Liberá espacio o ampliá la capacidad.",
+  "zenodo.quotaAlertDefault":
+    "Almacenamiento de Zenodo casi lleno. Revisá la configuración de Zenodo.",
+  "orthanc.storageAlertDefault":
+    "Almacenamiento del servidor Orthanc casi lleno ({{pct}}% usado). Liberá espacio o ampliá la capacidad.",
 
   // ── users (admin panel, US-H04) ─────────────────────────────────────────────
   "users.tab": "Usuarios",
@@ -451,7 +478,8 @@ export const es: Record<string, string> = {
   "users.form.email": "Correo",
   "users.form.role": "Rol",
   "users.empty": "No hay usuarios.",
-  "users.confirmDelete": "¿Eliminar esta cuenta? Se podrá recrear más adelante.",
+  "users.confirmDelete":
+    "¿Eliminar esta cuenta? Se podrá recrear más adelante.",
   "users.toast.created": "Usuario creado.",
   "users.toast.roleChanged": "Rol actualizado.",
   "users.toast.deleted": "Usuario eliminado.",

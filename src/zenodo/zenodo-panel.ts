@@ -838,7 +838,9 @@ export async function checkQuotaAlerts(): Promise<void> {
       const stats: OrthancStats = await orthancRes.json();
       if (stats.alert) {
         showBanner(
-          t("orthanc.storageAlertDefault", { pct: (stats.disk_used_pct ?? 0).toFixed(1) }),
+          t("orthanc.storageAlertDefault", {
+            pct: (stats.disk_used_pct ?? 0).toFixed(1),
+          }),
           "warning",
           0,
         );

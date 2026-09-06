@@ -45,7 +45,9 @@ export async function loadCurrent(): Promise<void> {
     displayParsed(parsed, getTitleForIndex(index));
     dicomCache.prefetchNext(index, 5);
   } catch (err: any) {
-    showError(t("viewer.loadImageGenericError", { message: err.message || err }));
+    showError(
+      t("viewer.loadImageGenericError", { message: err.message || err }),
+    );
   } finally {
     showLoading(false);
   }
@@ -92,11 +94,20 @@ export function initFileInputs(): void {
     filesInput.value = "";
     const { files: expanded } = await expandFiles(selected, null);
     const dcmFiles = collectDicomFiles(expanded);
-    if (dcmFiles.length === 0) { showError(t("viewer.folderNoDicom")); return; }
+    if (dcmFiles.length === 0) {
+      showError(t("viewer.folderNoDicom"));
+      return;
+    }
     dicomCache.clear();
     state.files = dcmFiles;
     state.currentIndex = 0;
-    state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+    state.viewport = {
+      windowCenter: 0,
+      windowWidth: 0,
+      zoom: 0,
+      panX: 0,
+      panY: 0,
+    };
     await loadCurrent();
   });
 
@@ -113,7 +124,13 @@ export function initFileInputs(): void {
     dicomCache.clear();
     state.files = dcmFiles;
     state.currentIndex = 0;
-    state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+    state.viewport = {
+      windowCenter: 0,
+      windowWidth: 0,
+      zoom: 0,
+      panX: 0,
+      panY: 0,
+    };
     await loadCurrent();
     folderInput.value = "";
   });
@@ -148,7 +165,13 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
   state.serverInstances = [];
   state.files = [];
   state.currentIndex = 0;
-  state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 0,
+    panX: 0,
+    panY: 0,
+  };
 
   try {
     const res = await authFetch(
@@ -264,7 +287,13 @@ export function initDropZone(): void {
       dicomCache.clear();
       state.files = dcmFiles.sort((a, b) => a.name.localeCompare(b.name));
       state.currentIndex = 0;
-      state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+      state.viewport = {
+        windowCenter: 0,
+        windowWidth: 0,
+        zoom: 0,
+        panX: 0,
+        panY: 0,
+      };
       await loadCurrent();
     }
   });

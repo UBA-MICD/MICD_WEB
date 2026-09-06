@@ -19,7 +19,10 @@ import assert from "node:assert/strict";
         text = v;
       },
       get innerHTML() {
-        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
       },
     };
   },
@@ -38,7 +41,10 @@ test("formatLastAccess renders a dash when never logged in", () => {
 });
 
 test("formatLastAccess renders YYYY-MM-DD HH:MM in UTC", () => {
-  assert.equal(formatLastAccess("2026-08-19T10:05:30.000Z"), "2026-08-19 10:05");
+  assert.equal(
+    formatLastAccess("2026-08-19T10:05:30.000Z"),
+    "2026-08-19 10:05",
+  );
 });
 
 test("validateNewUser trims name, lowercases email, and accepts a valid role", () => {
@@ -54,9 +60,18 @@ test("validateNewUser trims name, lowercases email, and accepts a valid role", (
 });
 
 test("validateNewUser rejects empty name, bad email, and unknown role", () => {
-  assert.equal(validateNewUser({ name: " ", email: "a@b.co", role: "medico" }).ok, false);
-  assert.equal(validateNewUser({ name: "X", email: "nope", role: "medico" }).ok, false);
-  assert.equal(validateNewUser({ name: "X", email: "a@b.co", role: "root" }).ok, false);
+  assert.equal(
+    validateNewUser({ name: " ", email: "a@b.co", role: "medico" }).ok,
+    false,
+  );
+  assert.equal(
+    validateNewUser({ name: "X", email: "nope", role: "medico" }).ok,
+    false,
+  );
+  assert.equal(
+    validateNewUser({ name: "X", email: "a@b.co", role: "root" }).ok,
+    false,
+  );
 });
 
 const user = (over = {}) => ({

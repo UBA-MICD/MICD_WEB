@@ -87,7 +87,10 @@ test("showToast auto-dismisses after ms and escapes its message", (t) => {
   showToast("<b>hi</b>", "error", 3000);
   const container = document.getElementById("toast-container")!;
   const toast = container.querySelector(".toast--error") as HTMLElement;
-  assert.equal(toast.querySelector(".toast__msg")!.innerHTML, "&lt;b&gt;hi&lt;/b&gt;");
+  assert.equal(
+    toast.querySelector(".toast__msg")!.innerHTML,
+    "&lt;b&gt;hi&lt;/b&gt;",
+  );
 
   t.mock.timers.tick(3000);
   assert.equal(toast.classList.contains("toast--out"), true);

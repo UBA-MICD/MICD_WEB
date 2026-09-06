@@ -87,12 +87,17 @@ function renderLoading(container: HTMLElement): void {
     </div>`;
 }
 
-export function mountSystemPanel(container: HTMLElement): { reload: () => void } {
+export function mountSystemPanel(container: HTMLElement): {
+  reload: () => void;
+} {
   async function reload(): Promise<void> {
     renderLoading(container);
     try {
       const res = await authFetch(`${API_BASE}/v1/orthanc/statistics`);
-      if (!res.ok) { renderError(container); return; }
+      if (!res.ok) {
+        renderError(container);
+        return;
+      }
       const stats: OrthancStats = await res.json();
       renderStats(container, stats);
     } catch {

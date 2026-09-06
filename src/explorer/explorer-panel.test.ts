@@ -19,14 +19,23 @@ test.after(() => uninstallDom());
  */
 function dragEvent(
   type: string,
-  opts: { dataTransfer?: { files: File[] }; relatedTarget?: EventTarget | null } = {},
+  opts: {
+    dataTransfer?: { files: File[] };
+    relatedTarget?: EventTarget | null;
+  } = {},
 ): Event {
   const evt = new Event(type, { bubbles: true, cancelable: true });
   if ("dataTransfer" in opts) {
-    Object.defineProperty(evt, "dataTransfer", { value: opts.dataTransfer, configurable: true });
+    Object.defineProperty(evt, "dataTransfer", {
+      value: opts.dataTransfer,
+      configurable: true,
+    });
   }
   if ("relatedTarget" in opts) {
-    Object.defineProperty(evt, "relatedTarget", { value: opts.relatedTarget, configurable: true });
+    Object.defineProperty(evt, "relatedTarget", {
+      value: opts.relatedTarget,
+      configurable: true,
+    });
   }
   return evt;
 }
@@ -47,7 +56,12 @@ beforeEach(() => {
 
 test("initExplorerPanel marks the toggle button active on start", () => {
   initExplorerPanel();
-  assert.equal(document.getElementById("btn-toggle-explorer")!.classList.contains("active"), true);
+  assert.equal(
+    document
+      .getElementById("btn-toggle-explorer")!
+      .classList.contains("active"),
+    true,
+  );
 });
 
 test("clicking the toggle button collapses and re-expands the panel", () => {
@@ -91,21 +105,36 @@ test("dragging the resize handle updates the panel width and persists it", () =>
   const panel = document.getElementById("explorer-panel")!;
 
   handle.dispatchEvent(
-    new MouseEvent("mousedown", { clientX: 500, bubbles: true, cancelable: true }),
+    new MouseEvent("mousedown", {
+      clientX: 500,
+      bubbles: true,
+      cancelable: true,
+    }),
   );
-  assert.equal(handle.classList.contains("explorer-panel__resize-handle--dragging"), true);
+  assert.equal(
+    handle.classList.contains("explorer-panel__resize-handle--dragging"),
+    true,
+  );
   assert.equal(document.body.style.cursor, "ew-resize");
 
   // Dragging left (smaller clientX) grows the panel (it's anchored on the right).
-  document.dispatchEvent(new MouseEvent("mousemove", { clientX: 450, bubbles: true }));
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 450, bubbles: true }),
+  );
   // jsdom reports offsetWidth as 0 (no layout engine), so startWidth is 0 and
   // the new width is clamped to MIN_WIDTH (220).
   assert.equal(panel.style.width, "220px");
 
   document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  assert.equal(handle.classList.contains("explorer-panel__resize-handle--dragging"), false);
+  assert.equal(
+    handle.classList.contains("explorer-panel__resize-handle--dragging"),
+    false,
+  );
   assert.equal(document.body.style.cursor, "");
-  assert.equal(localStorage.getItem("micd_explorer_width"), String(panel.offsetWidth));
+  assert.equal(
+    localStorage.getItem("micd_explorer_width"),
+    String(panel.offsetWidth),
+  );
 });
 
 test("mousedown on the resize handle while collapsed is a no-op", () => {
@@ -115,9 +144,16 @@ test("mousedown on the resize handle while collapsed is a no-op", () => {
   const handle = document.getElementById("explorer-resize-handle")!;
 
   handle.dispatchEvent(
-    new MouseEvent("mousedown", { clientX: 500, bubbles: true, cancelable: true }),
+    new MouseEvent("mousedown", {
+      clientX: 500,
+      bubbles: true,
+      cancelable: true,
+    }),
   );
-  assert.equal(handle.classList.contains("explorer-panel__resize-handle--dragging"), false);
+  assert.equal(
+    handle.classList.contains("explorer-panel__resize-handle--dragging"),
+    false,
+  );
 });
 
 test("dragover/dragenter add drag-over, dragleave outside the panel removes it", () => {
@@ -199,6 +235,8 @@ test("dropping nothing (no files) does not throw", async () => {
   initExplorerPanel();
   const panel = document.getElementById("explorer-panel")!;
   const dt = { files: [] as File[] };
-  assert.doesNotThrow(() => panel.dispatchEvent(dragEvent("drop", { dataTransfer: dt })));
+  assert.doesNotThrow(() =>
+    panel.dispatchEvent(dragEvent("drop", { dataTransfer: dt })),
+  );
   await Promise.resolve();
 });

@@ -238,13 +238,17 @@ export class MPR3DViewer {
         canvas.parentNode.replaceChild(newCanvas, canvas);
         canvas = newCanvas; // Update reference to newly created canvas
 
-        this.initGL(canvas);
+        if (!this.initGL(canvas)) {
+          throw new Error(t("viewer.mpr.webglUnavailable"));
+        }
         this.uploadVolumeTexture();
       }
 
       return true;
     } catch (err: any) {
-      showError(t("viewer.mpr.volumeLoadError", { message: err.message || err }));
+      showError(
+        t("viewer.mpr.volumeLoadError", { message: err.message || err }),
+      );
       return false;
     } finally {
       showLoading(false);
@@ -777,7 +781,7 @@ void main() {
     const view = Matrix4.lookAt(
       [eyeX, eyeY, eyeZ],
       [panOffsetX, panOffsetY, 0],
-      [0, 1, 0],
+      [0, -1, 0],
     );
 
     const mvp = Matrix4.multiply(proj, view);
@@ -870,11 +874,11 @@ void main() {
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 36);
 
-    // Render 3D orientation gizmo on widget canvas
+    // Render 3D Anatomical Reference Cube
     const gizmoCanvas =
       typeof document !== "undefined"
         ? (document.getElementById(
-            "mpr-gizmo-canvas",
+            "mpr-reference-cube",
           ) as HTMLCanvasElement | null)
         : null;
     if (gizmoCanvas) {
@@ -882,7 +886,20 @@ void main() {
     }
   }
 
-  /** Render 3D Orientation Gizmo (bottom-right widget). */
+  /** Render 3D Anatomical Reference Cube (delegates to renderGizmo). */
+  public renderReferenceCube(canvas: HTMLCanvasElement): void {
+    this.renderGizmo(canvas);
+  }
+
+  /**
+   * Render 3D Anatomical Reference Cube with Cut Plane (Orthographic 3D -> 2D).
+   * Steps:
+   *  A: 3D to 2D projected coordinates of 8 vertices ([-1, 1] * s)
+   *  B: Back edges (faint rgba(255, 255, 255, 0.2))
+   *  C: Cutting plane (perpendicular/active intersection polygon filled with rgba(46, 204, 113, 0.4))
+   *  D: Front edges (sharp rgba(255, 255, 255, 0.85))
+   *  E: Anatomical letters (A, P, L, R, S, I) projected on front-facing face centers
+   */
   public renderGizmo(canvas: HTMLCanvasElement): void {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -892,7 +909,6 @@ void main() {
     const h = canvas.height;
     const cx = w / 2;
     const cy = h / 2;
-    const len = 20;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -901,39 +917,184 @@ void main() {
     const cosP = Math.cos(this.camera.phi);
     const sinP = Math.sin(this.camera.phi);
 
-    // Projected 3D axes
-    const x2d = { x: len * cosP, y: len * sinP * sinT };
-    const y2d = { x: -len * sinP, y: len * cosP * sinT };
-    const z2d = { x: 0, y: -len * cosT };
+    const s = Math.min(w, h) * 0.28; // Half extent of the cube
 
-    // X Axis (Red)
-    ctx.strokeStyle = "#ff4444";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + x2d.x, cy + x2d.y);
-    ctx.stroke();
-    ctx.fillStyle = "#ff4444";
-    ctx.font = "bold 9px sans-serif";
-    ctx.fillText("X", cx + x2d.x + (x2d.x >= 0 ? 3 : -8), cy + x2d.y + 3);
+    // Paso A: 8 vertices in 3D: [x, y, z]
+    const rawVertices = [
+      [-s, -s, -s], // 0: L I P
+      [s, -s, -s], // 1: R I P
+      [s, s, -s], // 2: R S P
+      [-s, s, -s], // 3: L S P
+      [-s, -s, s], // 4: L I A
+      [s, -s, s], // 5: R I A
+      [s, s, s], // 6: R S A
+      [-s, s, s], // 7: L S A
+    ];
 
-    // Y Axis (Green)
-    ctx.strokeStyle = "#00e676";
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + y2d.x, cy + y2d.y);
-    ctx.stroke();
-    ctx.fillStyle = "#00e676";
-    ctx.fillText("Y", cx + y2d.x + (y2d.x >= 0 ? 3 : -8), cy + y2d.y + 3);
+    // Project 3D vector -> 2D Screen point
+    const project = (x: number, y: number, z: number) => {
+      // Yaw around Y
+      const x1 = x * cosP + z * sinP;
+      const y1 = y;
+      const z1 = -x * sinP + z * cosP;
 
-    // Z Axis (Blue)
-    ctx.strokeStyle = "#29b6f6";
+      // Pitch around X
+      const x2 = x1;
+      const y2 = y1 * cosT - z1 * sinT;
+      const z2 = y1 * sinT + z1 * cosT;
+
+      return {
+        x: cx + x2,
+        y: cy - y2, // Invert Y for canvas screen space
+        z: z2,
+      };
+    };
+
+    const projVertices = rawVertices.map((v) => project(v[0], v[1], v[2]));
+
+    // 6 Anatomical Faces: definition and front-facing test
+    const faces = [
+      {
+        indices: [4, 5, 6, 7],
+        label: "A",
+        color: "#2ee6a8",
+        center: [0, 0, s],
+      }, // Anterior (+Z)
+      {
+        indices: [1, 0, 3, 2],
+        label: "P",
+        color: "#2ee6a8",
+        center: [0, 0, -s],
+      }, // Posterior (-Z)
+      {
+        indices: [5, 1, 2, 6],
+        label: "R",
+        color: "#ff5252",
+        center: [s, 0, 0],
+      }, // Right (+X)
+      {
+        indices: [0, 4, 7, 3],
+        label: "L",
+        color: "#ff5252",
+        center: [-s, 0, 0],
+      }, // Left (-X)
+      {
+        indices: [7, 6, 2, 3],
+        label: "S",
+        color: "#00c8ff",
+        center: [0, s, 0],
+      }, // Superior (+Y)
+      {
+        indices: [0, 1, 5, 4],
+        label: "I",
+        color: "#00c8ff",
+        center: [0, -s, 0],
+      }, // Inferior (-Y)
+    ];
+
+    const testedFaces = faces.map((face) => {
+      const p0 = projVertices[face.indices[0]];
+      const p1 = projVertices[face.indices[1]];
+      const p2 = projVertices[face.indices[2]];
+      const p3 = projVertices[face.indices[3]];
+
+      const avgZ = (p0.z + p1.z + p2.z + p3.z) / 4;
+      const cross =
+        (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+
+      return {
+        ...face,
+        avgZ,
+        isFront: cross < 0,
+        pts: [p0, p1, p2, p3],
+      };
+    });
+
+    // 12 Edges
+    const allEdges: [number, number][] = [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0], // Back loop (-Z)
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 4], // Front loop (+Z)
+      [0, 4],
+      [1, 5],
+      [2, 6],
+      [3, 7], // Connecting edges
+    ];
+
+    // Classify edges: front if belonging to at least one front-facing face
+    const frontFaces = testedFaces.filter((f) => f.isFront);
+    const frontEdgeKeys = new Set<string>();
+    frontFaces.forEach((f) => {
+      for (let i = 0; i < 4; i++) {
+        const a = f.indices[i];
+        const b = f.indices[(i + 1) % 4];
+        const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+        frontEdgeKeys.add(key);
+      }
+    });
+
+    const backEdges: [number, number][] = [];
+    const frontEdges: [number, number][] = [];
+
+    allEdges.forEach(([i, j]) => {
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (frontEdgeKeys.has(key)) {
+        frontEdges.push([i, j]);
+      } else {
+        backEdges.push([i, j]);
+      }
+    });
+
+    // Step B: Back edges (Faint lines)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+    ctx.lineWidth = 1;
+    backEdges.forEach(([i, j]) => {
+      ctx.beginPath();
+      ctx.moveTo(projVertices[i].x, projVertices[i].y);
+      ctx.lineTo(projVertices[j].x, projVertices[j].y);
+      ctx.stroke();
+    });
+
+    // Step C: Cutting Plane (Viewport Plane)
+    ctx.save();
+    const planeSize = s * 1.4;
+    ctx.fillStyle = "rgba(46, 204, 113, 0.35)";
+    ctx.strokeStyle = "rgba(46, 204, 113, 0.8)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + z2d.x, cy + z2d.y);
+    ctx.rect(cx - planeSize, cy - planeSize, planeSize * 2, planeSize * 2);
+    ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#29b6f6";
-    ctx.fillText("Z", cx + z2d.x + 3, cy + z2d.y - 2);
+    ctx.restore();
+
+    // Step D: Front edges (Solid lines)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.lineWidth = 1.5;
+    frontEdges.forEach(([i, j]) => {
+      ctx.beginPath();
+      ctx.moveTo(projVertices[i].x, projVertices[i].y);
+      ctx.lineTo(projVertices[j].x, projVertices[j].y);
+      ctx.stroke();
+    });
+
+    // Step E: Anatomical labels on front-facing face centers
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 11px var(--font-mono, monospace)";
+
+    testedFaces
+      .filter((f) => f.isFront)
+      .sort((a, b) => b.avgZ - a.avgZ)
+      .forEach((face) => {
+        const cp = project(face.center[0], face.center[1], face.center[2]);
+        ctx.fillStyle = face.color;
+        ctx.fillText(face.label, cp.x, cp.y);
+      });
   }
 }
 

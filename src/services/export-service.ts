@@ -211,7 +211,9 @@ export async function exportCurrentStudyAsZip(
             `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instanceId)}/file`,
           );
           if (!res.ok)
-            throw new Error(t("export.instanceDownloadError", { index: i + 1 }));
+            throw new Error(
+              t("export.instanceDownloadError", { index: i + 1 }),
+            );
           buf = await res.arrayBuffer();
         }
 
@@ -267,7 +269,10 @@ export async function exportCurrentStudyAsZip(
     );
   } catch (err: any) {
     console.error("Export Error:", err);
-    showBanner(t("export.genericError", { message: err.message || err }), "error");
+    showBanner(
+      t("export.genericError", { message: err.message || err }),
+      "error",
+    );
   }
 }
 
@@ -329,6 +334,9 @@ export async function exportStudyByIdAsZip(
     );
   } catch (err: any) {
     console.error("Export study by ID error:", err);
-    showBanner(t("export.genericError", { message: err.message || err }), "error");
+    showBanner(
+      t("export.genericError", { message: err.message || err }),
+      "error",
+    );
   }
 }

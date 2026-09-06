@@ -55,6 +55,7 @@ interface ExplorerView {
   chips: HTMLElement | null;
   dateFrom: HTMLInputElement | null;
   dateTo: HTMLInputElement | null;
+  description: HTMLInputElement | null;
   paginationInfo: HTMLElement | null;
   prev: HTMLButtonElement | null;
   next: HTMLButtonElement | null;
@@ -68,6 +69,7 @@ const explorerState = {
   modality: "",
   dateFrom: "",
   dateTo: "",
+  description: "",
   zenodoLinked: false,
 };
 
@@ -144,6 +146,7 @@ function registerView(root: HTMLElement): void {
     chips: q<HTMLElement>(root, "data-explorer-chips"),
     dateFrom: q<HTMLInputElement>(root, "data-explorer-date-from"),
     dateTo: q<HTMLInputElement>(root, "data-explorer-date-to"),
+    description: q<HTMLInputElement>(root, "data-explorer-description"),
     paginationInfo: q<HTMLElement>(root, "data-explorer-pagination-info"),
     prev: q<HTMLButtonElement>(root, "data-explorer-prev"),
     next: q<HTMLButtonElement>(root, "data-explorer-next"),
@@ -210,6 +213,15 @@ function wireView(view: ExplorerView): void {
     applyFilterChange();
   });
 
+  let descTimer: ReturnType<typeof setTimeout>;
+  view.description?.addEventListener("input", () => {
+    clearTimeout(descTimer);
+    descTimer = setTimeout(() => {
+      explorerState.description = view.description!.value.trim();
+      applyFilterChange();
+    }, 400);
+  });
+
   q<HTMLElement>(view.root, "data-explorer-clear")?.addEventListener(
     "click",
     () => {
@@ -217,6 +229,7 @@ function wireView(view: ExplorerView): void {
       explorerState.modality = "";
       explorerState.dateFrom = "";
       explorerState.dateTo = "";
+      explorerState.description = "";
       explorerState.zenodoLinked = false;
       applyFilterChange();
     },
@@ -290,6 +303,7 @@ function syncControls(): void {
     explorerState.modality ||
     explorerState.dateFrom ||
     explorerState.dateTo ||
+    explorerState.description ||
     explorerState.zenodoLinked,
   );
 
@@ -300,6 +314,12 @@ function syncControls(): void {
     view.searchClear?.classList.toggle("hidden", explorerState.search === "");
     if (view.dateFrom) view.dateFrom.value = explorerState.dateFrom;
     if (view.dateTo) view.dateTo.value = explorerState.dateTo;
+    if (
+      view.description &&
+      view.description.value !== explorerState.description
+    ) {
+      view.description.value = explorerState.description;
+    }
     view.clearWrap?.classList.toggle("hidden", !hasFilters);
 
     view.chips
@@ -369,6 +389,8 @@ export async function loadStudyExplorer(): Promise<void> {
   if (explorerState.dateTo)
     params.set("date_to", explorerState.dateTo.replace(/-/g, ""));
   if (explorerState.search) params.set("search", explorerState.search);
+  if (explorerState.description)
+    params.set("description", explorerState.description);
   if (explorerState.zenodoLinked) params.set("zenodo_linked", "true");
 
   try {
@@ -385,10 +407,13 @@ export async function loadStudyExplorer(): Promise<void> {
         explorerState.modality ||
         explorerState.dateFrom ||
         explorerState.dateTo ||
+        explorerState.description ||
         explorerState.zenodoLinked;
       views.forEach((v) => {
         v.list.innerHTML = emptyState(
-          filtered ? t("explorer.noStudiesFiltered") : t("explorer.noStudiesLoaded"),
+          filtered
+            ? t("explorer.noStudiesFiltered")
+            : t("explorer.noStudiesLoaded"),
         );
       });
       setSelected(null);

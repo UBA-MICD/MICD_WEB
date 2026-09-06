@@ -7,7 +7,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { jwt, zenodoPanelHtml, createMockFetch } from "../../test/zenodo-fixture.ts";
+import {
+  jwt,
+  zenodoPanelHtml,
+  createMockFetch,
+} from "../../test/zenodo-fixture.ts";
 import { adoptSession, logout, type AuthUser } from "../auth/auth.ts";
 import { initZenodoPanel } from "./zenodo-panel.ts";
 
@@ -15,10 +19,18 @@ test.before(() => installDom());
 test.after(() => uninstallDom());
 
 const adminUser: AuthUser = { id: 1, email: "admin@micd.local", role: "admin" };
-const medicoUser: AuthUser = { id: 2, email: "medico@micd.local", role: "medico" };
+const medicoUser: AuthUser = {
+  id: 2,
+  email: "medico@micd.local",
+  role: "medico",
+};
 
 async function loginAs(user: AuthUser): Promise<void> {
-  await adoptSession(jwt({ sub: user.id, email: user.email, role: user.role }), "refresh-fake", user);
+  await adoptSession(
+    jwt({ sub: user.id, email: user.email, role: user.role }),
+    "refresh-fake",
+    user,
+  );
 }
 
 test.beforeEach(async () => {
@@ -64,7 +76,9 @@ test("Escape inside the panel closes it", () => {
   const panel = document.getElementById("zenodo-panel")!;
   document.getElementById("btn-open-zenodo")!.click();
 
-  panel.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  panel.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
   assert.equal(panel.classList.contains("zenodo-panel--closed"), true);
 });
 
@@ -78,12 +92,20 @@ test("clicking a tab switches the active tab and panel, and loads config on dema
   await loginAs(adminUser);
 
   initZenodoPanel();
-  const configTab = document.querySelector<HTMLElement>('.z-tab[data-tab="config"]')!;
+  const configTab = document.querySelector<HTMLElement>(
+    '.z-tab[data-tab="config"]',
+  )!;
   configTab.click();
 
   assert.equal(configTab.classList.contains("z-tab--active"), true);
-  assert.equal(document.getElementById("z-tab-config")!.classList.contains("hidden"), false);
-  assert.equal(document.getElementById("z-tab-search")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("z-tab-config")!.classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document.getElementById("z-tab-search")!.classList.contains("hidden"),
+    true,
+  );
 
   // loadConfig() is async — give its microtasks a tick to settle before
   // asserting the loading skeleton was at least swapped out.
@@ -93,9 +115,15 @@ test("clicking a tab switches the active tab and panel, and loads config on dema
 
 test("applyRoleVisibility hides admin-only tabs for a non-admin and shows them for an admin", async () => {
   initZenodoPanel();
-  const publishTab = document.querySelector<HTMLElement>('.z-tab[data-tab="publish"]')!;
-  const configTab = document.querySelector<HTMLElement>('.z-tab[data-tab="config"]')!;
-  const logsTab = document.querySelector<HTMLElement>('.z-tab[data-tab="logs"]')!;
+  const publishTab = document.querySelector<HTMLElement>(
+    '.z-tab[data-tab="publish"]',
+  )!;
+  const configTab = document.querySelector<HTMLElement>(
+    '.z-tab[data-tab="config"]',
+  )!;
+  const logsTab = document.querySelector<HTMLElement>(
+    '.z-tab[data-tab="logs"]',
+  )!;
 
   // Signed out: not admin.
   assert.equal(publishTab.classList.contains("hidden"), true);
@@ -122,12 +150,20 @@ test("losing admin while on an admin-only tab falls back to search", async () =>
   initZenodoPanel();
 
   document.querySelector<HTMLElement>('.z-tab[data-tab="config"]')!.click();
-  assert.equal(document.getElementById("z-tab-config")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("z-tab-config")!.classList.contains("hidden"),
+    false,
+  );
 
   await loginAs(medicoUser);
-  assert.equal(document.getElementById("z-tab-search")!.classList.contains("hidden"), false);
   assert.equal(
-    document.querySelector<HTMLElement>('.z-tab[data-tab="search"]')!.classList.contains("z-tab--active"),
+    document.getElementById("z-tab-search")!.classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document
+      .querySelector<HTMLElement>('.z-tab[data-tab="search"]')!
+      .classList.contains("z-tab--active"),
     true,
   );
 });

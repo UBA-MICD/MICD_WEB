@@ -36,7 +36,7 @@ test("single .dcm entry is returned", async () => {
 });
 
 test("extension-less DICOM candidate is returned", async () => {
-  const entries = { "IM000001": FAKE_BUF };
+  const entries = { IM000001: FAKE_BUF };
   const result = await extractZipEntries(FAKE_BUF, mockUnzip(entries));
   assert.equal(result.length, 1);
   assert.equal(result[0].name, "IM000001");
@@ -77,7 +77,7 @@ test("multiple entries: only DICOM ones returned", async () => {
     "slice002.dcm": FAKE_BUF,
     "readme.txt": FAKE_BUF,
     "cover.png": FAKE_BUF,
-    "IM000003": FAKE_BUF,
+    IM000003: FAKE_BUF,
   };
   const result = await extractZipEntries(FAKE_BUF, mockUnzip(entries));
   assert.equal(result.length, 3);
@@ -120,7 +120,10 @@ test(".DCM uppercase extension is accepted", async () => {
 });
 
 test("directory entry (trailing slash) is skipped", async () => {
-  const entries = { "study/series/": FAKE_BUF, "study/series/IM001.dcm": FAKE_BUF };
+  const entries = {
+    "study/series/": FAKE_BUF,
+    "study/series/IM001.dcm": FAKE_BUF,
+  };
   const result = await extractZipEntries(FAKE_BUF, mockUnzip(entries));
   assert.equal(result.length, 1);
   assert.equal(result[0].name, "IM001.dcm");
@@ -146,7 +149,11 @@ test("basename collision is disambiguated with parent dir prefix", async () => {
 
 test("expandFiles: non-ZIP files pass through unchanged", async () => {
   const dcm = new File([FAKE_BUF], "scan.dcm");
-  const { files, corruptZips, tooBigZips } = await expandFiles([dcm], null, mockUnzip({}));
+  const { files, corruptZips, tooBigZips } = await expandFiles(
+    [dcm],
+    null,
+    mockUnzip({}),
+  );
   assert.equal(files.length, 1);
   assert.equal(files[0], dcm);
   assert.equal(corruptZips.length, 0);
@@ -156,7 +163,11 @@ test("expandFiles: non-ZIP files pass through unchanged", async () => {
 test("expandFiles: ZIP is expanded into individual File objects", async () => {
   const zipFile = new File([FAKE_BUF], "study.zip");
   const entries = { "scan.dcm": FAKE_BUF };
-  const { files, corruptZips } = await expandFiles([zipFile], null, mockUnzip(entries));
+  const { files, corruptZips } = await expandFiles(
+    [zipFile],
+    null,
+    mockUnzip(entries),
+  );
   assert.equal(corruptZips.length, 0);
   assert.equal(files.length, 1);
   assert.equal(files[0].name, "scan.dcm");
@@ -164,7 +175,11 @@ test("expandFiles: ZIP is expanded into individual File objects", async () => {
 
 test("expandFiles: corrupt ZIP is reported in corruptZips, not thrown", async () => {
   const zipFile = new File([FAKE_BUF], "bad.zip");
-  const { files, corruptZips } = await expandFiles([zipFile], null, failingUnzip());
+  const { files, corruptZips } = await expandFiles(
+    [zipFile],
+    null,
+    failingUnzip(),
+  );
   assert.equal(files.length, 0);
   assert.equal(corruptZips.length, 1);
   assert.equal(corruptZips[0], "bad.zip");
@@ -174,7 +189,11 @@ test("expandFiles: ZIP exceeding MAX_CLIENT_ZIP_BYTES goes to tooBigZips", async
   // Create a File object whose .size reports as oversized without allocating real memory.
   const oversized = new File([new Uint8Array(1)], "huge.zip");
   Object.defineProperty(oversized, "size", { value: MAX_CLIENT_ZIP_BYTES + 1 });
-  const { files, corruptZips, tooBigZips } = await expandFiles([oversized], null, mockUnzip({}));
+  const { files, corruptZips, tooBigZips } = await expandFiles(
+    [oversized],
+    null,
+    mockUnzip({}),
+  );
   assert.equal(files.length, 0);
   assert.equal(corruptZips.length, 0);
   assert.equal(tooBigZips.length, 1);
@@ -185,7 +204,11 @@ test("expandFiles: mixed file list — ZIP expanded, .dcm passed through", async
   const dcm = new File([FAKE_BUF], "extra.dcm");
   const zipFile = new File([FAKE_BUF], "study.zip");
   const entries = { "from-zip.dcm": FAKE_BUF };
-  const { files, corruptZips } = await expandFiles([dcm, zipFile], null, mockUnzip(entries));
+  const { files, corruptZips } = await expandFiles(
+    [dcm, zipFile],
+    null,
+    mockUnzip(entries),
+  );
   assert.equal(corruptZips.length, 0);
   assert.equal(files.length, 2);
   const names = files.map((f) => f.name);
@@ -196,7 +219,11 @@ test("expandFiles: mixed file list — ZIP expanded, .dcm passed through", async
 test("expandFiles: corrupt ZIP does not abort subsequent files", async () => {
   const good = new File([FAKE_BUF], "good.dcm");
   const bad = new File([FAKE_BUF], "bad.zip");
-  const { files, corruptZips } = await expandFiles([good, bad], null, failingUnzip());
+  const { files, corruptZips } = await expandFiles(
+    [good, bad],
+    null,
+    failingUnzip(),
+  );
   assert.equal(corruptZips.length, 1);
   assert.equal(files.length, 1);
   assert.equal(files[0].name, "good.dcm");
@@ -205,20 +232,33 @@ test("expandFiles: corrupt ZIP does not abort subsequent files", async () => {
 test("expandFiles: statusEl is written and cleared per ZIP", async () => {
   const messages: string[] = [];
   const statusEl = {
-    get textContent() { return ""; },
-    set textContent(v: string) { messages.push(v); },
+    get textContent() {
+      return "";
+    },
+    set textContent(v: string) {
+      messages.push(v);
+    },
   } as unknown as HTMLElement;
   const zipFile = new File([FAKE_BUF], "study.zip");
   await expandFiles([zipFile], statusEl, mockUnzip({ "s.dcm": FAKE_BUF }));
-  assert.ok(messages.some((m) => m.includes("Descomprimiendo")), "decompression message shown");
+  assert.ok(
+    messages.some((m) => m.includes("Descomprimiendo")),
+    "decompression message shown",
+  );
   assert.equal(messages[messages.length - 1], "", "status cleared after ZIP");
 });
 
 test("expandFiles: fflate import failure goes to corruptZips, not an unhandled rejection", async () => {
   const zipFile = new File([FAKE_BUF], "study.zip");
   // Simulate import("fflate") throwing by providing a unzipFn that throws synchronously.
-  const throwingUnzip: UnzipFn = () => { throw new Error("import failed"); };
-  const { files, corruptZips } = await expandFiles([zipFile], null, throwingUnzip);
+  const throwingUnzip: UnzipFn = () => {
+    throw new Error("import failed");
+  };
+  const { files, corruptZips } = await expandFiles(
+    [zipFile],
+    null,
+    throwingUnzip,
+  );
   assert.equal(files.length, 0);
   assert.equal(corruptZips.length, 1);
 });

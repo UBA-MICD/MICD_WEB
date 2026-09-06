@@ -6,7 +6,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { viewerFixtureHtml, stubCanvas2DContext } from "../../test/viewer-fixture.ts";
+import {
+  viewerFixtureHtml,
+  stubCanvas2DContext,
+} from "../../test/viewer-fixture.ts";
 import {
   initToolbar,
   updateToolbarUI,
@@ -61,7 +64,11 @@ const baseMeta = {
 };
 
 function mockParsed() {
-  return { metadata: baseMeta, pixelData: new Uint16Array([0, 1, 2, 3]), rawDataSet: {} } as any;
+  return {
+    metadata: baseMeta,
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
 }
 
 function resetState(): void {
@@ -71,7 +78,13 @@ function resetState(): void {
   state.serverInstances = [];
   state.currentIndex = 0;
   state.parsed = null;
-  state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 1, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
   state.activeTool = "wl";
   state.isDragging = false;
   state.lastMouseX = 0;
@@ -108,7 +121,10 @@ test("initToolbar: clicking zoom activates it and closes the wl panel", () => {
   document.getElementById("tool-zoom")!.dispatchEvent(new MouseEvent("click"));
   assert.equal(state.activeTool, "zoom");
   assert.equal(state.isWlPanelOpen, false);
-  assert.equal(document.getElementById("tool-zoom")!.classList.contains("active"), true);
+  assert.equal(
+    document.getElementById("tool-zoom")!.classList.contains("active"),
+    true,
+  );
 });
 
 test("initToolbar: pan is a no-op in 3D mode, crosshair is a no-op outside it", () => {
@@ -118,21 +134,33 @@ test("initToolbar: pan is a no-op in 3D mode, crosshair is a no-op outside it", 
   assert.notEqual(state.activeTool, "pan");
 
   state.is3DMode = false;
-  document.getElementById("tool-crosshair")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("tool-crosshair")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.notEqual(state.activeTool, "crosshair");
 });
 
 test("initToolbar: tool-reset restores the default viewport from metadata", () => {
   initToolbar();
   state.parsed = mockParsed();
-  state.viewport = { windowCenter: 999, windowWidth: 999, zoom: 5, panX: 5, panY: 5 };
+  state.viewport = {
+    windowCenter: 999,
+    windowWidth: 999,
+    zoom: 5,
+    panX: 5,
+    panY: 5,
+  };
   document.getElementById("tool-reset")!.dispatchEvent(new MouseEvent("click"));
   assert.equal(state.viewport.windowWidth, baseMeta.windowWidth);
 });
 
 test("initToolbar: tool-reset with no windowWidth metadata falls back to auto W/L", () => {
   initToolbar();
-  state.parsed = { metadata: { ...baseMeta, windowWidth: 0 }, pixelData: new Uint16Array([0, 1, 2, 3]), rawDataSet: {} } as any;
+  state.parsed = {
+    metadata: { ...baseMeta, windowWidth: 0 },
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
   document.getElementById("tool-reset")!.dispatchEvent(new MouseEvent("click"));
   assert.equal(typeof state.viewport.windowWidth, "number");
 });
@@ -140,7 +168,9 @@ test("initToolbar: tool-reset with no windowWidth metadata falls back to auto W/
 test("initToolbar: tool-reset is a no-op with nothing loaded", () => {
   initToolbar();
   assert.doesNotThrow(() =>
-    document.getElementById("tool-reset")!.dispatchEvent(new MouseEvent("click")),
+    document
+      .getElementById("tool-reset")!
+      .dispatchEvent(new MouseEvent("click")),
   );
 });
 
@@ -160,7 +190,10 @@ test("initToolbar: tool-metadata toggles the metadata panel", () => {
   const btn = document.getElementById("tool-metadata")!;
   btn.dispatchEvent(new MouseEvent("click"));
   assert.equal(state.isMetadataOpen, true);
-  assert.equal(document.getElementById("metadata-panel")!.classList.contains("open"), true);
+  assert.equal(
+    document.getElementById("metadata-panel")!.classList.contains("open"),
+    true,
+  );
   assert.equal(btn.getAttribute("aria-expanded"), "true");
 });
 
@@ -176,32 +209,49 @@ test("initToolbar: tool-mpr is a no-op when disabled", async () => {
 test("initToolbar: btn-open delegates to the file input click", () => {
   initToolbar();
   let clicked = false;
-  document.getElementById("open-files-input")!.addEventListener("click", () => (clicked = true));
+  document
+    .getElementById("open-files-input")!
+    .addEventListener("click", () => (clicked = true));
   document.getElementById("btn-open")!.dispatchEvent(new MouseEvent("click"));
   assert.equal(clicked, true);
 });
 
 test("initToolbar: export dialog opens, and png/zip/cancel close it", () => {
   initToolbar();
-  document.getElementById("btn-export-menu")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-export-menu")!
+    .dispatchEvent(new MouseEvent("click"));
   const dialog = document.getElementById("export-dialog")!;
   assert.equal(dialog.classList.contains("hidden"), false);
 
-  document.getElementById("export-dialog-cancel")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("export-dialog-cancel")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(dialog.classList.contains("hidden"), true);
 });
 
 test("initToolbar: export png/zip buttons close the dialog without throwing", () => {
   initToolbar();
-  document.getElementById("btn-export-menu")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-export-menu")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.doesNotThrow(() =>
-    document.getElementById("btn-export-dialog-png")!.dispatchEvent(new MouseEvent("click")),
+    document
+      .getElementById("btn-export-dialog-png")!
+      .dispatchEvent(new MouseEvent("click")),
   );
-  assert.equal(document.getElementById("export-dialog")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("export-dialog")!.classList.contains("hidden"),
+    true,
+  );
 
-  document.getElementById("btn-export-menu")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-export-menu")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.doesNotThrow(() =>
-    document.getElementById("btn-export-dialog-zip")!.dispatchEvent(new MouseEvent("click")),
+    document
+      .getElementById("btn-export-dialog-zip")!
+      .dispatchEvent(new MouseEvent("click")),
   );
 });
 
@@ -220,7 +270,9 @@ test("initToolbar: wl slider input adjusts window width/center and renders", () 
 
 test("initToolbar: preset buttons apply their window/level values", () => {
   initToolbar();
-  document.getElementById("btn-preset-lung")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-preset-lung")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.notEqual(state.viewport.windowWidth, 0);
 });
 
@@ -241,11 +293,22 @@ test("updateToolbarUI: disables pan/enables crosshair in 3D mode, and sets expor
   state.activeTool = "wl";
   state.parsed = mockParsed();
   updateToolbarUI();
-  assert.equal((document.getElementById("tool-pan") as HTMLButtonElement).disabled, true);
-  assert.equal((document.getElementById("tool-crosshair") as HTMLButtonElement).disabled, false);
-  assert.equal((document.getElementById("btn-export-menu") as HTMLButtonElement).disabled, false);
   assert.equal(
-    document.getElementById("viewport-container")!.classList.contains("cursor-wl"),
+    (document.getElementById("tool-pan") as HTMLButtonElement).disabled,
+    true,
+  );
+  assert.equal(
+    (document.getElementById("tool-crosshair") as HTMLButtonElement).disabled,
+    false,
+  );
+  assert.equal(
+    (document.getElementById("btn-export-menu") as HTMLButtonElement).disabled,
+    false,
+  );
+  assert.equal(
+    document
+      .getElementById("viewport-container")!
+      .classList.contains("cursor-wl"),
     true,
   );
 });
@@ -258,7 +321,12 @@ test("initViewportInteraction: mousedown/mousemove in wl mode adjusts window/lev
   const container = document.getElementById("viewport-container")!;
 
   container.dispatchEvent(
-    new MouseEvent("mousedown", { clientX: 100, clientY: 100, bubbles: true, cancelable: true }),
+    new MouseEvent("mousedown", {
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(state.isDragging, true);
 
@@ -275,7 +343,12 @@ test("initViewportInteraction: mousedown/mousemove is a no-op with nothing loade
   initViewportInteraction();
   const container = document.getElementById("viewport-container")!;
   container.dispatchEvent(
-    new MouseEvent("mousedown", { clientX: 100, clientY: 100, bubbles: true, cancelable: true }),
+    new MouseEvent("mousedown", {
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(state.isDragging, false);
 });
@@ -286,14 +359,32 @@ test("initViewportInteraction: zoom and pan tools update state on drag (2D)", ()
   const container = document.getElementById("viewport-container")!;
 
   state.activeTool = "zoom";
-  container.dispatchEvent(new MouseEvent("mousedown", { clientX: 0, clientY: 0, bubbles: true, cancelable: true }));
-  document.dispatchEvent(new MouseEvent("mousemove", { clientX: 0, clientY: 20, bubbles: true }));
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 0,
+      clientY: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 0, clientY: 20, bubbles: true }),
+  );
   assert.notEqual(state.viewport.zoom, 1);
   document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 
   state.activeTool = "pan";
-  container.dispatchEvent(new MouseEvent("mousedown", { clientX: 0, clientY: 0, bubbles: true, cancelable: true }));
-  document.dispatchEvent(new MouseEvent("mousemove", { clientX: 30, clientY: 15, bubbles: true }));
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 0,
+      clientY: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 30, clientY: 15, bubbles: true }),
+  );
   assert.equal(state.viewport.panX, 30);
   document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 });
@@ -307,16 +398,29 @@ test("initViewportInteraction: 3D pan/zoom/orbit drag updates the mpr camera", (
   const container = document.getElementById("viewport-container")!;
 
   state.activeTool = "pan";
-  container.dispatchEvent(new MouseEvent("mousedown", { clientX: 0, clientY: 0, bubbles: true, cancelable: true }));
-  document.dispatchEvent(new MouseEvent("mousemove", { clientX: 10, clientY: 10, bubbles: true }));
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 0,
+      clientY: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 10, clientY: 10, bubbles: true }),
+  );
   assert.equal(mpr3DViewer.camera.panX, 10);
 
   state.activeTool = "zoom";
-  document.dispatchEvent(new MouseEvent("mousemove", { clientX: 10, clientY: 30, bubbles: true }));
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 10, clientY: 30, bubbles: true }),
+  );
   assert.notEqual(mpr3DViewer.camera.zoom, 1);
 
   state.activeTool = "crosshair";
-  document.dispatchEvent(new MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true }));
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true }),
+  );
   // orbit branch (default) with crosshair also updates the pointer position
   assert.equal(typeof mpr3DViewer.camera.phi, "number");
 
@@ -363,7 +467,10 @@ test("initViewportInteraction: 3D wheel navigates depth slices", () => {
   (mpr3DViewer as any).setDepthIndex = (i: number) => (setTo = i);
   try {
     const container = document.getElementById("viewport-container")!;
-    const wheel = new Event("wheel", { bubbles: true, cancelable: true }) as any;
+    const wheel = new Event("wheel", {
+      bubbles: true,
+      cancelable: true,
+    }) as any;
     wheel.deltaY = 100;
     container.dispatchEvent(wheel);
     assert.equal(setTo, 1);
@@ -377,7 +484,10 @@ test("initViewportInteraction: wheel is a no-op with nothing loaded", () => {
   initViewportInteraction();
   const container = document.getElementById("viewport-container")!;
   assert.doesNotThrow(() => {
-    const wheel = new Event("wheel", { bubbles: true, cancelable: true }) as any;
+    const wheel = new Event("wheel", {
+      bubbles: true,
+      cancelable: true,
+    }) as any;
     wheel.deltaY = 100;
     container.dispatchEvent(wheel);
   });
@@ -387,17 +497,28 @@ test("initViewportInteraction: wheel is a no-op with nothing loaded", () => {
 
 test("orientation buttons set mpr3DViewer's view and update the active class", () => {
   initToolbar();
-  document.getElementById("btn-view-axial")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-view-axial")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(mpr3DViewer.activeView, "axial");
-  assert.equal(document.getElementById("btn-view-axial")!.classList.contains("active"), true);
+  assert.equal(
+    document.getElementById("btn-view-axial")!.classList.contains("active"),
+    true,
+  );
 
-  document.getElementById("btn-view-coronal")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-view-coronal")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(mpr3DViewer.activeView, "coronal");
 
-  document.getElementById("btn-view-sagittal")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-view-sagittal")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(mpr3DViewer.activeView, "sagittal");
 
-  document.getElementById("btn-view-3d")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("btn-view-3d")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(mpr3DViewer.activeView, "3d");
 });
 
@@ -407,7 +528,9 @@ test("the depth slider input sets the mpr depth index", () => {
   let setTo = -1;
   (mpr3DViewer as any).setDepthIndex = (i: number) => (setTo = i);
   try {
-    const slider = document.getElementById("mpr-depth-slider") as HTMLInputElement;
+    const slider = document.getElementById(
+      "mpr-depth-slider",
+    ) as HTMLInputElement;
     slider.max = "10"; // a range input clamps .value to [min,max]
     slider.value = "3";
     slider.dispatchEvent(new Event("input"));
@@ -447,7 +570,11 @@ test("initSeriesNav: prev is a no-op at index 0, next is a no-op at the last ind
 
 test("initSeriesNav: the slider input jumps to the chosen index", async () => {
   initSeriesNav();
-  state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm"), new File(["c"], "c.dcm")] as any;
+  state.files = [
+    new File(["a"], "a.dcm"),
+    new File(["b"], "b.dcm"),
+    new File(["c"], "c.dcm"),
+  ] as any;
   dicomCache.set(2, mockParsed());
   const slider = document.getElementById("nav-slider") as HTMLInputElement;
   slider.max = "10"; // a range input clamps .value to [min,max]
@@ -460,7 +587,12 @@ test("initSeriesNav: the slider input jumps to the chosen index", async () => {
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
 function key(k: string, opts: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  return new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...opts });
+  return new KeyboardEvent("keydown", {
+    key: k,
+    bubbles: true,
+    cancelable: true,
+    ...opts,
+  });
 }
 
 test("keyboard: arrow keys adjust the active wl/zoom/pan tool", () => {
@@ -555,7 +687,11 @@ test("keyboard: ignores keys typed into an input/textarea", () => {
   state.activeTool = "wl";
   const input = document.createElement("input");
   document.body.appendChild(input);
-  const evt = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+  const evt = new KeyboardEvent("keydown", {
+    key: "ArrowRight",
+    bubbles: true,
+    cancelable: true,
+  });
   Object.defineProperty(evt, "target", { value: input });
   input.dispatchEvent(evt);
   assert.equal(state.viewport.windowWidth, 0);
@@ -565,8 +701,13 @@ test("keyboard: ignores the event while a dialog is open", () => {
   initToolbar();
   initKeyboardShortcuts();
   state.parsed = mockParsed();
-  document.getElementById("btn-export-menu")!.dispatchEvent(new MouseEvent("click"));
-  assert.equal(document.getElementById("export-dialog")!.classList.contains("hidden"), false);
+  document
+    .getElementById("btn-export-menu")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(
+    document.getElementById("export-dialog")!.classList.contains("hidden"),
+    false,
+  );
 
   const startWidth = state.viewport.windowWidth;
   document.dispatchEvent(key("ArrowRight"));
@@ -599,7 +740,11 @@ test("initMenuListeners wires menu:open-files/open-folder/api-server when window
   };
   try {
     initMenuListeners();
-    assert.deepEqual(calls, ["menu:open-files", "menu:open-folder", "menu:api-server"]);
+    assert.deepEqual(calls, [
+      "menu:open-files",
+      "menu:open-folder",
+      "menu:api-server",
+    ]);
   } finally {
     delete (window as any).api;
   }
@@ -607,4 +752,111 @@ test("initMenuListeners wires menu:open-files/open-folder/api-server when window
 
 test("initResizeObserver observes the viewport container without throwing", () => {
   assert.doesNotThrow(() => initResizeObserver());
+});
+
+// ── Zoom controls ─────────────────────────────────────────────────────────────
+
+test("zoom slider input sets viewport zoom in 2D mode and clamps to [0.1, 5]", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.is3DMode = false;
+
+  const slider = document.getElementById("slider-zoom") as HTMLInputElement;
+  slider.value = "2.5";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(state.viewport.zoom, 2.5);
+
+  const valZoom = document.getElementById("val-zoom")!;
+  assert.equal(valZoom.textContent, "2.5x");
+});
+
+test("zoom slider input sets mpr camera zoom in 3D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.is3DMode = true;
+
+  const slider = document.getElementById("slider-zoom") as HTMLInputElement;
+  slider.value = "1.5";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(mpr3DViewer.camera.zoom, 1.5);
+  state.is3DMode = false;
+});
+
+test("btn-zoom-fit in 2D mode sets zoom to fit the container and resets pan", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.parsed = mockParsed();
+  state.viewport.zoom = 3;
+  state.viewport.panX = 50;
+  state.viewport.panY = 50;
+
+  document
+    .getElementById("btn-zoom-fit")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.panX, 0);
+  assert.equal(state.viewport.panY, 0);
+});
+
+test("btn-zoom-fit in 3D mode resets camera zoom to 1", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.parsed = mockParsed();
+  state.is3DMode = true;
+  mpr3DViewer.camera.zoom = 3.0;
+
+  document
+    .getElementById("btn-zoom-fit")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(mpr3DViewer.camera.zoom, 1);
+  state.is3DMode = false;
+});
+
+test("btn-zoom-fit with no parsed study resets viewport zoom to 1 in 2D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+  state.parsed = null;
+  state.viewport.zoom = 3;
+
+  document
+    .getElementById("btn-zoom-fit")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.zoom, 1);
+});
+
+test("btn-zoom-100 sets zoom to 1 in 2D mode and 3D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.is3DMode = false;
+  state.viewport.zoom = 3;
+  document
+    .getElementById("btn-zoom-100")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.zoom, 1);
+
+  state.is3DMode = true;
+  mpr3DViewer.camera.zoom = 3;
+  document
+    .getElementById("btn-zoom-100")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(mpr3DViewer.camera.zoom, 1);
+  state.is3DMode = false;
+});
+
+test("btn-zoom-200 sets zoom to 2 in 2D mode and 3D mode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.is3DMode = false;
+  document
+    .getElementById("btn-zoom-200")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.zoom, 2);
+
+  state.is3DMode = true;
+  document
+    .getElementById("btn-zoom-200")!
+    .dispatchEvent(new MouseEvent("click"));
+  assert.equal(mpr3DViewer.camera.zoom, 2);
+  state.is3DMode = false;
 });

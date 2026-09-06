@@ -18,13 +18,17 @@ const STORAGE_KEY = "micd_lang";
 const TABLES: Record<Locale, Record<string, string>> = { es, en };
 
 function isLocale(value: unknown): value is Locale {
-  return typeof value === "string" && (SUPPORTED_LOCALES as string[]).includes(value);
+  return (
+    typeof value === "string" && (SUPPORTED_LOCALES as string[]).includes(value)
+  );
 }
 
 function readStoredLocale(): Locale | null {
   try {
     const raw =
-      typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem(STORAGE_KEY)
+        : null;
     return isLocale(raw) ? raw : null;
   } catch {
     return null;
@@ -46,7 +50,8 @@ export function setLocale(next: Locale): void {
   if (next === locale) return;
   locale = next;
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, next);
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(STORAGE_KEY, next);
   } catch {
     // best-effort persistence only — a locale that resets on reload is fine
   }
@@ -74,7 +79,8 @@ export function onLocaleChange(cb: LocaleListener): () => void {
 export function initLocaleFromBrowser(): void {
   if (readStoredLocale() !== null) return;
   try {
-    const lang = typeof navigator !== "undefined" ? navigator.language?.slice(0, 2) : null;
+    const lang =
+      typeof navigator !== "undefined" ? navigator.language?.slice(0, 2) : null;
     if (isLocale(lang)) setLocale(lang);
   } catch {
     // best-effort only — stay on the "es" default
@@ -86,11 +92,16 @@ export function initLocaleFromBrowser(): void {
  * from `params`. Falls back to the key itself when missing — this must never
  * throw, since a stale/missing key should degrade visibly, not crash the app.
  */
-export function t(key: string, params?: Record<string, string | number>): string {
+export function t(
+  key: string,
+  params?: Record<string, string | number>,
+): string {
   const value = TABLES[locale][key] ?? key;
   if (!params) return value;
   return value.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
-    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match,
+    Object.prototype.hasOwnProperty.call(params, name)
+      ? String(params[name])
+      : match,
   );
 }
 

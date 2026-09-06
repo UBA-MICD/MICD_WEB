@@ -6,7 +6,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { viewerFixtureHtml, stubCanvas2DContext } from "../../test/viewer-fixture.ts";
+import {
+  viewerFixtureHtml,
+  stubCanvas2DContext,
+} from "../../test/viewer-fixture.ts";
 import {
   loadCurrent,
   resetViewerToDropZone,
@@ -65,7 +68,10 @@ function mockParsed(overrides: Partial<typeof baseMeta> = {}) {
   } as any;
 }
 
-function withFakeDicomParser(dataSet: any, run: () => Promise<void>): Promise<void> {
+function withFakeDicomParser(
+  dataSet: any,
+  run: () => Promise<void>,
+): Promise<void> {
   const previous = (globalThis as any).dicomParser;
   (globalThis as any).dicomParser = { parseDicom: () => dataSet };
   return run().finally(() => {
@@ -111,7 +117,13 @@ function resetState(): void {
   state.serverInstances = [];
   state.currentIndex = 0;
   state.parsed = null;
-  state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 1, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
   dicomCache.clear();
 }
 
@@ -131,7 +143,10 @@ test("loadCurrent shows an error when the index can't be resolved", async () => 
   state.source = "local";
   state.files = [];
   await loadCurrent();
-  assert.equal(document.getElementById("error-message")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("error-message")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("resetViewerToDropZone clears state and shows the drop zone", () => {
@@ -140,15 +155,25 @@ test("resetViewerToDropZone clears state and shows the drop zone", () => {
   resetViewerToDropZone();
   assert.equal(state.parsed, null);
   assert.equal(state.files.length, 0);
-  assert.equal(document.getElementById("drop-zone")!.classList.contains("hidden"), false);
-  assert.equal(document.getElementById("series-nav")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("drop-zone")!.classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document.getElementById("series-nav")!.classList.contains("hidden"),
+    true,
+  );
 });
 
 test("openFiles/openFolder click their respective inputs", () => {
   let filesClicked = false;
   let folderClicked = false;
-  document.getElementById("open-files-input")!.addEventListener("click", () => (filesClicked = true));
-  document.getElementById("open-folder-input")!.addEventListener("click", () => (folderClicked = true));
+  document
+    .getElementById("open-files-input")!
+    .addEventListener("click", () => (filesClicked = true));
+  document
+    .getElementById("open-folder-input")!
+    .addEventListener("click", () => (folderClicked = true));
   openFiles();
   openFolder();
   assert.equal(filesClicked, true);
@@ -182,18 +207,30 @@ test("initFileInputs: an empty file selection is a no-op", async () => {
 
 test("initFileInputs: a folder selection with no DICOM files shows an error", async () => {
   initFileInputs();
-  const input = document.getElementById("open-folder-input") as HTMLInputElement;
-  Object.defineProperty(input, "files", { value: [new File(["x"], "notes.txt")], configurable: true });
+  const input = document.getElementById(
+    "open-folder-input",
+  ) as HTMLInputElement;
+  Object.defineProperty(input, "files", {
+    value: [new File(["x"], "notes.txt")],
+    configurable: true,
+  });
   input.dispatchEvent(new Event("change"));
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(document.getElementById("error-message")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("error-message")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("initFileInputs: btn-open-folder click opens the folder picker", () => {
   initFileInputs();
   let clicked = false;
-  document.getElementById("open-folder-input")!.addEventListener("click", () => (clicked = true));
-  document.getElementById("btn-open-folder")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("open-folder-input")!
+    .addEventListener("click", () => (clicked = true));
+  document
+    .getElementById("btn-open-folder")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(clicked, true);
 });
 
@@ -202,7 +239,9 @@ test("initDropZone: dragenter adds drag-over, dragleave outside removes it", () 
   const container = document.getElementById("viewport-container")!;
   const dropZone = document.getElementById("drop-zone")!;
 
-  container.dispatchEvent(new Event("dragenter", { bubbles: true, cancelable: true }));
+  container.dispatchEvent(
+    new Event("dragenter", { bubbles: true, cancelable: true }),
+  );
   assert.equal(dropZone.classList.contains("drag-over"), true);
 
   const leave = new Event("dragleave", { bubbles: true, cancelable: true });
@@ -234,7 +273,9 @@ test("initDropZone: dropping only non-dcm files is a no-op", async () => {
   initDropZone();
   const dropZone = document.getElementById("drop-zone")!;
   const dropEvt = new Event("drop", { bubbles: true, cancelable: true });
-  Object.defineProperty(dropEvt, "dataTransfer", { value: { files: [new File(["x"], "notes.txt")] } });
+  Object.defineProperty(dropEvt, "dataTransfer", {
+    value: { files: [new File(["x"], "notes.txt")] },
+  });
   dropZone.dispatchEvent(dropEvt);
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(state.files.length, 0);
@@ -243,27 +284,47 @@ test("initDropZone: dropping only non-dcm files is a no-op", async () => {
 test("initDropZone: drop-zone-open click delegates to openFiles", () => {
   initDropZone();
   let clicked = false;
-  document.getElementById("open-files-input")!.addEventListener("click", () => (clicked = true));
-  document.getElementById("drop-zone-open")!.dispatchEvent(new MouseEvent("click"));
+  document
+    .getElementById("open-files-input")!
+    .addEventListener("click", () => (clicked = true));
+  document
+    .getElementById("drop-zone-open")!
+    .dispatchEvent(new MouseEvent("click"));
   assert.equal(clicked, true);
 });
 
 test("displayParsed shows an error when pixelData is missing", () => {
-  displayParsed({ metadata: baseMeta, pixelData: null, rawDataSet: {} } as any, "empty");
-  assert.equal(document.getElementById("error-message")!.classList.contains("hidden"), false);
+  displayParsed(
+    { metadata: baseMeta, pixelData: null, rawDataSet: {} } as any,
+    "empty",
+  );
+  assert.equal(
+    document.getElementById("error-message")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("displayParsed sets the topbar title and renders the canvas", () => {
   displayParsed(mockParsed(), "My Study");
-  assert.equal(document.getElementById("topbar-title")!.textContent, "My Study");
-  assert.equal(document.getElementById("drop-zone")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("topbar-title")!.textContent,
+    "My Study",
+  );
+  assert.equal(
+    document.getElementById("drop-zone")!.classList.contains("hidden"),
+    true,
+  );
   const canvas = document.getElementById("dicom-canvas") as HTMLCanvasElement;
   assert.equal(canvas.width, 2);
 });
 
 // ── loadStudyFromServer ──────────────────────────────────────────────────────
 
-const testUser: AuthUser = { id: 1, email: "radiologist@example.com", role: "medico" };
+const testUser: AuthUser = {
+  id: 1,
+  email: "radiologist@example.com",
+  role: "medico",
+};
 
 test.beforeEach(async () => {
   await logout().catch(() => {});
@@ -273,7 +334,10 @@ test("loadStudyFromServer shows an error when the instances fetch fails", async 
   await adoptSession("fake-token", "fake-refresh", testUser);
   (globalThis as any).fetch = async () => new Response(null, { status: 500 });
   await loadStudyFromServer("study-1");
-  assert.equal(document.getElementById("error-message")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("error-message")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("loadStudyFromServer shows an error when the study has no instances", async () => {
@@ -281,7 +345,10 @@ test("loadStudyFromServer shows an error when the study has no instances", async
   (globalThis as any).fetch = async () =>
     new Response(JSON.stringify({ instances: [] }), { status: 200 });
   await loadStudyFromServer("study-1");
-  assert.equal(document.getElementById("error-message")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("error-message")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("loadStudyFromServer loads the first instance on success", async () => {
@@ -290,7 +357,10 @@ test("loadStudyFromServer loads the first instance on success", async () => {
   (globalThis as any).fetch = async (url: string) => {
     call++;
     if (url.includes("/instances") && !url.includes("/file")) {
-      return new Response(JSON.stringify({ instances: [{ instanceId: "i1" }] }), { status: 200 });
+      return new Response(
+        JSON.stringify({ instances: [{ instanceId: "i1" }] }),
+        { status: 200 },
+      );
     }
     return new Response(new ArrayBuffer(8), { status: 200 });
   };

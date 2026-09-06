@@ -26,8 +26,10 @@ beforeEach(() => {
       store.delete(k);
     },
   };
-  (globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) =>
-    fetchImpl(url, init);
+  (globalThis as { fetch?: unknown }).fetch = (
+    url: string,
+    init?: RequestInit,
+  ) => fetchImpl(url, init);
 });
 
 afterEach(() => {
@@ -100,7 +102,12 @@ test("successful submit clears the form, calls onSuccess, and de-busies", async 
     assert.equal(submit.disabled, true);
     assert.equal(cancel.disabled, true);
     return jsonResponse(200, {
-      accessToken: fakeJwt({ sub: "u1", email: "user@example.com", role: "medico", exp: 9999999999 }),
+      accessToken: fakeJwt({
+        sub: "u1",
+        email: "user@example.com",
+        role: "medico",
+        exp: 9999999999,
+      }),
       refreshToken: "refresh-abc",
       user: { id: "u1", email: "user@example.com" },
     });
@@ -205,7 +212,9 @@ test("mountLoginForm works without an optional cancel button", async () => {
   `);
   const form = document.getElementById("no-cancel") as HTMLFormElement;
   const email = form.querySelector("[data-login-email]") as HTMLInputElement;
-  const password = form.querySelector("[data-login-password]") as HTMLInputElement;
+  const password = form.querySelector(
+    "[data-login-password]",
+  ) as HTMLInputElement;
   email.value = "a@b.com";
   password.value = "x";
 
@@ -214,4 +223,30 @@ test("mountLoginForm works without an optional cancel button", async () => {
   submitForm(form);
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
+});
+
+test("password toggle button switches input type and updates aria-label", () => {
+  setBody(`
+    <form id="toggle-form">
+      <input data-login-email />
+      <input data-login-password type="password" />
+      <div data-login-error class="hidden"></div>
+      <button data-login-submit type="submit">Go</button>
+      <button data-login-toggle type="button" aria-label="Show password"></button>
+    </form>
+  `);
+  const form = document.getElementById("toggle-form") as HTMLFormElement;
+  const password = form.querySelector(
+    "[data-login-password]",
+  ) as HTMLInputElement;
+  const toggle = form.querySelector("[data-login-toggle]") as HTMLButtonElement;
+
+  mountLoginForm(form, { onSuccess: () => {} });
+
+  assert.equal(password.type, "password");
+  toggle.dispatchEvent(new MouseEvent("click"));
+  assert.equal(password.type, "text");
+
+  toggle.dispatchEvent(new MouseEvent("click"));
+  assert.equal(password.type, "password");
 });

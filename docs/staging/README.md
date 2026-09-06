@@ -9,8 +9,8 @@ This repo owns the **public entrypoint** for staging:
 - `.env.staging.example` — copy to `.env.staging` **on the VPS** (`STAGING_DOMAIN`, `ACME_EMAIL`).
 - `.github/workflows/deploy-to-staging.yml` — build+push to GHCR, SSH deploy, public HTTPS check.
 
-Full design and the cross-repo picture: `docs/staging-deployment/{spec,plan,tasks}.md` (parent
-workspace).
+Full design, the cross-repo picture, and the resume routemap live in the **`MICD_BACKEND`** repo:
+`docs/staging-deployment/{spec,plan,tasks,routemap}.md`.
 
 Quick facts:
 - Domain: `dicomviewermed.online` (its DNS A record must point at the VPS before first deploy — ACME).

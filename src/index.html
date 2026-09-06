@@ -121,6 +121,95 @@
               <option value="en" data-i18n="app.locale.en">English</option>
             </select>
           </div>
+
+          <!-- Grid Layout and Sync Controls -->
+          <div
+            class="topbar-grid-controls"
+            role="group"
+            aria-label="Layout y Sincronización"
+          >
+            <button
+              class="topbar-btn active"
+              id="btn-layout-1x1"
+              title="Vista simple (1x1)"
+              aria-label="Vista simple 1x1"
+              aria-pressed="true"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+              <span>1x1</span>
+            </button>
+            <button
+              class="topbar-btn"
+              id="btn-layout-1x2"
+              title="Vista dividida (1x2)"
+              aria-label="Vista dividida 1x2"
+              aria-pressed="false"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+              <span>1x2</span>
+            </button>
+            <button
+              class="topbar-btn"
+              id="btn-layout-2x2"
+              title="Cuadrícula (2x2)"
+              aria-label="Cuadrícula 2x2"
+              aria-pressed="false"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+              </svg>
+              <span>2x2</span>
+            </button>
+            <button
+              class="topbar-btn btn-sync"
+              id="btn-sync-viewports"
+              title="Sincronizar Visores"
+              aria-label="Sincronizar Visores"
+              aria-pressed="false"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"
+                />
+              </svg>
+              <span>Sync</span>
+            </button>
+          </div>
           <!-- Series navigation -->
           <div class="series-nav hidden" id="series-nav">
             <button
@@ -324,6 +413,26 @@
                   <rect x="13" y="13" width="8" height="8" rx="1" />
                 </svg>
                 <span>MPR</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-layers"
+                title="Capas de Superposición"
+                aria-label="Capas"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                </svg>
+                <span>Capas</span>
               </button>
             </div>
 
@@ -574,35 +683,6 @@
               />
             </div>
 
-            <!-- 3D Orientation Widget (Bottom-Right) -->
-            <div
-              class="mpr-orientation-widget hidden"
-              id="mpr-orientation-widget"
-            >
-              <div class="mpr-orient-buttons">
-                <button class="btn-orient active" id="btn-view-axial">
-                  Axial
-                </button>
-                <button
-                  class="btn-orient"
-                  id="btn-view-sagittal"
-                  data-i18n="viewer.mpr.sagittal"
-                >
-                  Sagital
-                </button>
-                <button class="btn-orient" id="btn-view-coronal">
-                  Coronal
-                </button>
-                <button
-                  class="btn-orient"
-                  id="btn-view-3d"
-                  data-i18n="viewer.mpr.volumetricView"
-                >
-                  Vista Volumétrica
-                </button>
-              </div>
-            </div>
-
             <div class="viewport-container cursor-wl" id="viewport-container">
               <!-- Anatomical Reference Cube (2D) -->
               <canvas
@@ -612,6 +692,64 @@
                 height="120"
               ></canvas>
 
+              <!-- 3D Orientation Widget (Bottom-Right) -->
+              <div id="mpr-orientation-widget" class="mpr-orientation-widget">
+                <button class="mpr-btn btn-orient active" id="btn-mpr-axial">
+                  Axial
+                </button>
+                <button
+                  class="mpr-btn btn-orient"
+                  id="btn-mpr-sagittal"
+                  data-i18n="viewer.mpr.sagittal"
+                >
+                  Sagital
+                </button>
+                <button class="mpr-btn btn-orient" id="btn-mpr-coronal">
+                  Coronal
+                </button>
+                <button
+                  class="mpr-btn btn-orient"
+                  id="btn-mpr-3d"
+                  data-i18n="viewer.mpr.volumetricView"
+                >
+                  Vista Volumétrica
+                </button>
+              </div>
+
+              <!-- MPR Tri-Planar Sliders Panel -->
+              <div id="mpr-sliders-panel" class="mpr-sliders-panel">
+                <div class="mpr-slider-row">
+                  <label for="mpr-scroll-axial">Axial</label>
+                  <input
+                    type="range"
+                    id="mpr-scroll-axial"
+                    min="0"
+                    max="0"
+                    value="0"
+                  />
+                </div>
+                <div class="mpr-slider-row">
+                  <label for="mpr-scroll-coronal">Coronal</label>
+                  <input
+                    type="range"
+                    id="mpr-scroll-coronal"
+                    min="0"
+                    max="0"
+                    value="0"
+                  />
+                </div>
+                <div class="mpr-slider-row">
+                  <label for="mpr-scroll-sagittal">Sagital</label>
+                  <input
+                    type="range"
+                    id="mpr-scroll-sagittal"
+                    min="0"
+                    max="0"
+                    value="0"
+                  />
+                </div>
+              </div>
+
               <!-- role="img" + a label written from the DICOM metadata; this
                  was an unlabelled black box to assistive tech. -->
               <canvas
@@ -620,18 +758,6 @@
                 data-i18n-attr="aria-label:viewer.canvasEmptyLabel"
                 aria-label="Sin imagen cargada"
               ></canvas>
-
-              <!-- 2D Cardinal Orientation Labels -->
-              <div id="mpr-orient-top" class="mpr-orient-label"></div>
-              <div id="mpr-orient-bottom" class="mpr-orient-label"></div>
-              <div id="mpr-orient-left" class="mpr-orient-label"></div>
-              <div id="mpr-orient-right" class="mpr-orient-label"></div>
-
-              <!-- Info overlays (HUD) -->
-              <div class="overlay overlay--tl" id="overlay-tl"></div>
-              <div class="overlay overlay--tr" id="overlay-tr"></div>
-              <div class="overlay overlay--bl" id="overlay-bl"></div>
-              <div class="overlay overlay--br" id="overlay-br"></div>
 
               <!-- Drop zone -->
               <div class="drop-zone" id="drop-zone">
@@ -894,6 +1020,77 @@
                 </div>
               </div>
             </aside>
+
+            <!-- Layers Popover Panel -->
+            <div
+              id="popover-layers"
+              class="toolbar-popover hidden"
+              role="dialog"
+              aria-label="Ajuste de Capas"
+            >
+              <div class="popover-header" data-i18n="viewer.layers.title"></div>
+              <div class="popover-body">
+                <button
+                  id="btn-load-layer"
+                  class="toolbar-btn"
+                  style="width: 100%; margin-bottom: 8px"
+                  data-i18n="viewer.layers.loadBtn"
+                >
+                  Cargar Estudio Superpuesto
+                </button>
+                <input
+                  type="file"
+                  id="input-layer-file"
+                  multiple
+                  accept=".dcm"
+                  hidden
+                />
+                <hr style="border-color: var(--border-color); margin: 8px 0" />
+                <label
+                  class="popover-label"
+                  for="slider-opacity"
+                  data-i18n="viewer.layers.opacity"
+                  >Opacidad</label
+                >
+                <input
+                  type="range"
+                  id="slider-opacity"
+                  class="wl-slider styled-slider"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value="0.5"
+                />
+                <label
+                  class="popover-label"
+                  for="slider-layer-ww"
+                  data-i18n="viewer.layers.ww"
+                  >Ancho de Capa (WW)</label
+                >
+                <input
+                  type="range"
+                  id="slider-layer-ww"
+                  class="wl-slider styled-slider"
+                  min="1"
+                  max="4000"
+                  value="400"
+                />
+                <label
+                  class="popover-label"
+                  for="slider-layer-wl"
+                  data-i18n="viewer.layers.wl"
+                  >Centro de Capa (WL)</label
+                >
+                <input
+                  type="range"
+                  id="slider-layer-wl"
+                  class="wl-slider styled-slider"
+                  min="-1000"
+                  max="1000"
+                  value="40"
+                />
+              </div>
+            </div>
 
             <!-- Metadata panel (slide-out) -->
             <aside class="metadata-panel" id="metadata-panel">

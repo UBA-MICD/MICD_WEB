@@ -238,9 +238,7 @@ export class MPR3DViewer {
         canvas.parentNode.replaceChild(newCanvas, canvas);
         canvas = newCanvas; // Update reference to newly created canvas
 
-        if (!this.initGL(canvas)) {
-          throw new Error(t("viewer.mpr.webglUnavailable"));
-        }
+        this.initGL(canvas);
         this.uploadVolumeTexture();
       }
 
@@ -1095,6 +1093,65 @@ void main() {
         ctx.fillStyle = face.color;
         ctx.fillText(face.label, cp.x, cp.y);
       });
+  }
+
+  /** Set axial slice index (Z dimension). */
+  public setAxialIndex(index: number): void {
+    if (!this.volume) return;
+    this.crosshair.z = Math.max(0, Math.min(this.volume.depth - 1, index));
+  }
+
+  /** Set coronal slice index (Y dimension). */
+  public setCoronalIndex(index: number): void {
+    if (!this.volume) return;
+    this.crosshair.y = Math.max(0, Math.min(this.volume.rows - 1, index));
+  }
+
+  /** Set sagittal slice index (X dimension). */
+  public setSagittalIndex(index: number): void {
+    if (!this.volume) return;
+    this.crosshair.x = Math.max(0, Math.min(this.volume.cols - 1, index));
+  }
+
+  /** Get volume dimension bounds (Z, Y, X). */
+  public getVolumeDimensions(): {
+    depth: number;
+    rows: number;
+    cols: number;
+  } | null {
+    if (!this.volume) return null;
+    return {
+      depth: this.volume.depth,
+      rows: this.volume.rows,
+      cols: this.volume.cols,
+    };
+  }
+
+  /** Get current slice indices across the 3 planes. */
+  public getCurrentIndices(): { x: number; y: number; z: number } {
+    return {
+      x: this.crosshair.x,
+      y: this.crosshair.y,
+      z: this.crosshair.z,
+    };
+  }
+
+  /** Recalculate WebGL viewport and canvas dimensions */
+  public resize(canvas?: HTMLCanvasElement): void {
+    const target =
+      canvas ||
+      (this.gl?.canvas as HTMLCanvasElement) ||
+      (document.getElementById("dicom-canvas") as HTMLCanvasElement);
+    if (!target) return;
+    const width = target.clientWidth || target.width;
+    const height = target.clientHeight || target.height;
+    if (width > 0 && height > 0) {
+      target.width = width;
+      target.height = height;
+    }
+    if (this.gl) {
+      this.gl.viewport(0, 0, target.width, target.height);
+    }
   }
 }
 

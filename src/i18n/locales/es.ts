@@ -164,6 +164,11 @@ export const es: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.layers.title": "Ajuste de Capas",
+  "viewer.layers.loadBtn": "Cargar Estudio Superpuesto",
+  "viewer.layers.opacity": "Opacidad",
+  "viewer.layers.ww": "Ancho de Capa (WW)",
+  "viewer.layers.wl": "Centro de Capa (WL)",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",

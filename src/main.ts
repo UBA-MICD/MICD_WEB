@@ -29,7 +29,9 @@ import {
   initMenuListeners,
   initKeyboardShortcuts,
   initResizeObserver,
+  initGridLayoutControls,
 } from "./viewer/interaction.js";
+import { initViewportManager } from "./viewer/viewport-registry.js";
 import { initUploadPanel } from "./upload/upload.js";
 import {
   initStudyExplorer,
@@ -119,6 +121,11 @@ async function initApp(): Promise<void> {
 }
 
 function startApp(): void {
+  // Multi-viewport grid: must be first — toolbar and loading modules read the registry.
+  const vpContainer = document.getElementById("viewport-container");
+  if (!vpContainer) throw new Error("#viewport-container not found in DOM");
+  initViewportManager(vpContainer);
+
   initFileInputs();
   initToolbar();
   initViewportInteraction();
@@ -144,6 +151,7 @@ function startApp(): void {
   // Last: the rail is one tab stop, with the arrow keys moving between tools,
   // so reaching the viewport does not mean tabbing through every tool. It
   // reads the tool buttons at init, so it runs after they are all wired.
+  initGridLayoutControls();
   initRovingTabindex($("viewer-toolbar"), ".toolbar__tool", "vertical");
 }
 

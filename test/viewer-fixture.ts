@@ -1,3 +1,4 @@
+// cspell:ignore Corte Sagital
 /**
  * Shared DOM fixture for viewer/interaction/loading/rendering tests — a
  * trimmed-down mirror of src/index.html's #viewer-screen markup, keeping
@@ -31,12 +32,12 @@ export function viewerFixtureHtml(): string {
     <button id="btn-export-menu" disabled></button>
 
     <div class="mpr-depth-slider-wrap hidden" id="mpr-depth-slider-wrap">
-      <span id="mpr-depth-counter">Slice: 1/1</span>
+      <span id="mpr-depth-counter">Corte: 1/1</span>
       <input type="range" id="mpr-depth-slider" min="0" max="0" value="0" />
     </div>
     <div class="mpr-orientation-widget hidden" id="mpr-orientation-widget">
       <button class="btn-orient active" id="btn-view-axial">Axial</button>
-      <button class="btn-orient" id="btn-view-sagittal">Sagittal</button>
+      <button class="btn-orient" id="btn-view-sagittal">Sagital</button>
       <button class="btn-orient" id="btn-view-coronal">Coronal</button>
       <button class="btn-orient" id="btn-view-3d">3D</button>
     </div>
@@ -65,20 +66,6 @@ export function viewerFixtureHtml(): string {
       <button id="btn-preset-soft" data-preset="softTissue"></button>
       <button id="btn-preset-brain" data-preset="brain"></button>
     </aside>
-
-    <aside class="zoom-panel" id="zoom-panel">
-      <input type="range" id="slider-zoom" min="0.1" max="5" step="0.1" value="1" />
-      <span id="val-zoom">1.0x</span>
-      <button id="btn-zoom-fit"></button>
-      <button id="btn-zoom-100"></button>
-      <button id="btn-zoom-200"></button>
-    </aside>
-
-    <div id="mpr-orient-top" class="mpr-orient"></div>
-    <div id="mpr-orient-bottom" class="mpr-orient"></div>
-    <div id="mpr-orient-left" class="mpr-orient"></div>
-    <div id="mpr-orient-right" class="mpr-orient"></div>
-    <canvas id="mpr-reference-cube"></canvas>
 
     <aside class="metadata-panel" id="metadata-panel">
       <table><tbody id="metadata-tbody"></tbody></table>

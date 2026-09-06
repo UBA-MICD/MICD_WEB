@@ -161,6 +161,11 @@ export const en: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error loading the 3D volume: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.layers.title": "Layer Adjustment",
+  "viewer.layers.loadBtn": "Load Overlay Study",
+  "viewer.layers.opacity": "Opacity",
+  "viewer.layers.ww": "Layer Width (WW)",
+  "viewer.layers.wl": "Layer Center (WL)",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",

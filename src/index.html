@@ -394,9 +394,9 @@
               </button>
               <button
                 class="toolbar__tool"
-                id="tool-mpr"
-                data-i18n-attr="title:viewer.tool.mprStaticTitle"
-                title="Reconstrucción Multiplanar (MPR)"
+                id="tool-view-3d"
+                data-i18n-attr="title:viewer.tool.view3dStaticTitle"
+                title="Vista 3D"
                 disabled
               >
                 <svg
@@ -406,13 +406,16 @@
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 >
-                  <rect x="3" y="3" width="8" height="8" rx="1" />
-                  <rect x="13" y="3" width="8" height="8" rx="1" />
-                  <rect x="3" y="13" width="8" height="8" rx="1" />
-                  <rect x="13" y="13" width="8" height="8" rx="1" />
+                  <path
+                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                  />
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                  <line x1="12" y1="22.08" x2="12" y2="12" />
                 </svg>
-                <span>MPR</span>
+                <span>Vista 3D</span>
               </button>
               <button
                 class="toolbar__tool"
@@ -667,16 +670,18 @@
           <div class="viewport-wrapper">
             <!-- 3D Unified Depth Slider (Right) -->
             <div
-              class="mpr-depth-slider-wrap hidden"
-              id="mpr-depth-slider-wrap"
+              class="view-3d-depth-slider-wrap mpr-depth-slider-wrap hidden"
+              id="view-3d-depth-slider-wrap"
             >
-              <span class="mpr-depth-counter" id="mpr-depth-counter"
+              <span
+                class="view-3d-depth-counter mpr-depth-counter"
+                id="view-3d-depth-counter"
                 >Corte: 1/1</span
               >
               <input
                 type="range"
-                id="mpr-depth-slider"
-                class="mpr-depth-slider"
+                id="view-3d-depth-slider"
+                class="view-3d-depth-slider mpr-depth-slider"
                 min="0"
                 max="0"
                 value="0"
@@ -684,65 +689,80 @@
             </div>
 
             <div class="viewport-container cursor-wl" id="viewport-container">
-              <!-- Anatomical Reference Cube (2D) -->
+              <!-- 3D Dedicated Container (Isolated overlay) -->
+              <div
+                id="view-3d-container"
+                class="view-3d-container hidden"
+              ></div>
+
+              <!-- Anatomical Reference Cube (3D Gizmo) -->
               <canvas
-                id="mpr-reference-cube"
-                class="hidden"
+                id="view-3d-reference-cube"
+                class="view-3d-reference-cube hidden"
                 width="120"
                 height="120"
               ></canvas>
 
               <!-- 3D Orientation Widget (Bottom-Right) -->
-              <div id="mpr-orientation-widget" class="mpr-orientation-widget">
-                <button class="mpr-btn btn-orient active" id="btn-mpr-axial">
+              <div
+                id="view-3d-orientation-widget"
+                class="view-3d-orientation-widget mpr-orientation-widget"
+              >
+                <button
+                  class="view-3d-btn btn-orient active"
+                  id="btn-view-3d-axial"
+                >
                   Axial
                 </button>
                 <button
-                  class="mpr-btn btn-orient"
-                  id="btn-mpr-sagittal"
-                  data-i18n="viewer.mpr.sagittal"
+                  class="view-3d-btn btn-orient"
+                  id="btn-view-3d-sagittal"
+                  data-i18n="viewer.view3d.sagittal"
                 >
                   Sagital
                 </button>
-                <button class="mpr-btn btn-orient" id="btn-mpr-coronal">
+                <button class="view-3d-btn btn-orient" id="btn-view-3d-coronal">
                   Coronal
                 </button>
                 <button
-                  class="mpr-btn btn-orient"
-                  id="btn-mpr-3d"
-                  data-i18n="viewer.mpr.volumetricView"
+                  class="view-3d-btn btn-orient"
+                  id="btn-view-3d-3d"
+                  data-i18n="viewer.view3d.volumetricView"
                 >
                   Vista Volumétrica
                 </button>
               </div>
 
-              <!-- MPR Tri-Planar Sliders Panel -->
-              <div id="mpr-sliders-panel" class="mpr-sliders-panel">
-                <div class="mpr-slider-row">
-                  <label for="mpr-scroll-axial">Axial</label>
+              <!-- 3D Tri-Planar Sliders Panel -->
+              <div
+                id="view-3d-sliders-panel"
+                class="view-3d-sliders-panel mpr-sliders-panel"
+              >
+                <div class="view-3d-slider-row mpr-slider-row">
+                  <label for="view-3d-scroll-axial">Axial</label>
                   <input
                     type="range"
-                    id="mpr-scroll-axial"
+                    id="view-3d-scroll-axial"
                     min="0"
                     max="0"
                     value="0"
                   />
                 </div>
-                <div class="mpr-slider-row">
-                  <label for="mpr-scroll-coronal">Coronal</label>
+                <div class="view-3d-slider-row mpr-slider-row">
+                  <label for="view-3d-scroll-coronal">Coronal</label>
                   <input
                     type="range"
-                    id="mpr-scroll-coronal"
+                    id="view-3d-scroll-coronal"
                     min="0"
                     max="0"
                     value="0"
                   />
                 </div>
-                <div class="mpr-slider-row">
-                  <label for="mpr-scroll-sagittal">Sagital</label>
+                <div class="view-3d-slider-row mpr-slider-row">
+                  <label for="view-3d-scroll-sagittal">Sagital</label>
                   <input
                     type="range"
-                    id="mpr-scroll-sagittal"
+                    id="view-3d-scroll-sagittal"
                     min="0"
                     max="0"
                     value="0"

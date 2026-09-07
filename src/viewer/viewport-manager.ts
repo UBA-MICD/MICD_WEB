@@ -95,13 +95,17 @@ export class Viewport {
     this.overlayBR = this.createDiv("overlay overlay--br");
 
     // Cardinal orientation labels
-    this.orientTop = this.createDiv("mpr-orient-label mpr-orient-label--top");
-    this.orientBottom = this.createDiv(
-      "mpr-orient-label mpr-orient-label--bottom",
+    this.orientTop = this.createDiv(
+      "viewport-orient-label viewport-orient-label--top mpr-orient-label mpr-orient-label--top",
     );
-    this.orientLeft = this.createDiv("mpr-orient-label mpr-orient-label--left");
+    this.orientBottom = this.createDiv(
+      "viewport-orient-label viewport-orient-label--bottom mpr-orient-label mpr-orient-label--bottom",
+    );
+    this.orientLeft = this.createDiv(
+      "viewport-orient-label viewport-orient-label--left mpr-orient-label mpr-orient-label--left",
+    );
     this.orientRight = this.createDiv(
-      "mpr-orient-label mpr-orient-label--right",
+      "viewport-orient-label viewport-orient-label--right mpr-orient-label mpr-orient-label--right",
     );
 
     this.attachDom();

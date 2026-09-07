@@ -117,6 +117,7 @@ export const en: Record<string, string> = {
   "viewer.tool.metadataTitle": "DICOM tags (M)",
   "viewer.tool.zenodoTitle": "Zenodo — open science repository",
   "viewer.tool.mprStaticTitle": "Multiplanar reconstruction (MPR)",
+  "viewer.tool.view3dStaticTitle": "3D View",
   "viewer.dropZone.title": "Open DICOM file",
   "viewer.dropZone.instructions": "Drag and drop .dcm files here, or",
   "viewer.dropZone.note":
@@ -161,6 +162,23 @@ export const en: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error loading the 3D volume: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.view3d.sliceCounter": "Slice: {{current}}/{{total}}",
+  "viewer.view3d.notCompatibleSlices":
+    "Study not compatible with 3D view: requires a series with more than 1 slice.",
+  "viewer.view3d.loadingMetadata": "Loading study metadata…",
+  "viewer.view3d.notCompatiblePixelSpacing":
+    "Study not compatible with 3D view: missing the PixelSpacing tag (0028,0030).",
+  "viewer.view3d.notCompatibleImagePosition":
+    "Study not compatible with 3D view: missing the ImagePositionPatient tag (0020,0032).",
+  "viewer.view3d.backTo2D": "Back to 2D view",
+  "viewer.view3d.enabledTitle": "3D volumetric view",
+  "viewer.view3d.needTwoSlices":
+    "The study needs at least 2 slices for the 3D volumetric view.",
+  "viewer.view3d.volumeLoadError": "Error loading the 3D volume: {{message}}",
+  "viewer.view3d.webglUnavailable":
+    "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.view3d.sagittal": "Sagittal",
+  "viewer.view3d.volumetricView": "Volumetric View",
   "viewer.layers.title": "Layer Adjustment",
   "viewer.layers.loadBtn": "Load Overlay Study",
   "viewer.layers.opacity": "Opacity",

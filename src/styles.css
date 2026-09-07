@@ -1233,7 +1233,7 @@ body {
   display: none !important;
 }
 
-/* 3D Mode (MPR active) */
+/* 3D Mode (Active 3D Volume View) */
 #viewport-container.mode-3d .viewport-cell {
   display: none !important; /* Hide 2D grid cells */
 }
@@ -1249,6 +1249,11 @@ body {
   touch-action: none;
 }
 
+#viewport-container.mode-3d #view-3d-container,
+#viewport-container.mode-3d .view-3d-container {
+  display: block !important;
+}
+
 #dicom-canvas {
   image-rendering: auto;
   transform-origin: center center;
@@ -1256,21 +1261,27 @@ body {
 }
 
 /* ── 2D Cardinal Orientation Labels (A, P, L, R) ────────────────────────── */
+.viewport-orient-label,
 .mpr-orient-label {
   position: absolute;
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
-  color: var(--accent);
+  color: #facc15; /* High-contrast clinical PACS yellow/amber */
   text-shadow:
-    1px 1px 3px rgba(0, 0, 0, 0.9),
-    0 0 4px rgba(0, 0, 0, 0.8);
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 0 5px rgba(0, 0, 0, 0.95);
   pointer-events: none;
   z-index: 6;
   user-select: none;
+  line-height: 1;
 }
 
 #mpr-orient-top,
+.viewport-orient-label--top,
 .mpr-orient-label--top {
   top: 14px;
   left: 50%;
@@ -1278,6 +1289,7 @@ body {
 }
 
 #mpr-orient-bottom,
+.viewport-orient-label--bottom,
 .mpr-orient-label--bottom {
   bottom: 14px;
   left: 50%;
@@ -1285,6 +1297,7 @@ body {
 }
 
 #mpr-orient-left,
+.viewport-orient-label--left,
 .mpr-orient-label--left {
   left: 14px;
   top: 50%;
@@ -1292,6 +1305,7 @@ body {
 }
 
 #mpr-orient-right,
+.viewport-orient-label--right,
 .mpr-orient-label--right {
   right: 14px;
   top: 50%;
@@ -3289,123 +3303,163 @@ body {
   pointer-events: auto !important;
 }
 
-/* ── US 2: MPR 3D Unified Viewport Controls ─────────────────────────────── */
+/* ── US 2 / UI-7: 3D View Unified Viewport Controls ─────────────────────── */
 .cursor-crosshair {
   cursor: crosshair !important;
 }
 
+#view-3d-container,
+.view-3d-container {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
 /* Right-side Depth Slider */
+.view-3d-depth-slider-wrap,
 .mpr-depth-slider-wrap {
   position: absolute;
   top: 20px;
   right: 16px;
   bottom: 80px;
-  z-index: 10;
+  z-index: 70;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  background: rgba(17, 17, 24, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border);
+  background: rgba(18, 18, 24, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong, #3f3f46);
   padding: 12px 8px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
 }
 
+.view-3d-depth-counter,
 .mpr-depth-counter {
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: var(--accent, #00b4d8);
   white-space: nowrap;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
 }
 
+.view-3d-depth-slider,
 .mpr-depth-slider {
   writing-mode: vertical-lr;
   direction: rtl;
   flex: 1;
-  width: 6px;
-  accent-color: var(--accent);
+  width: 8px;
+  accent-color: var(--accent, #00b4d8);
   cursor: pointer;
+  transition: opacity var(--transition, 0.15s ease);
 }
 
-/* Bottom-Right Orientation Widget */
-/* Anatomical Reference Cube */
+.view-3d-depth-slider:hover,
+.mpr-depth-slider:hover {
+  filter: brightness(1.2);
+}
+
+/* Anatomical Reference Cube (3D Gizmo) */
+#view-3d-reference-cube,
+.view-3d-reference-cube,
 #mpr-reference-cube {
   position: absolute;
-  bottom: 80px;
-  left: 16px;
+  bottom: 72px;
+  left: 20px;
   z-index: 100;
   pointer-events: none;
+  background: rgba(18, 18, 24, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-/* ── MPR Orientation Widget (Bottom-Right) ────────────────────────────────── */
+/* ── 3D View Orientation Widget (Bottom-Right) ────────────────────────────── */
+#view-3d-orientation-widget,
+.view-3d-orientation-widget,
 #mpr-orientation-widget,
 .mpr-orientation-widget {
   display: none;
   position: absolute;
   bottom: 20px;
   right: 20px;
-  background: var(--bg-elevated, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: rgba(18, 18, 24, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong, #3f3f46);
   border-radius: var(--radius-md, 8px);
   padding: 4px;
   gap: 4px;
   z-index: 200;
   align-items: center;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
 }
 
+#viewport-container.mode-3d #view-3d-orientation-widget,
+#viewport-container.mode-3d .view-3d-orientation-widget,
+#viewport-container.mode-3d #mpr-orientation-widget,
 #viewport-container.mode-3d .mpr-orientation-widget {
   display: flex;
 }
 
+.view-3d-btn,
 .mpr-btn {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #a1a1aa);
   border: 1px solid transparent;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 4px);
   cursor: pointer;
   font-size: 11px;
   font-weight: 500;
-  transition: all var(--transition);
-}
-
-.mpr-btn.active,
-.mpr-btn:hover {
-  border-color: var(--accent, #00b4d8);
-  color: var(--accent, #00b4d8);
+  transition: all var(--transition, 0.15s ease);
 }
 
 .btn-orient {
-  padding: 5px 10px;
+  padding: 6px 12px;
   font-size: 11px;
   font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary, #d4d4d8);
   cursor: pointer;
-  transition: all var(--transition);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  transition: all var(--transition, 0.15s ease);
+  user-select: none;
 }
 
-.btn-orient:hover {
+.btn-orient:hover,
+.view-3d-btn:hover {
   color: #ffffff;
-  background: var(--bg-active);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-.btn-orient.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: var(--border-accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+.btn-orient.active,
+.view-3d-btn.active {
+  background: var(--accent-soft, rgba(0, 180, 216, 0.2));
+  color: var(--accent, #00b4d8);
+  border-color: var(--accent, #00b4d8);
+  box-shadow: 0 0 10px rgba(0, 180, 216, 0.3);
+  font-weight: 700;
 }
 
+.btn-orient:focus-visible,
+.view-3d-btn:focus-visible {
+  outline: 2px solid var(--accent, #00b4d8);
+  outline-offset: 1px;
+}
+
+.view-3d-gizmo-wrap,
 .mpr-gizmo-wrap {
   width: 50px;
   height: 50px;
@@ -3414,27 +3468,35 @@ body {
   justify-content: center;
 }
 
-/* ── MPR Tri-Planar Sliders Panel ─────────────────────────────────────────── */
+/* ── 3D View Tri-Planar Sliders Panel ─────────────────────────────────────── */
+#view-3d-sliders-panel,
+.view-3d-sliders-panel,
+#mpr-sliders-panel,
 .mpr-sliders-panel {
   display: none;
   position: absolute;
   top: 16px;
   right: 16px;
-  background: var(--bg-elevated, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: rgba(18, 18, 24, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong, #3f3f46);
   border-radius: var(--radius-md, 8px);
-  padding: 10px 14px;
-  gap: 8px;
+  padding: 12px 16px;
+  gap: 10px;
   z-index: 999;
   pointer-events: auto;
   flex-direction: column;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.65);
 }
 
+#viewport-container.mode-3d #view-3d-sliders-panel,
+#viewport-container.mode-3d .view-3d-sliders-panel,
+#viewport-container.mode-3d #mpr-sliders-panel,
 #viewport-container.mode-3d .mpr-sliders-panel {
   display: flex;
 }
 
+.view-3d-slider-row,
 .mpr-slider-row {
   display: flex;
   align-items: center;
@@ -3442,17 +3504,48 @@ body {
   gap: 12px;
 }
 
+.view-3d-slider-row label,
 .mpr-slider-row label {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary, #a1a1aa);
-  min-width: 50px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  min-width: 56px;
+  letter-spacing: 0.5px;
 }
 
+/* Color coded anatomical axis labels matching 3D shader cut planes */
+.view-3d-slider-row label[for="view-3d-scroll-axial"],
+.view-3d-slider-row label[for="mpr-scroll-axial"],
+.mpr-slider-row label[for="mpr-scroll-axial"],
+.mpr-slider-row label[for="view-3d-scroll-axial"] {
+  color: #38bdf8; /* Axial — Sky Blue */
+}
+
+.view-3d-slider-row label[for="view-3d-scroll-coronal"],
+.view-3d-slider-row label[for="mpr-scroll-coronal"],
+.mpr-slider-row label[for="mpr-scroll-coronal"],
+.mpr-slider-row label[for="view-3d-scroll-coronal"] {
+  color: #34d399; /* Coronal — Emerald Green */
+}
+
+.view-3d-slider-row label[for="view-3d-scroll-sagittal"],
+.view-3d-slider-row label[for="mpr-scroll-sagittal"],
+.mpr-slider-row label[for="mpr-scroll-sagittal"],
+.mpr-slider-row label[for="view-3d-scroll-sagittal"] {
+  color: #f87171; /* Sagittal — Coral Red */
+}
+
+.view-3d-slider-row input[type="range"],
 .mpr-slider-row input[type="range"] {
-  width: 120px;
+  width: 130px;
   accent-color: var(--accent, #00b4d8);
   cursor: pointer;
+  transition: opacity var(--transition, 0.15s ease);
+}
+
+.view-3d-slider-row input[type="range"]:hover,
+.mpr-slider-row input[type="range"]:hover {
+  filter: brightness(1.2);
 }
 
 /* ── Toolbar Popovers (Layers, etc.) ──────────────────────────────────────── */

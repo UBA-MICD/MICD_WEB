@@ -119,6 +119,7 @@ export const es: Record<string, string> = {
   "viewer.tool.metadataTitle": "Etiquetas DICOM (M)",
   "viewer.tool.zenodoTitle": "Zenodo — repositorio de ciencia abierta",
   "viewer.tool.mprStaticTitle": "Reconstrucción Multiplanar (MPR)",
+  "viewer.tool.view3dStaticTitle": "Vista 3D",
   "viewer.dropZone.title": "Abrir archivo DICOM",
   "viewer.dropZone.instructions": "Arrastrá y soltá archivos .dcm aquí, o",
   "viewer.dropZone.note":
@@ -164,6 +165,23 @@ export const es: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.view3d.sliceCounter": "Corte: {{current}}/{{total}}",
+  "viewer.view3d.notCompatibleSlices":
+    "Estudio no compatible con Vista 3D: requiere una serie con más de 1 corte.",
+  "viewer.view3d.loadingMetadata": "Cargando metadatos del estudio…",
+  "viewer.view3d.notCompatiblePixelSpacing":
+    "Estudio no compatible con Vista 3D: falta el tag PixelSpacing (0028,0030).",
+  "viewer.view3d.notCompatibleImagePosition":
+    "Estudio no compatible con Vista 3D: falta el tag ImagePositionPatient (0020,0032).",
+  "viewer.view3d.backTo2D": "Volver a Vista 2D",
+  "viewer.view3d.enabledTitle": "Vista Volumétrica 3D",
+  "viewer.view3d.needTwoSlices":
+    "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
+  "viewer.view3d.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
+  "viewer.view3d.webglUnavailable":
+    "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.view3d.sagittal": "Sagital",
+  "viewer.view3d.volumetricView": "Vista Volumétrica",
   "viewer.layers.title": "Ajuste de Capas",
   "viewer.layers.loadBtn": "Cargar Estudio Superpuesto",
   "viewer.layers.opacity": "Opacidad",

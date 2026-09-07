@@ -3,6 +3,7 @@ import { dicomCache } from "./cache.js";
 import { $, showLoading, showError } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 import { t } from "../i18n/i18n.js";
+import { mprEngine } from "./mpr-engine.js";
 
 /**
  * 3D View (WebGL2 Volume Ray Marching Module)
@@ -92,16 +93,17 @@ export class Matrix4 {
     let x1 = up[2] * z0 - up[0] * z2;
     let x2 = up[0] * z1 - up[1] * z0;
     len = Math.hypot(x0, x1, x2);
-    if (!len) {
-      x0 = 0;
-      x1 = 0;
-      x2 = 0;
-    } else {
-      len = 1 / len;
-      x0 *= len;
-      x1 *= len;
-      x2 *= len;
+    if (len < 1e-5) {
+      const altUp = Math.abs(z1) > 0.9 ? [0, 0, 1] : [0, 1, 0];
+      x0 = altUp[1] * z2 - altUp[2] * z1;
+      x1 = altUp[2] * z0 - altUp[0] * z2;
+      x2 = altUp[0] * z1 - altUp[1] * z0;
+      len = Math.hypot(x0, x1, x2);
     }
+    len = 1 / (len || 1);
+    x0 *= len;
+    x1 *= len;
+    x2 *= len;
 
     let y0 = z1 * x2 - z2 * x1;
     let y1 = z2 * x0 - z0 * x2;
@@ -152,6 +154,7 @@ export class View3DViewer {
   public isActive = false;
   public windowCenter = 0;
   public windowWidth = 0;
+  public debugAABB = false;
 
   public resetCamera(): void {
     this.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
@@ -159,8 +162,15 @@ export class View3DViewer {
 
   public setVolume(vol: VoxelVolume): void {
     this.volume = vol;
-    this.windowCenter = vol.windowCenter;
-    this.windowWidth = vol.windowWidth;
+    this.windowCenter =
+      vol.windowCenter ||
+      (state.viewport?.windowCenter ? state.viewport.windowCenter : 40);
+    this.windowWidth =
+      vol.windowWidth > 0
+        ? vol.windowWidth
+        : state.viewport?.windowWidth > 0
+          ? state.viewport.windowWidth
+          : 400;
     this.crosshair = {
       x: Math.floor(vol.cols / 2),
       y: Math.floor(vol.rows / 2),
@@ -169,6 +179,11 @@ export class View3DViewer {
     if (this.gl) {
       this.uploadVolumeTexture();
     }
+  }
+
+  public setWindowLevel(center: number, width: number): void {
+    this.windowCenter = center;
+    this.windowWidth = width;
   }
 
   private gl: WebGL2RenderingContext | null = null;
@@ -351,11 +366,18 @@ export class View3DViewer {
       if (p) data.set(p, z * slicePixels);
     }
 
-    let windowCenter = refMeta.windowCenter;
-    let windowWidth = refMeta.windowWidth;
-    if (windowWidth <= 0 && state.viewport.windowWidth > 0) {
+    let windowCenter = refMeta.windowCenter ?? 40;
+    let windowWidth = refMeta.windowWidth ?? 400;
+    if (
+      (windowWidth <= 0 || isNaN(windowWidth)) &&
+      state.viewport.windowWidth > 0
+    ) {
       windowCenter = state.viewport.windowCenter;
       windowWidth = state.viewport.windowWidth;
+    }
+    if (windowWidth <= 0 || isNaN(windowWidth)) {
+      windowCenter = 40;
+      windowWidth = 400;
     }
 
     return {
@@ -423,19 +445,23 @@ uniform float u_windowWidth;   // Window width normalized (0, 1]
 uniform vec3 u_crosshair;      // Normalized crosshair position [0, 1]^3
 uniform int u_activeView;      // 0: Axial, 1: Coronal, 2: Sagittal, 3: Full 3D Volume
 uniform float u_clipPlane;     // Clipping plane ratio [0..1]
+uniform int u_debugAABB;       // Debug flag: 1 = flat red debug color
 
 out vec4 fragColor;
 
-// Ray-Box Intersection
+// Safe Slab Method Ray-Box Intersection (avoids division by zero / NaNs)
 bool intersectBox(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax, out float tNear, out float tFar) {
-    vec3 invDir = 1.0 / rayDir;
+    vec3 s = sign(rayDir);
+    vec3 dirSign = mix(s, vec3(1.0), equal(s, vec3(0.0)));
+    vec3 safeDir = dirSign * max(abs(rayDir), vec3(1e-6));
+    vec3 invDir = 1.0 / safeDir;
     vec3 tMin = (boxMin - rayOrigin) * invDir;
     vec3 tMax = (boxMax - rayOrigin) * invDir;
     vec3 t1 = min(tMin, tMax);
     vec3 t2 = max(tMin, tMax);
     tNear = max(max(t1.x, t1.y), t1.z);
     tFar = min(min(t2.x, t2.y), t2.z);
-    return tFar > max(tNear, 0.0);
+    return tFar >= max(tNear, 0.0);
 }
 
 void main() {
@@ -445,40 +471,46 @@ void main() {
         discard;
     }
 
+    // Flat red visual debug when requested
+    if (u_debugAABB == 1) {
+        fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
     tNear = max(tNear, 0.0);
     float minW = u_windowCenter - u_windowWidth * 0.5;
 
     // 2D Slice Plane Views (Axial, Coronal, Sagittal)
     if (u_activeView == 0) {
         float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
-        if (abs(rayDir.z) < 1e-5) discard;
+        if (abs(rayDir.z) < 1e-6) discard;
         float t = (planeZ - u_cameraPos.z) / rayDir.z;
-        if (t < tNear || t > tFar) discard;
+        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
         vec3 p = u_cameraPos + rayDir * t;
         vec3 texCoord = (p - u_boxMin) / (u_boxMax - u_boxMin);
-        float density = texture(u_volume, texCoord).r;
+        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
         float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
         fragColor = vec4(vec3(intensity), 1.0);
         return;
     } else if (u_activeView == 1) {
         float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
-        if (abs(rayDir.y) < 1e-5) discard;
+        if (abs(rayDir.y) < 1e-6) discard;
         float t = (planeY - u_cameraPos.y) / rayDir.y;
-        if (t < tNear || t > tFar) discard;
+        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
         vec3 p = u_cameraPos + rayDir * t;
         vec3 texCoord = (p - u_boxMin) / (u_boxMax - u_boxMin);
-        float density = texture(u_volume, texCoord).r;
+        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
         float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
         fragColor = vec4(vec3(intensity), 1.0);
         return;
     } else if (u_activeView == 2) {
         float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
-        if (abs(rayDir.x) < 1e-5) discard;
+        if (abs(rayDir.x) < 1e-6) discard;
         float t = (planeX - u_cameraPos.x) / rayDir.x;
-        if (t < tNear || t > tFar) discard;
+        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
         vec3 p = u_cameraPos + rayDir * t;
         vec3 texCoord = (p - u_boxMin) / (u_boxMax - u_boxMin);
-        float density = texture(u_volume, texCoord).r;
+        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
         float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
         fragColor = vec4(vec3(intensity), 1.0);
         return;
@@ -492,48 +524,72 @@ void main() {
     float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
     float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
 
-    float tX = abs(rayDir.x) > 1e-5 ? (planeX - u_cameraPos.x) / rayDir.x : -1.0;
-    float tY = abs(rayDir.y) > 1e-5 ? (planeY - u_cameraPos.y) / rayDir.y : -1.0;
-    float tZ = abs(rayDir.z) > 1e-5 ? (planeZ - u_cameraPos.z) / rayDir.z : -1.0;
+    float tX = abs(rayDir.x) > 1e-6 ? (planeX - u_cameraPos.x) / rayDir.x : -1.0;
+    float tY = abs(rayDir.y) > 1e-6 ? (planeY - u_cameraPos.y) / rayDir.y : -1.0;
+    float tZ = abs(rayDir.z) > 1e-6 ? (planeZ - u_cameraPos.z) / rayDir.z : -1.0;
 
-    vec4 hits[3];
+    float hitT[3];
+    vec4 hitColor[3];
     int hitCount = 0;
 
-    if (tX >= tNear && tX <= tFar) {
+    // Sagittal Plane (X cut)
+    if (tX >= tNear - 1e-3 && tX <= tFar + 1e-3) {
         vec3 p = u_cameraPos + rayDir * tX;
         vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
-        if (tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
-            float d = texture(u_volume, tc).r;
+        if (tc.y >= -1e-3 && tc.y <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
+            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
             float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-            hits[hitCount++] = vec4(tX, val * 1.0, val * 0.7, val * 0.7);
+            bool isBorder = (tc.y < 0.015 || tc.y > 0.985 || tc.z < 0.015 || tc.z > 0.985);
+            vec3 col = isBorder ? vec3(0.95, 0.35, 0.35) : vec3(val * 1.0, val * 0.8, val * 0.8);
+            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
+            hitT[hitCount] = tX;
+            hitColor[hitCount] = vec4(col, a);
+            hitCount++;
         }
     }
-    if (tY >= tNear && tY <= tFar) {
+
+    // Coronal Plane (Y cut)
+    if (tY >= tNear - 1e-3 && tY <= tFar + 1e-3) {
         vec3 p = u_cameraPos + rayDir * tY;
         vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
-        if (tc.x >= 0.0 && tc.x <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
-            float d = texture(u_volume, tc).r;
+        if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
+            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
             float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-            hits[hitCount++] = vec4(tY, val * 0.7, val * 1.0, val * 0.7);
+            bool isBorder = (tc.x < 0.015 || tc.x > 0.985 || tc.z < 0.015 || tc.z > 0.985);
+            vec3 col = isBorder ? vec3(0.35, 0.95, 0.5) : vec3(val * 0.8, val * 1.0, val * 0.8);
+            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
+            hitT[hitCount] = tY;
+            hitColor[hitCount] = vec4(col, a);
+            hitCount++;
         }
     }
-    if (tZ >= tNear && tZ <= tFar) {
+
+    // Axial Plane (Z cut)
+    if (tZ >= tNear - 1e-3 && tZ <= tFar + 1e-3) {
         vec3 p = u_cameraPos + rayDir * tZ;
         vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
-        if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0) {
-            float d = texture(u_volume, tc).r;
+        if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.y >= -1e-3 && tc.y <= 1.001) {
+            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
             float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-            hits[hitCount++] = vec4(tZ, val * 0.7, val * 0.85, val * 1.0);
+            bool isBorder = (tc.x < 0.015 || tc.x > 0.985 || tc.y < 0.015 || tc.y > 0.985);
+            vec3 col = isBorder ? vec3(0.35, 0.65, 1.0) : vec3(val * 0.8, val * 0.85, val * 1.0);
+            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
+            hitT[hitCount] = tZ;
+            hitColor[hitCount] = vec4(col, a);
+            hitCount++;
         }
     }
 
     // Sort hits front-to-back
     for (int i = 0; i < 2; i++) {
         for (int j = i + 1; j < 3; j++) {
-            if (j < hitCount && hits[j].x < hits[i].x) {
-                vec4 tmp = hits[i];
-                hits[i] = hits[j];
-                hits[j] = tmp;
+            if (j < hitCount && hitT[j] < hitT[i]) {
+                float tmpT = hitT[i];
+                hitT[i] = hitT[j];
+                hitT[j] = tmpT;
+                vec4 tmpCol = hitColor[i];
+                hitColor[i] = hitColor[j];
+                hitColor[j] = tmpCol;
             }
         }
     }
@@ -541,27 +597,28 @@ void main() {
     // Composite orthogonal plane cuts
     for (int i = 0; i < 3; i++) {
         if (i >= hitCount) break;
-        vec3 rgb = hits[i].yzw;
-        float alpha = 0.85;
+        vec3 rgb = hitColor[i].rgb;
+        float alpha = hitColor[i].a;
         accumColor.rgb += (1.0 - accumColor.a) * rgb * alpha;
         accumColor.a += (1.0 - accumColor.a) * alpha;
         if (accumColor.a >= 0.98) break;
     }
 
-    // Fallback volume ray march if no planes hit but within volume box
-    if (accumColor.a < 0.05) {
+    // Fallback volume ray march if planes don't fully occlude ray
+    if (accumColor.a < 0.95) {
         const int STEPS = 80;
         float stepSize = (tFar - tNear) / float(STEPS);
-        vec3 rayPos = u_cameraPos + rayDir * tNear;
+        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
         vec3 stepVec = rayDir * stepSize;
         for (int i = 0; i < STEPS; i++) {
             vec3 tc = (rayPos - u_boxMin) / (u_boxMax - u_boxMin);
             if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
                 float d = texture(u_volume, tc).r;
                 float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-                if (val > 0.15) {
-                    float a = val * 0.05;
-                    accumColor.rgb += (1.0 - accumColor.a) * vec3(val) * a;
+                if (val > 0.1) {
+                    float a = (val - 0.1) * 0.08;
+                    vec3 sampleColor = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
+                    accumColor.rgb += (1.0 - accumColor.a) * sampleColor * a;
                     accumColor.a += (1.0 - accumColor.a) * a;
                     if (accumColor.a >= 0.95) break;
                 }
@@ -571,7 +628,7 @@ void main() {
     }
 
     if (accumColor.a < 0.01) discard;
-    fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), accumColor.a);
+    fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), min(accumColor.a, 1.0));
 }
 `;
 
@@ -592,7 +649,9 @@ void main() {
     gl.shaderSource(vs, vsSource);
     gl.compileShader(vs);
     if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-      console.error("Vertex Shader Error:", gl.getShaderInfoLog(vs));
+      const vsLog = gl.getShaderInfoLog(vs);
+      console.error("Vertex Shader Error (GLSL compile failed):", vsLog);
+      gl.deleteShader(vs);
       return null;
     }
 
@@ -600,15 +659,23 @@ void main() {
     gl.shaderSource(fs, fsSource);
     gl.compileShader(fs);
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-      console.error("Fragment Shader Error:", gl.getShaderInfoLog(fs));
+      const fsLog = gl.getShaderInfoLog(fs);
+      console.error("Fragment Shader Error (GLSL compile failed):", fsLog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
       return null;
     }
 
     const prog = gl.createProgram()!;
     gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      console.error("Program Link Error:", gl.getProgramInfoLog(prog));
+      const progLog = gl.getProgramInfoLog(prog);
+      console.error("Program Link Error:", progLog);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
       return null;
     }
     return prog;
@@ -667,18 +734,70 @@ void main() {
 
   /** Upload VoxelVolume data into WebGL 3D Texture (gl.TEXTURE_3D). */
   private uploadVolumeTexture(): void {
-    if (!this.gl || !this.volume) return;
+    if (!this.gl || !this.volume) {
+      console.warn(
+        "[View3D] uploadVolumeTexture skipped: gl or volume missing",
+        {
+          hasGL: !!this.gl,
+          hasVolume: !!this.volume,
+        },
+      );
+      return;
+    }
     const gl = this.gl;
     const { depth, rows, cols, data, rescaleSlope, rescaleIntercept } =
       this.volume;
 
     const totalVoxels = depth * rows * cols;
-    const normalizedData = new Uint8Array(totalVoxels);
+    if (!data || data.length === 0) {
+      console.error(
+        "[View3D] uploadVolumeTexture error: volume data is null or empty!",
+        {
+          depth,
+          rows,
+          cols,
+          totalVoxels,
+          dataLength: data ? data.length : 0,
+        },
+      );
+      return;
+    }
 
+    // Diagnostic statistical audit across volume voxels
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    let nonZeroCount = 0;
+    const sampleStep = Math.max(1, Math.floor(data.length / 500));
+    let sampledCount = 0;
+    for (let i = 0; i < data.length; i += sampleStep) {
+      const v = data[i];
+      sampledCount++;
+      if (v !== 0) nonZeroCount++;
+      if (v < minVal) minVal = v;
+      if (v > maxVal) maxVal = v;
+    }
+
+    console.log("[View3D] Uploading 3D Texture Audit:", {
+      dimensions: `${cols}x${rows}x${depth}`,
+      totalVoxels,
+      dataLength: data.length,
+      dataType: data.constructor?.name,
+      sampleMin: minVal,
+      sampleMax: maxVal,
+      nonZeroRatio:
+        sampledCount > 0 ? (nonZeroCount / sampledCount).toFixed(3) : "0",
+      rescaleSlope: rescaleSlope ?? 1,
+      rescaleIntercept: rescaleIntercept ?? 0,
+      windowCenter: this.windowCenter,
+      windowWidth: this.windowWidth,
+    });
+
+    const normalizedData = new Uint8Array(totalVoxels);
     const slope = rescaleSlope ?? 1;
     const intercept = rescaleIntercept ?? 0;
+    const limit = Math.min(totalVoxels, data.length);
 
-    for (let i = 0; i < totalVoxels; i++) {
+    for (let i = 0; i < limit; i++) {
       const raw = data[i];
       const hu = raw * slope + intercept;
       // Map HU [-1024..3071] into [0..255]
@@ -689,11 +808,23 @@ void main() {
       normalizedData[i] = norm;
     }
 
+    if (typeof gl.getError === "function") {
+      const errBefore = gl.getError();
+      if (errBefore !== 0) {
+        console.warn("[View3D] WebGL error before texture upload:", errBefore);
+      }
+    }
+
     if (this.volumeTexture) {
       gl.deleteTexture(this.volumeTexture);
     }
 
     const tex = gl.createTexture();
+    if (!tex) {
+      console.error("[View3D] Failed to create WebGL3D texture");
+      return;
+    }
+
     gl.bindTexture(gl.TEXTURE_3D, tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage3D(
@@ -708,6 +839,13 @@ void main() {
       gl.UNSIGNED_BYTE,
       normalizedData,
     );
+
+    if (typeof gl.getError === "function") {
+      const errAfter = gl.getError();
+      if (errAfter !== 0) {
+        console.error("[View3D] WebGL error during texImage3D:", errAfter);
+      }
+    }
 
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -854,16 +992,23 @@ void main() {
     if (!this.volume || !this.program || !this.volumeTexture || !this.vao)
       return;
 
+    // WebGL pipeline state: Disable culling so orbiting close or inside proxy geometry
+    // never discards back-face fragments; disable depth test for alpha blending pass.
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.useProgram(this.program);
 
-    // Calculate physical bounding box scale
+    // Calculate physical bounding box scale safely
     const { depth, rows, cols, pixelSpacing, sliceSpacing } = this.volume;
-    const wMM = cols * pixelSpacing[1];
-    const hMM = rows * pixelSpacing[0];
-    const dMM = depth * sliceSpacing;
+    const psRow = (pixelSpacing && pixelSpacing[0]) || 1;
+    const psCol = (pixelSpacing && pixelSpacing[1]) || 1;
+    const ss = sliceSpacing || 1;
+    const wMM = (cols || 1) * psCol;
+    const hMM = (rows || 1) * psRow;
+    const dMM = (depth || 1) * ss;
     const maxDim = Math.max(wMM, hMM, dMM) || 1;
 
     const scaleX = wMM / maxDim;
@@ -922,6 +1067,7 @@ void main() {
       mvp,
     );
 
+    // Texture Binding: Active unit 0 & volume texture bound every frame
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_3D, this.volumeTexture);
     gl.uniform1i(gl.getUniformLocation(this.program, "u_volume"), 0);
@@ -945,11 +1091,25 @@ void main() {
       boxMax[2],
     );
 
-    // Normalized Window/Level parameters (isolated in View3DViewer)
-    const wcHU =
-      this.windowWidth > 0 ? this.windowCenter : this.volume.windowCenter;
-    const wwHU =
-      this.windowWidth > 0 ? this.windowWidth : this.volume.windowWidth;
+    // Normalized Window/Level parameters (isolated in View3DViewer with robust fallback)
+    let wcHU = this.windowWidth > 0 ? this.windowCenter : 0;
+    let wwHU = this.windowWidth > 0 ? this.windowWidth : 0;
+
+    if (wwHU <= 0 || isNaN(wwHU)) {
+      if (this.volume && this.volume.windowWidth > 0) {
+        wcHU = this.volume.windowCenter;
+        wwHU = this.volume.windowWidth;
+      } else if (state.viewport && state.viewport.windowWidth > 0) {
+        wcHU = state.viewport.windowCenter;
+        wwHU = state.viewport.windowWidth;
+      } else {
+        wcHU = 40;
+        wwHU = 400;
+      }
+    }
+    if (isNaN(wcHU)) {
+      wcHU = 40;
+    }
 
     const normCenter = (wcHU + 1024) / 4095;
     const normWidth = Math.max(0.001, wwHU / 4095);
@@ -964,9 +1124,22 @@ void main() {
     );
 
     // Normalized crosshair position [0..1]
-    const normNormX = this.crosshair.x / Math.max(1, cols - 1);
-    const normNormY = this.crosshair.y / Math.max(1, rows - 1);
-    const normNormZ = this.crosshair.z / Math.max(1, depth - 1);
+    let normNormX = this.crosshair.x / Math.max(1, cols - 1);
+    let normNormY = this.crosshair.y / Math.max(1, rows - 1);
+    let normNormZ = this.crosshair.z / Math.max(1, depth - 1);
+
+    if (normNormX === 0 && normNormY === 0 && normNormZ === 0) {
+      if (mprEngine && mprEngine.volume) {
+        const [mx, my, mz] = mprEngine.getCrosshairNormalized();
+        normNormX = mx;
+        normNormY = my;
+        normNormZ = mz;
+      } else {
+        normNormX = 0.5;
+        normNormY = 0.5;
+        normNormZ = 0.5;
+      }
+    }
     gl.uniform3f(
       gl.getUniformLocation(this.program, "u_crosshair"),
       normNormX,
@@ -994,6 +1167,30 @@ void main() {
       gl.getUniformLocation(this.program, "u_clipPlane"),
       clipPlaneRatio,
     );
+
+    // Flat color visual debug uniform
+    gl.uniform1i(
+      gl.getUniformLocation(this.program, "u_debugAABB"),
+      this.debugAABB ? 1 : 0,
+    );
+
+    // Diagnostic logging of uniforms and matrices before drawArrays
+    console.log("[View3D] Render Frame Uniforms & Matrices:", {
+      u_windowCenter: normCenter,
+      u_windowWidth: normWidth,
+      boxMin,
+      boxMax,
+      eye: [eyeX, eyeY, eyeZ],
+      cameraTheta: this.camera.theta,
+      cameraPhi: this.camera.phi,
+      cameraZoom: this.camera.zoom,
+      activeView: this.activeView,
+      debugAABB: this.debugAABB,
+      isMVPValid: !Array.from(mvp).some(isNaN),
+      isViewValid: !Array.from(view).some(isNaN),
+      isProjValid: !Array.from(proj).some(isNaN),
+      mvpSample: [mvp[0], mvp[5], mvp[10], mvp[15]],
+    });
 
     // Draw Volume Bounding Box Cube Geometry
     gl.bindVertexArray(this.vao);

@@ -16,6 +16,10 @@ import {
   openServerScreen,
   promptLoginOnServerScreen,
 } from "./server-screen/server-screen.js";
+import {
+  initServerConfigModal,
+  openServerConfigModal,
+} from "./server-screen/server-config-modal.js";
 import { state } from "./viewer/state.js";
 import {
   initFileInputs,
@@ -84,6 +88,7 @@ async function initApp(): Promise<void> {
   initI18n();
   initDesktopOnlyUI();
   void initApiOriginSetting();
+  initServerConfigModal();
 
   // One login surface in the app: the server screen's auth card. A session
   // that dies mid-operation brings the user here rather than throwing a modal
@@ -95,9 +100,9 @@ async function initApp(): Promise<void> {
   $("btn-login").addEventListener("click", (e) =>
     openServerScreen("buscar", e.currentTarget as HTMLElement),
   );
-  // Single entry point for everything server-bound.
+  // Opens server configuration modal (TK-29)
   $("btn-server").addEventListener("click", (e) =>
-    openServerScreen("buscar", e.currentTarget as HTMLElement),
+    openServerConfigModal(e.currentTarget as HTMLElement),
   );
   // cspell:enable
 

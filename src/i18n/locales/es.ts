@@ -610,4 +610,15 @@ export const es: Record<string, string> = {
   "validations.rejectDialog.confirm": "Rechazar",
   "validations.correctionBadge": "corrección",
   "validations.mlDone": "✓ Con IA",
+
+  // ── Configuración de Servidor (TK-29) ───────────────────────────────────────
+  "serverConfig.title": "Configuración del Servidor",
+  "serverConfig.description":
+    "Ingresá la URL base del servidor PACS/Orthanc para consultar estudios, metadatos y volúmenes DICOM.",
+  "serverConfig.urlLabel": "URL del Servidor",
+  "serverConfig.urlPlaceholder": "http://localhost:3000",
+  "serverConfig.saveAndConnect": "Guardar / Conectar",
+  "serverConfig.saveSuccess": "Configuración guardada exitosamente.",
+  "serverConfig.invalidUrl":
+    "Formato de URL inválido. Usá http:// o https:// (ej. http://localhost:3000)",
 };

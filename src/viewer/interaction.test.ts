@@ -950,19 +950,21 @@ test("toggle3DMode toggles is3DMode and ensures mutual exclusion with isMprMode"
   assert.equal(state.is3DMode, false);
 });
 
-test("ViewportManager: isTopRightViewport correctly identifies top-right quadrant", () => {
+test("ViewportManager: isCombined3DViewport correctly identifies combined 3D viewport", () => {
   const container = document.createElement("div");
   const manager = new ViewportManager(container);
-  assert.equal(manager.isTopRightViewport("vp-1"), true);
-  assert.equal(manager.isTopRightViewport("vp-0"), false);
-  assert.equal(manager.isTopRightViewport("vp-2"), false);
-  assert.equal(manager.isTopRightViewport("vp-3"), false);
+  manager.setLayout("2x2");
+  assert.equal(manager.isCombined3DViewport("vp-3"), true);
+  assert.equal(manager.isCombined3DViewport("vp-0"), false);
+  assert.equal(manager.isCombined3DViewport("vp-1"), false);
+  assert.equal(manager.isCombined3DViewport("vp-2"), false);
   manager.destroy();
 });
 
-test("ViewportManager: dispatchMprCrosshair only operates on top-right viewport", () => {
+test("ViewportManager: dispatchMprCrosshair operates on orthogonal planes and blocks vp-3", () => {
   const container = document.createElement("div");
   const manager = new ViewportManager(container);
+  manager.setLayout("2x2");
   let appliedDelta = false;
   const originalApply = mprEngine.applyCrosshairDelta2D;
   mprEngine.applyCrosshairDelta2D = () => {
@@ -970,21 +972,38 @@ test("ViewportManager: dispatchMprCrosshair only operates on top-right viewport"
   };
 
   try {
-    // Calling from non-top-right viewport should be a no-op
+    // Calling from orthogonal viewports should trigger crosshair delta
     appliedDelta = false;
     manager.dispatchMprCrosshair("vp-0", 10, 10, 400, 400);
     assert.equal(
       appliedDelta,
-      false,
-      "Crosshair delta should be ignored for vp-0",
+      true,
+      "Crosshair delta should be applied for vp-0 (Axial)",
+    );
+
+    appliedDelta = false;
+    manager.dispatchMprCrosshair("vp-1", 10, 10, 400, 400);
+    assert.equal(
+      appliedDelta,
+      true,
+      "Crosshair delta should be applied for vp-1 (Coronal)",
     );
 
     appliedDelta = false;
     manager.dispatchMprCrosshair("vp-2", 10, 10, 400, 400);
     assert.equal(
       appliedDelta,
+      true,
+      "Crosshair delta should be applied for vp-2 (Sagittal)",
+    );
+
+    // Calling from combined 3D viewport (vp-3) should be strictly blocked
+    appliedDelta = false;
+    manager.dispatchMprCrosshair("vp-3", 10, 10, 400, 400);
+    assert.equal(
+      appliedDelta,
       false,
-      "Crosshair delta should be ignored for vp-2",
+      "Crosshair delta should be ignored for vp-3 (3D combined)",
     );
   } finally {
     mprEngine.applyCrosshairDelta2D = originalApply;

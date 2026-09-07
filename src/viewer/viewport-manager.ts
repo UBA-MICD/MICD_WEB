@@ -483,6 +483,31 @@ export class ViewportManager {
     return false;
   }
 
+  /**
+   * Identifies whether the specified viewport ID corresponds to the combined 3D volume viewport.
+   * In 2x2 grid layout, 'vp-3' represents the bottom-right cell (combined 3D / volume view).
+   */
+  public isCombined3DViewport(id: string): boolean {
+    if (id === "vp-3") return true;
+    const vp = this.viewports.get(id);
+    if (!vp) return false;
+    if (this.currentLayout === "2x2") {
+      const cell = vp.cellElement;
+      const containerRect = this.container.getBoundingClientRect();
+      const cellRect = cell.getBoundingClientRect();
+      if (containerRect.width > 0 && containerRect.height > 0) {
+        const isRightHalf =
+          cellRect.left + cellRect.width / 2 >
+          containerRect.left + containerRect.width / 2;
+        const isBottomHalf =
+          cellRect.top + cellRect.height / 2 >
+          containerRect.top + containerRect.height / 2;
+        return isRightHalf && isBottomHalf;
+      }
+    }
+    return false;
+  }
+
   // ── Multi-viewport sync dispatcher ───────────────────────────────────────
 
   public dispatchMprCrosshair(
@@ -492,9 +517,10 @@ export class ViewportManager {
     viewportWidth: number,
     viewportHeight: number,
   ): void {
-    // Clinical requirement: drag interaction with crosshair is strictly confined
-    // to the top-right viewport (combined view).
-    if (!this.isTopRightViewport(originId)) {
+    // Clinical requirement: crosshair drag is enabled on the 3 orthogonal planes
+    // (vp-0 Axial, vp-1 Coronal, vp-2 Sagittal) and strictly blocked on the
+    // combined 3D volume viewport (vp-3).
+    if (this.isCombined3DViewport(originId)) {
       return;
     }
 

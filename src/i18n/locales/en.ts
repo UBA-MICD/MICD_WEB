@@ -599,4 +599,15 @@ export const en: Record<string, string> = {
   "validations.rejectDialog.confirm": "Reject",
   "validations.correctionBadge": "correction",
   "validations.mlDone": "✓ AI analyzed",
+
+  // ── Server Configuration (TK-29) ──────────────────────────────────────────
+  "serverConfig.title": "Server Configuration",
+  "serverConfig.description":
+    "Enter the base URL of the PACS/Orthanc server to query studies, metadata, and DICOM volumes.",
+  "serverConfig.urlLabel": "Server URL",
+  "serverConfig.urlPlaceholder": "http://localhost:3000",
+  "serverConfig.saveAndConnect": "Save / Connect",
+  "serverConfig.saveSuccess": "Configuration saved successfully.",
+  "serverConfig.invalidUrl":
+    "Invalid URL format. Use http:// or https:// (e.g. http://localhost:3000)",
 };

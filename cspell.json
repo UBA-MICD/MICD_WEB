@@ -46,6 +46,7 @@
     "inerted",
     "nums",
     "raymarching",
+    "aabb",
     "fovy",
     "highp",
     "accum",
@@ -106,6 +107,18 @@
     "menos",
     "pudo",
     "reconstruir",
-    "volumen"
+    "volumen",
+    "puede",
+    "estar",
+    "vacía",
+    "protocolo",
+    "debe",
+    "nombre",
+    "válido",
+    "Formato",
+    "inválido",
+    "Configuración",
+    "Guardar",
+    "Conectar"
   ]
 }

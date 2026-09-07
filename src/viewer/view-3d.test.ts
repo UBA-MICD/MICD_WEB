@@ -38,6 +38,7 @@ function createMockWebGL2Context(): any {
     TEXTURE0: 0x84c0,
     UNPACK_ALIGNMENT: 0x0cf5,
     DEPTH_TEST: 0x0b71,
+    CULL_FACE: 0x0b44,
     BLEND: 0x0be2,
     SRC_ALPHA: 0x0302,
     ONE_MINUS_SRC_ALPHA: 0x0303,
@@ -264,4 +265,101 @@ test("View3DViewer.render safely handles canvas with 0 dimensions without throwi
   // Canvas should have been defaulted safely to >= 512
   assert.equal(zeroCanvas.width, 512);
   assert.equal(zeroCanvas.height, 512);
+});
+
+test("View3DViewer: setWindowLevel updates window parameters", () => {
+  const viewer = new View3DViewer();
+  viewer.setWindowLevel(50, 350);
+  assert.equal(viewer.windowCenter, 50);
+  assert.equal(viewer.windowWidth, 350);
+});
+
+test("View3DViewer: render disables CULL_FACE, sets TEXTURE0, and binds 3D texture", () => {
+  const viewer = new View3DViewer();
+  const disabledFeatures: number[] = [];
+  let activeTexUnit = -1;
+  let boundTexture3D: any = null;
+
+  const mockGL = {
+    ...createMockWebGL2Context(),
+    disable: (cap: number) => {
+      disabledFeatures.push(cap);
+    },
+    activeTexture: (unit: number) => {
+      activeTexUnit = unit;
+    },
+    bindTexture: (target: number, tex: any) => {
+      if (target === 0x806f) {
+        // TEXTURE_3D
+        boundTexture3D = tex;
+      }
+    },
+  };
+
+  (viewer as any).gl = mockGL;
+  (viewer as any).program = {};
+  const mockTex = { id: "test-volume-texture" };
+  (viewer as any).volumeTexture = mockTex;
+  (viewer as any).vao = {};
+  viewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  const canvas: any = {
+    width: 512,
+    height: 512,
+    clientWidth: 512,
+    clientHeight: 512,
+    getContext: () => mockGL,
+  };
+  mockGL.canvas = canvas;
+
+  viewer.render(canvas);
+
+  // Verifies CULL_FACE (0x0b44) is explicitly disabled
+  assert.ok(
+    disabledFeatures.includes(mockGL.CULL_FACE),
+    "CULL_FACE must be disabled during volume raymarching",
+  );
+  // Verifies TEXTURE0 (0x84c0) is activated
+  assert.equal(
+    activeTexUnit,
+    mockGL.TEXTURE0,
+    "TEXTURE0 must be activated every frame",
+  );
+  // Verifies volume texture is bound to TEXTURE_3D
+  assert.equal(
+    boundTexture3D,
+    mockTex,
+    "volumeTexture must be bound every active frame",
+  );
+});
+
+test("View3DViewer.initGL attaches both vertex and fragment shaders before linking", () => {
+  const viewer = new View3DViewer();
+  const attachedShaders: any[] = [];
+  const mockGL = {
+    ...createMockWebGL2Context(),
+    attachShader: (_prog: any, shader: any) => {
+      attachedShaders.push(shader);
+    },
+  };
+  const canvas: any = {
+    getContext: (type: string) => (type === "webgl2" ? mockGL : null),
+  };
+
+  const ok = viewer.initGL(canvas);
+  assert.equal(ok, true);
+  assert.equal(
+    attachedShaders.length,
+    2,
+    "Both VS and FS must be attached to the program",
+  );
 });

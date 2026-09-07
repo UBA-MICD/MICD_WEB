@@ -1,5 +1,6 @@
 import { parseDicomFile, ParsedDicom } from "../dicom/dicom-parser-util.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
+import { fetchInstanceFile } from "../services/api.js";
 import { state } from "./state.js";
 
 /**
@@ -69,9 +70,7 @@ export class DicomCache {
         return null;
       }
       const instanceId = state.serverInstances[index];
-      const res = await authFetch(
-        `${API_BASE}/v1/studies/${encodeURIComponent(state.serverStudyId)}/instances/${encodeURIComponent(instanceId)}/file`,
-      );
+      const res = await fetchInstanceFile(state.serverStudyId, instanceId);
       if (!res.ok) return null;
       const buffer = await res.arrayBuffer();
       return parseDicomFile(buffer);

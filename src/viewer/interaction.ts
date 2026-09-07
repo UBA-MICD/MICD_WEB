@@ -736,7 +736,7 @@ export function initViewportInteraction(): void {
       const manager = getViewportManager();
       const originId =
         dragOriginViewportId || manager?.activeViewport?.id || "";
-      if (manager && !manager.isTopRightViewport(originId)) {
+      if (manager && manager.isCombined3DViewport(originId)) {
         return;
       }
       const activeVp =
@@ -875,7 +875,7 @@ export function initViewportInteraction(): void {
         case "crosshair":
           if (mprEngine.volume) {
             const originId = dragOriginViewportId || activeVp.id;
-            if (!manager.isTopRightViewport(originId)) {
+            if (manager.isCombined3DViewport(originId)) {
               break;
             }
             manager.dispatchMprCrosshair(

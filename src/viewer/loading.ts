@@ -8,6 +8,7 @@ import {
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
+import { fetchStudyInstances } from "../services/api.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
 import { expandFiles } from "../upload/zip-expand.js";
 import { $, showLoading, showError } from "../shared/dom.js";
@@ -294,9 +295,7 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
   };
 
   try {
-    const res = await authFetch(
-      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`,
-    );
+    const res = await fetchStudyInstances(studyId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as {
       instances: Array<{ instanceId: string }>;

@@ -9,6 +9,7 @@ import { zipSync } from "fflate";
 import { anonymizeDicomBuffer } from "../utils/dicom-anonymizer.js";
 import { showBanner } from "../shared/banner.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
+import { fetchStudyInstances, fetchInstanceFile } from "./api.js";
 import { state } from "../viewer/state.js";
 import { dicomCache } from "../viewer/cache.js";
 import { t } from "../i18n/i18n.js";
@@ -207,9 +208,7 @@ export async function exportCurrentStudyAsZip(
         if (cached?.rawDataSet?.byteArray?.buffer) {
           buf = cached.rawDataSet.byteArray.buffer.slice(0);
         } else {
-          const res = await authFetch(
-            `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instanceId)}/file`,
-          );
+          const res = await fetchInstanceFile(studyId, instanceId);
           if (!res.ok)
             throw new Error(
               t("export.instanceDownloadError", { index: i + 1 }),
@@ -288,9 +287,7 @@ export async function exportStudyByIdAsZip(
   showBanner(t("export.fetchingStudyInfo"), "warning");
 
   try {
-    const res = await authFetch(
-      `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances`,
-    );
+    const res = await fetchStudyInstances(studyId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as {
       instances: Array<{ instanceId: string }>;
@@ -309,9 +306,7 @@ export async function exportStudyByIdAsZip(
 
     for (let i = 0; i < instanceIds.length; i++) {
       const instId = instanceIds[i];
-      const fRes = await authFetch(
-        `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instId)}/file`,
-      );
+      const fRes = await fetchInstanceFile(studyId, instId);
       if (!fRes.ok)
         throw new Error(t("export.fileFetchError", { index: i + 1 }));
       let buf = await fRes.arrayBuffer();

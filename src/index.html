@@ -2919,6 +2919,84 @@
       </div>
     </div>
 
+    <!-- Server Configuration dialog (TK-29) -->
+    <div id="server-config-dialog" class="dialog-overlay hidden">
+      <form
+        class="dialog server-config-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="server-config-dialog-title"
+        id="server-config-form"
+        novalidate
+      >
+        <div class="server-config-dialog__header">
+          <div class="server-config-dialog__icon" aria-hidden="true">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="2" y="2" width="20" height="8" rx="2" />
+              <rect x="2" y="14" width="20" height="8" rx="2" />
+              <line x1="6" y1="6" x2="6.01" y2="6" />
+              <line x1="6" y1="18" x2="6.01" y2="18" />
+            </svg>
+          </div>
+          <h3
+            class="dialog__title"
+            id="server-config-dialog-title"
+            data-i18n="serverConfig.title"
+          >
+            Configuración del Servidor
+          </h3>
+        </div>
+        <p class="dialog__msg" data-i18n="serverConfig.description">
+          Ingresá la URL base del servidor PACS/Orthanc para consultar estudios,
+          metadatos y volúmenes DICOM.
+        </p>
+        <label class="login-field">
+          <span data-i18n="serverConfig.urlLabel">URL del Servidor</span>
+          <input
+            type="url"
+            id="server-config-url-input"
+            class="server-config-input"
+            data-dialog-autofocus
+            placeholder="http://localhost:3000"
+            data-i18n-attr="placeholder:serverConfig.urlPlaceholder"
+            required
+            autocomplete="url"
+            spellcheck="false"
+          />
+        </label>
+        <p
+          id="server-config-error"
+          class="login-error server-config-error hidden"
+          role="alert"
+        ></p>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--secondary"
+            type="button"
+            id="btn-server-config-cancel"
+            data-i18n="common.cancel"
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn--accent"
+            type="submit"
+            id="btn-server-config-save"
+            data-i18n="serverConfig.saveAndConnect"
+          >
+            Guardar / Conectar
+          </button>
+        </div>
+      </form>
+    </div>
+
     <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
@@ -2930,7 +3008,9 @@
          that is loaded first so the `??=` fallback does not overwrite it. -->
     <script>
       if (typeof window.api === "undefined") {
-        var _s = localStorage.getItem("micd_api_origin");
+        var _s =
+          localStorage.getItem("micd_server_url") ||
+          localStorage.getItem("micd_api_origin");
         if (_s) window.MICD_API_ORIGIN = _s;
       }
       window.MICD_API_ORIGIN ??= "";

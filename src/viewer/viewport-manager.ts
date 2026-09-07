@@ -13,6 +13,9 @@ import {
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
 import { escapeHtml } from "../shared/dom.js";
+import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
+import { view3DViewer, type VoxelVolume } from "./view-3d.js";
+import { state } from "./state.js";
 
 // ── Types and Contracts ───────────────────────────────────────────────────────
 
@@ -57,7 +60,9 @@ export class Viewport {
   private readonly orientRight: HTMLDivElement;
 
   // Viewport state
+  public plane: MPRPlane = "axial";
   public data: ViewportData;
+  public readonly glCanvasElement: HTMLCanvasElement;
   private resizeObserver: ResizeObserver | null = null;
   private readonly onSelectCallback?: (id: string) => void;
 
@@ -81,6 +86,10 @@ export class Viewport {
     this.cellElement.dataset.viewportId = id;
     this.cellElement.tabIndex = 0;
 
+    this.glCanvasElement = document.createElement("canvas");
+    this.glCanvasElement.className = "viewport-canvas-gl";
+    this.glCanvasElement.setAttribute("role", "presentation");
+
     this.canvasElement = document.createElement("canvas");
     this.canvasElement.className = "viewport-canvas";
     this.canvasElement.setAttribute("role", "img");
@@ -95,13 +104,17 @@ export class Viewport {
     this.overlayBR = this.createDiv("overlay overlay--br");
 
     // Cardinal orientation labels
-    this.orientTop = this.createDiv("mpr-orient-label mpr-orient-label--top");
-    this.orientBottom = this.createDiv(
-      "mpr-orient-label mpr-orient-label--bottom",
+    this.orientTop = this.createDiv(
+      "viewport-orient-label viewport-orient-label--top mpr-orient-label mpr-orient-label--top",
     );
-    this.orientLeft = this.createDiv("mpr-orient-label mpr-orient-label--left");
+    this.orientBottom = this.createDiv(
+      "viewport-orient-label viewport-orient-label--bottom mpr-orient-label mpr-orient-label--bottom",
+    );
+    this.orientLeft = this.createDiv(
+      "viewport-orient-label viewport-orient-label--left mpr-orient-label mpr-orient-label--left",
+    );
     this.orientRight = this.createDiv(
-      "mpr-orient-label mpr-orient-label--right",
+      "viewport-orient-label viewport-orient-label--right mpr-orient-label mpr-orient-label--right",
     );
 
     this.attachDom();
@@ -115,6 +128,7 @@ export class Viewport {
   }
 
   private attachDom(): void {
+    this.cellElement.appendChild(this.glCanvasElement);
     this.cellElement.appendChild(this.canvasElement);
     this.cellElement.appendChild(this.orientTop);
     this.cellElement.appendChild(this.orientBottom);
@@ -132,6 +146,14 @@ export class Viewport {
     });
 
     this.resizeObserver = new ResizeObserver(() => {
+      const w = this.cellElement.clientWidth;
+      const h = this.cellElement.clientHeight;
+      if (w > 0 && h > 0) {
+        if (this.canvasElement.width !== w) this.canvasElement.width = w;
+        if (this.canvasElement.height !== h) this.canvasElement.height = h;
+        if (this.glCanvasElement.width !== w) this.glCanvasElement.width = w;
+        if (this.glCanvasElement.height !== h) this.glCanvasElement.height = h;
+      }
       // Re-fit if zoom was calculated while the cell was hidden (zoom=0).
       if (this.data.viewport.zoom <= 0 && this.data.parsed?.metadata) {
         this.fitImage();
@@ -215,6 +237,29 @@ export class Viewport {
   // ── Rendering ─────────────────────────────────────────────────────────────
 
   public render(): void {
+    if (mprEngine.volume && state.isMprMode) {
+      if (this.glCanvasElement) {
+        this.glCanvasElement.style.display = "block";
+        mprEngine.renderView(this.plane, this.glCanvasElement);
+      }
+      this.clear();
+      if (this.ctx) {
+        mprEngine.renderCrosshair(
+          this.plane,
+          this.ctx,
+          this.canvasElement.width,
+          this.canvasElement.height,
+        );
+      }
+      this.updateOrientationLabels();
+      this.updateInfoOverlay();
+      return;
+    }
+
+    if (this.glCanvasElement) {
+      this.glCanvasElement.style.display = "none";
+    }
+
     if (!this.data.parsed?.pixelData || !this.ctx) {
       this.clear();
       this.updateOrientationLabels();
@@ -234,6 +279,15 @@ export class Viewport {
     this.applyTransform();
     this.updateInfoOverlay();
     this.updateOrientationLabels();
+
+    if (mprEngine.volume && this.ctx) {
+      mprEngine.renderCrosshair(
+        this.plane,
+        this.ctx,
+        this.canvasElement.width,
+        this.canvasElement.height,
+      );
+    }
   }
 
   private applyTransform(): void {
@@ -255,10 +309,30 @@ export class Viewport {
 
   private updateOrientationLabels(): void {
     const hasData = Boolean(this.data.parsed?.pixelData);
-    this.orientTop.textContent = hasData ? "A" : "";
-    this.orientBottom.textContent = hasData ? "P" : "";
-    this.orientLeft.textContent = hasData ? "R" : "";
-    this.orientRight.textContent = hasData ? "L" : "";
+    if (!hasData) {
+      this.orientTop.textContent = "";
+      this.orientBottom.textContent = "";
+      this.orientLeft.textContent = "";
+      this.orientRight.textContent = "";
+      return;
+    }
+
+    if (this.plane === "coronal") {
+      this.orientTop.textContent = "S";
+      this.orientBottom.textContent = "I";
+      this.orientLeft.textContent = "R";
+      this.orientRight.textContent = "L";
+    } else if (this.plane === "sagittal") {
+      this.orientTop.textContent = "S";
+      this.orientBottom.textContent = "I";
+      this.orientLeft.textContent = "A";
+      this.orientRight.textContent = "P";
+    } else {
+      this.orientTop.textContent = "A";
+      this.orientBottom.textContent = "P";
+      this.orientLeft.textContent = "R";
+      this.orientRight.textContent = "L";
+    }
   }
 
   private updateInfoOverlay(): void {
@@ -286,6 +360,7 @@ export class Viewport {
 
   public destroy(): void {
     this.resizeObserver?.disconnect();
+    this.glCanvasElement.remove();
     this.cellElement.remove();
   }
 }
@@ -302,6 +377,11 @@ export class ViewportManager {
   constructor(containerElement: HTMLElement) {
     this.container = containerElement;
     this.setLayout("1x1");
+  }
+
+  public setVolume(data: MPRVolumeData): void {
+    mprEngine.loadVolume(data);
+    view3DViewer.setVolume(data as unknown as VoxelVolume);
   }
 
   public get activeViewport(): Viewport | null {
@@ -331,6 +411,7 @@ export class ViewportManager {
     this.container.classList.add(`grid-layout-${layout}`);
 
     const currentKeys = Array.from(this.viewports.keys());
+    const defaultPlanes: MPRPlane[] = ["axial", "coronal", "sagittal", "axial"];
 
     // Create missing viewports
     for (let i = 0; i < requiredCount; i++) {
@@ -339,6 +420,7 @@ export class ViewportManager {
         const vp = new Viewport(id, (selectedId) =>
           this.setActiveViewport(selectedId),
         );
+        vp.plane = defaultPlanes[i] || "axial";
         this.viewports.set(id, vp);
         this.container.appendChild(vp.cellElement);
       }
@@ -378,7 +460,109 @@ export class ViewportManager {
     this.isSynchronized = enabled;
   }
 
+  /**
+   * Identifies whether the specified viewport ID corresponds to the top-right viewport.
+   * In 2x2 and 1x2 grid layouts, 'vp-1' represents the top-right cell.
+   */
+  public isTopRightViewport(id: string): boolean {
+    if (id === "vp-1") return true;
+    const vp = this.viewports.get(id);
+    if (!vp) return false;
+    const cell = vp.cellElement;
+    const containerRect = this.container.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+    if (containerRect.width > 0 && containerRect.height > 0) {
+      const isRightHalf =
+        cellRect.left + cellRect.width / 2 >
+        containerRect.left + containerRect.width / 2;
+      const isTopHalf =
+        cellRect.top + cellRect.height / 2 <
+        containerRect.top + containerRect.height / 2;
+      return isRightHalf && isTopHalf;
+    }
+    return false;
+  }
+
+  /**
+   * Identifies whether the specified viewport ID corresponds to the combined 3D volume viewport.
+   * In 2x2 grid layout, 'vp-3' represents the bottom-right cell (combined 3D / volume view).
+   */
+  public isCombined3DViewport(id: string): boolean {
+    if (id === "vp-3") return true;
+    const vp = this.viewports.get(id);
+    if (!vp) return false;
+    if (this.currentLayout === "2x2") {
+      const cell = vp.cellElement;
+      const containerRect = this.container.getBoundingClientRect();
+      const cellRect = cell.getBoundingClientRect();
+      if (containerRect.width > 0 && containerRect.height > 0) {
+        const isRightHalf =
+          cellRect.left + cellRect.width / 2 >
+          containerRect.left + containerRect.width / 2;
+        const isBottomHalf =
+          cellRect.top + cellRect.height / 2 >
+          containerRect.top + containerRect.height / 2;
+        return isRightHalf && isBottomHalf;
+      }
+    }
+    return false;
+  }
+
   // ── Multi-viewport sync dispatcher ───────────────────────────────────────
+
+  public dispatchMprCrosshair(
+    originId: string,
+    deltaScreenX: number,
+    deltaScreenY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): void {
+    // Clinical requirement: crosshair drag is enabled on the 3 orthogonal planes
+    // (vp-0 Axial, vp-1 Coronal, vp-2 Sagittal) and strictly blocked on the
+    // combined 3D volume viewport (vp-3).
+    if (this.isCombined3DViewport(originId)) {
+      return;
+    }
+
+    const origin = this.viewports.get(originId);
+    if (!origin) return;
+
+    mprEngine.applyCrosshairDelta2D(
+      origin.plane,
+      deltaScreenX,
+      deltaScreenY,
+      viewportWidth,
+      viewportHeight,
+    );
+
+    // Re-render all viewports in real time reflecting synchronized cuts
+    for (const vp of this.viewports.values()) {
+      vp.render();
+    }
+  }
+
+  public dispatchMprPan(
+    originId: string,
+    deltaScreenX: number,
+    deltaScreenY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): void {
+    const origin = this.viewports.get(originId);
+    if (!origin) return;
+
+    mprEngine.applyPanDelta2D(
+      origin.plane,
+      deltaScreenX,
+      deltaScreenY,
+      viewportWidth,
+      viewportHeight,
+    );
+
+    for (const vp of this.viewports.values()) {
+      vp.render();
+    }
+  }
 
   public dispatchPan(originId: string, dx: number, dy: number): void {
     this.viewports.get(originId)?.applyPanDelta(dx, dy);

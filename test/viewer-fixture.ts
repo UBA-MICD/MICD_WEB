@@ -21,6 +21,7 @@ export function viewerFixtureHtml(): string {
     <button id="tool-crosshair" aria-pressed="false"></button>
     <button id="tool-reset"></button>
     <button id="tool-metadata" aria-expanded="false"></button>
+    <button id="tool-view-3d" disabled></button>
     <button id="tool-mpr" disabled></button>
 
     <input type="file" id="open-files-input" multiple class="hidden" />
@@ -29,6 +30,29 @@ export function viewerFixtureHtml(): string {
     <button id="btn-open-folder">Open folder</button>
 
     <button id="btn-export-menu" disabled></button>
+
+    <div id="view-3d-container" class="hidden">
+      <canvas id="view-3d-canvas" class="view-3d-canvas"></canvas>
+      <div class="view-3d-depth-slider-wrap hidden" id="view-3d-depth-slider-wrap">
+        <span id="view-3d-depth-counter">Slice: 1/1</span>
+        <input type="range" id="view-3d-depth-slider" min="0" max="0" value="0" />
+      </div>
+      <div class="view-3d-orientation-widget hidden" id="view-3d-orientation-widget">
+        <button class="btn-orient active" id="btn-view-3d-axial">Axial</button>
+        <button class="btn-orient" id="btn-view-3d-sagittal">Sagittal</button>
+        <button class="btn-orient" id="btn-view-3d-coronal">Coronal</button>
+        <button class="btn-orient" id="btn-view-3d-3d">3D</button>
+      </div>
+      <canvas id="view-3d-reference-cube"></canvas>
+      <div class="view-3d-sliders-panel" id="view-3d-sliders-panel">
+        <input type="range" id="view-3d-scroll-axial" min="0" max="0" value="0" />
+        <span id="view-3d-val-axial">0</span>
+        <input type="range" id="view-3d-scroll-sagittal" min="0" max="0" value="0" />
+        <span id="view-3d-val-sagittal">0</span>
+        <input type="range" id="view-3d-scroll-coronal" min="0" max="0" value="0" />
+        <span id="view-3d-val-coronal">0</span>
+      </div>
+    </div>
 
     <div class="mpr-depth-slider-wrap hidden" id="mpr-depth-slider-wrap">
       <span id="mpr-depth-counter">Slice: 1/1</span>

@@ -18,10 +18,14 @@ import {
   initKeyboardShortcuts,
   initMenuListeners,
   initResizeObserver,
+  toggleMprMode,
+  toggle3DMode,
 } from "./interaction.ts";
 import { state, itemCount } from "./state.ts";
-import { mpr3DViewer } from "./mpr.ts";
+import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
+import { mprEngine } from "./mpr-engine.ts";
 import { dicomCache } from "./cache.ts";
+import { ViewportManager } from "./viewport-manager.ts";
 
 // Fresh jsdom document per test (not just a fresh body): initKeyboardShortcuts()
 // and parts of initViewportInteraction() bind listeners to `document` itself,
@@ -859,4 +863,150 @@ test("btn-zoom-200 sets zoom to 2 in 2D mode and 3D mode", () => {
     .dispatchEvent(new MouseEvent("click"));
   assert.equal(mpr3DViewer.camera.zoom, 2);
   state.is3DMode = false;
+});
+
+test("toggleMprMode toggles isMprMode and ensures mutual exclusion with is3DMode", async () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
+  state.parsed = {
+    metadata: {
+      ...baseMeta,
+      pixelSpacing: [0.5, 0.5] as [number, number],
+      imagePositionPatient: [0, 0, 0] as [number, number, number],
+    },
+    pixelData: null,
+    rawDataSet: {},
+  } as any;
+
+  const btnMpr = document.getElementById("tool-mpr") as HTMLButtonElement;
+  btnMpr.disabled = false;
+  mprEngine.volume = {
+    data: new Uint8Array(8),
+    dimensions: [2, 2, 2],
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  state.is3DMode = true;
+  state.isMprMode = false;
+
+  await toggleMprMode();
+  assert.equal(state.isMprMode, true);
+  assert.equal(state.is3DMode, false);
+
+  const mprContainer = document.getElementById("view-3d-container");
+  assert.ok(mprContainer?.classList.contains("hidden"));
+
+  btnMpr.disabled = false;
+  await toggleMprMode();
+  assert.equal(state.isMprMode, false);
+});
+
+test("toggle3DMode toggles is3DMode and ensures mutual exclusion with isMprMode", async () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
+  state.parsed = {
+    metadata: {
+      ...baseMeta,
+      pixelSpacing: [0.5, 0.5] as [number, number],
+      imagePositionPatient: [0, 0, 0] as [number, number, number],
+    },
+    pixelData: null,
+    rawDataSet: {},
+  } as any;
+
+  const btn3D = (document.getElementById("tool-view-3d") ||
+    document.getElementById("tool-mpr")) as HTMLButtonElement;
+  btn3D.disabled = false;
+  view3DViewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  state.isMprMode = true;
+  state.is3DMode = false;
+
+  await toggle3DMode();
+  assert.equal(state.is3DMode, true);
+  assert.equal(state.isMprMode, false);
+
+  const container3D = document.getElementById("view-3d-container");
+  assert.ok(!container3D?.classList.contains("hidden"));
+
+  btn3D.disabled = false;
+  await toggle3DMode();
+  assert.equal(state.is3DMode, false);
+});
+
+test("ViewportManager: isCombined3DViewport correctly identifies combined 3D viewport", () => {
+  const container = document.createElement("div");
+  const manager = new ViewportManager(container);
+  manager.setLayout("2x2");
+  assert.equal(manager.isCombined3DViewport("vp-3"), true);
+  assert.equal(manager.isCombined3DViewport("vp-0"), false);
+  assert.equal(manager.isCombined3DViewport("vp-1"), false);
+  assert.equal(manager.isCombined3DViewport("vp-2"), false);
+  manager.destroy();
+});
+
+test("ViewportManager: dispatchMprCrosshair operates on orthogonal planes and blocks vp-3", () => {
+  const container = document.createElement("div");
+  const manager = new ViewportManager(container);
+  manager.setLayout("2x2");
+  let appliedDelta = false;
+  const originalApply = mprEngine.applyCrosshairDelta2D;
+  mprEngine.applyCrosshairDelta2D = () => {
+    appliedDelta = true;
+  };
+
+  try {
+    // Calling from orthogonal viewports should trigger crosshair delta
+    appliedDelta = false;
+    manager.dispatchMprCrosshair("vp-0", 10, 10, 400, 400);
+    assert.equal(
+      appliedDelta,
+      true,
+      "Crosshair delta should be applied for vp-0 (Axial)",
+    );
+
+    appliedDelta = false;
+    manager.dispatchMprCrosshair("vp-1", 10, 10, 400, 400);
+    assert.equal(
+      appliedDelta,
+      true,
+      "Crosshair delta should be applied for vp-1 (Coronal)",
+    );
+
+    appliedDelta = false;
+    manager.dispatchMprCrosshair("vp-2", 10, 10, 400, 400);
+    assert.equal(
+      appliedDelta,
+      true,
+      "Crosshair delta should be applied for vp-2 (Sagittal)",
+    );
+
+    // Calling from combined 3D viewport (vp-3) should be strictly blocked
+    appliedDelta = false;
+    manager.dispatchMprCrosshair("vp-3", 10, 10, 400, 400);
+    assert.equal(
+      appliedDelta,
+      false,
+      "Crosshair delta should be ignored for vp-3 (3D combined)",
+    );
+  } finally {
+    mprEngine.applyCrosshairDelta2D = originalApply;
+    manager.destroy();
+  }
 });

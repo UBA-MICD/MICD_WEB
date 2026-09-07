@@ -378,6 +378,137 @@ test.describe("mountValidationsPanel", () => {
     );
   });
 
+  test("open button with data-needs-ml shows toast and does not open study", async () => {
+    fetchImpl = async () =>
+      jsonResponse(200, {
+        studies: [{ ...STUDY_ROW, has_ml_prediction: false }],
+      });
+    const root = makeRoot();
+    const opened: string[] = [];
+    const handle = mountValidationsPanel(root, (id) => opened.push(id));
+    await handle.reload();
+
+    const openBtn = root.querySelector<HTMLElement>(
+      "[data-action='open'][data-needs-ml='true']",
+    )!;
+    assert.ok(openBtn, "open button with data-needs-ml should exist");
+    openBtn.click();
+    assert.deepEqual(
+      opened,
+      [],
+      "onOpenStudy must not be called when ML is missing",
+    );
+  });
+
+  test("clicking analyze button on success replaces it with ML badge and un-dims open button", async () => {
+    const enc = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj)).toString("base64url");
+    const h = enc({ alg: "HS256", typ: "JWT" });
+    const p = enc({
+      sub: 2,
+      email: "admin@micd.local",
+      role: "admin",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    await adoptSession(`${h}.${p}.sig`, "rt-admin", {
+      id: 2,
+      email: "admin@micd.local",
+      role: "admin",
+    });
+
+    let analyzeCallCount = 0;
+    fetchImpl = async (url) => {
+      if ((url as string).includes("/ml/analyze")) {
+        analyzeCallCount++;
+        return jsonResponse(201, {
+          predictionId: 1,
+          studyId: "study-abc",
+          label: "normal",
+          confidence: 0.87,
+          analyzedBy: "admin@micd.local",
+          analyzedAt: "2026-09-07T10:00:00.000Z",
+        });
+      }
+      return jsonResponse(200, {
+        studies: [{ ...STUDY_ROW, has_ml_prediction: false }],
+      });
+    };
+
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+
+    const analyzeBtn = root.querySelector<HTMLElement>(
+      "[data-action='analyze']",
+    )!;
+    assert.ok(
+      analyzeBtn,
+      "analyze button should exist for admin when no ML prediction",
+    );
+    analyzeBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    assert.equal(analyzeCallCount, 1, "analyze endpoint should be called once");
+    const badge = root.querySelector(".validation-ml-badge--done");
+    assert.ok(badge, "done badge should replace the analyze button on success");
+    const openBtn = root.querySelector<HTMLButtonElement>(
+      "[data-action='open']",
+    );
+    assert.ok(openBtn, "open button should still be present");
+    assert.ok(
+      !openBtn!.classList.contains("btn--dim"),
+      "open button should not be dimmed after analysis",
+    );
+    assert.ok(
+      !openBtn!.dataset.needsMl,
+      "data-needs-ml should be removed from open button after analysis",
+    );
+  });
+
+  test("clicking analyze button on API error re-enables it and does not show badge", async () => {
+    const enc = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj)).toString("base64url");
+    const h = enc({ alg: "HS256", typ: "JWT" });
+    const p = enc({
+      sub: 2,
+      email: "admin@micd.local",
+      role: "admin",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    await adoptSession(`${h}.${p}.sig`, "rt-admin2", {
+      id: 2,
+      email: "admin@micd.local",
+      role: "admin",
+    });
+
+    fetchImpl = async (url) => {
+      if ((url as string).includes("/ml/analyze")) {
+        return jsonResponse(500, { error: "internal error" });
+      }
+      return jsonResponse(200, {
+        studies: [{ ...STUDY_ROW, has_ml_prediction: false }],
+      });
+    };
+
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+
+    const analyzeBtn = root.querySelector<HTMLButtonElement>(
+      "[data-action='analyze']",
+    )!;
+    assert.ok(analyzeBtn, "analyze button should exist");
+    analyzeBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    assert.ok(!analyzeBtn.disabled, "button should be re-enabled after error");
+    assert.equal(
+      root.querySelector(".validation-ml-badge--done"),
+      null,
+      "no done badge should appear on API error",
+    );
+  });
+
   test("filter chip click re-fetches with the filter param", async () => {
     const requestedUrls: string[] = [];
     fetchImpl = async (url) => {

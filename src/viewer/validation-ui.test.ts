@@ -86,6 +86,7 @@ function setupFixture(): void {
     <div id="validation-bar" class="hidden" role="toolbar">
       <span id="validation-status-badge"></span>
       <p id="validation-correction-notice" class="hidden"></p>
+      <p id="validation-readonly-notice" class="hidden"></p>
       <button id="btn-validate-approve">Aprobar</button>
       <button id="btn-validate-reject">Rechazar</button>
       <button id="btn-validate-review">Marcar para revisión</button>
@@ -556,5 +557,265 @@ test("error toast has role=alert for screen reader interruption", async () => {
     toast.getAttribute("role"),
     "alert",
     "error toast must have role=alert",
+  );
+});
+
+// ── Tests: requestValidationMode / pendingValidationBar one-shot ──────────────
+
+test("bar is hidden when notifyStudyLoaded is called without requestValidationMode", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const { initValidation, notifyStudyLoaded } = await freshUi();
+  initValidation();
+  // No requestValidationMode() — bar must stay hidden
+  notifyStudyLoaded("study-001");
+
+  const bar = document.getElementById("validation-bar")!;
+  assert.ok(
+    bar.classList.contains("hidden"),
+    "bar must be hidden without requestValidationMode",
+  );
+});
+
+test("bar is visible when requestValidationMode is called before notifyStudyLoaded", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001");
+
+  const bar = document.getElementById("validation-bar")!;
+  assert.ok(
+    !bar.classList.contains("hidden"),
+    "bar must be visible after requestValidationMode",
+  );
+});
+
+test("isValidationBarActive returns false before requestValidationMode", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const { initValidation, notifyStudyLoaded, isValidationBarActive } =
+    await freshUi();
+  initValidation();
+  notifyStudyLoaded("study-001");
+
+  assert.ok(
+    !isValidationBarActive(),
+    "should be inactive without requestValidationMode",
+  );
+});
+
+test("isValidationBarActive returns true after requestValidationMode + notifyStudyLoaded", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const {
+    initValidation,
+    notifyStudyLoaded,
+    requestValidationMode,
+    isValidationBarActive,
+  } = await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001");
+
+  assert.ok(
+    isValidationBarActive(),
+    "should be active after requestValidationMode",
+  );
+});
+
+test("pendingValidationBar is consumed: second notifyStudyLoaded hides the bar", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001");
+  notifyStudyLoaded("study-002"); // no requestValidationMode before this
+
+  const bar = document.getElementById("validation-bar")!;
+  assert.ok(
+    bar.classList.contains("hidden"),
+    "bar must hide on second load without re-requesting validation mode",
+  );
+});
+
+// ── Tests: readonly notice (medico + existing validation) ─────────────────────
+
+test("readonly notice is hidden for medico on unvalidated study", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001");
+
+  const notice = document.getElementById("validation-readonly-notice")!;
+  assert.ok(
+    notice.classList.contains("hidden"),
+    "readonly notice must be hidden for unvalidated study",
+  );
+});
+
+test("readonly notice is visible for medico when study already has a validation", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001", MOCK_RECORD);
+
+  const notice = document.getElementById("validation-readonly-notice")!;
+  assert.ok(
+    !notice.classList.contains("hidden"),
+    "readonly notice must show for medico + validated study",
+  );
+});
+
+test("readonly notice is hidden for admin even when validation exists", async () => {
+  setupFixture();
+  await loginAs("admin");
+  state.source = "server";
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001", MOCK_RECORD);
+
+  const notice = document.getElementById("validation-readonly-notice")!;
+  assert.ok(notice.classList.contains("hidden"), "admin is not readonly");
+});
+
+// ── Tests: action buttons hidden for medico on validated study ────────────────
+
+test("action buttons are hidden for medico when study is already validated", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001", MOCK_RECORD);
+
+  for (const id of [
+    "btn-validate-approve",
+    "btn-validate-reject",
+    "btn-validate-review",
+  ]) {
+    const btn = document.getElementById(id)!;
+    assert.ok(
+      btn.classList.contains("hidden"),
+      `${id} must be hidden for medico + validated`,
+    );
+  }
+});
+
+test("action buttons are visible for medico on unvalidated study", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001");
+
+  for (const id of [
+    "btn-validate-approve",
+    "btn-validate-reject",
+    "btn-validate-review",
+  ]) {
+    const btn = document.getElementById(id)!;
+    assert.ok(
+      !btn.classList.contains("hidden"),
+      `${id} must be visible for medico + unvalidated`,
+    );
+  }
+});
+
+test("action buttons are visible for admin even when study is already validated", async () => {
+  setupFixture();
+  await loginAs("admin");
+  state.source = "server";
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001", MOCK_RECORD);
+
+  for (const id of [
+    "btn-validate-approve",
+    "btn-validate-reject",
+    "btn-validate-review",
+  ]) {
+    const btn = document.getElementById(id)!;
+    assert.ok(
+      !btn.classList.contains("hidden"),
+      `${id} must be visible for admin`,
+    );
+  }
+});
+
+// ── Tests: cancel dialog ──────────────────────────────────────────────────────
+
+test("clicking cancel on the dialog does not call the API", async () => {
+  setupFixture();
+  await loginAs("medico");
+  state.source = "server";
+  state.serverValidation = null;
+
+  let fetchCalled = false;
+  fetchImpl = async () => {
+    fetchCalled = true;
+    return jsonResponse(201, MOCK_RECORD);
+  };
+
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
+  initValidation();
+  requestValidationMode();
+  notifyStudyLoaded("study-001");
+
+  document.getElementById("btn-validate-approve")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+  document.getElementById("validation-dialog-cancel")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.ok(!fetchCalled, "API must not be called after cancel");
+  assert.equal(
+    state.serverValidation,
+    null,
+    "state must not change after cancel",
   );
 });

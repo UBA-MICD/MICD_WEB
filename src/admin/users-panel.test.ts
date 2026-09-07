@@ -18,8 +18,10 @@ let fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
 let confirmResult = true;
 
 beforeEach(() => {
-  (globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) =>
-    fetchImpl(url, init);
+  (globalThis as { fetch?: unknown }).fetch = (
+    url: string,
+    init?: RequestInit,
+  ) => fetchImpl(url, init);
   (globalThis as any).confirm = () => confirmResult;
   confirmResult = true;
 
@@ -76,7 +78,10 @@ test("reload() renders fetched users into the table", async () => {
 
   const tbody = root().querySelector("[data-users-tbody]")!;
   assert.match(tbody.innerHTML, /jane@micd\.local/);
-  assert.equal(root().querySelector("[data-users-error]")!.classList.contains("hidden"), true);
+  assert.equal(
+    root().querySelector("[data-users-error]")!.classList.contains("hidden"),
+    true,
+  );
 });
 
 test("reload() shows a forbidden message on a 403", async () => {
@@ -87,7 +92,10 @@ test("reload() shows a forbidden message on a 403", async () => {
   const errorEl = root().querySelector("[data-users-error]")!;
   assert.equal(errorEl.classList.contains("hidden"), false);
   assert.notEqual(errorEl.textContent, "");
-  assert.match(root().querySelector("[data-users-tbody]")!.innerHTML, /user-empty/);
+  assert.match(
+    root().querySelector("[data-users-tbody]")!.innerHTML,
+    /user-empty/,
+  );
 });
 
 test("reload() shows the server error message on other failures", async () => {
@@ -107,7 +115,8 @@ test("create form: client-side validation blocks submit before hitting the netwo
 
   const form = root().querySelector("[data-user-create]") as HTMLFormElement;
   (form.querySelector("[data-user-new-name]") as HTMLInputElement).value = "";
-  (form.querySelector("[data-user-new-email]") as HTMLInputElement).value = "not-an-email";
+  (form.querySelector("[data-user-new-email]") as HTMLInputElement).value =
+    "not-an-email";
   form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 0));
 
@@ -122,7 +131,11 @@ test("create form: valid submit creates the user, resets the form, and reloads",
   fetchImpl = async (url, init) => {
     if (init?.method === "POST") {
       createCalls++;
-      return jsonResponse(201, { ...sampleUser, id: 2, email: "new@micd.local" });
+      return jsonResponse(201, {
+        ...sampleUser,
+        id: 2,
+        email: "new@micd.local",
+      });
     }
     listCalls++;
     return jsonResponse(200, [sampleUser]);
@@ -130,36 +143,49 @@ test("create form: valid submit creates the user, resets the form, and reloads",
   mountUsersPanel(root());
 
   const form = root().querySelector("[data-user-create]") as HTMLFormElement;
-  (form.querySelector("[data-user-new-name]") as HTMLInputElement).value = "New";
-  (form.querySelector("[data-user-new-email]") as HTMLInputElement).value = "new@micd.local";
-  (form.querySelector("[data-user-new-role]") as HTMLSelectElement).value = "medico";
+  (form.querySelector("[data-user-new-name]") as HTMLInputElement).value =
+    "New";
+  (form.querySelector("[data-user-new-email]") as HTMLInputElement).value =
+    "new@micd.local";
+  (form.querySelector("[data-user-new-role]") as HTMLSelectElement).value =
+    "medico";
   form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
   assert.equal(createCalls, 1);
   assert.equal(listCalls, 1);
-  assert.equal((form.querySelector("[data-user-new-name]") as HTMLInputElement).value, "");
+  assert.equal(
+    (form.querySelector("[data-user-new-name]") as HTMLInputElement).value,
+    "",
+  );
 });
 
 test("create form: server-side rejection shows the returned error and does not reset", async () => {
   fetchImpl = async (url, init) => {
-    if (init?.method === "POST") return jsonResponse(409, { error: "email taken" });
+    if (init?.method === "POST")
+      return jsonResponse(409, { error: "email taken" });
     return jsonResponse(200, []);
   };
   mountUsersPanel(root());
 
   const form = root().querySelector("[data-user-create]") as HTMLFormElement;
-  (form.querySelector("[data-user-new-name]") as HTMLInputElement).value = "New";
-  (form.querySelector("[data-user-new-email]") as HTMLInputElement).value = "new@micd.local";
-  (form.querySelector("[data-user-new-role]") as HTMLSelectElement).value = "medico";
+  (form.querySelector("[data-user-new-name]") as HTMLInputElement).value =
+    "New";
+  (form.querySelector("[data-user-new-email]") as HTMLInputElement).value =
+    "new@micd.local";
+  (form.querySelector("[data-user-new-role]") as HTMLSelectElement).value =
+    "medico";
   form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
   const formErr = form.querySelector("[data-user-new-error]")!;
   assert.equal(formErr.textContent, "email taken");
-  assert.notEqual((form.querySelector("[data-user-new-name]") as HTMLInputElement).value, "");
+  assert.notEqual(
+    (form.querySelector("[data-user-new-name]") as HTMLInputElement).value,
+    "",
+  );
 });
 
 test("changing a row's role select calls setUserRole and reloads", async () => {
@@ -299,7 +325,9 @@ test("a failed delete shows a toast but does not throw, then reloads", async () 
   await panel.reload();
 
   fetchImpl = async (url, init) =>
-    init?.method === "DELETE" ? jsonResponse(500, { error: "cannot delete" }) : jsonResponse(200, []);
+    init?.method === "DELETE"
+      ? jsonResponse(500, { error: "cannot delete" })
+      : jsonResponse(200, []);
 
   const del = root().querySelector("[data-user-delete]") as HTMLElement;
   await assert.doesNotReject(async () => {
@@ -330,14 +358,17 @@ test("clicking the export button fetches the admin-only CSV endpoint", async () 
         return {
           ok: true,
           status: 200,
-          blob: async () => new Blob(["timestamp,action\n"], { type: "text/csv" }),
+          blob: async () =>
+            new Blob(["timestamp,action\n"], { type: "text/csv" }),
         } as unknown as Response;
       }
       return jsonResponse(200, [sampleUser]);
     };
     mountUsersPanel(root());
 
-    const btn = root().querySelector("[data-users-export]") as HTMLButtonElement;
+    const btn = root().querySelector(
+      "[data-users-export]",
+    ) as HTMLButtonElement;
     await assert.doesNotReject(async () => {
       btn.dispatchEvent(new Event("click", { bubbles: true }));
       await new Promise((r) => setTimeout(r, 0));

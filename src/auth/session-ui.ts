@@ -50,7 +50,9 @@ function tick(): void {
   const remaining = expiresAt - Date.now();
   if (remaining <= 0) {
     $("session-expiry").textContent = t("auth.sessionExpired");
-    $("explorer-session-line").textContent = t("auth.explorerSessionExpiredLine");
+    $("explorer-session-line").textContent = t(
+      "auth.explorerSessionExpiredLine",
+    );
     announceOnce(t("auth.announceExpired"));
     return;
   }

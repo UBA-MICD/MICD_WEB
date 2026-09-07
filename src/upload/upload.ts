@@ -77,9 +77,16 @@ export function initUploadPanel(): void {
     const selected = Array.from(input.files ?? []);
     input.value = "";
     void (async () => {
-      const { files: expanded, corruptZips, tooBigZips } = await expandFiles(selected, null);
+      const {
+        files: expanded,
+        corruptZips,
+        tooBigZips,
+      } = await expandFiles(selected, null);
       if (corruptZips.length > 0)
-        showToast(t("upload.zipReadError", { files: corruptZips.join(", ") }), "error");
+        showToast(
+          t("upload.zipReadError", { files: corruptZips.join(", ") }),
+          "error",
+        );
       if (tooBigZips.length > 0)
         showToast(
           t("upload.zipTooBig", { files: tooBigZips.join(", ") }),
@@ -134,11 +141,18 @@ function initUploadDropZone(): void {
     const dropped = Array.from(e.dataTransfer?.files ?? []);
     const hasZip = dropped.some((f) => f.name.toLowerCase().endsWith(".zip"));
     if (hasZip) showUploadStatus(t("upload.unzippingGeneric"), "");
-    const { files: expanded, corruptZips, tooBigZips } = await expandFiles(dropped, null);
+    const {
+      files: expanded,
+      corruptZips,
+      tooBigZips,
+    } = await expandFiles(dropped, null);
     if (hasZip) showUploadStatus("", "");
     // Use toasts for expansion errors so they survive the per-file upload status updates.
     if (corruptZips.length > 0)
-      showToast(t("upload.zipReadError", { files: corruptZips.join(", ") }), "error");
+      showToast(
+        t("upload.zipReadError", { files: corruptZips.join(", ") }),
+        "error",
+      );
     if (tooBigZips.length > 0)
       showToast(
         t("upload.zipTooBig", { files: tooBigZips.join(", ") }),
@@ -346,7 +360,12 @@ function uploadOne(
           file,
           safeMessage(xhr.responseText),
           async (replace, cancelAll) => {
-            if (cancelAll) { cancelled = true; setRowState(row, "aborted"); resolve("aborted"); return; }
+            if (cancelAll) {
+              cancelled = true;
+              setRowState(row, "aborted");
+              resolve("aborted");
+              return;
+            }
             resolve(replace ? await uploadOne(file, row, true) : "duplicate");
           },
         );
@@ -587,7 +606,10 @@ function uploadOneExplorer(
       }
 
       if (xhr.status === 409) {
-        showToast(t("upload.duplicateOnServer", { name: file.name }), "warning");
+        showToast(
+          t("upload.duplicateOnServer", { name: file.name }),
+          "warning",
+        );
         resolve("duplicate");
         return;
       }
@@ -628,7 +650,9 @@ function showDuplicateDialog(
 
   ($("duplicate-yes") as HTMLButtonElement).onclick = () => finish(true);
   ($("duplicate-no") as HTMLButtonElement).onclick = () => finish(false);
-  const cancelAllBtn = document.getElementById("duplicate-cancel-all") as HTMLButtonElement | null;
+  const cancelAllBtn = document.getElementById(
+    "duplicate-cancel-all",
+  ) as HTMLButtonElement | null;
   if (cancelAllBtn) cancelAllBtn.onclick = () => finish(false, true);
   // Escape closes without replacing — the safe outcome for a destructive
   // confirmation, and the queue must not stall waiting on a promise.

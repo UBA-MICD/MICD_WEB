@@ -26,8 +26,10 @@ beforeEach(() => {
       store.delete(k);
     },
   };
-  (globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) =>
-    fetchImpl(url, init);
+  (globalThis as { fetch?: unknown }).fetch = (
+    url: string,
+    init?: RequestInit,
+  ) => fetchImpl(url, init);
   setBody(`
     <button id="btn-login">Log in</button>
     <div id="session-block" class="hidden">
@@ -66,7 +68,8 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function fakeJwt(claims: Record<string, unknown>): string {
-  const b64 = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+  const b64 = (obj: unknown) =>
+    Buffer.from(JSON.stringify(obj)).toString("base64url");
   return `${b64({ alg: "none" })}.${b64(claims)}.sig`;
 }
 
@@ -88,27 +91,54 @@ async function loginAs(
 
 test("updateAuthUI shows the guest state when signed out", () => {
   updateAuthUI();
-  assert.equal(document.getElementById("btn-login")!.classList.contains("hidden"), false);
-  assert.equal(document.getElementById("session-block")!.classList.contains("hidden"), true);
-  assert.notEqual(document.getElementById("explorer-session-line")!.textContent, "");
+  assert.equal(
+    document.getElementById("btn-login")!.classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document.getElementById("session-block")!.classList.contains("hidden"),
+    true,
+  );
+  assert.notEqual(
+    document.getElementById("explorer-session-line")!.textContent,
+    "",
+  );
 });
 
 test("updateAuthUI shows the session state for a signed-in non-admin", async () => {
   await loginAs("medico", "doc@example.com", 300);
   updateAuthUI();
 
-  assert.equal(document.getElementById("btn-login")!.classList.contains("hidden"), true);
-  assert.equal(document.getElementById("session-block")!.classList.contains("hidden"), false);
-  assert.equal(document.getElementById("btn-activity")!.classList.contains("hidden"), true);
-  assert.equal(document.getElementById("session-email")!.textContent, "doc@example.com");
+  assert.equal(
+    document.getElementById("btn-login")!.classList.contains("hidden"),
+    true,
+  );
+  assert.equal(
+    document.getElementById("session-block")!.classList.contains("hidden"),
+    false,
+  );
+  assert.equal(
+    document.getElementById("btn-activity")!.classList.contains("hidden"),
+    true,
+  );
+  assert.equal(
+    document.getElementById("session-email")!.textContent,
+    "doc@example.com",
+  );
   assert.equal(document.getElementById("session-avatar")!.textContent, "DO");
-  assert.match(document.getElementById("session-expiry")!.textContent!, /\d+:\d\d/);
+  assert.match(
+    document.getElementById("session-expiry")!.textContent!,
+    /\d+:\d\d/,
+  );
 });
 
 test("updateAuthUI reveals the activity button for admins", async () => {
   await loginAs("admin", "root@example.com", 300);
   updateAuthUI();
-  assert.equal(document.getElementById("btn-activity")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("btn-activity")!.classList.contains("hidden"),
+    false,
+  );
 });
 
 test("the countdown announces once when under a minute remains, then reports expired", (t) => {
@@ -132,7 +162,10 @@ test("the countdown announces once when under a minute remains, then reports exp
       document.getElementById("session-expiry")!.textContent,
       document.getElementById("session-expiry")!.textContent, // just re-read below
     );
-    assert.match(document.getElementById("explorer-session-line")!.textContent!, /.+/);
+    assert.match(
+      document.getElementById("explorer-session-line")!.textContent!,
+      /.+/,
+    );
   })();
 });
 
@@ -142,7 +175,10 @@ test("updateAuthUI falls back to '··' avatar and stops ticking when signing ou
   await logout();
   updateAuthUI();
   assert.equal(document.getElementById("session-announce")!.textContent, "");
-  assert.equal(document.getElementById("session-block")!.classList.contains("hidden"), true);
+  assert.equal(
+    document.getElementById("session-block")!.classList.contains("hidden"),
+    true,
+  );
 });
 
 test("initActivityHistory opens the dialog and loads entries", async () => {
@@ -151,23 +187,37 @@ test("initActivityHistory opens the dialog and loads entries", async () => {
     assert.equal(url, `${API_BASE}/v1/activity?limit=50`);
     return jsonResponse(200, {
       entries: [
-        { action: "upload", timestamp: "2024-01-01T00:00:00Z", resourceId: "abc" },
+        {
+          action: "upload",
+          timestamp: "2024-01-01T00:00:00Z",
+          resourceId: "abc",
+        },
         { action: "login", timestamp: "2024-01-02T00:00:00Z" },
       ],
     });
   };
 
   initActivityHistory();
-  document.getElementById("btn-activity")!.dispatchEvent(new Event("click", { bubbles: true }));
+  document
+    .getElementById("btn-activity")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
   const body = document.getElementById("activity-body")!;
   assert.equal(body.querySelectorAll(".activity-item").length, 2);
-  assert.equal(document.getElementById("activity-dialog")!.classList.contains("hidden"), false);
+  assert.equal(
+    document.getElementById("activity-dialog")!.classList.contains("hidden"),
+    false,
+  );
 
-  document.getElementById("activity-close")!.dispatchEvent(new Event("click", { bubbles: true }));
-  assert.equal(document.getElementById("activity-dialog")!.classList.contains("hidden"), true);
+  document
+    .getElementById("activity-close")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
+  assert.equal(
+    document.getElementById("activity-dialog")!.classList.contains("hidden"),
+    true,
+  );
 });
 
 test("loadActivity shows an empty-state message when there are no entries", async () => {
@@ -175,11 +225,16 @@ test("loadActivity shows an empty-state message when there are no entries", asyn
   fetchImpl = async () => jsonResponse(200, { entries: [] });
 
   initActivityHistory();
-  document.getElementById("btn-activity")!.dispatchEvent(new Event("click", { bubbles: true }));
+  document
+    .getElementById("btn-activity")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.match(document.getElementById("activity-body")!.innerHTML, /activity-empty/);
+  assert.match(
+    document.getElementById("activity-body")!.innerHTML,
+    /activity-empty/,
+  );
 });
 
 test("loadActivity reports the 'not available' message on a 404", async () => {
@@ -187,11 +242,16 @@ test("loadActivity reports the 'not available' message on a 404", async () => {
   fetchImpl = async () => jsonResponse(404, {});
 
   initActivityHistory();
-  document.getElementById("btn-activity")!.dispatchEvent(new Event("click", { bubbles: true }));
+  document
+    .getElementById("btn-activity")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.match(document.getElementById("activity-body")!.innerHTML, /activity-empty/);
+  assert.match(
+    document.getElementById("activity-body")!.innerHTML,
+    /activity-empty/,
+  );
 });
 
 test("loadActivity reports a load error on a non-ok, non-404 response", async () => {
@@ -199,11 +259,16 @@ test("loadActivity reports a load error on a non-ok, non-404 response", async ()
   fetchImpl = async () => jsonResponse(500, {});
 
   initActivityHistory();
-  document.getElementById("btn-activity")!.dispatchEvent(new Event("click", { bubbles: true }));
+  document
+    .getElementById("btn-activity")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.match(document.getElementById("activity-body")!.innerHTML, /activity-empty/);
+  assert.match(
+    document.getElementById("activity-body")!.innerHTML,
+    /activity-empty/,
+  );
 });
 
 test("loadActivity reports a network error when fetch throws", async () => {
@@ -213,11 +278,16 @@ test("loadActivity reports a network error when fetch throws", async () => {
   };
 
   initActivityHistory();
-  document.getElementById("btn-activity")!.dispatchEvent(new Event("click", { bubbles: true }));
+  document
+    .getElementById("btn-activity")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.match(document.getElementById("activity-body")!.innerHTML, /activity-empty/);
+  assert.match(
+    document.getElementById("activity-body")!.innerHTML,
+    /activity-empty/,
+  );
 });
 
 test("loadActivity reports an unexpected-response message when json() throws", async () => {
@@ -232,9 +302,14 @@ test("loadActivity reports an unexpected-response message when json() throws", a
     }) as Response;
 
   initActivityHistory();
-  document.getElementById("btn-activity")!.dispatchEvent(new Event("click", { bubbles: true }));
+  document
+    .getElementById("btn-activity")!
+    .dispatchEvent(new Event("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.match(document.getElementById("activity-body")!.innerHTML, /activity-empty/);
+  assert.match(
+    document.getElementById("activity-body")!.innerHTML,
+    /activity-empty/,
+  );
 });

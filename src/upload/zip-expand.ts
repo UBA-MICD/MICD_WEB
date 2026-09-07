@@ -30,12 +30,14 @@ export async function extractZipEntries(
   data: Uint8Array,
   unzipFn: UnzipFn,
 ): Promise<{ name: string; data: Uint8Array }[]> {
-  const out = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-    unzipFn(data, (err, result) => {
-      if (err) reject(err);
-      else resolve(result);
-    });
-  });
+  const out = await new Promise<Record<string, Uint8Array>>(
+    (resolve, reject) => {
+      unzipFn(data, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    },
+  );
 
   const seen = new Set<string>();
   return Object.entries(out)

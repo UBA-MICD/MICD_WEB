@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { $, showLoading, showError, escapeHtml, escapeAttr, formatDate } from "./dom.ts";
+import {
+  $,
+  showLoading,
+  showError,
+  escapeHtml,
+  escapeAttr,
+  formatDate,
+} from "./dom.ts";
 
 test.before(() => installDom());
 test.after(() => uninstallDom());
@@ -14,7 +21,10 @@ test.beforeEach(() => {
 });
 
 test("$ returns the element by id", () => {
-  assert.equal($("loading-indicator"), document.getElementById("loading-indicator"));
+  assert.equal(
+    $("loading-indicator"),
+    document.getElementById("loading-indicator"),
+  );
 });
 
 test("showLoading toggles the hidden class on the loading indicator", () => {

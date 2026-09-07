@@ -44,8 +44,7 @@ interface InviteScreenDeps {
 export async function fetchInviteEmail(
   code: string,
 ): Promise<
-  | { ok: true; email: string }
-  | { ok: false; invalid: boolean; error: string }
+  { ok: true; email: string } | { ok: false; invalid: boolean; error: string }
 > {
   let res: Response;
   try {
@@ -101,10 +100,15 @@ export function initInviteScreen(d: InviteScreenDeps): void {
   screenDeps = d;
   registerScreen("invite", $("invite-screen"));
 
-  const form = $("invite-screen").querySelector<HTMLFormElement>("[data-invite-form]")!;
-  const passwordEl = form.querySelector<HTMLInputElement>("[data-invite-password]")!;
+  const form =
+    $("invite-screen").querySelector<HTMLFormElement>("[data-invite-form]")!;
+  const passwordEl = form.querySelector<HTMLInputElement>(
+    "[data-invite-password]",
+  )!;
   const errorEl = form.querySelector<HTMLElement>("[data-invite-error]")!;
-  const submitEl = form.querySelector<HTMLButtonElement>("[data-invite-submit]")!;
+  const submitEl = form.querySelector<HTMLButtonElement>(
+    "[data-invite-submit]",
+  )!;
 
   const showError = (msg: string): void => {
     errorEl.textContent = msg;
@@ -155,9 +159,14 @@ export async function enterInviteFlowIfPresent(): Promise<boolean> {
 }
 
 async function loadInviteEmail(code: string): Promise<void> {
-  const emailEl = $("invite-screen").querySelector<HTMLElement>("[data-invite-email]")!;
-  const formEl = $("invite-screen").querySelector<HTMLElement>("[data-invite-form]")!;
-  const invalidEl = $("invite-screen").querySelector<HTMLElement>("[data-invite-invalid]")!;
+  const emailEl = $("invite-screen").querySelector<HTMLElement>(
+    "[data-invite-email]",
+  )!;
+  const formEl =
+    $("invite-screen").querySelector<HTMLElement>("[data-invite-form]")!;
+  const invalidEl = $("invite-screen").querySelector<HTMLElement>(
+    "[data-invite-invalid]",
+  )!;
 
   const info = await fetchInviteEmail(code);
   if (!info.ok) {
@@ -177,13 +186,27 @@ async function loadInviteEmail(code: string): Promise<void> {
 /** Wire the "Were you invited?" trigger and its modal. Call once at bootstrap. */
 export function initInviteDialog(d: InviteScreenDeps): void {
   const overlay = $("invite-dialog");
-  const form = overlay.querySelector<HTMLFormElement>("[data-invite-dialog-form]")!;
-  const emailEl = form.querySelector<HTMLInputElement>("[data-invite-dialog-email]")!;
-  const codeEl = form.querySelector<HTMLInputElement>("[data-invite-dialog-code]")!;
-  const passwordEl = form.querySelector<HTMLInputElement>("[data-invite-dialog-password]")!;
-  const errorEl = form.querySelector<HTMLElement>("[data-invite-dialog-error]")!;
-  const submitEl = form.querySelector<HTMLButtonElement>("[data-invite-dialog-submit]")!;
-  const cancelEl = form.querySelector<HTMLButtonElement>("[data-invite-dialog-cancel]")!;
+  const form = overlay.querySelector<HTMLFormElement>(
+    "[data-invite-dialog-form]",
+  )!;
+  const emailEl = form.querySelector<HTMLInputElement>(
+    "[data-invite-dialog-email]",
+  )!;
+  const codeEl = form.querySelector<HTMLInputElement>(
+    "[data-invite-dialog-code]",
+  )!;
+  const passwordEl = form.querySelector<HTMLInputElement>(
+    "[data-invite-dialog-password]",
+  )!;
+  const errorEl = form.querySelector<HTMLElement>(
+    "[data-invite-dialog-error]",
+  )!;
+  const submitEl = form.querySelector<HTMLButtonElement>(
+    "[data-invite-dialog-submit]",
+  )!;
+  const cancelEl = form.querySelector<HTMLButtonElement>(
+    "[data-invite-dialog-cancel]",
+  )!;
 
   const showError = (msg: string): void => {
     errorEl.textContent = msg;

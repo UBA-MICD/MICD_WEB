@@ -42,7 +42,10 @@ import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { initWalkthrough } from "./walkthrough/init.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
-import { initDesktopOnlyUI, initDesktopApiOriginSetting } from "./shared/desktop.js";
+import {
+  initDesktopOnlyUI,
+  initDesktopApiOriginSetting,
+} from "./shared/desktop.js";
 import {
   currentLocale,
   setLocale,

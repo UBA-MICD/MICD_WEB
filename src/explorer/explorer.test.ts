@@ -25,7 +25,10 @@ type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>;
 let fetchImpl: FetchImpl = () => Promise.reject(new Error("no fetch stub set"));
 let fetchCalls: string[] = [];
 
-(globalThis as { fetch?: unknown }).fetch = (url: string, init?: RequestInit) => {
+(globalThis as { fetch?: unknown }).fetch = (
+  url: string,
+  init?: RequestInit,
+) => {
   fetchCalls.push(url);
   return fetchImpl(url, init);
 };
@@ -208,7 +211,9 @@ test("clicking a select-mode option selects it and notifies listeners", async ()
     selected = id;
   });
 
-  const serverList = document.querySelectorAll("[data-explorer-list]")[1] as HTMLElement;
+  const serverList = document.querySelectorAll(
+    "[data-explorer-list]",
+  )[1] as HTMLElement;
   const option = serverList.querySelector<HTMLElement>('[data-id="study-a"]')!;
   option.click();
 
@@ -227,7 +232,9 @@ test("clearSelection deselects and notifies listeners with null", async () => {
   mod.initStudyExplorer();
   await mod.loadStudyExplorer();
 
-  const serverList = document.querySelectorAll("[data-explorer-list]")[1] as HTMLElement;
+  const serverList = document.querySelectorAll(
+    "[data-explorer-list]",
+  )[1] as HTMLElement;
   serverList.querySelector<HTMLElement>('[data-id="study-a"]')!.click();
 
   let selected: string | null = "unset" as any;
@@ -255,25 +262,43 @@ test("listbox arrow keys move selection, Home/End jump, Enter activates", async 
   mod.initStudyExplorer();
   await mod.loadStudyExplorer();
 
-  const serverList = document.querySelectorAll("[data-explorer-list]")[1] as HTMLElement;
+  const serverList = document.querySelectorAll(
+    "[data-explorer-list]",
+  )[1] as HTMLElement;
 
   serverList.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(mod.getSelectedStudyId(), "study-a");
 
   serverList.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "End", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "End",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(mod.getSelectedStudyId(), "study-b");
 
   serverList.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "Home",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(mod.getSelectedStudyId(), "study-a");
 
   serverList.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "ArrowUp",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(mod.getSelectedStudyId(), "study-a"); // clamped at the start
 
@@ -282,7 +307,11 @@ test("listbox arrow keys move selection, Home/End jump, Enter activates", async 
     activated = id;
   });
   serverList.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(activated, "study-a");
 });
@@ -298,7 +327,9 @@ test("search input is debounced and refetches with the search param", async (t) 
   await mod.loadStudyExplorer();
   fetchCalls = [];
 
-  const search = document.querySelector("[data-explorer-search]") as HTMLInputElement;
+  const search = document.querySelector(
+    "[data-explorer-search]",
+  ) as HTMLInputElement;
   search.value = "ana";
   search.dispatchEvent(new Event("input", { bubbles: true }));
 
@@ -311,7 +342,9 @@ test("search input is debounced and refetches with the search param", async (t) 
   assert.equal(fetchCalls.length, 1);
   assert.match(fetchCalls[0], /search=ana/);
   // both views' search boxes stay in sync
-  const otherSearch = document.querySelectorAll("[data-explorer-search]")[1] as HTMLInputElement;
+  const otherSearch = document.querySelectorAll(
+    "[data-explorer-search]",
+  )[1] as HTMLInputElement;
   assert.equal(otherSearch.value, "ana");
 });
 
@@ -324,9 +357,13 @@ test("the search clear button resets the search and refetches", async () => {
   mod.initStudyExplorer();
   await mod.loadStudyExplorer();
 
-  const search = document.querySelector("[data-explorer-search]") as HTMLInputElement;
+  const search = document.querySelector(
+    "[data-explorer-search]",
+  ) as HTMLInputElement;
   search.value = "x";
-  const clearBtn = document.querySelector("[data-explorer-search-clear]") as HTMLElement;
+  const clearBtn = document.querySelector(
+    "[data-explorer-search-clear]",
+  ) as HTMLElement;
   clearBtn.click();
   await Promise.resolve();
   assert.equal(search.value, ""); // syncControls pushes state back
@@ -377,14 +414,18 @@ test("date range inputs filter and format as YYYYMMDD", async () => {
   await mod.loadStudyExplorer();
   fetchCalls = [];
 
-  const from = document.querySelector("[data-explorer-date-from]") as HTMLInputElement;
+  const from = document.querySelector(
+    "[data-explorer-date-from]",
+  ) as HTMLInputElement;
   from.value = "2024-01-01";
   from.dispatchEvent(new Event("change", { bubbles: true }));
   await Promise.resolve();
   assert.match(fetchCalls[0], /date_from=20240101/);
 
   fetchCalls = [];
-  const to = document.querySelector("[data-explorer-date-to]") as HTMLInputElement;
+  const to = document.querySelector(
+    "[data-explorer-date-to]",
+  ) as HTMLInputElement;
   to.value = "2024-02-01";
   to.dispatchEvent(new Event("change", { bubbles: true }));
   await Promise.resolve();
@@ -415,19 +456,29 @@ test("the clear-filters button resets every filter and refetches", async () => {
 
 test("pagination prev/next respect the page boundaries", async () => {
   await adoptSession("t.t.t", "r", { id: 1, email: "a@b.com", role: "medico" });
-  fetchImpl = async () => jsonResponse(200, studiesPage([STUDY_A], { page: 2, totalPages: 3, total: 40 }));
+  fetchImpl = async () =>
+    jsonResponse(
+      200,
+      studiesPage([STUDY_A], { page: 2, totalPages: 3, total: 40 }),
+    );
 
   const mod = await freshExplorer();
   explorerFixture();
   mod.initStudyExplorer();
   await mod.loadStudyExplorer();
 
-  const prev = document.querySelector("[data-explorer-prev]") as HTMLButtonElement;
-  const next = document.querySelector("[data-explorer-next]") as HTMLButtonElement;
+  const prev = document.querySelector(
+    "[data-explorer-prev]",
+  ) as HTMLButtonElement;
+  const next = document.querySelector(
+    "[data-explorer-next]",
+  ) as HTMLButtonElement;
   assert.equal(prev.disabled, false);
   assert.equal(next.disabled, false);
 
-  const info = document.querySelector("[data-explorer-pagination-info]") as HTMLElement;
+  const info = document.querySelector(
+    "[data-explorer-pagination-info]",
+  ) as HTMLElement;
   assert.equal(info.textContent, "2 / 3");
 
   fetchCalls = [];

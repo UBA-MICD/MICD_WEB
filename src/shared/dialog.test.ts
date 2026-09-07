@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
-import { openDialog, closeDialog, isDialogOpen, anyDialogOpen } from "./dialog.ts";
+import {
+  openDialog,
+  closeDialog,
+  isDialogOpen,
+  anyDialogOpen,
+} from "./dialog.ts";
 
 // dialog.ts only touches `document` inside function bodies, never at module
 // scope, so it's safe to import before the dom is installed.
@@ -108,13 +113,21 @@ test("Escape closes the dialog unless data-dialog-busy is true", () => {
 
   overlay.dataset.dialogBusy = "true";
   overlay.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(isDialogOpen(overlay), true);
 
   overlay.dataset.dialogBusy = "false";
   overlay.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(isDialogOpen(overlay), false);
 });
@@ -125,7 +138,11 @@ test("Tab wraps from the last focusable element to the first", () => {
   document.getElementById("last")!.focus();
 
   overlay.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+    new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    }),
   );
   assert.equal(document.activeElement?.id, "first");
   closeDialog(overlay);
@@ -157,7 +174,11 @@ test("Tab with no focusable elements just prevents default", () => {
   const overlay = document.getElementById("overlay") as HTMLElement;
   openDialog(overlay);
 
-  const evt = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+  const evt = new KeyboardEvent("keydown", {
+    key: "Tab",
+    bubbles: true,
+    cancelable: true,
+  });
   overlay.dispatchEvent(evt);
   assert.equal(evt.defaultPrevented, true);
   closeDialog(overlay);

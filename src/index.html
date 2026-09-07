@@ -2008,9 +2008,10 @@
           </button>
         </form>
 
-        <!-- Desktop only: nginx already proxies /api and /auth same-origin
-             in the browser build, so there is nothing to configure there. -->
-        <div class="auth-card auth-card--settings hidden" data-desktop-only>
+        <!-- API-origin settings card: shown for all platforms (TK-29).
+             Browser users persist via localStorage; desktop users via the
+             Electron preload bridge. initApiOriginSetting() unhides it. -->
+        <div class="auth-card auth-card--settings hidden">
           <p class="auth-settings__label" aria-hidden="true">
             <svg
               width="12"
@@ -2879,8 +2880,14 @@
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
          must run before auth.ts's module-load-time resolveApiOrigin() call.
          `??=` rather than `=`: Electron's preload sets this synchronously
-         before any page script runs, and must win here. -->
+         before any page script runs, and must win here.
+         Browser users may store a custom origin in localStorage (TK-29);
+         that is loaded first so the `??=` fallback does not overwrite it. -->
     <script>
+      if (typeof window.api === "undefined") {
+        var _s = localStorage.getItem("micd_api_origin");
+        if (_s) window.MICD_API_ORIGIN = _s;
+      }
       window.MICD_API_ORIGIN ??= "";
     </script>
     <!-- dicom-parser UMD bundle (loaded before our modules) -->

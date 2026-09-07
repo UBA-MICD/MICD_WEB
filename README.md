@@ -25,35 +25,75 @@ Para que esto funcione en contenedores:
 ```text
 MICD_WEB/
 ├── src/
-│   ├── index.html              # Estructura base del visor web
+│   ├── index.html              # Estructura base del visor web (ambas screens)
 │   ├── styles.css              # Estilos del visualizador y sistema de diseño
 │   ├── main.ts                 # Punto de entrada: bootstrap y wiring de features
+│   ├── global.d.ts             # Tipos del puente opcional window.api (Electron)
 │   ├── auth/
 │   │   ├── auth.ts             # Sesión JWT: login, refresh, authFetch y gate de login
-│   │   └── login-dialog.ts     # Popup de login y estado de sesión en la barra lateral
-│   ├── dicom/
-│   │   ├── dicom-parser-util.ts # Utilidad para parseo local de archivos DICOM
-│   │   └── dicom-renderer.ts   # Procesamiento de Canvas, coordenadas y ajustes visuales
+│   │   ├── login-form.ts       # mountLoginForm(): submit/error/disable del form de login
+│   │   └── session-ui.ts       # updateAuthUI(), countdown de sesión, historial de actividad
+│   ├── server-screen/
+│   │   ├── server-screen.ts    # Screen del servidor: tabs Buscar/Cargar, auth card
+│   │   └── study-detail-panel.ts # Panel de detalle de un estudio (Buscar)
+│   ├── explorer/
+│   │   ├── explorer.ts         # Explorador de estudios (panel + grilla de Buscar)
+│   │   └── explorer-panel.ts   # Variante compacta del explorador junto al visor
+│   ├── upload/
+│   │   ├── upload.ts           # Panel de subida (progreso XHR, carpetas, duplicados)
+│   │   └── zip-expand.ts       # Expansión de .zip del lado del cliente antes de subir
 │   ├── viewer/
 │   │   ├── state.ts            # Estado compartido del visor (serie, viewport, herramienta)
 │   │   ├── loading.ts          # Apertura local (archivos/carpeta/drop) y carga desde servidor
 │   │   ├── rendering.ts        # Render de canvas, panel de metadata y overlays
-│   │   └── interaction.ts      # Toolbar, mouse, teclado, navegación de serie
-│   ├── upload/
-│   │   └── upload.ts           # Panel de subida (progreso XHR, carpetas, duplicados)
-│   ├── explorer/
-│   │   └── explorer.ts         # Explorador de estudios del servidor (filtros, paginado)
+│   │   ├── interaction.ts      # Toolbar, mouse, teclado, navegación de serie
+│   │   ├── cache.ts            # Cache + prefetch de slices (local y servidor)
+│   │   └── mpr.ts              # Reconstrucción 3D/MPR con raymarching WebGL2
+│   ├── zenodo/
+│   │   └── zenodo-panel.ts     # Panel Zenodo: buscar, publicar, config, logs
+│   ├── services/
+│   │   └── export-service.ts   # Export a PNG/ZIP anonimizado (downloadBlob)
+│   ├── utils/
+│   │   └── dicom-anonymizer.ts # Anonimización de tags DICOM para export/Zenodo
+│   ├── dicom/
+│   │   ├── dicom-parser-util.ts # Utilidad para parseo local de archivos DICOM
+│   │   └── dicom-renderer.ts   # Procesamiento de Canvas, coordenadas y ajustes visuales
+│   ├── i18n/
+│   │   ├── i18n.ts             # t(), setLocale(), applyTranslations() — ver CLAUDE.md
+│   │   └── locales/            # es.ts (default) y en.ts, mismo set de keys
 │   ├── shared/
 │   │   ├── dom.ts              # Helpers de DOM ($, escapes, loading/error)
+│   │   ├── token-store.ts      # Refresh token: safeStorage (Electron) o localStorage
+│   │   ├── desktop.ts          # isDesktop(), UI condicional [data-desktop-only]
 │   │   └── folder-files.ts     # Filtrado y ordenado lógico de imágenes locales
-│   └── **/*.test.ts            # Pruebas unitarias del cliente (node:test)
+│   ├── vendor/                 # Assets vendorizados (fuentes; fflate se genera en build)
+│   └── **/*.test.ts            # Pruebas unitarias del cliente (node:test, vía tsx)
 ├── Dockerfile                  # Compilación tsc + Servidor Nginx (multi-stage)
 ├── nginx.conf                  # Proxy inverso /api y /auth -> backend:3000 y fallback de SPA
 ├── docker-compose.yml          # Definición del contenedor frontend (Red externa: micd)
 ├── Makefile                    # Comandos rápidos para despliegue y validación
+├── docs/adr/                   # Architecture Decision Records (decisiones de arquitectura)
 ├── .env.example                # Define el puerto público del frontend (FRONTEND_PORT)
 └── tsconfig.json               # Configuración de compilación TypeScript
 ```
+
+> Este cliente comparte código, feature por feature, con `desktop` (la app Electron): todo lo
+> que se agrega acá debe funcionar también ahí, y viceversa. Ver la sección "Desktop parity" de
+> `CLAUDE.md` para el detalle del mecanismo de sincronización.
+
+---
+
+## Decisiones de Arquitectura (ADR)
+
+Las decisiones técnicas del sistema están registradas como **Architecture Decision Records** en [`docs/adr/`](docs/adr/README.md), todas con el mismo formato: **Contexto → Opciones consideradas → Decisión → Consecuencias**.
+
+- [ADR-0001 — Stack tecnológico](docs/adr/0001-stack-tecnologico.md)
+- [ADR-0002 — Protocolo de comunicación](docs/adr/0002-protocolo-de-comunicacion.md)
+- [ADR-0003 — Integración con Orthanc como PACS](docs/adr/0003-integracion-orthanc.md)
+- [ADR-0004 — Autenticación con JWT](docs/adr/0004-autenticacion-jwt.md)
+- [ADR-0005 — Módulo de anonimización externo](docs/adr/0005-modulo-anonimizacion-externo.md)
+
+Para registrar una decisión nueva, copiar [`docs/adr/TEMPLATE.md`](docs/adr/TEMPLATE.md) con el número siguiente y agregarla al índice. El conjunto de ADR se mantiene **idéntico en `MICD_WEB` y `MICD_BACKEND`** (son decisiones del sistema, no de un repo): al cambiar uno, replicar el archivo en el otro repo.
 
 ---
 

@@ -6,6 +6,7 @@
  */
 
 import { isDicomCandidate } from "../shared/folder-files.js";
+import { t } from "../i18n/i18n.js";
 export type UnzipFn = (
   data: Uint8Array,
   cb: (err: Error | null, out: Record<string, Uint8Array>) => void,
@@ -29,12 +30,14 @@ export async function extractZipEntries(
   data: Uint8Array,
   unzipFn: UnzipFn,
 ): Promise<{ name: string; data: Uint8Array }[]> {
-  const out = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-    unzipFn(data, (err, result) => {
-      if (err) reject(err);
-      else resolve(result);
-    });
-  });
+  const out = await new Promise<Record<string, Uint8Array>>(
+    (resolve, reject) => {
+      unzipFn(data, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    },
+  );
 
   const seen = new Set<string>();
   return Object.entries(out)
@@ -81,7 +84,7 @@ export async function expandFiles(
     }
 
     if (statusEl) {
-      statusEl.textContent = `Descomprimiendo ${file.name}…`;
+      statusEl.textContent = t("upload.unzippingNamed", { name: file.name });
     }
 
     try {

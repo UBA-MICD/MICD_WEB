@@ -5,7 +5,11 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectDicomFiles, collectServerUploadFiles, type FolderFile } from "./folder-files.ts";
+import {
+  collectDicomFiles,
+  collectServerUploadFiles,
+  type FolderFile,
+} from "./folder-files.ts";
 
 const f = (name: string, webkitRelativePath?: string): FolderFile => ({
   name,
@@ -145,7 +149,10 @@ test("collectServerUploadFiles: mixed input splits correctly", () => {
   const { valid, rejected } = collectServerUploadFiles(input);
   assert.equal(valid.length, 2);
   assert.equal(rejected.length, 2);
-  assert.deepEqual(valid.map((x) => x.name), ["a.dcm", "archive.zip"]);
+  assert.deepEqual(
+    valid.map((x) => x.name),
+    ["a.dcm", "archive.zip"],
+  );
 });
 
 test("collectServerUploadFiles: extension-less files (DICOM candidates) are valid", () => {

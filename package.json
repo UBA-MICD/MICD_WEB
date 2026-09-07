@@ -4,14 +4,17 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npx tsx --test 'src/**/*.test.ts'",
-    "test:coverage": "mkdir -p coverage && npx tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info 'src/**/*.test.ts'"
+    "test": "tsx --test 'src/**/*.test.ts'",
+    "test:coverage": "mkdir -p coverage && tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info 'src/**/*.test.ts'"
   },
   "dependencies": {
     "dicom-parser": "^1.8.21",
     "fflate": "^0.8.3"
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "jsdom": "^30.0.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.3.3"
   }
 }

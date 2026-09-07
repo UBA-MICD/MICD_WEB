@@ -17,6 +17,7 @@ import {
   exportCurrentViewToPNG,
   exportCurrentStudyAsZip,
 } from "../services/export-service.js";
+import { openServerScreen } from "../server-screen/server-screen.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -35,9 +36,19 @@ export function initToolbar(): void {
             state.activeTool = "wl";
             state.isWlPanelOpen = true;
           }
+          state.isZoomPanelOpen = false;
+        } else if (tool === "zoom") {
+          if (state.activeTool === "zoom") {
+            state.isZoomPanelOpen = !state.isZoomPanelOpen;
+          } else {
+            state.activeTool = "zoom";
+            state.isZoomPanelOpen = true;
+          }
+          state.isWlPanelOpen = false;
         } else {
           state.activeTool = tool;
           state.isWlPanelOpen = false;
+          state.isZoomPanelOpen = false;
         }
         updateToolbarUI();
       });
@@ -77,6 +88,7 @@ export function initToolbar(): void {
       mpr3DViewer.camera.panY = 0;
     }
 
+    updateZoomControlsUI();
     render();
   });
 
@@ -121,6 +133,7 @@ export function initToolbar(): void {
   });
 
   initWlControlsInteraction();
+  initZoomControlsInteraction();
   init3DControlsInteraction();
   updateToolbarUI();
 }
@@ -169,6 +182,88 @@ function initWlControlsInteraction(): void {
   });
 }
 
+function initZoomControlsInteraction(): void {
+  const sliderZoom = $("slider-zoom") as HTMLInputElement | null;
+  if (sliderZoom) {
+    sliderZoom.addEventListener("input", () => {
+      const val = parseFloat(sliderZoom.value);
+      if (!isNaN(val)) {
+        if (state.is3DMode) {
+          mpr3DViewer.camera.zoom = Math.max(0.1, Math.min(5.0, val));
+        } else {
+          state.viewport.zoom = Math.max(0.1, Math.min(5.0, val));
+        }
+        const valZoom = $("val-zoom");
+        if (valZoom) {
+          valZoom.textContent = `${val.toFixed(1)}x`;
+        }
+        render();
+      }
+    });
+  }
+
+  $("btn-zoom-fit")?.addEventListener("click", () => {
+    if (state.parsed) {
+      const container = $("viewport-container");
+      const fitZoom = fitToContainer(
+        container.clientWidth,
+        container.clientHeight,
+        state.parsed.metadata.columns,
+        state.parsed.metadata.rows,
+      );
+      if (state.is3DMode) {
+        mpr3DViewer.camera.zoom = 1;
+      } else {
+        state.viewport.zoom = fitZoom;
+        state.viewport.panX = 0;
+        state.viewport.panY = 0;
+      }
+    } else {
+      if (state.is3DMode) {
+        mpr3DViewer.camera.zoom = 1;
+      } else {
+        state.viewport.zoom = 1;
+      }
+    }
+    updateZoomControlsUI();
+    render();
+  });
+
+  $("btn-zoom-100")?.addEventListener("click", () => {
+    if (state.is3DMode) {
+      mpr3DViewer.camera.zoom = 1;
+    } else {
+      state.viewport.zoom = 1;
+    }
+    updateZoomControlsUI();
+    render();
+  });
+
+  $("btn-zoom-200")?.addEventListener("click", () => {
+    if (state.is3DMode) {
+      mpr3DViewer.camera.zoom = 2;
+    } else {
+      state.viewport.zoom = 2;
+    }
+    updateZoomControlsUI();
+    render();
+  });
+}
+
+function updateZoomControlsUI(): void {
+  const currentZoom = state.is3DMode
+    ? mpr3DViewer.camera.zoom
+    : state.viewport.zoom;
+  const sliderZoom = $("slider-zoom") as HTMLInputElement | null;
+  if (sliderZoom && document.activeElement !== sliderZoom) {
+    sliderZoom.value = String(Math.max(0.1, Math.min(5.0, currentZoom)));
+  }
+  const valZoom = $("val-zoom");
+  if (valZoom) {
+    valZoom.textContent = `${currentZoom.toFixed(1)}x`;
+  }
+}
+
 export function updateToolbarUI(): void {
   if (state.is3DMode && state.activeTool === "pan") {
     state.activeTool = "wl";
@@ -207,6 +302,16 @@ export function updateToolbarUI(): void {
     wlPanel.classList.toggle("open", state.isWlPanelOpen);
   }
 
+  const zoomBtn = $("tool-zoom");
+  if (zoomBtn) {
+    zoomBtn.setAttribute("aria-expanded", String(state.isZoomPanelOpen));
+  }
+
+  const zoomPanel = $("zoom-panel");
+  if (zoomPanel) {
+    zoomPanel.classList.toggle("open", state.isZoomPanelOpen);
+  }
+
   const exportBtn = $("btn-export-menu") as HTMLButtonElement | null;
   if (exportBtn) {
     const hasLoadedStudy = itemCount() > 0 || state.parsed !== null;
@@ -218,6 +323,8 @@ export function updateToolbarUI(): void {
     viewport.className = "viewport-container";
     viewport.classList.add(`cursor-${state.activeTool}`);
   }
+
+  updateZoomControlsUI();
 }
 
 // ── Viewport Mouse Interaction ───────────────────────────────────────────────
@@ -487,6 +594,10 @@ export function initMenuListeners(): void {
   if (!window.api) return;
   window.api.on("menu:open-files", () => void openFiles());
   window.api.on("menu:open-folder", () => void openFolder());
+  // Desktop-only "File > API Server…": the setting lives on the server
+  // screen's auth card (shared/desktop.ts unhides it there), so this just
+  // navigates — nothing new to render.
+  window.api.on("menu:api-server", () => openServerScreen("buscar"));
 }
 
 // ── Keyboard Shortcuts ───────────────────────────────────────────────────────

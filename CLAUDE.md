@@ -8,7 +8,7 @@ MICD web client — the browser-based DICOM viewer/study explorer. Plain TypeScr
 
 ## Critical networking requirement
 
-This frontend never talks to Postgres/Orthanc directly — it only calls the backend's `/api/*` and `/auth/*` endpoints. The origin those calls target is resolved once in `src/auth/auth.ts` (`API_ORIGIN`, re-used across features via the exported `API_BASE`): it defaults to `http://localhost:3000` for local dev (page opened directly or served without nginx). For the Docker/nginx deployment, where the page is served same-origin and nginx reverse-proxies `/api` and `/auth` to `http://backend:3000` (see `nginx.conf`), set `window.MICD_API_ORIGIN = ""` before `auth.ts` loads to use the same-origin path. In Docker, this container joins an **external** network named `micd` that is created by the `backend` repo's `docker-compose.yml` — **the backend stack must be started first** (`make up` in `../backend`), or `docker compose up` here will fail with the network not existing.
+This frontend never talks to Postgres/Orthanc directly — it only calls the backend's `/api/*` and `/auth/*` endpoints. The origin those calls target is resolved once in `src/auth/auth.ts` (`API_ORIGIN`, re-used across features via the exported `API_BASE`): it defaults to `http://localhost:3000` for local dev (page opened directly or served without nginx). For the Docker/nginx deployment, where the page is served same-origin and nginx reverse-proxies `/api` and `/auth` to `http://backend:3000` (see `nginx.conf`), `window.MICD_API_ORIGIN ??= ""` in `index.html` (before `auth.ts` loads) resolves the same-origin path. It's `??=`, not `=`: the vendored copy of this file also ships inside the desktop app, where Electron's preload sets `window.MICD_API_ORIGIN` synchronously before any page script runs — the browser build's default must not clobber it. In Docker, this container joins an **external** network named `micd` that is created by the `backend` repo's `docker-compose.yml` — **the backend stack must be started first** (`make up` in `../backend`), or `docker compose up` here will fail with the network not existing.
 
 ## Commands
 
@@ -23,12 +23,10 @@ make test               # npm test (node:test unit tests)
 make hooks                # install pre-commit git hooks
 
 npm run build   # tsc -p tsconfig.json, compiles src/**/*.ts -> dist/
-npm test         # node --experimental-strip-types --test 'src/**/*.test.ts'
+npm test         # tsx --test 'src/**/*.test.ts' (tsx is a pinned devDependency)
 ```
 
-Run these in a container rather than on the host. **`npm test` needs Node 22+**
-for `--experimental-strip-types`; the Dockerfile's `node:20` builder only ever
-runs `tsc`, so it is fine there but will fail the tests:
+Run these in a container rather than on the host:
 
 ```bash
 docker run --rm -v "$PWD":/app -w /app node:22-alpine \
@@ -53,9 +51,34 @@ Two top-level **screens** are registered with `shared/screen.ts` and exactly one
 - **`src/explorer/explorer.ts`** — the study explorer, rendered into **two views at once**: the compact panel beside the viewer and the wide grid on Buscar. Controls are found by `data-explorer-*` attribute inside a view root rather than by global id, because ids could only describe one of the two. Both share one filter state and one fetch. The views differ only in what a click means — the panel opens a study immediately (`mode: "open"`), Buscar selects it as a listbox option and `Abrir estudio seleccionado` confirms (`mode: "select"`). Thumbnails are loaded via `authFetch` + `URL.createObjectURL`, so the CSP must allow `blob:` in `img-src`.
 - **`src/upload/upload.ts`** — the Cargar tab. Every file gets its own progress row and its own XHR, because `fetch` reports no upload progress. Files upload one at a time. The XHR path can't use `authFetch`, so it pre-flights `ensureAuthenticated()` and does its own on-401 refresh + single retry per file. Exposes `onUploadComplete()`; it never navigates itself, since the server screen already imports it.
 - **`src/viewer/`** — `state.ts` (the shared mutable `AppState`), `loading.ts` (file/folder pickers, drag-drop, `displayDicom`), `rendering.ts` (canvas render, metadata panel, info overlays — all DICOM-derived text is escaped, and the canvas `aria-label` is written here), `interaction.ts` (toolbar, mouse and **keyboard** window/level-zoom-pan, resize observer, Electron menu hooks).
-- **`src/shared/`** — `dom.ts` (`$`, `escapeHtml`/`escapeAttr`, `showLoading`/`showError`, `formatDate`), `screen.ts` (viewer↔server switching), `dialog.ts` (`openDialog`/`closeDialog`: focus trap, Escape, background `inert`, focus restore; `anyDialogOpen()` lets global shortcuts stand down), `roving.ts` (single-tab-stop groups; `nextRovingIndex` is pure and unit-tested), `banner.ts` (the confirmation strip), `folder-files.ts` (DICOM filtering/sorting, unit-tested).
+- **`src/shared/`** — `dom.ts` (`$`, `escapeHtml`/`escapeAttr`, `showLoading`/`showError`, `formatDate`), `screen.ts` (viewer↔server switching), `dialog.ts` (`openDialog`/`closeDialog`: focus trap, Escape, background `inert`, focus restore; `anyDialogOpen()` lets global shortcuts stand down), `roving.ts` (single-tab-stop groups; `nextRovingIndex` is pure and unit-tested), `banner.ts` (the confirmation strip), `folder-files.ts` (DICOM filtering/sorting, unit-tested), `token-store.ts` and `desktop.ts` (see Desktop parity below).
+- **`src/i18n/`** — see Internationalization below.
 - **`src/index.html`** — one document holding both screens plus the duplicate-upload and activity dialogs. Loads `./dicomParser.min.js` (UMD) before `./main.js`.
 - **`src/dicom/dicom-parser-util.ts`** / **`src/dicom/dicom-renderer.ts`** — pure DICOM parsing and canvas window/level/zoom/pan rendering.
+
+## Internationalization
+
+The UI ships in Spanish (`es`, the default and the app's original language) and English (`en`). Everything lives in `src/i18n/`:
+
+- **`i18n.ts`** — `t(key, params?)` looks up the active locale with `{{param}}` interpolation and falls back to the key itself if missing (never throws). `setLocale()`/`currentLocale()` persist the choice to `localStorage` (`micd_lang`). `applyTranslations(root)` walks `[data-i18n]` (textContent), `[data-i18n-html]` (innerHTML — only for the handful of static, app-authored strings that carry trusted markup, e.g. `<kbd>` shortcut hints; never for DICOM/user-supplied data), and `[data-i18n-attr]` (`"attr:key; attr2:key2"`). `onLocaleChange(cb)` subscribes to switches. All browser-global access is guarded (`typeof localStorage`/`navigator`), because this module is unit-tested under Node's bare test runner and is also vendored into the Electron renderer.
+- **`locales/es.ts`** / **`locales/en.ts`** — flat `key -> string` maps. `i18n.test.ts` asserts they carry the **same key set**, which is what stops the two from silently drifting apart — add a key to one, the test fails until you add it to the other.
+- **Static markup** (`index.html`) is translated once via `applyTranslations(document)` in `main.ts`'s `initI18n()`, called before `startApp()`, and re-applied on every `onLocaleChange`.
+- **Dynamically-rendered markup** — features that build their own HTML from live data (`explorer.ts`, `study-detail-panel.ts`, the metadata/series-nav/info-overlay trio in `rendering.ts`, the Zenodo panel's config/publish/logs tabs, the upload transport note) don't go through the static-DOM pass, so each subscribes to `onLocaleChange` and re-renders itself. The one deliberate exception is Zenodo search results: they stay in whatever locale they were fetched in, since the next search naturally lands in the new one — re-rendering already-fetched result cards wasn't worth the extra state.
+- **First-visit detection**: `initLocaleFromBrowser()` (called once from `main.ts`, browser-only) matches `navigator.language` against a supported locale, but only if `micd_lang` has never been stored. It's deliberately **not** run at module load in `i18n.ts` itself — Node's test runner also has a `navigator` global, and a CI container's own locale must never leak into the `es`-asserting unit tests that import `i18n.ts` transitively (e.g. `auth.test.ts`).
+- Adding a string: add the key to both locale files, then either `data-i18n="the.key"` in HTML or `t("the.key")` in TS. If the call site is inside a function that only runs once (at `init*` time) rather than on every render, wire an `onLocaleChange` re-render — a string that looks translated but freezes after the first paint is the usual mistake here.
+
+## Desktop parity
+
+**Every feature landed here must also work in `desktop` (an Electron app), and vice versa — this is a standing rule, not a one-time migration.** `desktop/src/renderer/` is a verbatim copy of this repo's `src/`, kept in sync by a script in `desktop/` and checked by CI (`diff -r web/src desktop/src/renderer` must be empty). Practically, this means:
+
+- **Never write Electron-specific branches directly in a feature file.** Anything that needs to differ under Electron goes through a shared, feature-detected seam:
+  - `shared/token-store.ts` — the refresh token goes through `window.api.secureStore` (Electron's `safeStorage`) when present, else `localStorage`.
+  - `services/export-service.ts`'s `downloadBlob()` — `window.api.saveFile` (native save dialog) when present, else the browser's `<a download>`.
+  - `window.MICD_API_ORIGIN ??= ""` in `index.html` — see the networking section above.
+  - `shared/desktop.ts` — `isDesktop()` and `initDesktopOnlyUI()`, which unhides `[data-desktop-only]` markup (currently just the server screen's API-origin field, meaningless in the browser build where nginx already proxies same-origin).
+  - `global.d.ts` declares the full `window.api` contract these target. `window.api` is simply `undefined` in the browser, so every seam takes its already-tested fallback path with zero desktop-specific setup.
+- **This file (`web/`) is upstream.** A change to shared behavior lands here first; `desktop` never hand-edits `src/renderer/` — it re-syncs from this repo's `src/`. If you're fixing something and find yourself editing a file under `desktop/src/renderer/`, stop and make the change in `web/src/` instead.
+- **Offline-capable by construction.** Electron loads from `file://` under `default-src 'self'`, so nothing here may depend on a CDN: `fflate` is generated at build time from `node_modules` (see `Dockerfile`), and Inter/JetBrains Mono ship as local variable-weight `woff2` files in `src/vendor/fonts/` (latin subset only — sufficient for `es`/`en`).
 
 ## Accessibility
 
@@ -67,7 +90,6 @@ The UI targets WCAG 2.2 AA, and several conventions exist to keep it there:
 - **Every group is one tab stop** via `shared/roving.ts`, and every modal traps focus and restores it via `shared/dialog.ts`.
 - Reflow below ~900px is **not** claimed: a three-pane DICOM viewer does not reflow to 320px.
 
-## Known gaps
+## Multi-repo context
 
-- **Activity history has no backend.** `Ver historial de actividad` calls `GET /api/v1/activity`, which does not exist: the backend writes an `audit_log` via `shared/audit.ts` but exposes no reader, and `AUDIT_ACTIONS` covers only Zenodo operations — no logins, uploads, downloads or study views. The dialog says so on a 404. Landing it needs a read route returning `{ entries: [{ action, resourceId, timestamp }] }` scoped to the caller, plus new audit actions.
-- **Multi-repo context** — sibling repos `backend` (the API this proxies to) and `desktop` (an Electron app). `desktop/frontend/src/` was once a file-for-file mirror of this source, but the two have **diverged substantially**: it still has a monolithic `renderer.ts` with no feature folders, and none of the screen/dialog/roving primitives, the server screen, or the accessibility work above. Only `dicom-parser-util.ts` and `dicom-renderer.ts` are still worth keeping in lockstep by filename.
+Sibling repos: `backend` (the API this proxies to — see the networking section above) and `desktop` (an Electron app built on a verbatim vendored copy of this repo's `src/` — see Desktop parity above).

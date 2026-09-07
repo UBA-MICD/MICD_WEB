@@ -144,6 +144,281 @@ test("calculateAutoWindowLevel uses min/max for non-CT modality", () => {
 });
 
 // cspell:disable
+// ── parseDicomFile / extractMetadata / extractPixelData ─────────────────────
+//
+// dicom-parser-util.ts calls a global `dicomParser` (loaded via a <script>
+// tag / window.dicomParser in the real app — see the file's own comment).
+// That's a clean injection seam: rather than constructing byte-perfect real
+// DICOM files, we install a fake `dicomParser.parseDicom()` that returns a
+// controllable fake dataSet exposing the exact surface this module actually
+// calls (string/uint16/floatString/elements/byteArray).
+
+interface FakeElement {
+  dataOffset: number;
+  length: number;
+}
+
+function fakeDataSet(opts: {
+  strings?: Record<string, string>;
+  uint16s?: Record<string, number>;
+  floats?: Record<string, number>;
+  throwing?: string[]; // tags whose accessor throws
+  pixelDataElement?: FakeElement | null;
+  byteArray?: Uint8Array;
+}): any {
+  const throwing = new Set(opts.throwing ?? []);
+  const elements: Record<string, FakeElement> = {};
+  if (opts.pixelDataElement !== null) {
+    elements.x7fe00010 = opts.pixelDataElement ?? { dataOffset: 0, length: 8 };
+  }
+  const byteArray = opts.byteArray ?? new Uint8Array(64);
+  return {
+    elements,
+    byteArray,
+    string(tag: string) {
+      if (throwing.has(tag)) throw new Error(`boom:${tag}`);
+      return opts.strings?.[tag];
+    },
+    uint16(tag: string) {
+      if (throwing.has(tag)) throw new Error(`boom:${tag}`);
+      return opts.uint16s?.[tag];
+    },
+    floatString(tag: string) {
+      if (throwing.has(tag)) throw new Error(`boom:${tag}`);
+      return opts.floats?.[tag];
+    },
+  };
+}
+
+function withFakeDicomParser(dataSet: any, run: () => void): void {
+  const previous = (globalThis as any).dicomParser;
+  (globalThis as any).dicomParser = { parseDicom: () => dataSet };
+  try {
+    run();
+  } finally {
+    (globalThis as any).dicomParser = previous;
+  }
+}
+
+test("parseDicomFile extracts patient/study/series metadata and formats name/date", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    strings: {
+      x00100010: "DOE^JOHN^",
+      x00100020: "MRN1",
+      x00100030: "19800101",
+      x00080020: "20240115",
+      x00080090: "SMITH^JANE",
+    },
+    uint16s: { x00280010: 2, x00280011: 2, x00280100: 16 },
+    pixelDataElement: { dataOffset: 0, length: 8 },
+  });
+
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+
+  assert.equal(result.metadata.patientName, "DOE, JOHN");
+  assert.equal(result.metadata.patientBirthDate, "1980-01-01");
+  assert.equal(result.metadata.studyDate, "2024-01-15");
+  assert.equal(result.metadata.referringPhysician, "SMITH, JANE");
+  assert.equal(result.rawDataSet, dataSet);
+});
+
+test("parseDicomFile: safeString/safeUint16/safeFloat fall back when the accessor throws", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    throwing: ["x00100010", "x00280010", "x00281052"],
+    pixelDataElement: null,
+  });
+
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+
+  assert.equal(result.metadata.patientName, "");
+  assert.equal(result.metadata.rows, 0);
+  assert.equal(result.metadata.rescaleIntercept, 0);
+  assert.equal(result.pixelData, null); // no pixel data element
+});
+
+test("parseDicomFile parses window center/width, taking the first of multiple values", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    strings: { x00281050: "40\\80", x00281051: "400\\800" },
+    pixelDataElement: null,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+  assert.equal(result.metadata.windowCenter, 40);
+  assert.equal(result.metadata.windowWidth, 400);
+});
+
+test("parseDicomFile leaves window center/width at 0 when the tags are absent", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({ pixelDataElement: null });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+  assert.equal(result.metadata.windowCenter, 0);
+  assert.equal(result.metadata.windowWidth, 0);
+});
+
+test("parseDicomFile parses pixelSpacing/imagePositionPatient/imageOrientationPatient when valid", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    strings: {
+      x00280030: "0.7\\0.7",
+      x00200032: "-150\\-150\\10",
+      x00200037: "1\\0\\0\\0\\1\\0",
+    },
+    pixelDataElement: null,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+  assert.deepEqual(result.metadata.pixelSpacing, [0.7, 0.7]);
+  assert.deepEqual(result.metadata.imagePositionPatient, [-150, -150, 10]);
+  assert.deepEqual(result.metadata.imageOrientationPatient, [1, 0, 0, 0, 1, 0]);
+});
+
+test("parseDicomFile leaves geometry tags undefined when malformed (too few parts or NaN)", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    strings: {
+      x00280030: "0.7", // only one part
+      x00200032: "-150\\abc\\10", // NaN part
+      x00200037: "1\\0\\0\\0\\1", // only 5 parts
+    },
+    pixelDataElement: null,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+  assert.equal(result.metadata.pixelSpacing, undefined);
+  assert.equal(result.metadata.imagePositionPatient, undefined);
+  assert.equal(result.metadata.imageOrientationPatient, undefined);
+});
+
+test("parseDicomFile: extractPixelData returns null for missing, zero-length, or encapsulated pixel data", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+
+  withFakeDicomParser(fakeDataSet({ pixelDataElement: null }), () => {
+    assert.equal(parseDicomFile(new ArrayBuffer(16)).pixelData, null);
+  });
+  withFakeDicomParser(
+    fakeDataSet({ pixelDataElement: { dataOffset: 0, length: 0 } }),
+    () => {
+      assert.equal(parseDicomFile(new ArrayBuffer(16)).pixelData, null);
+    },
+  );
+  withFakeDicomParser(
+    fakeDataSet({ pixelDataElement: { dataOffset: 0, length: 0xffffffff } }),
+    () => {
+      assert.equal(parseDicomFile(new ArrayBuffer(16)).pixelData, null);
+    },
+  );
+});
+
+test("parseDicomFile: extractPixelData reads 8-bit pixel data as Uint8Array", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+  const dataSet = fakeDataSet({
+    uint16s: { x00280100: 8 },
+    pixelDataElement: { dataOffset: 0, length: 4 },
+    byteArray: bytes,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(bytes.buffer);
+  });
+  assert.ok(result.pixelData instanceof Uint8Array);
+  assert.equal(result.pixelData.length, 4);
+});
+
+test("parseDicomFile: extractPixelData reads signed 16-bit pixel data as Int16Array", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const bytes = new Uint8Array(8);
+  const dataSet = fakeDataSet({
+    uint16s: { x00280100: 16, x00280103: 1 },
+    pixelDataElement: { dataOffset: 0, length: 8 },
+    byteArray: bytes,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(bytes.buffer);
+  });
+  assert.ok(result.pixelData instanceof Int16Array);
+  assert.equal(result.pixelData.length, 4);
+});
+
+test("parseDicomFile: extractPixelData reads unsigned 16-bit pixel data as Uint16Array", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const bytes = new Uint8Array(8);
+  const dataSet = fakeDataSet({
+    uint16s: { x00280100: 16, x00280103: 0 },
+    pixelDataElement: { dataOffset: 0, length: 8 },
+    byteArray: bytes,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(bytes.buffer);
+  });
+  assert.ok(result.pixelData instanceof Uint16Array);
+  assert.equal(result.pixelData.length, 4);
+});
+
+test("parseDicomFile: extractPixelData falls back to Uint8Array for an unrecognized bitsAllocated", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const bytes = new Uint8Array(8);
+  const dataSet = fakeDataSet({
+    uint16s: { x00280100: 32 },
+    pixelDataElement: { dataOffset: 0, length: 8 },
+    byteArray: bytes,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(bytes.buffer);
+  });
+  assert.ok(result.pixelData instanceof Uint8Array);
+  assert.equal(result.pixelData.length, 8);
+});
+
+test("formatPatientName (via parseDicomFile) only strips the very last trailing separator", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    strings: { x00100010: "DOE^JOHN^^^" },
+    pixelDataElement: null,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+  // Every ^ becomes ", ", then only the final ", " is trimmed off the end —
+  // this is the module's actual (slightly quirky) behavior, not idealized.
+  assert.equal(result.metadata.patientName, "DOE, JOHN, , ");
+});
+
+test("formatDicomDate (via parseDicomFile) leaves a short/malformed date untouched", () => {
+  const { parseDicomFile } = require("./dicom-parser-util.js");
+  const dataSet = fakeDataSet({
+    strings: { x00080020: "2024" },
+    pixelDataElement: null,
+  });
+  let result: any;
+  withFakeDicomParser(dataSet, () => {
+    result = parseDicomFile(new ArrayBuffer(16));
+  });
+  assert.equal(result.metadata.studyDate, "2024");
+});
+
 test("WINDOW_PRESETS contains exact values for required presets", () => {
   const { WINDOW_PRESETS } = require("./dicom-parser-util.js");
   assert.deepEqual(WINDOW_PRESETS.lung, {

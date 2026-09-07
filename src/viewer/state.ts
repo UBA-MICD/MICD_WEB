@@ -24,6 +24,7 @@ export interface AppState {
   lastMouseY: number;
   isMetadataOpen: boolean;
   isWlPanelOpen: boolean;
+  isZoomPanelOpen: boolean;
   is3DMode: boolean;
 }
 
@@ -41,6 +42,7 @@ export const state: AppState = {
   lastMouseY: 0,
   isMetadataOpen: false,
   isWlPanelOpen: false,
+  isZoomPanelOpen: false,
   is3DMode: false,
 };
 

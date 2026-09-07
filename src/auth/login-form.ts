@@ -10,6 +10,10 @@
 // so more than one instance can live in the document.
 
 import { login } from "./auth.js";
+import { t } from "../i18n/i18n.js";
+
+const EYE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_OFF_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 
 export interface LoginFormOptions {
   /** Runs after a successful login, before the caller's own navigation. */
@@ -44,6 +48,19 @@ export function mountLoginForm(
   const submitEl = field<HTMLButtonElement>(form, "submit");
   // Optional: the server screen's landing card has nothing to cancel to.
   const cancelEl = form.querySelector<HTMLButtonElement>("[data-login-cancel]");
+  const toggleEl = form.querySelector<HTMLButtonElement>("[data-login-toggle]");
+
+  if (toggleEl) {
+    toggleEl.addEventListener("click", () => {
+      const isPassword = passwordEl.type === "password";
+      passwordEl.type = isPassword ? "text" : "password";
+      toggleEl.setAttribute(
+        "aria-label",
+        isPassword ? t("auth.hidePassword") : t("auth.showPassword"),
+      );
+      toggleEl.innerHTML = isPassword ? EYE_OFF_SVG : EYE_SVG;
+    });
+  }
 
   let inFlight = false;
 

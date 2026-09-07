@@ -2,6 +2,7 @@ import { renderDicom, applyCanvasTransform } from "../dicom/dicom-renderer.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 import { mpr3DViewer } from "./mpr.js";
+import { t, onLocaleChange } from "../i18n/i18n.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
@@ -14,12 +15,16 @@ export function render(): void {
 
     // Show and update depth slider and orientation widget
     update3DControls();
+    updateOrientationLabels();
     return;
   }
 
   // Standard 2D Slice rendering
   hide3DControls();
-  if (!state.parsed?.pixelData) return;
+  if (!state.parsed?.pixelData) {
+    updateOrientationLabels();
+    return;
+  }
 
   renderDicom({
     canvas,
@@ -35,6 +40,29 @@ export function render(): void {
   );
 
   updateInfoOverlay();
+  updateOrientationLabels();
+}
+
+// ── 2D Orientation Labels (A, P, L, R) ───────────────────────────────────────
+
+export function updateOrientationLabels(): void {
+  const top = $("mpr-orient-top");
+  const bottom = $("mpr-orient-bottom");
+  const left = $("mpr-orient-left");
+  const right = $("mpr-orient-right");
+
+  if (!state.parsed?.pixelData || state.is3DMode) {
+    if (top) top.textContent = "";
+    if (bottom) bottom.textContent = "";
+    if (left) left.textContent = "";
+    if (right) right.textContent = "";
+    return;
+  }
+
+  if (top) top.textContent = "A";
+  if (bottom) bottom.textContent = "P";
+  if (left) left.textContent = "R";
+  if (right) right.textContent = "L";
 }
 
 // ── 3D Controls Update ───────────────────────────────────────────────────────
@@ -42,9 +70,11 @@ export function render(): void {
 export function update3DControls(): void {
   const depthWrap = $("mpr-depth-slider-wrap");
   const orientWidget = $("mpr-orientation-widget");
+  const refCube = $("mpr-reference-cube");
 
   if (depthWrap) depthWrap.classList.remove("hidden");
   if (orientWidget) orientWidget.classList.remove("hidden");
+  if (refCube) refCube.classList.remove("hidden");
 
   const depthInfo = mpr3DViewer.getDepthInfo();
   const depthSlider = $("mpr-depth-slider") as HTMLInputElement | null;
@@ -57,8 +87,10 @@ export function update3DControls(): void {
   }
 
   if (depthCounter) {
-    // cspell:disable-next-line
-    depthCounter.textContent = `Corte: ${depthInfo.current + 1}/${depthInfo.total}`;
+    depthCounter.textContent = t("viewer.mpr.sliceCounter", {
+      current: depthInfo.current + 1,
+      total: depthInfo.total,
+    });
   }
 
   updateMprButtonState();
@@ -67,9 +99,11 @@ export function update3DControls(): void {
 export function hide3DControls(): void {
   const depthWrap = $("mpr-depth-slider-wrap");
   const orientWidget = $("mpr-orientation-widget");
+  const refCube = $("mpr-reference-cube");
 
   if (depthWrap) depthWrap.classList.add("hidden");
   if (orientWidget) orientWidget.classList.add("hidden");
+  if (refCube) refCube.classList.add("hidden");
 }
 
 // ── Series Navigation ────────────────────────────────────────────────────────
@@ -96,15 +130,16 @@ export function updateSeriesNav(): void {
     slider.value = String(state.currentIndex);
   }
 
-  // cspell:disable-next-line
-  $("nav-counter").textContent = `Corte ${state.currentIndex + 1}/${count}`;
+  $("nav-counter").textContent = t("viewer.nav.sliceCounter", {
+    current: state.currentIndex + 1,
+    count,
+  });
 
   updateMprButtonState();
 }
 
 // ── MPR Button Tooltip / Validation State ─────────────────────────────────────
 
-// cspell:disable
 export function updateMprButtonState(): void {
   const mprBtn = $("tool-mpr") as HTMLButtonElement | null;
   if (!mprBtn) return;
@@ -112,15 +147,14 @@ export function updateMprButtonState(): void {
   const count = itemCount();
   if (count <= 1) {
     mprBtn.disabled = true;
-    mprBtn.title =
-      "Estudio no compatible con MPR: requiere una serie con más de 1 corte.";
+    mprBtn.title = t("viewer.mpr.notCompatibleSlices");
     mprBtn.classList.add("disabled");
     return;
   }
 
   if (!state.parsed || !state.parsed.metadata) {
     mprBtn.disabled = true;
-    mprBtn.title = "Cargando metadatos del estudio…";
+    mprBtn.title = t("viewer.mpr.loadingMetadata");
     mprBtn.classList.add("disabled");
     return;
   }
@@ -133,28 +167,25 @@ export function updateMprButtonState(): void {
     meta.pixelSpacing[1] <= 0
   ) {
     mprBtn.disabled = true;
-    mprBtn.title =
-      "Estudio no compatible con MPR: falta el tag PixelSpacing (0028,0030).";
+    mprBtn.title = t("viewer.mpr.notCompatiblePixelSpacing");
     mprBtn.classList.add("disabled");
     return;
   }
 
   if (!meta.imagePositionPatient || meta.imagePositionPatient.length < 3) {
     mprBtn.disabled = true;
-    mprBtn.title =
-      "Estudio no compatible con MPR: falta el tag ImagePositionPatient (0020,0032).";
+    mprBtn.title = t("viewer.mpr.notCompatibleImagePosition");
     mprBtn.classList.add("disabled");
     return;
   }
 
   mprBtn.disabled = false;
   mprBtn.title = state.is3DMode
-    ? "Volver a Vista 2D"
-    : "Reconstrucción Volumétrica 3D (MPR)";
+    ? t("viewer.mpr.backTo2D")
+    : t("viewer.mpr.enabledTitle");
   mprBtn.classList.remove("disabled");
   mprBtn.classList.toggle("active", state.is3DMode);
 }
-// cspell:enable
 
 // ── Metadata Panel ───────────────────────────────────────────────────────────
 
@@ -163,37 +194,42 @@ export function updateMetadataPanel(): void {
   const m = state.parsed.metadata;
 
   const rows = [
-    ["Patient Name", m.patientName],
-    ["Patient ID", m.patientId],
-    ["Birth Date", m.patientBirthDate],
-    ["Sex", m.patientSex],
+    [t("viewer.metadata.patientName"), m.patientName],
+    [t("viewer.metadata.patientId"), m.patientId],
+    [t("viewer.metadata.birthDate"), m.patientBirthDate],
+    [t("viewer.metadata.sex"), m.patientSex],
     ["", ""],
-    ["Study Date", m.studyDate],
-    ["Study Description", m.studyDescription],
-    ["Accession #", m.accessionNumber],
-    ["Referring Physician", m.referringPhysician],
+    [t("viewer.metadata.studyDate"), m.studyDate],
+    [t("viewer.metadata.studyDescription"), m.studyDescription],
+    [t("viewer.metadata.accessionNumber"), m.accessionNumber],
+    [t("viewer.metadata.referringPhysician"), m.referringPhysician],
     ["", ""],
-    ["Modality", m.modality],
-    ["Series", m.seriesDescription],
-    ["Series #", m.seriesNumber],
-    ["Instance #", m.instanceNumber],
+    [t("viewer.metadata.modality"), m.modality],
+    [t("viewer.metadata.series"), m.seriesDescription],
+    [t("viewer.metadata.seriesNumber"), m.seriesNumber],
+    [t("viewer.metadata.instanceNumber"), m.instanceNumber],
     ["", ""],
-    ["Dimensions", `${m.columns} × ${m.rows}`],
+    [t("viewer.metadata.dimensions"), `${m.columns} × ${m.rows}`],
     [
-      "Pixel Spacing",
+      t("viewer.metadata.pixelSpacing"),
       m.pixelSpacing ? `${m.pixelSpacing[0]} × ${m.pixelSpacing[1]} mm` : "—",
     ],
     [
-      "Image Position",
+      t("viewer.metadata.imagePosition"),
       m.imagePositionPatient ? m.imagePositionPatient.join(", ") : "—",
     ],
-    ["Bits Allocated", String(m.bitsAllocated)],
-    ["Bits Stored", String(m.bitsStored)],
-    ["Photometric", m.photometricInterpretation],
-    ["Pixel Repr.", m.pixelRepresentation === 0 ? "Unsigned" : "Signed"],
-    ["Rescale Slope", String(m.rescaleSlope)],
-    ["Rescale Intercept", String(m.rescaleIntercept)],
-    ["Transfer Syntax", m.transferSyntaxUid],
+    [t("viewer.metadata.bitsAllocated"), String(m.bitsAllocated)],
+    [t("viewer.metadata.bitsStored"), String(m.bitsStored)],
+    [t("viewer.metadata.photometric"), m.photometricInterpretation],
+    [
+      t("viewer.metadata.pixelRepr"),
+      m.pixelRepresentation === 0
+        ? t("viewer.metadata.valueUnsigned")
+        : t("viewer.metadata.valueSigned"),
+    ],
+    [t("viewer.metadata.rescaleSlope"), String(m.rescaleSlope)],
+    [t("viewer.metadata.rescaleIntercept"), String(m.rescaleIntercept)],
+    [t("viewer.metadata.transferSyntax"), m.transferSyntaxUid],
   ];
 
   const tbody = $("metadata-tbody");
@@ -285,22 +321,33 @@ export function updateWlControlsUI(): void {
  * The canvas is the whole point of the app and was an unlabelled black box to
  * assistive tech. Describe what is on it, refreshed whenever the overlay is.
  */
-// cspell:disable
 function updateCanvasLabel(): void {
   if (!state.parsed) return;
   const m = state.parsed.metadata;
   const count = itemCount();
 
   const parts = [
-    "Imagen DICOM",
-    m.patientName && `paciente ${m.patientName}`,
+    t("viewer.canvasLabel.imageDicom"),
+    m.patientName && t("viewer.canvasLabel.patient", { name: m.patientName }),
     m.modality,
     m.studyDate,
     m.studyDescription,
-    count > 1 && `imagen ${state.currentIndex + 1} de ${count}`,
-    `${m.columns} por ${m.rows} píxeles`,
+    count > 1 &&
+      t("viewer.canvasLabel.imageOf", {
+        current: state.currentIndex + 1,
+        total: count,
+      }),
+    t("viewer.canvasLabel.pixels", { cols: m.columns, rows: m.rows }),
   ].filter(Boolean);
 
   $("dicom-canvas").setAttribute("aria-label", parts.join(", "));
 }
-// cspell:enable
+
+// Re-run every computed-text render on a locale switch: these build their own
+// markup/attributes rather than going through data-i18n, so main.ts's global
+// applyTranslations() pass doesn't reach them.
+onLocaleChange(() => {
+  updateMetadataPanel();
+  updateSeriesNav();
+  updateInfoOverlay();
+});

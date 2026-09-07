@@ -9,6 +9,7 @@ import {
 } from "../dicom/dicom-renderer.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
+import { expandFiles } from "../upload/zip-expand.js";
 import { $, showLoading, showError } from "../shared/dom.js";
 import { state } from "./state.js";
 import { dicomCache } from "./cache.js";
@@ -19,6 +20,7 @@ import {
   updateInfoOverlay,
 } from "./rendering.js";
 import { updateToolbarUI } from "./interaction.js";
+import { t } from "../i18n/i18n.js";
 
 /** Load the image at state.currentIndex from whichever source is active. */
 export async function loadCurrent(): Promise<void> {
@@ -36,16 +38,16 @@ export async function loadCurrent(): Promise<void> {
   try {
     const parsed = await dicomCache.getOrFetch(index);
     if (!parsed) {
-      // cspell:disable-next-line
-      showError(`No se pudo cargar la imagen en el índice ${index + 1}`);
+      showError(t("viewer.loadImageError", { index: index + 1 }));
       return;
     }
     state.parsed = parsed;
     displayParsed(parsed, getTitleForIndex(index));
     dicomCache.prefetchNext(index, 5);
   } catch (err: any) {
-    // cspell:disable-next-line
-    showError(`Error al cargar la imagen: ${err.message || err}`);
+    showError(
+      t("viewer.loadImageGenericError", { message: err.message || err }),
+    );
   } finally {
     showLoading(false);
   }
@@ -53,13 +55,15 @@ export async function loadCurrent(): Promise<void> {
 
 function getTitleForIndex(index: number): string {
   if (state.source === "server") {
-    // cspell:disable-next-line
-    return `${state.serverStudyId || "Estudio"} — Corte ${index + 1}`;
+    return t("viewer.titleServerSlice", {
+      study: state.serverStudyId || t("viewer.defaultStudyLabel"),
+      index: index + 1,
+    });
   }
   if (state.files.length > 0 && index < state.files.length) {
     return state.files[index].name;
   }
-  return "Visualizador DICOM";
+  return t("viewer.defaultTitle");
 }
 
 export function resetViewerToDropZone(): void {
@@ -71,11 +75,10 @@ export function resetViewerToDropZone(): void {
   state.currentIndex = 0;
   state.parsed = null;
   $("series-nav").classList.add("hidden");
-  $("topbar-title").textContent = "Visualizador DICOM";
+  $("topbar-title").textContent = t("viewer.defaultTitle");
   $("topbar-title").title = "";
   // Otherwise the canvas keeps describing the study that is no longer shown.
-  // cspell:disable-next-line
-  $("dicom-canvas").setAttribute("aria-label", "Sin imagen cargada");
+  $("dicom-canvas").setAttribute("aria-label", t("viewer.canvasEmptyLabel"));
   updateToolbarUI();
   showDropZone();
 }
@@ -87,12 +90,25 @@ export function initFileInputs(): void {
   const filesInput = $("open-files-input") as HTMLInputElement;
   filesInput.addEventListener("change", async () => {
     if (!filesInput.files || filesInput.files.length === 0) return;
-    dicomCache.clear();
-    state.files = collectDicomFiles(Array.from(filesInput.files));
-    state.currentIndex = 0;
-    state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
-    await loadCurrent();
+    const selected = Array.from(filesInput.files);
     filesInput.value = "";
+    const { files: expanded } = await expandFiles(selected, null);
+    const dcmFiles = collectDicomFiles(expanded);
+    if (dcmFiles.length === 0) {
+      showError(t("viewer.folderNoDicom"));
+      return;
+    }
+    dicomCache.clear();
+    state.files = dcmFiles;
+    state.currentIndex = 0;
+    state.viewport = {
+      windowCenter: 0,
+      windowWidth: 0,
+      zoom: 0,
+      panX: 0,
+      panY: 0,
+    };
+    await loadCurrent();
   });
 
   // Folder picker — loads every DICOM image in the folder so you can walk through them
@@ -102,14 +118,19 @@ export function initFileInputs(): void {
     if (!folderInput.files || folderInput.files.length === 0) return;
     const dcmFiles = collectDicomFiles(Array.from(folderInput.files));
     if (dcmFiles.length === 0) {
-      // cspell:disable-next-line
-      showError("No se encontraron archivos DICOM en la carpeta seleccionada.");
+      showError(t("viewer.folderNoDicom"));
       return;
     }
     dicomCache.clear();
     state.files = dcmFiles;
     state.currentIndex = 0;
-    state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+    state.viewport = {
+      windowCenter: 0,
+      windowWidth: 0,
+      zoom: 0,
+      panX: 0,
+      panY: 0,
+    };
     await loadCurrent();
     folderInput.value = "";
   });
@@ -144,7 +165,13 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
   state.serverInstances = [];
   state.files = [];
   state.currentIndex = 0;
-  state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+  state.viewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 0,
+    panX: 0,
+    panY: 0,
+  };
 
   try {
     const res = await authFetch(
@@ -156,14 +183,14 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
     };
     state.serverInstances = (data.instances ?? []).map((i) => i.instanceId);
     if (state.serverInstances.length === 0) {
-      // cspell:disable-next-line
-      showError("El estudio no tiene imágenes.");
+      showError(t("viewer.serverStudyNoImages"));
       return;
     }
     await loadCurrent();
   } catch (err: any) {
-    // cspell:disable-next-line
-    showError(`Error al cargar el estudio del servidor: ${err.message || err}`);
+    showError(
+      t("viewer.serverStudyLoadError", { message: err.message || err }),
+    );
   } finally {
     showLoading(false);
   }
@@ -173,10 +200,7 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
   state.parsed = parsed;
 
   if (!parsed.pixelData) {
-    showError(
-      // cspell:disable-next-line
-      "No se encontraron datos de píxeles. El archivo puede usar sintaxis de transferencia comprimida.",
-    );
+    showError(t("viewer.noPixelsFound"));
     return;
   }
 
@@ -263,7 +287,13 @@ export function initDropZone(): void {
       dicomCache.clear();
       state.files = dcmFiles.sort((a, b) => a.name.localeCompare(b.name));
       state.currentIndex = 0;
-      state.viewport = { windowCenter: 0, windowWidth: 0, zoom: 0, panX: 0, panY: 0 };
+      state.viewport = {
+        windowCenter: 0,
+        windowWidth: 0,
+        zoom: 0,
+        panX: 0,
+        panY: 0,
+      };
       await loadCurrent();
     }
   });

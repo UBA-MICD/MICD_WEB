@@ -9,8 +9,15 @@
 // A guest who opens this screen lands on the auth card, which states the rule
 // in plain language, instead of getting a modal thrown over their image.
 
-import { isAuthenticated } from "../auth/auth.js";
+import {
+  isAuthenticated,
+  isAdmin,
+  isStaff,
+  onAuthChange,
+} from "../auth/auth.js";
 import { mountLoginForm } from "../auth/login-form.js";
+import { mountUsersPanel } from "../admin/users-panel.js";
+import { mountSystemPanel } from "../admin/system-panel.js";
 import {
   loadStudyExplorer,
   getSelectedStudyId,
@@ -28,15 +35,31 @@ import { $ } from "../shared/dom.js";
 import { showBanner } from "../shared/banner.js";
 import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
 import { initRovingTabindex, nextRovingIndex } from "../shared/roving.js";
+import { t } from "../i18n/i18n.js";
 
-export type ServerTab = "buscar" | "cargar";
+export type ServerTab = "buscar" | "cargar" | "usuarios" | "sistema";
 
 let activeTab: ServerTab = "buscar";
 let loginForm: ReturnType<typeof mountLoginForm> | null = null;
+let usersPanel: ReturnType<typeof mountUsersPanel> | null = null;
+let systemPanel: ReturnType<typeof mountSystemPanel> | null = null;
 /** Resolves the pending ensureAuthenticated() gate, if one sent us here. */
 let pendingGate: ((ok: boolean) => void) | null = null;
 
-const TABS: ServerTab[] = ["buscar", "cargar"];
+const TABS: ServerTab[] = ["buscar", "cargar", "usuarios", "sistema"];
+
+/** Can the current session use a tab? "usuarios" and "sistema" are admin-only;
+ *  "cargar" (upload) is a write, so clinical staff only. */
+function canUseTab(tab: ServerTab): boolean {
+  if (tab === "usuarios" || tab === "sistema") return isAdmin();
+  if (tab === "cargar") return isStaff();
+  return true;
+}
+
+/** Tabs visible for the current session (drops the ones the role can't use). */
+function visibleTabs(): ServerTab[] {
+  return TABS.filter(canUseTab);
+}
 
 function tabButton(tab: ServerTab): HTMLElement {
   return $(`tab-${tab}`);
@@ -60,6 +83,8 @@ function showTab(tab: ServerTab): void {
   });
 
   if (tab === "buscar") void loadStudyExplorer();
+  if (tab === "usuarios") void usersPanel?.reload();
+  if (tab === "sistema") void systemPanel?.reload();
 }
 
 /**
@@ -77,6 +102,14 @@ function renderForSession(): void {
     loginForm?.reset();
     return;
   }
+
+  // Reveal each role-gated tab only where the role permits it; if the active
+  // tab is now off-limits (e.g. a role change surfaced on refresh), fall back
+  // to Buscar, which every signed-in role can use.
+  TABS.forEach((tab) =>
+    tabButton(tab).classList.toggle("hidden", !canUseTab(tab)),
+  );
+  if (!canUseTab(activeTab)) activeTab = "buscar";
   showTab(activeTab);
 }
 
@@ -140,27 +173,39 @@ export function initServerScreen(): void {
       renderForSession();
     },
   });
+  usersPanel = mountUsersPanel($("panel-usuarios"));
+  systemPanel = mountSystemPanel($("system-panel-body"));
+
+  // A role change (e.g. surfaced on the next token refresh) must re-evaluate the
+  // admin tab's visibility while the screen is already open.
+  onAuthChange(() => {
+    if (isAuthenticated()) renderForSession();
+  });
 
   $("btn-server-back").addEventListener("click", () => closeServerScreen());
 
-  // One tab stop for the tablist, arrow keys within it (WCAG tabs pattern).
+  // One tab stop for the tablist, arrow keys within it (WCAG tabs pattern). The
+  // :not(.hidden) selector keeps the admin-only tab out of the roving cycle for
+  // non-admins (it queries live, so it follows the tab's visibility).
   const tabs = $("server-tabs");
-  initRovingTabindex(tabs, '[role="tab"]', "horizontal");
+  initRovingTabindex(tabs, '[role="tab"]:not(.hidden)', "horizontal");
   tabs.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
     if (!btn) return;
-    showTab(btn.id === "tab-cargar" ? "cargar" : "buscar");
+    const tab = btn.id.replace(/^tab-/, "") as ServerTab;
+    if (visibleTabs().includes(tab)) showTab(tab);
   });
   // Arrow keys move focus (roving); they should select the focused tab too,
   // which is the "automatic activation" half of the tabs pattern.
   tabs.addEventListener("keydown", (e: KeyboardEvent) => {
-    const current = TABS.indexOf(activeTab);
-    if (nextRovingIndex(e.key, current, TABS.length, "horizontal") === null)
+    const nav = visibleTabs();
+    const current = nav.indexOf(activeTab);
+    if (nextRovingIndex(e.key, current, nav.length, "horizontal") === null)
       return;
     // The roving handler has already moved focus by the time this runs.
     queueMicrotask(() => {
       const focused = document.activeElement;
-      const tab = TABS.find((name) => tabButton(name) === focused);
+      const tab = nav.find((name) => tabButton(name) === focused);
       if (tab && tab !== activeTab) showTab(tab);
     });
   });
@@ -175,7 +220,7 @@ export function initServerScreen(): void {
     openSelected.disabled = true;
     await openStudy(studyId);
     closeServerScreen();
-    showBanner("Estudio cargado · volviendo al visualizador");
+    showBanner(t("server.studyLoadedBanner"));
   };
 
   openSelected.addEventListener("click", () => {
@@ -211,8 +256,8 @@ export function initServerScreen(): void {
     closeServerScreen();
     showBanner(
       summary.ok === 1
-        ? "Estudio cargado · volviendo al visualizador"
-        : `${summary.ok} estudios cargados · volviendo al visualizador`,
+        ? t("server.studyLoadedBanner")
+        : t("server.studiesLoadedBanner", { count: summary.ok }),
     );
   });
 

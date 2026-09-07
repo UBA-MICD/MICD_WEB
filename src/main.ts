@@ -16,6 +16,10 @@ import {
   openServerScreen,
   promptLoginOnServerScreen,
 } from "./server-screen/server-screen.js";
+import {
+  initServerConfigModal,
+  openServerConfigModal,
+} from "./server-screen/server-config-modal.js";
 import { state } from "./viewer/state.js";
 import {
   initFileInputs,
@@ -29,7 +33,9 @@ import {
   initMenuListeners,
   initKeyboardShortcuts,
   initResizeObserver,
+  initGridLayoutControls,
 } from "./viewer/interaction.js";
+import { initViewportManager } from "./viewer/viewport-registry.js";
 import { initUploadPanel } from "./upload/upload.js";
 import {
   initStudyExplorer,
@@ -39,12 +45,12 @@ import {
 import { initZenodoPanel, checkQuotaAlerts } from "./zenodo/zenodo-panel.js";
 import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { initExplorerPanel } from "./explorer/explorer-panel.js";
+import { initWalkthrough } from "./walkthrough/init.js";
+import { initValidation } from "./viewer/validation-ui.js";
+import { initMLView } from "./viewer/ml-view.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
-import {
-  initDesktopOnlyUI,
-  initDesktopApiOriginSetting,
-} from "./shared/desktop.js";
+import { initDesktopOnlyUI, initApiOriginSetting } from "./shared/desktop.js";
 import {
   currentLocale,
   setLocale,
@@ -82,7 +88,8 @@ function initI18n(): void {
 async function initApp(): Promise<void> {
   initI18n();
   initDesktopOnlyUI();
-  void initDesktopApiOriginSetting();
+  void initApiOriginSetting();
+  initServerConfigModal();
 
   // One login surface in the app: the server screen's auth card. A session
   // that dies mid-operation brings the user here rather than throwing a modal
@@ -94,9 +101,9 @@ async function initApp(): Promise<void> {
   $("btn-login").addEventListener("click", (e) =>
     openServerScreen("buscar", e.currentTarget as HTMLElement),
   );
-  // Single entry point for everything server-bound.
+  // Opens server configuration modal (TK-29)
   $("btn-server").addEventListener("click", (e) =>
-    openServerScreen("buscar", e.currentTarget as HTMLElement),
+    openServerConfigModal(e.currentTarget as HTMLElement),
   );
   // cspell:enable
 
@@ -119,6 +126,11 @@ async function initApp(): Promise<void> {
 }
 
 function startApp(): void {
+  // Multi-viewport grid: must be first — toolbar and loading modules read the registry.
+  const vpContainer = document.getElementById("viewport-container");
+  if (!vpContainer) throw new Error("#viewport-container not found in DOM");
+  initViewportManager(vpContainer);
+
   initFileInputs();
   initToolbar();
   initViewportInteraction();
@@ -141,9 +153,13 @@ function startApp(): void {
   initZenodoPanel();
   initStudyDetailPanel();
   initExplorerPanel();
+  initWalkthrough();
+  initValidation();
+  initMLView();
   // Last: the rail is one tab stop, with the arrow keys moving between tools,
   // so reaching the viewport does not mean tabbing through every tool. It
   // reads the tool buttons at init, so it runs after they are all wired.
+  initGridLayoutControls();
   initRovingTabindex($("viewer-toolbar"), ".toolbar__tool", "vertical");
 }
 

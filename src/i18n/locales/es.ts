@@ -119,6 +119,7 @@ export const es: Record<string, string> = {
   "viewer.tool.metadataTitle": "Etiquetas DICOM (M)",
   "viewer.tool.zenodoTitle": "Zenodo — repositorio de ciencia abierta",
   "viewer.tool.mprStaticTitle": "Reconstrucción Multiplanar (MPR)",
+  "viewer.tool.view3dStaticTitle": "Vista 3D",
   "viewer.dropZone.title": "Abrir archivo DICOM",
   "viewer.dropZone.instructions": "Arrastrá y soltá archivos .dcm aquí, o",
   "viewer.dropZone.note":
@@ -164,6 +165,28 @@ export const es: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.view3d.sliceCounter": "Corte: {{current}}/{{total}}",
+  "viewer.view3d.notCompatibleSlices":
+    "Estudio no compatible con Vista 3D: requiere una serie con más de 1 corte.",
+  "viewer.view3d.loadingMetadata": "Cargando metadatos del estudio…",
+  "viewer.view3d.notCompatiblePixelSpacing":
+    "Estudio no compatible con Vista 3D: falta el tag PixelSpacing (0028,0030).",
+  "viewer.view3d.notCompatibleImagePosition":
+    "Estudio no compatible con Vista 3D: falta el tag ImagePositionPatient (0020,0032).",
+  "viewer.view3d.backTo2D": "Volver a Vista 2D",
+  "viewer.view3d.enabledTitle": "Vista Volumétrica 3D",
+  "viewer.view3d.needTwoSlices":
+    "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
+  "viewer.view3d.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
+  "viewer.view3d.webglUnavailable":
+    "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.view3d.sagittal": "Sagital",
+  "viewer.view3d.volumetricView": "Vista Volumétrica",
+  "viewer.layers.title": "Ajuste de Capas",
+  "viewer.layers.loadBtn": "Cargar Estudio Superpuesto",
+  "viewer.layers.opacity": "Opacidad",
+  "viewer.layers.ww": "Ancho de Capa (WW)",
+  "viewer.layers.wl": "Centro de Capa (WL)",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",
@@ -519,4 +542,199 @@ export const es: Record<string, string> = {
   "system.instances": "Instancias",
   "system.used": "usados",
   "system.loadError": "No se pudo cargar el estado del servidor.",
+
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Siguiente",
+  "tour.controls.back": "Atrás",
+  "tour.controls.skip": "Omitir tutorial",
+  "tour.controls.finish": "Finalizar",
+  "tour.controls.close": "Cerrar tutorial",
+  "tour.progress": "Paso {{n}} de {{total}}",
+  "tour.help.label": "Tutorial guiado",
+  "tour.core.welcome.title": "Bienvenido a MICD",
+  "tour.core.welcome.body":
+    "Un recorrido breve por el visor y, si inicias sesión, por las funciones del servidor. Pulsa Esc u Omitir para salir cuando quieras — puedes reabrirlo desde el botón ?.",
+  "tour.core.open.title": "Abrir un estudio",
+  "tour.core.open.body":
+    "Abre un archivo o carpeta DICOM local desde tu equipo — sin iniciar sesión. También puedes arrastrar archivos al visor.",
+  "tour.core.wl.title": "Ventana / Nivel",
+  "tour.core.wl.body":
+    "Ajusta brillo y contraste arrastrando sobre la imagen, o aplica un preset (hueso, cerebro, pulmón, tejido blando).",
+  "tour.core.zoompan.title": "Zoom y desplazamiento",
+  "tour.core.zoompan.body":
+    "Haz zoom para ver el detalle y desplázate para moverte por la imagen. La rueda del ratón también hace zoom.",
+  "tour.core.mpr.title": "MPR y 3D",
+  "tour.core.mpr.body":
+    "Para series volumétricas, reconstruye los planos axial, coronal y sagital, o cambia a la vista 3D.",
+  "tour.core.metadata.title": "Metadatos DICOM",
+  "tour.core.metadata.body":
+    "Consulta las etiquetas DICOM del estudio — paciente, serie y detalles de adquisición.",
+  "tour.core.reset.title": "Restablecer la vista",
+  "tour.core.reset.body":
+    "Devuelve ventana/nivel, zoom y desplazamiento a sus valores por defecto con un clic.",
+  "tour.core.explorer.title": "Explorador de estudios",
+  "tour.core.explorer.body":
+    "Muestra u oculta el panel del explorador para navegar por las series y estudios que tienes abiertos.",
+  "tour.core.language.title": "Idioma",
+  "tour.core.language.body":
+    "Cambia la interfaz entre español e inglés en cualquier momento.",
+  "tour.core.signin.title": "Funciones del servidor",
+  "tour.core.signin.body":
+    "Inicia sesión para acceder al servidor: busca estudios compartidos y — según tu rol — sube, publica y gestiona usuarios.",
+  "tour.investigador.search.title": "Buscar estudios",
+  "tour.investigador.search.body":
+    "Encuentra estudios por paciente, modalidad o fecha. Empieza a escribir para buscar en el repositorio compartido.",
+  "tour.investigador.dates.title": "Filtrar por fecha",
+  "tour.investigador.dates.body":
+    "Acota los resultados a un rango de fechas de adquisición con los campos desde/hasta.",
+  "tour.investigador.results.title": "Resultados",
+  "tour.investigador.results.body":
+    "Los estudios coincidentes aparecen aquí. Para tu rol, la identidad del paciente está anonimizada — trabajas con datos sin identificar.",
+  "tour.investigador.open.title": "Abrir un estudio",
+  "tour.investigador.open.body":
+    "Selecciona un estudio y ábrelo en el visor para revisar sus imágenes.",
+  "tour.investigador.export.title": "Exportar",
+  "tour.investigador.export.body":
+    "Exporta imágenes o un paquete del estudio. Las descargas para tu rol están anonimizadas.",
+  "tour.investigador.zenodo.title": "Corpus público de Zenodo",
+  "tour.investigador.zenodo.body":
+    "Busca en el corpus público de investigación de Zenodo conjuntos de datos publicados abiertamente.",
+  "tour.investigador.done.title": "Todo listo",
+  "tour.investigador.done.body":
+    "Ese es tu kit de investigador — buscar, revisar y exportar anonimizado. Subir estudios, la administración de usuarios y la publicación no forman parte de este rol. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.staff.search.title": "Buscar estudios",
+  "tour.staff.search.body":
+    "Encuentra estudios por paciente, modalidad o fecha. Como personal clínico ves los datos completos del paciente.",
+  "tour.staff.results.title": "Resultados",
+  "tour.staff.results.body":
+    "Los estudios coincidentes aparecen aquí con la información completa del paciente.",
+  "tour.staff.open.title": "Abrir un estudio",
+  "tour.staff.open.body":
+    "Selecciona un estudio y ábrelo en el visor para revisar sus imágenes.",
+  "tour.staff.export.title": "Exportar un estudio",
+  "tour.staff.export.body":
+    "Exporta imágenes (PNG) o un paquete completo del estudio (ZIP), con todos los metadatos.",
+  "tour.staff.uploadTab.title": "Subir estudios",
+  "tour.staff.uploadTab.body":
+    "Abre la pestaña Cargar para añadir nuevos estudios al servidor.",
+  "tour.staff.uploadDrop.title": "Arrastrar y soltar",
+  "tour.staff.uploadDrop.body":
+    "Suelta archivos DICOM aquí para subirlos. Cada archivo se sube con su propia fila de progreso.",
+  "tour.staff.uploadFolder.title": "Subir una carpeta",
+  "tour.staff.uploadFolder.body":
+    "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
+  "tour.staff.uploadStatus.title": "Progreso y estado",
+  "tour.staff.uploadStatus.body":
+    "Sigue aquí el progreso y el estado de cada archivo mientras se suben tus estudios.",
+  "tour.staff.zenodoImport.title": "Conjuntos de datos de Zenodo",
+  "tour.staff.zenodoImport.body":
+    "Busca en el corpus público de Zenodo e importa conjuntos de datos directamente al servidor.",
+  "tour.medico.done.title": "Todo listo",
+  "tour.medico.done.body":
+    "Ese es tu kit clínico — buscar, revisar, subir, importar y exportar con todos los metadatos. La gestión de usuarios, la configuración/publicación en Zenodo y el registro de actividad son solo para administradores. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.admin.usersTab.title": "Gestión de usuarios",
+  "tour.admin.usersTab.body":
+    "Abre la pestaña Usuarios para gestionar cuentas — solo la ven los administradores.",
+  "tour.admin.create.title": "Crear un usuario",
+  "tour.admin.create.body":
+    "Añade un usuario con nombre, correo y rol. Se le envía una invitación por correo.",
+  "tour.admin.role.title": "Asignar roles",
+  "tour.admin.role.body":
+    "Cambia aquí el rol de un usuario — investigador, médico o administrador.",
+  "tour.admin.block.title": "Bloquear y habilitar",
+  "tour.admin.block.body":
+    "Bloquea una cuenta para suspender el acceso y vuelve a habilitarla más tarde.",
+  "tour.admin.delete.title": "Eliminar un usuario",
+  "tour.admin.delete.body":
+    "La eliminación es un borrado lógico — la cuenta se retira pero se conserva el historial de auditoría.",
+  "tour.admin.lastAccess.title": "Último acceso",
+  "tour.admin.lastAccess.body":
+    "El último inicio de sesión de cada usuario se registra en esta columna.",
+  "tour.admin.activity.title": "Registro de actividad",
+  "tour.admin.activity.body":
+    "Abre el registro de auditoría para revisar las acciones del sistema y expórtalo como CSV.",
+  "tour.admin.zenodo.title": "Administración de Zenodo",
+  "tour.admin.zenodo.body":
+    "Configura las credenciales y la sincronización de Zenodo, revisa los registros de sincronización y la cuota, y publica estudios. La publicación es irreversible y hace los datos públicos — verifica con cuidado antes de publicar.",
+  "tour.admin.help.title": "Reábrelo cuando quieras",
+  "tour.admin.help.body":
+    "Ese es el kit completo de administrador. Relanza este tutorial cuando quieras desde este botón ?.",
+  // ── validation (US-26) ───────────────────────────────────────────────────────
+  "validation.barAriaLabel": "Validación de diagnóstico",
+  "validation.approve": "Aprobar",
+  "validation.reject": "Rechazar",
+  "validation.review": "Marcar para revisión",
+  "validation.correctionNotice":
+    "Se registrará una corrección sobre la validación previa.",
+  "validation.dialog.title": "Confirmar acción",
+  "validation.dialog.titleCorrection": "Registrar corrección",
+  "validation.dialog.msg.approved": "¿Confirmás la aprobación de este estudio?",
+  "validation.dialog.msg.rejected":
+    "¿Confirmás el rechazo de este estudio? El comentario es obligatorio.",
+  "validation.dialog.msg.review":
+    "¿Marcás este estudio para revisión posterior?",
+  "validation.dialog.msg.correctionApproved":
+    "¿Registrás una corrección aprobando este estudio?",
+  "validation.dialog.msg.correctionRejected":
+    "¿Registrás una corrección rechazando este estudio? El comentario es obligatorio.",
+  "validation.dialog.msg.correctionReview":
+    "¿Registrás una corrección marcando este estudio para revisión?",
+  "validation.dialog.commentLabel": "Comentario",
+  "validation.dialog.commentRequired":
+    "El comentario es obligatorio para rechazar.",
+  "validation.dialog.confirm": "Confirmar",
+  "validation.status.approved": "Aprobado",
+  "validation.status.rejected": "Rechazado",
+  "validation.status.review": "Para revisión",
+  "validation.status.none": "Sin validación",
+  "validation.toast.success.approved": "Estudio aprobado.",
+  "validation.toast.success.rejected": "Estudio rechazado.",
+  "validation.toast.success.review": "Estudio marcado para revisión.",
+  "validation.toast.success.correction": "Corrección registrada.",
+  "validation.toast.error": "No se pudo registrar la validación.",
+  "validation.analyzeWithAI": "Analizar con IA",
+  "validation.analyzing": "Analizando...",
+  "validation.analysisDone": "Análisis completado.",
+  "validation.analysisFailed": "Error en el análisis.",
+  "validation.readonlyNotice":
+    "Solo el administrador puede corregir esta validación.",
+  "validations.openNeedsML":
+    "Se requiere análisis de IA para visualizar el estudio.",
+
+  // ── Panel de Validaciones (US-26) ────────────────────────────────────────────
+  "validations.tab": "Validaciones",
+  "validations.filtersLabel": "Filtrar por estado",
+  "validations.filterAll": "Todos",
+  "validations.filterPending": "Sin validar",
+  "validations.filterApproved": "Aprobados",
+  "validations.filterRejected": "Rechazados",
+  "validations.filterReview": "Para revisión",
+  "validations.colPatient": "Paciente",
+  "validations.colModality": "Modalidad",
+  "validations.colDate": "Fecha",
+  "validations.colStatus": "Estado",
+  "validations.colValidatedBy": "Validado por",
+  "validations.colActions": "Acciones",
+  "validations.openInViewer": "Ver estudio",
+  "validations.empty": "No hay estudios que coincidan con el filtro.",
+  "validations.loadError": "No se pudo cargar la lista de estudios.",
+  "validations.actionSuccess.approved": "Estudio aprobado.",
+  "validations.actionSuccess.rejected": "Estudio rechazado.",
+  "validations.actionSuccess.review": "Estudio marcado para revisión.",
+  "validations.rejectDialog.title": "Rechazar estudio",
+  "validations.rejectDialog.commentLabel": "Comentario (obligatorio)",
+  "validations.rejectDialog.confirm": "Rechazar",
+  "validations.correctionBadge": "corrección",
+  "validations.mlDone": "✓ Con IA",
+
+  // ── Configuración de Servidor (TK-29) ───────────────────────────────────────
+  "serverConfig.title": "Configuración del Servidor",
+  "serverConfig.description":
+    "Ingresá la URL base del servidor PACS/Orthanc para consultar estudios, metadatos y volúmenes DICOM.",
+  "serverConfig.urlLabel": "URL del Servidor",
+  "serverConfig.urlPlaceholder": "http://localhost:3000",
+  "serverConfig.saveAndConnect": "Guardar / Conectar",
+  "serverConfig.saveSuccess": "Configuración guardada exitosamente.",
+  "serverConfig.invalidUrl":
+    "Formato de URL inválido. Usá http:// o https:// (ej. http://localhost:3000)",
 };

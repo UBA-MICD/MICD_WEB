@@ -117,6 +117,7 @@ export const en: Record<string, string> = {
   "viewer.tool.metadataTitle": "DICOM tags (M)",
   "viewer.tool.zenodoTitle": "Zenodo — open science repository",
   "viewer.tool.mprStaticTitle": "Multiplanar reconstruction (MPR)",
+  "viewer.tool.view3dStaticTitle": "3D View",
   "viewer.dropZone.title": "Open DICOM file",
   "viewer.dropZone.instructions": "Drag and drop .dcm files here, or",
   "viewer.dropZone.note":
@@ -161,6 +162,28 @@ export const en: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error loading the 3D volume: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.view3d.sliceCounter": "Slice: {{current}}/{{total}}",
+  "viewer.view3d.notCompatibleSlices":
+    "Study not compatible with 3D view: requires a series with more than 1 slice.",
+  "viewer.view3d.loadingMetadata": "Loading study metadata…",
+  "viewer.view3d.notCompatiblePixelSpacing":
+    "Study not compatible with 3D view: missing the PixelSpacing tag (0028,0030).",
+  "viewer.view3d.notCompatibleImagePosition":
+    "Study not compatible with 3D view: missing the ImagePositionPatient tag (0020,0032).",
+  "viewer.view3d.backTo2D": "Back to 2D view",
+  "viewer.view3d.enabledTitle": "3D volumetric view",
+  "viewer.view3d.needTwoSlices":
+    "The study needs at least 2 slices for the 3D volumetric view.",
+  "viewer.view3d.volumeLoadError": "Error loading the 3D volume: {{message}}",
+  "viewer.view3d.webglUnavailable":
+    "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.view3d.sagittal": "Sagittal",
+  "viewer.view3d.volumetricView": "Volumetric View",
+  "viewer.layers.title": "Layer Adjustment",
+  "viewer.layers.loadBtn": "Load Overlay Study",
+  "viewer.layers.opacity": "Opacity",
+  "viewer.layers.ww": "Layer Width (WW)",
+  "viewer.layers.wl": "Layer Center (WL)",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",
@@ -511,4 +534,196 @@ export const en: Record<string, string> = {
   "system.instances": "Instances",
   "system.used": "used",
   "system.loadError": "Could not load server status.",
+
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Next",
+  "tour.controls.back": "Back",
+  "tour.controls.skip": "Skip tour",
+  "tour.controls.finish": "Finish",
+  "tour.controls.close": "Close tour",
+  "tour.progress": "Step {{n}} of {{total}}",
+  "tour.help.label": "Guided tour",
+  "tour.core.welcome.title": "Welcome to MICD",
+  "tour.core.welcome.body":
+    "A quick tour of the viewer and, if you sign in, your server features. Press Esc or Skip to leave at any time — reopen it later from the ? button.",
+  "tour.core.open.title": "Open a study",
+  "tour.core.open.body":
+    "Open a local DICOM file or folder straight from your computer — no sign-in needed. You can also drag files onto the viewer.",
+  "tour.core.wl.title": "Window / Level",
+  "tour.core.wl.body":
+    "Adjust brightness and contrast by dragging on the image, or apply a preset (bone, brain, lung, soft tissue).",
+  "tour.core.zoompan.title": "Zoom & pan",
+  "tour.core.zoompan.body":
+    "Zoom to inspect detail and pan to move around the image. The scroll wheel zooms too.",
+  "tour.core.mpr.title": "MPR & 3D",
+  "tour.core.mpr.body":
+    "For volume series, reconstruct axial, coronal and sagittal planes, or switch to a 3D view.",
+  "tour.core.metadata.title": "DICOM metadata",
+  "tour.core.metadata.body":
+    "Inspect the study's DICOM tags — patient, series and acquisition details.",
+  "tour.core.reset.title": "Reset the view",
+  "tour.core.reset.body":
+    "Return window/level, zoom and pan to their defaults in one click.",
+  "tour.core.explorer.title": "Study explorer",
+  "tour.core.explorer.body":
+    "Toggle the explorer rail to browse the series and studies you have open.",
+  "tour.core.language.title": "Language",
+  "tour.core.language.body":
+    "Switch the interface between Spanish and English at any time.",
+  "tour.core.signin.title": "Server features",
+  "tour.core.signin.body":
+    "Sign in to reach the server: search shared studies, and — depending on your role — upload, publish and manage users.",
+  "tour.investigador.search.title": "Search studies",
+  "tour.investigador.search.body":
+    "Find studies by patient, modality or date. Start typing to search the shared repository.",
+  "tour.investigador.dates.title": "Filter by date",
+  "tour.investigador.dates.body":
+    "Narrow results to an acquisition date range with the from/to fields.",
+  "tour.investigador.results.title": "Results",
+  "tour.investigador.results.body":
+    "Matching studies appear here. For your role, patient identity is anonymized — you work with de-identified data.",
+  "tour.investigador.open.title": "Open a study",
+  "tour.investigador.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.investigador.export.title": "Export",
+  "tour.investigador.export.body":
+    "Export images or a study package. Downloads for your role are anonymized.",
+  "tour.investigador.zenodo.title": "Zenodo public corpus",
+  "tour.investigador.zenodo.body":
+    "Search Zenodo's public research corpus for openly published datasets.",
+  "tour.investigador.done.title": "You're set",
+  "tour.investigador.done.body":
+    "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
+  "tour.staff.search.title": "Search studies",
+  "tour.staff.search.body":
+    "Find studies by patient, modality or date. As clinical staff you see full patient details.",
+  "tour.staff.results.title": "Results",
+  "tour.staff.results.body":
+    "Matching studies appear here with full patient information.",
+  "tour.staff.open.title": "Open a study",
+  "tour.staff.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.staff.export.title": "Export a study",
+  "tour.staff.export.body":
+    "Export images (PNG) or a full study package (ZIP), with complete metadata.",
+  "tour.staff.uploadTab.title": "Upload studies",
+  "tour.staff.uploadTab.body":
+    "Open the Upload tab to add new studies to the server.",
+  "tour.staff.uploadDrop.title": "Drag & drop",
+  "tour.staff.uploadDrop.body":
+    "Drop DICOM files here to upload them. Each file uploads with its own progress row.",
+  "tour.staff.uploadFolder.title": "Upload a folder",
+  "tour.staff.uploadFolder.body":
+    "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
+  "tour.staff.uploadStatus.title": "Progress & status",
+  "tour.staff.uploadStatus.body":
+    "Track per-file progress and status here as your studies upload.",
+  "tour.staff.zenodoImport.title": "Zenodo datasets",
+  "tour.staff.zenodoImport.body":
+    "Search Zenodo's public corpus and import datasets straight into the server.",
+  "tour.medico.done.title": "You're set",
+  "tour.medico.done.body":
+    "That's your clinical toolkit — search, review, upload, import and export with full metadata. User management, Zenodo publishing/config and the activity log are admin-only. Reopen this tour anytime from the ? button.",
+  "tour.admin.usersTab.title": "User management",
+  "tour.admin.usersTab.body":
+    "Open the Users tab to manage accounts — only administrators see it.",
+  "tour.admin.create.title": "Create a user",
+  "tour.admin.create.body":
+    "Add a user with a name, email and role. An email invitation is sent to them.",
+  "tour.admin.role.title": "Assign roles",
+  "tour.admin.role.body":
+    "Change a user's role here — researcher, clinician or administrator.",
+  "tour.admin.block.title": "Block & enable",
+  "tour.admin.block.body":
+    "Block an account to suspend access, and re-enable it later.",
+  "tour.admin.delete.title": "Delete a user",
+  "tour.admin.delete.body":
+    "Deleting is a soft-delete — the account is removed but the audit history is preserved.",
+  "tour.admin.lastAccess.title": "Last access",
+  "tour.admin.lastAccess.body":
+    "Each user's last login is tracked in this column.",
+  "tour.admin.activity.title": "Activity log",
+  "tour.admin.activity.body":
+    "Open the audit log to review actions across the system, and export it as CSV.",
+  "tour.admin.zenodo.title": "Zenodo administration",
+  "tour.admin.zenodo.body":
+    "Configure Zenodo credentials and sync, review sync logs and quota, and publish studies. Publishing is irreversible and makes data publicly available — check carefully before you publish.",
+  "tour.admin.help.title": "Reopen anytime",
+  "tour.admin.help.body":
+    "That's the full administrator toolkit. Relaunch this tour whenever you like from this ? button.",
+  // ── validation (US-26) ───────────────────────────────────────────────────────
+  "validation.barAriaLabel": "Diagnostic validation",
+  "validation.approve": "Approve",
+  "validation.reject": "Reject",
+  "validation.review": "Flag for review",
+  "validation.correctionNotice":
+    "This will record a correction over the prior validation.",
+  "validation.dialog.title": "Confirm action",
+  "validation.dialog.titleCorrection": "Record correction",
+  "validation.dialog.msg.approved": "Confirm approval of this study?",
+  "validation.dialog.msg.rejected":
+    "Confirm rejection of this study? A comment is required.",
+  "validation.dialog.msg.review": "Flag this study for later review?",
+  "validation.dialog.msg.correctionApproved":
+    "Record a correction approving this study?",
+  "validation.dialog.msg.correctionRejected":
+    "Record a correction rejecting this study? A comment is required.",
+  "validation.dialog.msg.correctionReview":
+    "Record a correction flagging this study for review?",
+  "validation.dialog.commentLabel": "Comment",
+  "validation.dialog.commentRequired": "A comment is required when rejecting.",
+  "validation.dialog.confirm": "Confirm",
+  "validation.status.approved": "Approved",
+  "validation.status.rejected": "Rejected",
+  "validation.status.review": "Flagged for review",
+  "validation.status.none": "Not validated",
+  "validation.toast.success.approved": "Study approved.",
+  "validation.toast.success.rejected": "Study rejected.",
+  "validation.toast.success.review": "Study flagged for review.",
+  "validation.toast.success.correction": "Correction recorded.",
+  "validation.toast.error": "Could not record validation.",
+  "validation.analyzeWithAI": "Analyze with AI",
+  "validation.analyzing": "Analyzing...",
+  "validation.analysisDone": "Analysis complete.",
+  "validation.analysisFailed": "Analysis failed.",
+  "validation.readonlyNotice":
+    "Only an administrator can correct this validation.",
+  "validations.openNeedsML": "AI analysis required to open the study.",
+
+  // ── Validations panel (US-26) ────────────────────────────────────────────────
+  "validations.tab": "Validations",
+  "validations.filtersLabel": "Filter by status",
+  "validations.filterAll": "All",
+  "validations.filterPending": "Unvalidated", // cspell:ignore Unvalidated
+  "validations.filterApproved": "Approved",
+  "validations.filterRejected": "Rejected",
+  "validations.filterReview": "Flagged for review",
+  "validations.colPatient": "Patient",
+  "validations.colModality": "Modality",
+  "validations.colDate": "Date",
+  "validations.colStatus": "Status",
+  "validations.colValidatedBy": "Validated by",
+  "validations.colActions": "Actions",
+  "validations.openInViewer": "Open study",
+  "validations.empty": "No studies match the current filter.",
+  "validations.loadError": "Could not load the study list.",
+  "validations.actionSuccess.approved": "Study approved.",
+  "validations.actionSuccess.rejected": "Study rejected.",
+  "validations.actionSuccess.review": "Study flagged for review.",
+  "validations.rejectDialog.title": "Reject study",
+  "validations.rejectDialog.commentLabel": "Comment (required)",
+  "validations.rejectDialog.confirm": "Reject",
+  "validations.correctionBadge": "correction",
+  "validations.mlDone": "✓ AI analyzed",
+
+  // ── Server Configuration (TK-29) ──────────────────────────────────────────
+  "serverConfig.title": "Server Configuration",
+  "serverConfig.description":
+    "Enter the base URL of the PACS/Orthanc server to query studies, metadata, and DICOM volumes.",
+  "serverConfig.urlLabel": "Server URL",
+  "serverConfig.urlPlaceholder": "http://localhost:3000",
+  "serverConfig.saveAndConnect": "Save / Connect",
+  "serverConfig.saveSuccess": "Configuration saved successfully.",
+  "serverConfig.invalidUrl":
+    "Invalid URL format. Use http:// or https:// (e.g. http://localhost:3000)",
 };

@@ -14,6 +14,7 @@ export interface ViewportState {
   zoom: number;
   panX: number;
   panY: number;
+  layerOpacity?: number;
 }
 
 export interface RenderParams {
@@ -21,6 +22,9 @@ export interface RenderParams {
   pixelData: Int16Array | Uint16Array | Uint8Array;
   metadata: DicomMetadata;
   viewport: ViewportState;
+  overlayPixelData?: Int16Array | Uint16Array | Uint8Array | null;
+  overlayMetadata?: DicomMetadata | null;
+  overlayViewport?: ViewportState | null;
 }
 
 // ── Renderer ─────────────────────────────────────────────────────────────────
@@ -73,12 +77,53 @@ export function renderDicom(params: RenderParams): void {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // Clear and apply transforms
-  const displayCanvas = canvas;
-  const displayCtx = ctx;
+  // Render base image
+  ctx.putImageData(imageData, 0, 0);
 
-  // We render to the canvas at native resolution, then CSS handles display scaling
-  displayCtx.putImageData(imageData, 0, 0);
+  // Render secondary overlay layer if present
+  if (params.overlayPixelData && params.overlayMetadata) {
+    const ovMeta = params.overlayMetadata;
+    const ovCanvas = document.createElement("canvas");
+    ovCanvas.width = ovMeta.columns;
+    ovCanvas.height = ovMeta.rows;
+    const ovCtx = ovCanvas.getContext("2d");
+    if (ovCtx) {
+      const ovImageData = ovCtx.createImageData(ovMeta.columns, ovMeta.rows);
+      const isOvMonochrome1 =
+        ovMeta.photometricInterpretation === "MONOCHROME1";
+      const isOvRgb =
+        ovMeta.photometricInterpretation === "RGB" &&
+        ovMeta.samplesPerPixel === 3;
+
+      if (isOvRgb) {
+        renderRgb(
+          params.overlayPixelData,
+          ovImageData.data,
+          ovMeta.columns,
+          ovMeta.rows,
+        );
+      } else {
+        renderMonochrome(
+          params.overlayPixelData,
+          ovImageData.data,
+          ovMeta.columns,
+          ovMeta.rows,
+          params.overlayViewport?.windowCenter ?? windowCenter,
+          params.overlayViewport?.windowWidth ?? windowWidth,
+          ovMeta.rescaleSlope,
+          ovMeta.rescaleIntercept,
+          isOvMonochrome1,
+        );
+      }
+      ovCtx.putImageData(ovImageData, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha =
+        typeof viewport.layerOpacity === "number" ? viewport.layerOpacity : 0.5;
+      ctx.drawImage(ovCanvas, 0, 0, columns, rows);
+      ctx.restore();
+    }
+  }
 }
 
 // ── Monochrome Rendering ─────────────────────────────────────────────────────

@@ -1,17 +1,19 @@
 import { renderDicom, applyCanvasTransform } from "../dicom/dicom-renderer.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
-import { mpr3DViewer } from "./mpr.js";
+import { view3DViewer, mpr3DViewer } from "./view-3d.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
+import { getViewportManager } from "./viewport-registry.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 export function render(): void {
-  const canvas = $("dicom-canvas") as HTMLCanvasElement;
+  const canvas = (document.getElementById("view-3d-canvas") ||
+    $("dicom-canvas")) as HTMLCanvasElement;
 
-  if (state.is3DMode && mpr3DViewer.isActive) {
+  if (state.is3DMode && view3DViewer.isActive) {
     // 3D Unified Viewport rendering
-    mpr3DViewer.render(canvas);
+    view3DViewer.render(canvas);
 
     // Show and update depth slider and orientation widget
     update3DControls();
@@ -26,8 +28,33 @@ export function render(): void {
     return;
   }
 
+  const manager = getViewportManager();
+  if (manager) {
+    if (state.isMprMode) {
+      manager.getAllViewports().forEach((vp) => vp.render());
+      updateOrientationLabels();
+      return;
+    }
+    // Multi-viewport Grid architecture (1x1, 1x2, 2x2)
+    const activeVp = manager.activeViewport;
+    if (activeVp) {
+      activeVp.data.parsed = state.parsed;
+      activeVp.data.source = state.source;
+      activeVp.data.files = state.files;
+      activeVp.data.serverStudyId = state.serverStudyId;
+      activeVp.data.serverInstances = state.serverInstances;
+      activeVp.data.currentIndex = state.currentIndex;
+      activeVp.data.viewport = state.viewport;
+      activeVp.render();
+    }
+    updateOrientationLabels();
+    return;
+  }
+
+  // Single viewport fallback (legacy)
+  const dicomCanvas = $("dicom-canvas") as HTMLCanvasElement;
   renderDicom({
-    canvas,
+    canvas: dicomCanvas,
     pixelData: state.parsed.pixelData,
     metadata: state.parsed.metadata,
     viewport: state.viewport,
@@ -35,7 +62,7 @@ export function render(): void {
 
   applyCanvasTransform(
     $("viewport-container") as HTMLCanvasElement,
-    canvas,
+    dicomCanvas,
     state.viewport,
   );
 
@@ -68,42 +95,90 @@ export function updateOrientationLabels(): void {
 // ── 3D Controls Update ───────────────────────────────────────────────────────
 
 export function update3DControls(): void {
-  const depthWrap = $("mpr-depth-slider-wrap");
-  const orientWidget = $("mpr-orientation-widget");
-  const refCube = $("mpr-reference-cube");
+  [
+    "view-3d-container",
+    "view-3d-depth-slider-wrap",
+    "mpr-depth-slider-wrap",
+    "view-3d-orientation-widget",
+    "mpr-orientation-widget",
+    "view-3d-reference-cube",
+    "mpr-reference-cube",
+  ].forEach((id) => {
+    $(id)?.classList.remove("hidden");
+  });
 
-  if (depthWrap) depthWrap.classList.remove("hidden");
-  if (orientWidget) orientWidget.classList.remove("hidden");
-  if (refCube) refCube.classList.remove("hidden");
+  const depthInfo = view3DViewer.getDepthInfo();
+  ["view-3d-depth-slider", "mpr-depth-slider"].forEach((id) => {
+    const depthSlider = $(id) as HTMLInputElement | null;
+    if (depthSlider) {
+      depthSlider.min = "0";
+      depthSlider.max = String(Math.max(0, depthInfo.total - 1));
+      depthSlider.value = String(depthInfo.current);
+    }
+  });
 
-  const depthInfo = mpr3DViewer.getDepthInfo();
-  const depthSlider = $("mpr-depth-slider") as HTMLInputElement | null;
-  const depthCounter = $("mpr-depth-counter");
-
-  if (depthSlider) {
-    depthSlider.min = "0";
-    depthSlider.max = String(Math.max(0, depthInfo.total - 1));
-    depthSlider.value = String(depthInfo.current);
-  }
-
-  if (depthCounter) {
-    depthCounter.textContent = t("viewer.mpr.sliceCounter", {
+  const counterText =
+    t("viewer.view3d.sliceCounter", {
+      current: depthInfo.current + 1,
+      total: depthInfo.total,
+    }) ||
+    t("viewer.mpr.sliceCounter", {
       current: depthInfo.current + 1,
       total: depthInfo.total,
     });
-  }
 
-  updateMprButtonState();
+  ["view-3d-depth-counter", "mpr-depth-counter"].forEach((id) => {
+    const depthCounter = $(id);
+    if (depthCounter) {
+      depthCounter.textContent = counterText;
+    }
+  });
+
+  updateView3DButtonState();
+
+  // Update Tri-Planar sliders
+  if (view3DViewer.volume) {
+    ["view-3d-scroll-axial", "mpr-scroll-axial"].forEach((id) => {
+      const scrollAxial = $(id) as HTMLInputElement | null;
+      if (scrollAxial && document.activeElement !== scrollAxial) {
+        scrollAxial.min = "0";
+        scrollAxial.max = String(Math.max(0, view3DViewer.volume!.depth - 1));
+        scrollAxial.value = String(view3DViewer.crosshair.z);
+      }
+    });
+
+    ["view-3d-scroll-coronal", "mpr-scroll-coronal"].forEach((id) => {
+      const scrollCoronal = $(id) as HTMLInputElement | null;
+      if (scrollCoronal && document.activeElement !== scrollCoronal) {
+        scrollCoronal.min = "0";
+        scrollCoronal.max = String(Math.max(0, view3DViewer.volume!.rows - 1));
+        scrollCoronal.value = String(view3DViewer.crosshair.y);
+      }
+    });
+
+    ["view-3d-scroll-sagittal", "mpr-scroll-sagittal"].forEach((id) => {
+      const scrollSagittal = $(id) as HTMLInputElement | null;
+      if (scrollSagittal && document.activeElement !== scrollSagittal) {
+        scrollSagittal.min = "0";
+        scrollSagittal.max = String(Math.max(0, view3DViewer.volume!.cols - 1));
+        scrollSagittal.value = String(view3DViewer.crosshair.x);
+      }
+    });
+  }
 }
 
 export function hide3DControls(): void {
-  const depthWrap = $("mpr-depth-slider-wrap");
-  const orientWidget = $("mpr-orientation-widget");
-  const refCube = $("mpr-reference-cube");
-
-  if (depthWrap) depthWrap.classList.add("hidden");
-  if (orientWidget) orientWidget.classList.add("hidden");
-  if (refCube) refCube.classList.add("hidden");
+  [
+    "view-3d-container",
+    "view-3d-depth-slider-wrap",
+    "mpr-depth-slider-wrap",
+    "view-3d-orientation-widget",
+    "mpr-orientation-widget",
+    "view-3d-reference-cube",
+    "mpr-reference-cube",
+  ].forEach((id) => {
+    $(id)?.classList.add("hidden");
+  });
 }
 
 // ── Series Navigation ────────────────────────────────────────────────────────
@@ -135,27 +210,40 @@ export function updateSeriesNav(): void {
     count,
   });
 
-  updateMprButtonState();
+  updateView3DButtonState();
 }
 
-// ── MPR Button Tooltip / Validation State ─────────────────────────────────────
+// ── 3D View Button Tooltip / Validation State ─────────────────────────────────
 
-export function updateMprButtonState(): void {
-  const mprBtn = $("tool-mpr") as HTMLButtonElement | null;
-  if (!mprBtn) return;
+export function updateView3DButtonState(): void {
+  const buttons = [$("tool-view-3d"), $("tool-mpr")].filter(
+    Boolean,
+  ) as HTMLButtonElement[];
+  if (buttons.length === 0) return;
 
   const count = itemCount();
   if (count <= 1) {
-    mprBtn.disabled = true;
-    mprBtn.title = t("viewer.mpr.notCompatibleSlices");
-    mprBtn.classList.add("disabled");
+    const title =
+      t("viewer.view3d.notCompatibleSlices") ||
+      t("viewer.mpr.notCompatibleSlices");
+    buttons.forEach((btn) => {
+      btn.disabled = true;
+      btn.title = title;
+      btn.classList.add("disabled");
+      btn.classList.remove("active");
+    });
     return;
   }
 
   if (!state.parsed || !state.parsed.metadata) {
-    mprBtn.disabled = true;
-    mprBtn.title = t("viewer.mpr.loadingMetadata");
-    mprBtn.classList.add("disabled");
+    const title =
+      t("viewer.view3d.loadingMetadata") || t("viewer.mpr.loadingMetadata");
+    buttons.forEach((btn) => {
+      btn.disabled = true;
+      btn.title = title;
+      btn.classList.add("disabled");
+      btn.classList.remove("active");
+    });
     return;
   }
 
@@ -166,26 +254,56 @@ export function updateMprButtonState(): void {
     meta.pixelSpacing[0] <= 0 ||
     meta.pixelSpacing[1] <= 0
   ) {
-    mprBtn.disabled = true;
-    mprBtn.title = t("viewer.mpr.notCompatiblePixelSpacing");
-    mprBtn.classList.add("disabled");
+    const title =
+      t("viewer.view3d.notCompatiblePixelSpacing") ||
+      t("viewer.mpr.notCompatiblePixelSpacing");
+    buttons.forEach((btn) => {
+      btn.disabled = true;
+      btn.title = title;
+      btn.classList.add("disabled");
+      btn.classList.remove("active");
+    });
     return;
   }
 
   if (!meta.imagePositionPatient || meta.imagePositionPatient.length < 3) {
-    mprBtn.disabled = true;
-    mprBtn.title = t("viewer.mpr.notCompatibleImagePosition");
-    mprBtn.classList.add("disabled");
+    const title =
+      t("viewer.view3d.notCompatibleImagePosition") ||
+      t("viewer.mpr.notCompatibleImagePosition");
+    buttons.forEach((btn) => {
+      btn.disabled = true;
+      btn.title = title;
+      btn.classList.add("disabled");
+      btn.classList.remove("active");
+    });
     return;
   }
 
-  mprBtn.disabled = false;
-  mprBtn.title = state.is3DMode
-    ? t("viewer.mpr.backTo2D")
-    : t("viewer.mpr.enabledTitle");
-  mprBtn.classList.remove("disabled");
-  mprBtn.classList.toggle("active", state.is3DMode);
+  const btn3D = $("tool-view-3d") as HTMLButtonElement | null;
+  if (btn3D) {
+    btn3D.disabled = false;
+    btn3D.classList.remove("disabled");
+    btn3D.classList.toggle("active", Boolean(state.is3DMode));
+    btn3D.title = state.is3DMode
+      ? t("viewer.view3d.backTo2D") || t("viewer.mpr.backTo2D")
+      : t("viewer.view3d.enabledTitle") || t("viewer.mpr.enabledTitle");
+    btn3D.setAttribute("aria-pressed", String(Boolean(state.is3DMode)));
+  }
+
+  const btnMpr = $("tool-mpr") as HTMLButtonElement | null;
+  if (btnMpr) {
+    btnMpr.disabled = false;
+    btnMpr.classList.remove("disabled");
+    btnMpr.classList.toggle("active", Boolean(state.isMprMode));
+    btnMpr.title = state.isMprMode
+      ? t("viewer.mpr.backTo2D") || t("viewer.view3d.backTo2D")
+      : t("viewer.tool.mprStaticTitle") || t("viewer.mpr.enabledTitle");
+    btnMpr.setAttribute("aria-pressed", String(Boolean(state.isMprMode)));
+  }
 }
+
+// Backwards-compatible alias for existing tests and callers
+export const updateMprButtonState = updateView3DButtonState;
 
 // ── Metadata Panel ───────────────────────────────────────────────────────────
 
@@ -264,20 +382,27 @@ export function updateInfoOverlay(): void {
       .map((part) => escapeHtml(String(part)))
       .join("<br>");
 
-  $("overlay-tl").innerHTML = lines([m.patientName, m.patientId]);
-  $("overlay-tr").innerHTML = lines([
-    m.studyDate,
-    m.modality,
-    m.studyDescription,
-  ]);
-  $("overlay-bl").innerHTML = lines([
-    `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
-    `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
-  ]);
-  $("overlay-br").innerHTML = lines([
-    `${m.columns} × ${m.rows}`,
-    `${m.bitsStored}bit`,
-  ]);
+  const overlayTl = document.getElementById("overlay-tl");
+  const overlayTr = document.getElementById("overlay-tr");
+  const overlayBl = document.getElementById("overlay-bl");
+  const overlayBr = document.getElementById("overlay-br");
+
+  if (overlayTl) overlayTl.innerHTML = lines([m.patientName, m.patientId]);
+  if (overlayTr) {
+    overlayTr.innerHTML = lines([m.studyDate, m.modality, m.studyDescription]);
+  }
+  if (overlayBl) {
+    overlayBl.innerHTML = lines([
+      `W: ${Math.round(state.viewport.windowWidth)} L: ${Math.round(state.viewport.windowCenter)}`,
+      `Zoom: ${(state.viewport.zoom * 100).toFixed(0)}%`,
+    ]);
+  }
+  if (overlayBr) {
+    overlayBr.innerHTML = lines([
+      `${m.columns} × ${m.rows}`,
+      `${m.bitsStored}bit`,
+    ]);
+  }
 
   updateCanvasLabel();
   updateWlControlsUI();

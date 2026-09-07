@@ -121,6 +121,118 @@
               <option value="en" data-i18n="app.locale.en">English</option>
             </select>
           </div>
+          <!-- Guided tour (TK-27): relaunch the walkthrough from any screen. -->
+          <button
+            class="nav-btn"
+            id="btn-help"
+            type="button"
+            data-i18n-attr="aria-label:tour.help.label; title:tour.help.label"
+            aria-label="Guided tour"
+            title="Guided tour"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </button>
+
+          <!-- Grid Layout and Sync Controls -->
+          <div
+            class="topbar-grid-controls"
+            role="group"
+            aria-label="Layout y Sincronización"
+          >
+            <button
+              class="topbar-btn active"
+              id="btn-layout-1x1"
+              title="Vista simple (1x1)"
+              aria-label="Vista simple 1x1"
+              aria-pressed="true"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+              <span>1x1</span>
+            </button>
+            <button
+              class="topbar-btn"
+              id="btn-layout-1x2"
+              title="Vista dividida (1x2)"
+              aria-label="Vista dividida 1x2"
+              aria-pressed="false"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+              <span>1x2</span>
+            </button>
+            <button
+              class="topbar-btn"
+              id="btn-layout-2x2"
+              title="Cuadrícula (2x2)"
+              aria-label="Cuadrícula 2x2"
+              aria-pressed="false"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+              </svg>
+              <span>2x2</span>
+            </button>
+            <button
+              class="topbar-btn btn-sync"
+              id="btn-sync-viewports"
+              title="Sincronizar Visores"
+              aria-label="Sincronizar Visores"
+              aria-pressed="false"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"
+                />
+              </svg>
+              <span>Sync</span>
+            </button>
+          </div>
           <!-- Series navigation -->
           <div class="series-nav hidden" id="series-nav">
             <button
@@ -305,6 +417,31 @@
               </button>
               <button
                 class="toolbar__tool"
+                id="tool-view-3d"
+                data-i18n-attr="title:viewer.tool.view3dStaticTitle"
+                title="Vista 3D"
+                disabled
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                  />
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                  <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+                <span>Vista 3D</span>
+              </button>
+              <button
+                class="toolbar__tool"
                 id="tool-mpr"
                 data-i18n-attr="title:viewer.tool.mprStaticTitle"
                 title="Reconstrucción Multiplanar (MPR)"
@@ -317,13 +454,37 @@
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 >
-                  <rect x="3" y="3" width="8" height="8" rx="1" />
-                  <rect x="13" y="3" width="8" height="8" rx="1" />
-                  <rect x="3" y="13" width="8" height="8" rx="1" />
-                  <rect x="13" y="13" width="8" height="8" rx="1" />
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                  <path d="M10 3v18" stroke-dasharray="2 2" />
+                  <path d="M3 10h18" stroke-dasharray="2 2" />
                 </svg>
                 <span>MPR</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-layers"
+                title="Capas de Superposición"
+                aria-label="Capas"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                </svg>
+                <span>Capas</span>
               </button>
             </div>
 
@@ -558,59 +719,104 @@
           <div class="viewport-wrapper">
             <!-- 3D Unified Depth Slider (Right) -->
             <div
-              class="mpr-depth-slider-wrap hidden"
-              id="mpr-depth-slider-wrap"
+              class="view-3d-depth-slider-wrap mpr-depth-slider-wrap hidden"
+              id="view-3d-depth-slider-wrap"
             >
-              <span class="mpr-depth-counter" id="mpr-depth-counter"
+              <span
+                class="view-3d-depth-counter mpr-depth-counter"
+                id="view-3d-depth-counter"
                 >Corte: 1/1</span
               >
               <input
                 type="range"
-                id="mpr-depth-slider"
-                class="mpr-depth-slider"
+                id="view-3d-depth-slider"
+                class="view-3d-depth-slider mpr-depth-slider"
                 min="0"
                 max="0"
                 value="0"
               />
             </div>
 
-            <!-- 3D Orientation Widget (Bottom-Right) -->
-            <div
-              class="mpr-orientation-widget hidden"
-              id="mpr-orientation-widget"
-            >
-              <div class="mpr-orient-buttons">
-                <button class="btn-orient active" id="btn-view-axial">
+            <div class="viewport-container cursor-wl" id="viewport-container">
+              <!-- 3D Dedicated Container (Isolated overlay) -->
+              <div id="view-3d-container" class="view-3d-container hidden">
+                <canvas id="view-3d-canvas" class="view-3d-canvas"></canvas>
+              </div>
+
+              <!-- Anatomical Reference Cube (3D Gizmo) -->
+              <canvas
+                id="view-3d-reference-cube"
+                class="view-3d-reference-cube hidden"
+                width="120"
+                height="120"
+              ></canvas>
+
+              <!-- 3D Orientation Widget (Bottom-Right) -->
+              <div
+                id="view-3d-orientation-widget"
+                class="view-3d-orientation-widget mpr-orientation-widget"
+              >
+                <button
+                  class="view-3d-btn btn-orient active"
+                  id="btn-view-3d-axial"
+                >
                   Axial
                 </button>
                 <button
-                  class="btn-orient"
-                  id="btn-view-sagittal"
-                  data-i18n="viewer.mpr.sagittal"
+                  class="view-3d-btn btn-orient"
+                  id="btn-view-3d-sagittal"
+                  data-i18n="viewer.view3d.sagittal"
                 >
                   Sagital
                 </button>
-                <button class="btn-orient" id="btn-view-coronal">
+                <button class="view-3d-btn btn-orient" id="btn-view-3d-coronal">
                   Coronal
                 </button>
                 <button
-                  class="btn-orient"
-                  id="btn-view-3d"
-                  data-i18n="viewer.mpr.volumetricView"
+                  class="view-3d-btn btn-orient"
+                  id="btn-view-3d-3d"
+                  data-i18n="viewer.view3d.volumetricView"
                 >
                   Vista Volumétrica
                 </button>
               </div>
-            </div>
 
-            <div class="viewport-container cursor-wl" id="viewport-container">
-              <!-- Anatomical Reference Cube (2D) -->
-              <canvas
-                id="mpr-reference-cube"
-                class="hidden"
-                width="120"
-                height="120"
-              ></canvas>
+              <!-- 3D Tri-Planar Sliders Panel -->
+              <div
+                id="view-3d-sliders-panel"
+                class="view-3d-sliders-panel mpr-sliders-panel"
+              >
+                <div class="view-3d-slider-row mpr-slider-row">
+                  <label for="view-3d-scroll-axial">Axial</label>
+                  <input
+                    type="range"
+                    id="view-3d-scroll-axial"
+                    min="0"
+                    max="0"
+                    value="0"
+                  />
+                </div>
+                <div class="view-3d-slider-row mpr-slider-row">
+                  <label for="view-3d-scroll-coronal">Coronal</label>
+                  <input
+                    type="range"
+                    id="view-3d-scroll-coronal"
+                    min="0"
+                    max="0"
+                    value="0"
+                  />
+                </div>
+                <div class="view-3d-slider-row mpr-slider-row">
+                  <label for="view-3d-scroll-sagittal">Sagital</label>
+                  <input
+                    type="range"
+                    id="view-3d-scroll-sagittal"
+                    min="0"
+                    max="0"
+                    value="0"
+                  />
+                </div>
+              </div>
 
               <!-- role="img" + a label written from the DICOM metadata; this
                  was an unlabelled black box to assistive tech. -->
@@ -620,18 +826,6 @@
                 data-i18n-attr="aria-label:viewer.canvasEmptyLabel"
                 aria-label="Sin imagen cargada"
               ></canvas>
-
-              <!-- 2D Cardinal Orientation Labels -->
-              <div id="mpr-orient-top" class="mpr-orient-label"></div>
-              <div id="mpr-orient-bottom" class="mpr-orient-label"></div>
-              <div id="mpr-orient-left" class="mpr-orient-label"></div>
-              <div id="mpr-orient-right" class="mpr-orient-label"></div>
-
-              <!-- Info overlays (HUD) -->
-              <div class="overlay overlay--tl" id="overlay-tl"></div>
-              <div class="overlay overlay--tr" id="overlay-tr"></div>
-              <div class="overlay overlay--bl" id="overlay-bl"></div>
-              <div class="overlay overlay--br" id="overlay-br"></div>
 
               <!-- Drop zone -->
               <div class="drop-zone" id="drop-zone">
@@ -895,6 +1089,77 @@
               </div>
             </aside>
 
+            <!-- Layers Popover Panel -->
+            <div
+              id="popover-layers"
+              class="toolbar-popover hidden"
+              role="dialog"
+              aria-label="Ajuste de Capas"
+            >
+              <div class="popover-header" data-i18n="viewer.layers.title"></div>
+              <div class="popover-body">
+                <button
+                  id="btn-load-layer"
+                  class="toolbar-btn"
+                  style="width: 100%; margin-bottom: 8px"
+                  data-i18n="viewer.layers.loadBtn"
+                >
+                  Cargar Estudio Superpuesto
+                </button>
+                <input
+                  type="file"
+                  id="input-layer-file"
+                  multiple
+                  accept=".dcm"
+                  hidden
+                />
+                <hr style="border-color: var(--border-color); margin: 8px 0" />
+                <label
+                  class="popover-label"
+                  for="slider-opacity"
+                  data-i18n="viewer.layers.opacity"
+                  >Opacidad</label
+                >
+                <input
+                  type="range"
+                  id="slider-opacity"
+                  class="wl-slider styled-slider"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value="0.5"
+                />
+                <label
+                  class="popover-label"
+                  for="slider-layer-ww"
+                  data-i18n="viewer.layers.ww"
+                  >Ancho de Capa (WW)</label
+                >
+                <input
+                  type="range"
+                  id="slider-layer-ww"
+                  class="wl-slider styled-slider"
+                  min="1"
+                  max="4000"
+                  value="400"
+                />
+                <label
+                  class="popover-label"
+                  for="slider-layer-wl"
+                  data-i18n="viewer.layers.wl"
+                  >Centro de Capa (WL)</label
+                >
+                <input
+                  type="range"
+                  id="slider-layer-wl"
+                  class="wl-slider styled-slider"
+                  min="-1000"
+                  max="1000"
+                  value="40"
+                />
+              </div>
+            </div>
+
             <!-- Metadata panel (slide-out) -->
             <aside class="metadata-panel" id="metadata-panel">
               <div class="metadata-header">
@@ -906,6 +1171,55 @@
                 </table>
               </div>
             </aside>
+
+            <!-- Validation action bar (US-26) — staff-only, server studies -->
+            <div
+              class="validation-bar hidden"
+              id="validation-bar"
+              role="toolbar"
+              data-i18n-attr="aria-label:validation.barAriaLabel"
+              aria-label="Validación de diagnóstico"
+            >
+              <span
+                class="validation-bar__status"
+                id="validation-status-badge"
+              ></span>
+              <p
+                class="validation-bar__correction-notice hidden"
+                id="validation-correction-notice"
+                data-i18n="validation.correctionNotice"
+              >
+                Se registrará una corrección sobre la validación previa.
+              </p>
+              <p
+                class="validation-bar__readonly-notice hidden"
+                id="validation-readonly-notice"
+                data-i18n="validation.readonlyNotice"
+              >
+                Solo el administrador puede corregir esta validación.
+              </p>
+              <button
+                class="btn btn--accent btn--sm"
+                id="btn-validate-approve"
+                data-i18n="validation.approve"
+              >
+                Aprobar
+              </button>
+              <button
+                class="btn btn--danger btn--sm"
+                id="btn-validate-reject"
+                data-i18n="validation.reject"
+              >
+                Rechazar
+              </button>
+              <button
+                class="btn btn--secondary btn--sm"
+                id="btn-validate-review"
+                data-i18n="validation.review"
+              >
+                Marcar para revisión
+              </button>
+            </div>
           </div>
         </main>
 
@@ -1622,6 +1936,18 @@
           >
             Cargar
           </button>
+          <!-- Staff-only (medico + admin): diagnostic validation panel. -->
+          <button
+            class="server-tab hidden"
+            id="tab-validaciones"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-validaciones"
+            tabindex="-1"
+            data-i18n="validations.tab"
+          >
+            Validaciones
+          </button>
           <!-- Admin-only: shown/hidden by server-screen.ts renderForSession(). -->
           <button
             class="server-tab hidden"
@@ -1750,9 +2076,10 @@
           </button>
         </form>
 
-        <!-- Desktop only: nginx already proxies /api and /auth same-origin
-             in the browser build, so there is nothing to configure there. -->
-        <div class="auth-card auth-card--settings hidden" data-desktop-only>
+        <!-- API-origin settings card: shown for all platforms (TK-29).
+             Browser users persist via localStorage; desktop users via the
+             Electron preload bridge. initApiOriginSetting() unhides it. -->
+        <div class="auth-card auth-card--settings hidden">
           <p class="auth-settings__label" aria-hidden="true">
             <svg
               width="12"
@@ -2241,6 +2568,40 @@
       >
         <div class="server-panel__body" id="system-panel-body"></div>
       </div>
+      <!-- Staff-only: diagnostic validation panel (US-26). -->
+      <div
+        class="server-panel hidden"
+        id="panel-validaciones"
+        role="tabpanel"
+        aria-labelledby="tab-validaciones"
+        tabindex="0"
+      >
+        <div class="server-panel__body validations-panel">
+          <div
+            class="validations-filters"
+            role="group"
+            data-i18n-attr="aria-label:validations.filtersLabel"
+            aria-label="Filtrar por estado"
+            data-validations-filters
+          ></div>
+          <div class="validations-table-wrap">
+            <table class="validations-table" data-validations-table>
+              <thead data-validations-thead></thead>
+              <tbody data-validations-tbody></tbody>
+            </table>
+            <p
+              class="validations-empty hidden"
+              data-validations-empty
+              role="status"
+            ></p>
+            <p
+              class="validations-error hidden"
+              data-validations-error
+              role="alert"
+            ></p>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Public accept-invite screen (US-H04), entered from ?invite=<code>. -->
@@ -2526,14 +2887,155 @@
       </form>
     </div>
 
+    <!-- Validation confirmation dialog (US-26) -->
+    <div id="validation-dialog" class="dialog-overlay hidden">
+      <div
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="validation-dialog-title"
+      >
+        <h3
+          class="dialog__title"
+          id="validation-dialog-title"
+          data-i18n="validation.dialog.title"
+        >
+          Confirmar acción
+        </h3>
+        <p class="dialog__msg" id="validation-dialog-msg"></p>
+        <div class="dialog__field">
+          <label
+            for="validation-comment"
+            data-i18n="validation.dialog.commentLabel"
+            >Comentario</label
+          >
+          <textarea
+            id="validation-comment"
+            class="dialog__textarea"
+            rows="3"
+            data-dialog-autofocus
+          ></textarea>
+          <p
+            class="dialog__field-note hidden"
+            id="validation-comment-required"
+            data-i18n="validation.dialog.commentRequired"
+          >
+            El comentario es obligatorio para rechazar.
+          </p>
+        </div>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--secondary"
+            id="validation-dialog-cancel"
+            data-i18n="common.cancel"
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn--accent"
+            id="validation-dialog-confirm"
+            data-i18n="validation.dialog.confirm"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Configuration dialog (TK-29) -->
+    <div id="server-config-dialog" class="dialog-overlay hidden">
+      <form
+        class="dialog server-config-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="server-config-dialog-title"
+        id="server-config-form"
+        novalidate
+      >
+        <div class="server-config-dialog__header">
+          <div class="server-config-dialog__icon" aria-hidden="true">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="2" y="2" width="20" height="8" rx="2" />
+              <rect x="2" y="14" width="20" height="8" rx="2" />
+              <line x1="6" y1="6" x2="6.01" y2="6" />
+              <line x1="6" y1="18" x2="6.01" y2="18" />
+            </svg>
+          </div>
+          <h3
+            class="dialog__title"
+            id="server-config-dialog-title"
+            data-i18n="serverConfig.title"
+          >
+            Configuración del Servidor
+          </h3>
+        </div>
+        <p class="dialog__msg" data-i18n="serverConfig.description">
+          Ingresá la URL base del servidor PACS/Orthanc para consultar estudios,
+          metadatos y volúmenes DICOM.
+        </p>
+        <label class="login-field">
+          <span data-i18n="serverConfig.urlLabel">URL del Servidor</span>
+          <input
+            type="url"
+            id="server-config-url-input"
+            class="server-config-input"
+            data-dialog-autofocus
+            placeholder="http://localhost:3000"
+            data-i18n-attr="placeholder:serverConfig.urlPlaceholder"
+            required
+            autocomplete="url"
+            spellcheck="false"
+          />
+        </label>
+        <p
+          id="server-config-error"
+          class="login-error server-config-error hidden"
+          role="alert"
+        ></p>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--secondary"
+            type="button"
+            id="btn-server-config-cancel"
+            data-i18n="common.cancel"
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn--accent"
+            type="submit"
+            id="btn-server-config-save"
+            data-i18n="serverConfig.saveAndConnect"
+          >
+            Guardar / Conectar
+          </button>
+        </div>
+      </form>
+    </div>
+
     <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
          must run before auth.ts's module-load-time resolveApiOrigin() call.
          `??=` rather than `=`: Electron's preload sets this synchronously
-         before any page script runs, and must win here. -->
+         before any page script runs, and must win here.
+         Browser users may store a custom origin in localStorage (TK-29);
+         that is loaded first so the `??=` fallback does not overwrite it. -->
     <script>
+      if (typeof window.api === "undefined") {
+        var _s =
+          localStorage.getItem("micd_server_url") ||
+          localStorage.getItem("micd_api_origin");
+        if (_s) window.MICD_API_ORIGIN = _s;
+      }
       window.MICD_API_ORIGIN ??= "";
     </script>
     <!-- dicom-parser UMD bundle (loaded before our modules) -->

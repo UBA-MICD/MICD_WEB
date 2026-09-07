@@ -2,8 +2,8 @@ import {
   authFetch,
   ensureAuthenticated,
   isAuthenticated,
-  API_BASE,
 } from "../auth/auth.js";
+import { fetchStudies, serverFetch } from "../services/api.js";
 import { escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
@@ -34,6 +34,9 @@ interface StudyRecord {
   num_instances: number;
   zenodo_doi: string | null;
   zenodo_source_doi: string | null;
+  validation_status?: string | null;
+  validated_by?: string | null;
+  validated_at?: string | null;
 }
 
 interface StudiesResponse {
@@ -394,7 +397,7 @@ export async function loadStudyExplorer(): Promise<void> {
   if (explorerState.zenodoLinked) params.set("zenodo_linked", "true");
 
   try {
-    const res = await authFetch(`${API_BASE}/v1/studies?${params}`);
+    const res = await fetchStudies(params);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: StudiesResponse = await res.json();
 
@@ -507,6 +510,7 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
       <span class="study-item__meta">
         <span class="study-item__badge">${modality}</span>
         ${imgLabel}
+        ${s.validation_status ? `<span class="study-item__validation-badge study-item__validation-badge--${escapeAttr(s.validation_status)}">${escapeHtml(t(`validation.status.${s.validation_status}`))}</span>` : ""}
       </span>
       ${zenodoBadges ? `<span class="study-item__zenodo-badges">${zenodoBadges}</span>` : ""}
     </span>`;
@@ -567,8 +571,8 @@ function loadThumbnails(list: HTMLElement): void {
     .forEach(async (img) => {
       const studyId = img.dataset.thumbId!;
       try {
-        const res = await authFetch(
-          `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/thumbnail`,
+        const res = await serverFetch(
+          `/v1/studies/${encodeURIComponent(studyId)}/thumbnail`,
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();

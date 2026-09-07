@@ -49,6 +49,7 @@ const GLOBAL_KEYS = [
   "matchMedia",
   "ResizeObserver",
   "IntersectionObserver",
+  "CSS",
 ] as const;
 
 /**
@@ -68,7 +69,10 @@ function shimOffsetParent(window: JSDOM["window"]): void {
       while (el) {
         if (el.hidden) return null;
         const style = (el as any).style as CSSStyleDeclaration | undefined;
-        if (style && (style.display === "none" || style.visibility === "hidden")) {
+        if (
+          style &&
+          (style.display === "none" || style.visibility === "hidden")
+        ) {
           return null;
         }
         el = el.parentElement as typeof this | null;

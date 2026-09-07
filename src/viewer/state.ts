@@ -26,6 +26,66 @@ export interface AppState {
   isWlPanelOpen: boolean;
   isZoomPanelOpen: boolean;
   is3DMode: boolean;
+  isMprMode?: boolean;
+  /** Configured base URL for the PACS / Orthanc server (TK-29). */
+  serverUrl: string;
+  /** Validation record for the currently loaded server study, or null if none. */
+  serverValidation: {
+    validationId: number;
+    status: string;
+    validatedBy: string;
+    validatedAt: string;
+  } | null;
+}
+
+export const DEFAULT_SERVER_URL = "http://localhost:3000";
+export const SERVER_URL_STORAGE_KEY = "micd_server_url";
+
+function getStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== "undefined") return localStorage;
+    if (typeof window !== "undefined" && window.localStorage) {
+      return window.localStorage;
+    }
+  } catch {
+    // blocked or security error
+  }
+  return null;
+}
+
+/** Reads the persisted server URL from localStorage or environment fallback. */
+export function getStoredServerUrl(): string {
+  const storage = getStorage();
+  if (storage) {
+    const stored =
+      storage.getItem(SERVER_URL_STORAGE_KEY) ||
+      storage.getItem("micd_api_origin");
+    if (stored && typeof stored === "string" && stored.trim().length > 0) {
+      return stored.trim().replace(/\/+$/, "");
+    }
+  }
+  const globalOrigin = (globalThis as { MICD_API_ORIGIN?: string })
+    .MICD_API_ORIGIN;
+  if (typeof globalOrigin === "string" && globalOrigin.trim().length > 0) {
+    return globalOrigin.trim().replace(/\/+$/, "");
+  }
+  return DEFAULT_SERVER_URL;
+}
+
+/** Persists the server URL to state and localStorage. */
+export function persistServerUrl(url: string): void {
+  const clean = url.trim().replace(/\/+$/, "");
+  state.serverUrl = clean;
+  const storage = getStorage();
+  if (storage) {
+    try {
+      storage.setItem(SERVER_URL_STORAGE_KEY, clean);
+      storage.setItem("micd_api_origin", clean);
+    } catch {
+      // Ignore storage quota or access errors
+    }
+  }
+  (globalThis as { MICD_API_ORIGIN?: string }).MICD_API_ORIGIN = clean;
 }
 
 export const state: AppState = {
@@ -44,6 +104,9 @@ export const state: AppState = {
   isWlPanelOpen: false,
   isZoomPanelOpen: false,
   is3DMode: false,
+  isMprMode: false,
+  serverUrl: getStoredServerUrl(),
+  serverValidation: null,
 };
 
 /** Number of images in the current series, regardless of source. */

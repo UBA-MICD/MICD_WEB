@@ -1,3 +1,4 @@
+exclude: '^(\.claude/|\.github/skills/|\.gemini/)'
 repos:
   # Standard hooks provided by pre-commit
   - repo: https://github.com/pre-commit/pre-commit-hooks

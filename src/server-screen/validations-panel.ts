@@ -211,7 +211,7 @@ export function mountValidationsPanel(
       <td>${escapeHtml(s.validated_by ?? "—")}</td>
       <td>
         <div class="validations-row-actions">
-          ${admin ? mlAnalysisHtml(s.orthanc_study_id, s.has_ml_prediction) : ""}
+          ${mlAnalysisHtml(s.orthanc_study_id, s.has_ml_prediction, admin)}
           ${openButtonHtml(s.orthanc_study_id, s.has_ml_prediction)}
         </div>
       </td>
@@ -219,13 +219,18 @@ export function mountValidationsPanel(
   }
 
   /**
-   * Shows a done badge when the study already has an ML prediction,
+   * Shows a done badge for all staff when the study already has an ML prediction,
    * or a "Solicitar análisis" button (admin only) when it doesn't.
    */
-  function mlAnalysisHtml(studyId: string, hasPrediction: boolean): string {
+  function mlAnalysisHtml(
+    studyId: string,
+    hasPrediction: boolean,
+    admin: boolean,
+  ): string {
     if (hasPrediction) {
       return `<span class="validation-ml-badge validation-ml-badge--done">${escapeHtml(t("validations.mlDone"))}</span>`;
     }
+    if (!admin) return "";
     return `<button class="btn btn--secondary btn--sm" data-action="analyze"
       data-study="${escapeHtml(studyId)}" type="button">
       ${escapeHtml(t("validation.analyzeWithAI"))}

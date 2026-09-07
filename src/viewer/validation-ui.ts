@@ -27,8 +27,10 @@ import {
 // ── Internal state ────────────────────────────────────────────────────────────
 
 let currentStudyId: string | null = null;
-// One-shot flag set by requestValidationMode() before openStudy(); consumed by
-// notifyStudyLoaded() so the bar only appears when the caller explicitly asked.
+// Once requestValidationMode() is ever called, bar visibility is gated by the
+// one-shot pendingValidationBar flag. Before that first call the bar shows for
+// any staff + server study without an explicit request.
+let requestedOnce = false;
 let pendingValidationBar = false;
 let validationBarActive = false;
 
@@ -51,6 +53,7 @@ export function initValidation(): void {
  * The flag is consumed (cleared) by notifyStudyLoaded().
  */
 export function requestValidationMode(): void {
+  requestedOnce = true;
   pendingValidationBar = true;
 }
 
@@ -73,7 +76,7 @@ export function notifyStudyLoaded(
     : null;
   if (studyId === null) {
     validationBarActive = false;
-  } else {
+  } else if (requestedOnce) {
     validationBarActive = pendingValidationBar;
     pendingValidationBar = false;
   }
@@ -87,10 +90,10 @@ function refreshBar(): void {
   if (!bar) return;
 
   const shouldShow =
-    validationBarActive &&
     currentStudyId !== null &&
     state.source === "server" &&
-    isStaff();
+    isStaff() &&
+    (!requestedOnce || validationBarActive);
 
   bar.classList.toggle("hidden", !shouldShow);
 

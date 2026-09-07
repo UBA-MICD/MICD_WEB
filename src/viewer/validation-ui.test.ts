@@ -562,7 +562,7 @@ test("error toast has role=alert for screen reader interruption", async () => {
 
 // ── Tests: requestValidationMode / pendingValidationBar one-shot ──────────────
 
-test("bar is hidden when notifyStudyLoaded is called without requestValidationMode", async () => {
+test("bar is visible when notifyStudyLoaded is called without requestValidationMode (free path)", async () => {
   setupFixture();
   await loginAs("medico");
   state.source = "server";
@@ -570,13 +570,12 @@ test("bar is hidden when notifyStudyLoaded is called without requestValidationMo
 
   const { initValidation, notifyStudyLoaded } = await freshUi();
   initValidation();
-  // No requestValidationMode() — bar must stay hidden
   notifyStudyLoaded("study-001");
 
   const bar = document.getElementById("validation-bar")!;
   assert.ok(
-    bar.classList.contains("hidden"),
-    "bar must be hidden without requestValidationMode",
+    !bar.classList.contains("hidden"),
+    "bar must be visible for staff + server study without requestValidationMode",
   );
 });
 

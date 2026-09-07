@@ -11,10 +11,12 @@
     ".env.*",
     ".git",
     "docs/*",
-    "*.md"
+    "*.md",
+    "src/i18n/locales/es.ts"
   ],
   "words": [
     "micd",
+    "doi",
     "gihub",
     "codecov",
     "kubuntu",
@@ -49,6 +51,25 @@
     "glsl",
     "fflate",
     "anonymization",
-    "buscar"
+    "buscar",
+    "Español",
+    "investigador",
+    "unhides",
+    "usuarios",
+    "Médico",
+    "Estudios",
+    "servidor",
+    "unparseable",
+    "Subir",
+    "carpeta",
+    "Actualizar",
+    "Finalizar",
+    "Reemplazar",
+    "Cancelar",
+    "existe",
+    "Cargar",
+    "Descomprimiendo",
+    "Pérez",
+    "refetches"
   ]
 }

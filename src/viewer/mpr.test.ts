@@ -258,12 +258,16 @@ test("MPR3DViewer renderGizmo draws axes on 2D context", () => {
   const viewer = new MPR3DViewer();
   const mock2dCtx: any = {
     clearRect: () => {},
+    save: () => {},
+    restore: () => {},
     strokeStyle: "",
     lineWidth: 1,
     beginPath: () => {},
     moveTo: () => {},
     lineTo: () => {},
+    rect: () => {},
     stroke: () => {},
+    fill: () => {},
     fillStyle: "",
     fillText: () => {},
   };
@@ -334,6 +338,29 @@ test("updateToolbarUI disables Pan in 3D mode and Crosshair in 2D mode", () => {
   } finally {
     (globalThis as any).document = originalDoc;
   }
+});
+
+test("initGL returns false when the canvas has no WebGL2 context", () => {
+  const viewer = new MPR3DViewer();
+  const noWebglCanvas: any = { getContext: () => null };
+  const result = (viewer as any).initGL(noWebglCanvas);
+  assert.equal(result, false);
+  assert.equal((viewer as any).gl, null);
+});
+
+test("initGL returns true and sets this.gl when WebGL2 is available", () => {
+  const viewer = new MPR3DViewer();
+  const mockCtx = createMockWebGL2Context();
+  const mockCanvas: any = {
+    getContext: (type: string) => (type === "webgl2" ? mockCtx : null),
+    clientWidth: 500,
+    clientHeight: 500,
+    width: 500,
+    height: 500,
+  };
+  const result = (viewer as any).initGL(mockCanvas);
+  assert.equal(result, true);
+  assert.notEqual((viewer as any).gl, null);
 });
 
 test("MPR3DViewer renders cleanly under high zoom levels with dynamic clipping", () => {

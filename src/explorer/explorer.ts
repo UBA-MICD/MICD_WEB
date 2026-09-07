@@ -1,6 +1,12 @@
-import { authFetch, ensureAuthenticated, API_BASE } from "../auth/auth.js";
+import {
+  authFetch,
+  ensureAuthenticated,
+  isAuthenticated,
+  API_BASE,
+} from "../auth/auth.js";
 import { escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
+import { t, onLocaleChange } from "../i18n/i18n.js";
 
 // ── Study Explorer ────────────────────────────────────────────────────────────
 //
@@ -49,6 +55,7 @@ interface ExplorerView {
   chips: HTMLElement | null;
   dateFrom: HTMLInputElement | null;
   dateTo: HTMLInputElement | null;
+  description: HTMLInputElement | null;
   paginationInfo: HTMLElement | null;
   prev: HTMLButtonElement | null;
   next: HTMLButtonElement | null;
@@ -62,6 +69,7 @@ const explorerState = {
   modality: "",
   dateFrom: "",
   dateTo: "",
+  description: "",
   zenodoLinked: false,
 };
 
@@ -138,6 +146,7 @@ function registerView(root: HTMLElement): void {
     chips: q<HTMLElement>(root, "data-explorer-chips"),
     dateFrom: q<HTMLInputElement>(root, "data-explorer-date-from"),
     dateTo: q<HTMLInputElement>(root, "data-explorer-date-to"),
+    description: q<HTMLInputElement>(root, "data-explorer-description"),
     paginationInfo: q<HTMLElement>(root, "data-explorer-pagination-info"),
     prev: q<HTMLButtonElement>(root, "data-explorer-prev"),
     next: q<HTMLButtonElement>(root, "data-explorer-next"),
@@ -204,6 +213,15 @@ function wireView(view: ExplorerView): void {
     applyFilterChange();
   });
 
+  let descTimer: ReturnType<typeof setTimeout>;
+  view.description?.addEventListener("input", () => {
+    clearTimeout(descTimer);
+    descTimer = setTimeout(() => {
+      explorerState.description = view.description!.value.trim();
+      applyFilterChange();
+    }, 400);
+  });
+
   q<HTMLElement>(view.root, "data-explorer-clear")?.addEventListener(
     "click",
     () => {
@@ -211,6 +229,7 @@ function wireView(view: ExplorerView): void {
       explorerState.modality = "";
       explorerState.dateFrom = "";
       explorerState.dateTo = "";
+      explorerState.description = "";
       explorerState.zenodoLinked = false;
       applyFilterChange();
     },
@@ -284,6 +303,7 @@ function syncControls(): void {
     explorerState.modality ||
     explorerState.dateFrom ||
     explorerState.dateTo ||
+    explorerState.description ||
     explorerState.zenodoLinked,
   );
 
@@ -294,6 +314,12 @@ function syncControls(): void {
     view.searchClear?.classList.toggle("hidden", explorerState.search === "");
     if (view.dateFrom) view.dateFrom.value = explorerState.dateFrom;
     if (view.dateTo) view.dateTo.value = explorerState.dateTo;
+    if (
+      view.description &&
+      view.description.value !== explorerState.description
+    ) {
+      view.description.value = explorerState.description;
+    }
     view.clearWrap?.classList.toggle("hidden", !hasFilters);
 
     view.chips
@@ -316,6 +342,14 @@ export function initStudyExplorer(): void {
     .querySelectorAll<HTMLElement>("[data-explorer-view]")
     .forEach(registerView);
   syncControls();
+  // Re-render whichever list is currently on screen when the locale changes —
+  // the rows are HTML strings, not data-i18n markup. Never escalate to a login
+  // prompt just because the language changed: only refetch when a session
+  // already exists, otherwise repaint the logged-out state directly.
+  onLocaleChange(() => {
+    if (isAuthenticated()) void loadStudyExplorer();
+    else renderLoggedOutExplorer();
+  });
 }
 
 /**
@@ -341,12 +375,9 @@ export async function loadStudyExplorer(): Promise<void> {
     return;
   }
 
-  /* cspell:disable */
   views.forEach((v) => {
-    v.list.innerHTML =
-      '<li class="study-item study-item--loading">Cargando estudios…</li>';
+    v.list.innerHTML = `<li class="study-item study-item--loading">${escapeHtml(t("explorer.loadingStudies"))}</li>`;
   });
-  /* cspell:enable */
 
   const params = new URLSearchParams({
     page: String(explorerState.page),
@@ -358,6 +389,8 @@ export async function loadStudyExplorer(): Promise<void> {
   if (explorerState.dateTo)
     params.set("date_to", explorerState.dateTo.replace(/-/g, ""));
   if (explorerState.search) params.set("search", explorerState.search);
+  if (explorerState.description)
+    params.set("description", explorerState.description);
   if (explorerState.zenodoLinked) params.set("zenodo_linked", "true");
 
   try {
@@ -368,17 +401,19 @@ export async function loadStudyExplorer(): Promise<void> {
     explorerState.totalPages = data.totalPages || 1;
     updatePaginationUI(data.page, explorerState.totalPages, data.total);
 
-    // cspell:disable
     if (data.studies.length === 0) {
       const filtered =
         explorerState.search ||
         explorerState.modality ||
         explorerState.dateFrom ||
         explorerState.dateTo ||
+        explorerState.description ||
         explorerState.zenodoLinked;
       views.forEach((v) => {
         v.list.innerHTML = emptyState(
-          `No hay estudios${filtered ? " con esos filtros" : " cargados"}.`,
+          filtered
+            ? t("explorer.noStudiesFiltered")
+            : t("explorer.noStudiesLoaded"),
         );
       });
       setSelected(null);
@@ -400,8 +435,7 @@ export async function loadStudyExplorer(): Promise<void> {
     }
   } catch {
     views.forEach((v) => {
-      v.list.innerHTML =
-        '<li class="study-item study-item--error">Error al cargar estudios.</li>';
+      v.list.innerHTML = `<li class="study-item study-item--error">${escapeHtml(t("explorer.loadError"))}</li>`;
     });
     explorerState.page = 1;
     explorerState.totalPages = 1;
@@ -422,14 +456,19 @@ function zenodoRecordUrl(doi: string): string {
 function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
   const id = escapeAttr(s.orthanc_study_id);
   const modality = escapeHtml(s.modality || "?");
-  const name = escapeHtml(s.patient_name || "Paciente desconocido");
+  const name = escapeHtml(s.patient_name || t("explorer.unknownPatient"));
   const date = formatDate(s.study_date);
   const desc = escapeHtml(s.study_description || "—");
   const count = Number(s.num_instances);
-  const imgLabel = count === 1 ? "1 imagen" : `${count} imágenes`;
+  const imgLabel =
+    count === 1
+      ? t("explorer.imageCountSingular")
+      : t("explorer.imageCountPlural", { count });
 
   const isNew = newStudyIds.has(s.orthanc_study_id);
-  const newBadge = isNew ? '<span class="study-item__new">Nuevo</span>' : "";
+  const newBadge = isNew
+    ? `<span class="study-item__new">${escapeHtml(t("explorer.newBadge"))}</span>`
+    : "";
 
   function doiShort(doi: string): string {
     const suffix = doi.split("/").pop() ?? doi;
@@ -442,16 +481,16 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
            href="${escapeAttr(zenodoRecordUrl(s.zenodo_doi))}"
            target="_blank" rel="noopener noreferrer"
            title="${escapeAttr(s.zenodo_doi)}"
-           aria-label="Publicado en Zenodo — ${escapeAttr(s.zenodo_doi)}"
-           onclick="event.stopPropagation()">📤 Zenodo · ${escapeHtml(doiShort(s.zenodo_doi))}</a>`
+           aria-label="${escapeAttr(t("explorer.publishedOnZenodo", { doi: s.zenodo_doi }))}"
+           onclick="event.stopPropagation()">📤 ${escapeHtml(t("explorer.zenodoBadge", { doi: doiShort(s.zenodo_doi) }))}</a>`
       : "",
     s.zenodo_source_doi
       ? `<a class="study-item__zenodo-badge study-item__zenodo-badge--imported"
            href="${escapeAttr(zenodoRecordUrl(s.zenodo_source_doi))}"
            target="_blank" rel="noopener noreferrer"
            title="${escapeAttr(s.zenodo_source_doi)}"
-           aria-label="Importado de Zenodo — ${escapeAttr(s.zenodo_source_doi)}"
-           onclick="event.stopPropagation()">📥 Importado · ${escapeHtml(doiShort(s.zenodo_source_doi))}</a>`
+           aria-label="${escapeAttr(t("explorer.importedFromZenodo", { doi: s.zenodo_source_doi }))}"
+           onclick="event.stopPropagation()">📥 ${escapeHtml(t("explorer.importedBadge", { doi: doiShort(s.zenodo_source_doi) }))}</a>`
       : "",
   ]
     .filter(Boolean)
@@ -474,9 +513,10 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
 
   // In the listbox each <li> IS the option; in the panel each row is a button,
   // because there a click acts immediately rather than selecting.
+  const hasZenodo = s.zenodo_doi || s.zenodo_source_doi ? "true" : "false";
   return mode === "select"
-    ? `<li class="study-item" role="option" data-id="${id}" aria-selected="false" tabindex="-1">${body}</li>`
-    : `<li><button type="button" class="study-item" data-id="${id}">${body}</button></li>`;
+    ? `<li class="study-item" role="option" data-id="${id}" data-has-zenodo="${hasZenodo}" aria-selected="false" tabindex="-1">${body}</li>`
+    : `<li><button type="button" class="study-item" data-id="${id}" data-has-zenodo="${hasZenodo}">${body}</button></li>`;
 }
 
 function emptyState(message: string): string {
@@ -503,15 +543,14 @@ export function renderLoggedOutExplorer(): void {
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
           <p>
-            Iniciá sesión para ver los estudios del servidor.<br />
-            Abrir archivos locales no requiere sesión.
+            ${escapeHtml(t("explorer.loggedOutHintLine1"))}<br />
+            ${escapeHtml(t("explorer.loggedOutHintLine2"))}
           </p>
-          <button class="btn btn--accent" data-explorer-login>Iniciar sesión</button>
+          <button class="btn btn--accent" data-explorer-login>${escapeHtml(t("auth.login"))}</button>
         </div>
       </li>`;
   });
 }
-// cspell:enable
 
 let thumbUrls: string[] = [];
 

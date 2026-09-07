@@ -11,6 +11,7 @@ import { showBanner } from "../shared/banner.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { state } from "../viewer/state.js";
 import { dicomCache } from "../viewer/cache.js";
+import { t } from "../i18n/i18n.js";
 
 export interface StudyExportMetadata {
   studyDate?: string;
@@ -67,9 +68,22 @@ export function generateDescriptiveFilename(
 }
 
 /**
- * Downloads a Blob using an invisible <a> link.
+ * Saves a Blob: the native save dialog under Electron, an invisible <a> link
+ * in the browser.
+ *
+ * Returns whether a file was actually written. The browser path always
+ * reports `true` — `<a download>` cannot fail or be declined from here — but
+ * the desktop path returns `false` when the user dismisses the save dialog,
+ * and callers must not announce success without checking. Rejects if the
+ * write itself fails.
  */
-export function downloadBlob(blob: Blob, filename: string): void {
+export async function downloadBlob(
+  blob: Blob,
+  filename: string,
+): Promise<boolean> {
+  if (typeof window !== "undefined" && window.api?.saveFile) {
+    return await window.api.saveFile(filename, await blob.arrayBuffer());
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -78,6 +92,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return true;
 }
 
 /**
@@ -93,10 +108,7 @@ export async function exportCurrentViewToPNG(
       : canvasTarget;
 
   if (!canvas) {
-    showBanner(
-      "No se encontró el canvas de renderizado para exportar PNG.",
-      "error",
-    );
+    showBanner(t("export.canvasNotFound"), "error");
     return;
   }
 
@@ -112,28 +124,43 @@ export async function exportCurrentViewToPNG(
       "png",
     );
 
-  showBanner("Exportando imagen actual a PNG…", "warning");
+  showBanner(t("export.exportingPng"), "warning");
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
+    // The callback is async, so anything thrown inside it lands nowhere —
+    // this promise would simply never settle. Everything after toBlob() is
+    // wrapped so a failed save rejects the caller instead.
+    canvas.toBlob(async (blob) => {
       if (!blob) {
-        showBanner("Error al generar imagen PNG desde el canvas.", "error");
+        showBanner(t("export.canvasBlobError"), "error");
         reject(new Error("Canvas toBlob failed"));
         return;
       }
-      downloadBlob(blob, filename);
-      showBanner("Imagen PNG descargada con éxito.", "success");
-      resolve();
+      try {
+        const saved = await downloadBlob(blob, filename);
+        showBanner(
+          saved ? t("export.pngSuccess") : t("export.saveCanceled"),
+          saved ? "success" : "warning",
+        );
+        resolve();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        showBanner(t("export.genericError", { message }), "error");
+        reject(err instanceof Error ? err : new Error(message));
+      }
     }, "image/png");
   });
 }
 
 /**
- * Packages multiple files into a single .zip file using fflate and triggers download.
+ * Packages multiple files into a single .zip Blob using fflate.
+ *
+ * Building the archive and saving it are separate steps on purpose: saving is
+ * async and can be declined (see `downloadBlob`), so the caller owns it and
+ * reports the outcome.
  */
-export function exportStudyToZip(
+export function buildStudyZip(
   files: Array<{ name: string; buffer: ArrayBuffer }>,
-  zipFilename: string,
 ): Blob {
   const zipData: Record<string, Uint8Array> = {};
 
@@ -142,9 +169,7 @@ export function exportStudyToZip(
   });
 
   const compressed = zipSync(zipData, { level: 6 });
-  const blob = new Blob([compressed], { type: "application/zip" });
-  downloadBlob(blob, zipFilename);
-  return blob;
+  return new Blob([compressed], { type: "application/zip" });
 }
 
 /**
@@ -154,7 +179,7 @@ export async function exportCurrentStudyAsZip(
   opts: { anonymize?: boolean } = {},
 ): Promise<void> {
   const anonymize = opts.anonymize !== false;
-  showBanner("Preparando exportación de estudio .zip…", "warning");
+  showBanner(t("export.preparingZip"), "warning");
 
   try {
     const filesToZip: Array<{ name: string; buffer: ArrayBuffer }> = [];
@@ -165,11 +190,11 @@ export async function exportCurrentStudyAsZip(
       const instances = state.serverInstances;
 
       if (instances.length === 0) {
-        throw new Error("El estudio no contiene imágenes.");
+        throw new Error(t("export.noImagesInStudy"));
       }
 
       showBanner(
-        `Descargando ${instances.length} imágenes del servidor…`,
+        t("export.downloadingServerImages", { count: instances.length }),
         "warning",
       );
 
@@ -185,7 +210,10 @@ export async function exportCurrentStudyAsZip(
           const res = await authFetch(
             `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instanceId)}/file`,
           );
-          if (!res.ok) throw new Error(`Error descargando instancia ${i + 1}`);
+          if (!res.ok)
+            throw new Error(
+              t("export.instanceDownloadError", { index: i + 1 }),
+            );
           buf = await res.arrayBuffer();
         }
 
@@ -228,18 +256,23 @@ export async function exportCurrentStudyAsZip(
         };
       }
     } else {
-      throw new Error("No hay ningún estudio cargado para exportar.");
+      throw new Error(t("export.noStudyLoaded"));
     }
 
     const zipFilename = generateDescriptiveFilename(meta, "zip");
-    exportStudyToZip(filesToZip, zipFilename);
+    const saved = await downloadBlob(buildStudyZip(filesToZip), zipFilename);
     showBanner(
-      `Estudio exportado exitosamente como '${zipFilename}'.`,
-      "success",
+      saved
+        ? t("export.zipSuccess", { filename: zipFilename })
+        : t("export.saveCanceled"),
+      saved ? "success" : "warning",
     );
   } catch (err: any) {
     console.error("Export Error:", err);
-    showBanner(`Error al exportar estudio: ${err.message || err}`, "error");
+    showBanner(
+      t("export.genericError", { message: err.message || err }),
+      "error",
+    );
   }
 }
 
@@ -252,7 +285,7 @@ export async function exportStudyByIdAsZip(
   opts: { anonymize?: boolean } = {},
 ): Promise<void> {
   const anonymize = opts.anonymize !== false;
-  showBanner("Obteniendo información del estudio en el servidor…", "warning");
+  showBanner(t("export.fetchingStudyInfo"), "warning");
 
   try {
     const res = await authFetch(
@@ -265,11 +298,11 @@ export async function exportStudyByIdAsZip(
     const instanceIds = data.instances.map((x) => x.instanceId);
 
     if (instanceIds.length === 0) {
-      throw new Error("El estudio seleccionado no contiene instancias.");
+      throw new Error(t("export.noInstancesInStudy"));
     }
 
     showBanner(
-      `Descargando ${instanceIds.length} archivos DICOM del estudio…`,
+      t("export.downloadingFiles", { count: instanceIds.length }),
       "warning",
     );
     const filesToZip: Array<{ name: string; buffer: ArrayBuffer }> = [];
@@ -279,7 +312,8 @@ export async function exportStudyByIdAsZip(
       const fRes = await authFetch(
         `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/instances/${encodeURIComponent(instId)}/file`,
       );
-      if (!fRes.ok) throw new Error(`Error recuperando archivo ${i + 1}`);
+      if (!fRes.ok)
+        throw new Error(t("export.fileFetchError", { index: i + 1 }));
       let buf = await fRes.arrayBuffer();
 
       if (anonymize) {
@@ -291,13 +325,18 @@ export async function exportStudyByIdAsZip(
     }
 
     const zipFilename = generateDescriptiveFilename(studyMeta, "zip");
-    exportStudyToZip(filesToZip, zipFilename);
+    const saved = await downloadBlob(buildStudyZip(filesToZip), zipFilename);
     showBanner(
-      `Estudio exportado exitosamente como '${zipFilename}'.`,
-      "success",
+      saved
+        ? t("export.zipSuccess", { filename: zipFilename })
+        : t("export.saveCanceled"),
+      saved ? "success" : "warning",
     );
   } catch (err: any) {
     console.error("Export study by ID error:", err);
-    showBanner(`Error al exportar estudio: ${err.message || err}`, "error");
+    showBanner(
+      t("export.genericError", { message: err.message || err }),
+      "error",
+    );
   }
 }

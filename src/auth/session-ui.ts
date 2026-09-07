@@ -1,5 +1,6 @@
 import {
   isAuthenticated,
+  isAdmin,
   getCurrentUser,
   getSessionExpiresAt,
   authFetch,
@@ -7,6 +8,7 @@ import {
 } from "./auth.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { openDialog, closeDialog } from "../shared/dialog.js";
+import { t } from "../i18n/i18n.js";
 
 // ── Session UI (sidebar + panel footer) ──────────────────────────────────────
 //
@@ -40,29 +42,30 @@ function formatRemaining(ms: number): string {
  */
 function tick(): void {
   const expiresAt = getSessionExpiresAt();
-  // cspell:disable
   if (!isAuthenticated() || expiresAt === null) {
-    $("session-expiry").textContent = "Sesión activa";
+    $("session-expiry").textContent = t("auth.sessionActive");
     return;
   }
 
   const remaining = expiresAt - Date.now();
   if (remaining <= 0) {
-    $("session-expiry").textContent = "Sesión expirada";
-    $("explorer-session-line").textContent =
-      "Sesión expirada · la próxima acción pedirá iniciar sesión";
-    announceOnce("Tu sesión expiró. La próxima acción pedirá iniciar sesión.");
+    $("session-expiry").textContent = t("auth.sessionExpired");
+    $("explorer-session-line").textContent = t(
+      "auth.explorerSessionExpiredLine",
+    );
+    announceOnce(t("auth.announceExpired"));
     return;
   }
 
   const left = formatRemaining(remaining);
-  $("session-expiry").textContent = `Expira en ${left}`;
-  $("explorer-session-line").textContent = `Sesión activa · expira en ${left}`;
+  $("session-expiry").textContent = t("auth.expiresIn", { time: left });
+  $("explorer-session-line").textContent = t("auth.explorerActiveLine", {
+    time: left,
+  });
 
   if (remaining <= 60_000) {
-    announceOnce("Tu sesión expira en menos de un minuto.");
+    announceOnce(t("auth.announceExpiringSoon"));
   }
-  // cspell:enable
 }
 
 function announceOnce(message: string): void {
@@ -96,19 +99,19 @@ export function updateAuthUI(): void {
 
   $("btn-login").classList.toggle("hidden", authed);
   $("session-block").classList.toggle("hidden", !authed);
-  $("btn-activity").classList.toggle("hidden", !authed);
+  // The activity log is admin-only server-side; a non-admin who opened it only
+  // ever got a load error, so the button shows for admins alone.
+  $("btn-activity").classList.toggle("hidden", !(authed && isAdmin()));
 
   if (!authed) {
     stopTicking();
     // The panel footer states the rule in words, so a guest can see why the
     // list is empty without having to click anything.
-    // cspell:disable-next-line
-    $("explorer-session-line").textContent = "Sin sesión · solo lectura local";
+    $("explorer-session-line").textContent = t("auth.noSessionReadOnly");
     return;
   }
 
-  // cspell:disable-next-line
-  $("session-email").textContent = email || "Sesión activa";
+  $("session-email").textContent = email || t("auth.sessionActive");
   $("session-email").title = email;
   $("session-avatar").textContent = email ? initials(email) : "··";
   startTicking();
@@ -135,16 +138,15 @@ function message(text: string): string {
   return `<p class="activity-empty">${escapeHtml(text)}</p>`;
 }
 
-// cspell:disable
 async function loadActivity(): Promise<void> {
   const body = $("activity-body");
-  body.innerHTML = message("Cargando…");
+  body.innerHTML = message(t("auth.activity.loading"));
 
   let res: Response;
   try {
     res = await authFetch(`${API_BASE}/v1/activity?limit=50`);
   } catch {
-    body.innerHTML = message("No se pudo conectar con el servidor.");
+    body.innerHTML = message(t("auth.error.networkError"));
     return;
   }
 
@@ -152,13 +154,11 @@ async function loadActivity(): Promise<void> {
   // but exposes no reader, and currently records only Zenodo actions. Saying
   // so is better than an empty list, which would read as "you did nothing".
   if (res.status === 404) {
-    body.innerHTML = message(
-      "Historial no disponible todavía en este servidor.",
-    );
+    body.innerHTML = message(t("auth.activity.notAvailable"));
     return;
   }
   if (!res.ok) {
-    body.innerHTML = message("No se pudo cargar el historial.");
+    body.innerHTML = message(t("auth.activity.loadError"));
     return;
   }
 
@@ -166,7 +166,7 @@ async function loadActivity(): Promise<void> {
     const data = (await res.json()) as { entries?: ActivityEntry[] };
     const entries = data.entries ?? [];
     if (entries.length === 0) {
-      body.innerHTML = message("Sin actividad registrada.");
+      body.innerHTML = message(t("auth.activity.empty"));
       return;
     }
     body.innerHTML = `<ul class="activity-list">${entries
@@ -181,7 +181,6 @@ async function loadActivity(): Promise<void> {
       )
       .join("")}</ul>`;
   } catch {
-    body.innerHTML = message("Respuesta inesperada del servidor.");
+    body.innerHTML = message(t("auth.activity.unexpectedResponse"));
   }
 }
-// cspell:enable

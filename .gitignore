@@ -16,6 +16,7 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+!.env.staging.example
 
 # ── OS generated files ────────────────────────────────────────────────────────
 .DS_Store
@@ -37,3 +38,6 @@ docker-compose.override.yml
 # ── Coverage / Temp ───────────────────────────────────────────────────────────
 coverage/
 dist-test/
+
+# ── Generated vendor assets (built from node_modules, see Dockerfile) ─────────
+src/vendor/fflate.js

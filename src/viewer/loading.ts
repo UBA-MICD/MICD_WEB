@@ -21,7 +21,7 @@ import {
 } from "./rendering.js";
 import { updateToolbarUI } from "./interaction.js";
 import { t } from "../i18n/i18n.js";
-import { notifyStudyLoaded } from "./validation-ui.js";
+import { notifyStudyLoaded, isValidationBarActive } from "./validation-ui.js";
 import { fetchValidation } from "./validation-api.js";
 import { fetchPrediction } from "./prediction-api.js";
 import { notifyPredictionLoaded, clearMLView } from "./ml-view.js";
@@ -278,7 +278,11 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
       studyId,
       validationResult.ok ? validationResult.data : null,
     );
-    notifyPredictionLoaded(predictionResult.ok ? predictionResult.data : null);
+    // Only apply 1x2 ML layout when opened from the validations panel.
+    notifyPredictionLoaded(
+      predictionResult.ok ? predictionResult.data : null,
+      isValidationBarActive(),
+    );
   } catch (err: any) {
     showError(
       t("viewer.serverStudyLoadError", { message: err.message || err }),
@@ -303,6 +307,12 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
   if (vp) {
     // ── Multi-viewport path ───────────────────────────────────────────────
     vp.data.parsed = parsed;
+    // Keep server-study fields in sync so ml-view can mirror them to vp1.
+    vp.data.source = state.source;
+    vp.data.serverStudyId = state.serverStudyId;
+    vp.data.serverInstances = state.serverInstances;
+    vp.data.files = state.files;
+    vp.data.currentIndex = state.currentIndex;
 
     // Preserve the user's W/L adjustments across slice navigations; only
     // initialize from metadata (or auto) when the viewport is fresh (zoom=0).

@@ -1,21 +1,8 @@
 // ── Validations panel (US-26) ─────────────────────────────────────────────────
-// cspell:ignore Validaciones estudio
-//
-// Standalone "Panel de Validaciones" for the server screen tab.
-// Lets staff (medico + admin) browse studies by validation status and record
-// validations inline, without going through the DICOM viewer.
-//
-// Intentionally isolated: no imports from viewer/ or server-screen internals.
-// Navigation back to the viewer is delegated via the `onOpenStudy` callback so
-// there is no circular dependency with server-screen.ts.
+// cspell:ignore Validaciones estudio Solicitar análisis
 
 import { authFetch, API_BASE, isAdmin } from "../auth/auth.js";
-import {
-  submitValidation,
-  submitCorrection,
-  type ValidationAction,
-} from "../viewer/validation-api.js";
-import { openDialog, closeDialog } from "../shared/dialog.js";
+import { triggerAnalysis } from "../viewer/prediction-api.js";
 import { escapeHtml } from "../shared/dom.js";
 import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
@@ -32,6 +19,7 @@ interface StudyRow {
   validation_status: "approved" | "rejected" | "review" | null;
   validated_by: string | null;
   validated_at: string | null;
+  has_ml_prediction: boolean;
 }
 
 export interface ValidationsPanelHandle {
@@ -93,105 +81,6 @@ export function formatDate(iso: string | null): string {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  });
-}
-
-// ── Reject dialog ─────────────────────────────────────────────────────────────
-//
-// Built on demand (once) and reused. Mirrors the structure the existing
-// validation-ui dialogs use so the same CSS rules apply.
-
-let rejectDialogEl: HTMLElement | null = null;
-
-function getRejectDialog(): HTMLElement {
-  if (rejectDialogEl) return rejectDialogEl;
-
-  const overlay = document.createElement("div");
-  overlay.className = "dialog-overlay hidden";
-  overlay.id = "validations-reject-dialog";
-  overlay.innerHTML = `
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="vrd-title">
-      <h2 class="dialog__title" id="vrd-title"></h2>
-      <div class="dialog__body">
-        <label class="dialog__label" id="vrd-comment-label" for="vrd-comment"></label>
-        <textarea
-          id="vrd-comment"
-          class="dialog__textarea"
-          rows="3"
-          data-dialog-autofocus
-          aria-labelledby="vrd-comment-label"
-        ></textarea>
-        <p class="dialog__error hidden" id="vrd-error" role="alert"></p>
-      </div>
-      <div class="dialog__actions">
-        <button class="btn btn--secondary btn--sm" id="vrd-cancel"></button>
-        <button class="btn btn--danger btn--sm" id="vrd-confirm"></button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  rejectDialogEl = overlay;
-  return overlay;
-}
-
-/**
- * Opens the reject dialog, pre-fills i18n labels, and returns a promise that
- * resolves with the entered comment (trimmed) or null if the user cancelled.
- */
-function promptRejectComment(opener: HTMLElement): Promise<string | null> {
-  return new Promise<string | null>((resolve) => {
-    const overlay = getRejectDialog();
-    const title = overlay.querySelector<HTMLElement>("#vrd-title")!;
-    const commentLabel =
-      overlay.querySelector<HTMLElement>("#vrd-comment-label")!;
-    const textarea =
-      overlay.querySelector<HTMLTextAreaElement>("#vrd-comment")!;
-    const errorEl = overlay.querySelector<HTMLElement>("#vrd-error")!;
-    const cancelBtn = overlay.querySelector<HTMLButtonElement>("#vrd-cancel")!;
-    const confirmBtn =
-      overlay.querySelector<HTMLButtonElement>("#vrd-confirm")!;
-
-    title.textContent = t("validations.rejectDialog.title");
-    commentLabel.textContent = t("validations.rejectDialog.commentLabel");
-    cancelBtn.textContent = t("common.cancel");
-    confirmBtn.textContent = t("validations.rejectDialog.confirm");
-    textarea.value = "";
-    errorEl.textContent = "";
-    errorEl.classList.add("hidden");
-
-    const handleClose = (): void => {
-      cancelBtn.removeEventListener("click", handleCancel);
-      confirmBtn.removeEventListener("click", handleConfirm);
-      overlay.removeEventListener("dialog:close", handleClose);
-    };
-
-    const handleCancel = (): void => {
-      closeDialog(overlay);
-      handleClose();
-      resolve(null);
-    };
-
-    const handleConfirm = (): void => {
-      const comment = textarea.value.trim();
-      if (!comment) {
-        errorEl.textContent = t("validation.dialog.commentRequired");
-        errorEl.classList.remove("hidden");
-        textarea.focus();
-        return;
-      }
-      closeDialog(overlay);
-      handleClose();
-      resolve(comment);
-    };
-
-    overlay.addEventListener("dialog:close", () => {
-      handleClose();
-      resolve(null);
-    });
-
-    cancelBtn.addEventListener("click", handleCancel);
-    confirmBtn.addEventListener("click", handleConfirm);
-
-    openDialog(overlay, opener);
   });
 }
 
@@ -314,7 +203,6 @@ export function mountValidationsPanel(
 
   function rowHtml(s: StudyRow): string {
     const admin = isAdmin();
-    const canCorrect = admin && s.validation_status !== null;
     return `<tr data-study-id="${escapeHtml(s.orthanc_study_id)}">
       <td>${escapeHtml(s.patient_name ?? "—")}</td>
       <td>${escapeHtml(s.modality ?? "—")}</td>
@@ -323,33 +211,36 @@ export function mountValidationsPanel(
       <td>${escapeHtml(s.validated_by ?? "—")}</td>
       <td>
         <div class="validations-row-actions">
-          ${actionButtonsHtml(s.orthanc_study_id, canCorrect)}
-          <button class="btn btn--secondary btn--sm" data-action="open"
-            data-study="${escapeHtml(s.orthanc_study_id)}"
-            type="button">
-            ${escapeHtml(t("validations.openInViewer"))}
-          </button>
+          ${admin ? mlAnalysisHtml(s.orthanc_study_id, s.has_ml_prediction) : ""}
+          ${openButtonHtml(s.orthanc_study_id, s.has_ml_prediction)}
         </div>
       </td>
     </tr>`;
   }
 
-  function actionButtonsHtml(studyId: string, isCorrection: boolean): string {
-    const esc = escapeHtml(studyId);
-    const corrAttr = isCorrection ? ` data-correction="true"` : "";
-    return `
-      <button class="btn btn--accent btn--sm" data-action="approve"
-        data-study="${esc}"${corrAttr} type="button">
-        ${escapeHtml(t("validation.approve"))}
-      </button>
-      <button class="btn btn--danger btn--sm" data-action="reject"
-        data-study="${esc}"${corrAttr} type="button">
-        ${escapeHtml(t("validation.reject"))}
-      </button>
-      <button class="btn btn--secondary btn--sm" data-action="review"
-        data-study="${esc}"${corrAttr} type="button">
-        ${escapeHtml(t("validation.review"))}
-      </button>`;
+  /**
+   * Shows a done badge when the study already has an ML prediction,
+   * or a "Solicitar análisis" button (admin only) when it doesn't.
+   */
+  function mlAnalysisHtml(studyId: string, hasPrediction: boolean): string {
+    if (hasPrediction) {
+      return `<span class="validation-ml-badge validation-ml-badge--done">${escapeHtml(t("validations.mlDone"))}</span>`;
+    }
+    return `<button class="btn btn--secondary btn--sm" data-action="analyze"
+      data-study="${escapeHtml(studyId)}" type="button">
+      ${escapeHtml(t("validation.analyzeWithAI"))}
+    </button>`;
+  }
+
+  function openButtonHtml(studyId: string, hasPrediction: boolean): string {
+    // data-needs-ml signals the click handler to show a toast instead of opening.
+    const needsAttr = hasPrediction ? "" : ` data-needs-ml="true"`;
+    const dimClass = hasPrediction ? "" : " btn--dim";
+    return `<button class="btn btn--secondary btn--sm${dimClass}" data-action="open"
+      data-study="${escapeHtml(studyId)}"
+      type="button"${needsAttr}>
+      ${escapeHtml(t("validations.openInViewer"))}
+    </button>`;
   }
 
   // ── Action dispatch ─────────────────────────────────────────────────────────
@@ -359,102 +250,64 @@ export function mountValidationsPanel(
     if (!btn) return;
     const action = btn.dataset.action!;
     const studyId = btn.dataset.study!;
-    const isCorrection = btn.dataset.correction === "true";
 
     if (action === "open") {
+      if (btn.dataset.needsMl === "true") {
+        showToast(t("validations.openNeedsML"), "error");
+        return;
+      }
       onOpenStudy(studyId);
       return;
     }
 
-    void dispatchValidation(
-      studyId,
-      action as "approve" | "reject" | "review",
-      isCorrection,
-      btn,
-    );
+    if (action === "analyze") {
+      void analyzeStudy(studyId, btn as HTMLButtonElement);
+      return;
+    }
   });
 
-  async function dispatchValidation(
+  async function analyzeStudy(
     studyId: string,
-    action: "approve" | "reject" | "review",
-    isCorrection: boolean,
-    opener: HTMLElement,
+    btn: HTMLButtonElement,
   ): Promise<void> {
-    const validationAction: ValidationAction =
-      action === "approve"
-        ? "approved"
-        : action === "reject"
-          ? "rejected"
-          : "review";
+    btn.disabled = true;
+    btn.textContent = t("validation.analyzing");
 
-    let comment: string | undefined;
-    if (action === "reject") {
-      const entered = await promptRejectComment(opener);
-      if (entered === null) return; // user cancelled
-      comment = entered;
-    }
+    try {
+      const result = await triggerAnalysis(studyId);
+      if (!result.ok) {
+        showToast(result.error, "error");
+        return;
+      }
+      showToast(t("validation.analysisDone"), "success");
 
-    const submit = isCorrection ? submitCorrection : submitValidation;
-    const result = await submit(studyId, validationAction, comment);
+      const rec = studies.find((s) => s.orthanc_study_id === studyId);
+      if (rec) rec.has_ml_prediction = true;
 
-    if (!result.ok) {
-      showToast(result.error, "error");
-      return;
-    }
+      // Swap the button for the done badge in-place.
+      const row = tbodyEl.querySelector<HTMLElement>(
+        `[data-study-id="${CSS.escape(studyId)}"]`,
+      );
+      if (row) {
+        const badge = document.createElement("span");
+        badge.className = "validation-ml-badge validation-ml-badge--done";
+        badge.textContent = t("validations.mlDone");
+        btn.replaceWith(badge);
 
-    const msgKey =
-      action === "approve"
-        ? "validations.actionSuccess.approved"
-        : action === "reject"
-          ? "validations.actionSuccess.rejected"
-          : "validations.actionSuccess.review";
-    showToast(t(msgKey), "success");
-
-    // Update just the affected row's status columns without a full reload.
-    updateRowInPlace(
-      studyId,
-      result.data.status as StudyRow["validation_status"],
-      result.data.validatedBy,
-    );
-  }
-
-  /** Patches the validation badge + "validated by" cell without re-fetching. */
-  function updateRowInPlace(
-    studyId: string,
-    newStatus: StudyRow["validation_status"],
-    validatedBy: string,
-  ): void {
-    const row = tbodyEl.querySelector<HTMLElement>(
-      `[data-study-id="${CSS.escape(studyId)}"]`,
-    );
-    if (!row) {
-      void fetch();
-      return;
-    }
-
-    // Update in-memory record so subsequent re-renders are correct.
-    const rec = studies.find((s) => s.orthanc_study_id === studyId);
-    if (rec) {
-      rec.validation_status = newStatus;
-      rec.validated_by = validatedBy;
-      rec.validated_at = new Date().toISOString();
-    }
-
-    // Patch the badge cell (column 4) and validated_by cell (column 5).
-    const cells = row.querySelectorAll("td");
-    if (cells[3]) cells[3].innerHTML = badgeHtml(newStatus);
-    if (cells[4]) cells[4].textContent = validatedBy;
-
-    // Re-render actions for this row (correction flag may have changed).
-    const admin = isAdmin();
-    const canCorrect = admin && newStatus !== null;
-    if (cells[5]) {
-      cells[5].querySelector(".validations-row-actions")!.innerHTML =
-        actionButtonsHtml(studyId, canCorrect) +
-        `<button class="btn btn--secondary btn--sm" data-action="open"
-          data-study="${escapeHtml(studyId)}" type="button">
-          ${escapeHtml(t("validations.openInViewer"))}
-        </button>`;
+        const openBtn = row.querySelector<HTMLButtonElement>(
+          '[data-action="open"]',
+        );
+        if (openBtn) {
+          openBtn.classList.remove("btn--dim");
+          openBtn.removeAttribute("data-needs-ml");
+        }
+      }
+    } finally {
+      // Re-enable only if the button is still in the DOM (error path).
+      if (btn.isConnected) {
+        btn.disabled = false;
+        btn.textContent = t("validation.analyzeWithAI");
+      }
     }
   }
 

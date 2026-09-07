@@ -23,19 +23,35 @@ import {
   type ValidationAction,
   type ValidationRecord,
 } from "./validation-api.js";
-import { triggerAnalysis } from "./prediction-api.js";
-import { notifyPredictionLoaded } from "./ml-view.js";
 
 // ── Internal state ────────────────────────────────────────────────────────────
 
 let currentStudyId: string | null = null;
+// One-shot flag set by requestValidationMode() before openStudy(); consumed by
+// notifyStudyLoaded() so the bar only appears when the caller explicitly asked.
+let pendingValidationBar = false;
+let validationBarActive = false;
 
 // ── Public API ────────────────────────────────────────────────────────────────
+
+/** Returns true when the validation bar is currently shown (opened via "Ver estudio"). */
+export function isValidationBarActive(): boolean {
+  return validationBarActive;
+}
 
 /** Called from main.ts once during bootstrap. */
 export function initValidation(): void {
   wireButtons();
   onLocaleChange(refreshBar);
+}
+
+/**
+ * Signal that the next study load should show the validation bar.
+ * Call this immediately before openStudy() / loadStudyFromServer().
+ * The flag is consumed (cleared) by notifyStudyLoaded().
+ */
+export function requestValidationMode(): void {
+  pendingValidationBar = true;
 }
 
 /**
@@ -55,6 +71,12 @@ export function notifyStudyLoaded(
         validatedAt: validation.validatedAt,
       }
     : null;
+  if (studyId === null) {
+    validationBarActive = false;
+  } else {
+    validationBarActive = pendingValidationBar;
+    pendingValidationBar = false;
+  }
   refreshBar();
 }
 
@@ -65,14 +87,18 @@ function refreshBar(): void {
   if (!bar) return;
 
   const shouldShow =
-    currentStudyId !== null && state.source === "server" && isStaff();
+    validationBarActive &&
+    currentStudyId !== null &&
+    state.source === "server" &&
+    isStaff();
 
   bar.classList.toggle("hidden", !shouldShow);
 
   if (shouldShow) {
     renderBadge();
     renderCorrectionNotice();
-    renderAIButton();
+    renderReadonlyNotice();
+    renderActionButtons();
   }
 }
 
@@ -96,8 +122,28 @@ function renderBadge(): void {
 function renderCorrectionNotice(): void {
   const notice = document.getElementById("validation-correction-notice");
   if (!notice) return;
-  const isCorrectionMode = isAdmin() && state.serverValidation !== null;
-  notice.classList.toggle("hidden", !isCorrectionMode);
+  const inCorrectionMode = isAdmin() && state.serverValidation !== null;
+  notice.classList.toggle("hidden", !inCorrectionMode);
+}
+
+/** Shows readonly notice when medico opens an already-validated study. */
+function renderReadonlyNotice(): void {
+  const notice = document.getElementById("validation-readonly-notice");
+  if (!notice) return;
+  const isReadonly = !isAdmin() && state.serverValidation !== null;
+  notice.classList.toggle("hidden", !isReadonly);
+}
+
+/** Hides action buttons for medico on already-validated studies (admin corrects instead). */
+function renderActionButtons(): void {
+  const canAct = isAdmin() || state.serverValidation === null;
+  for (const id of [
+    "btn-validate-approve",
+    "btn-validate-reject",
+    "btn-validate-review",
+  ]) {
+    document.getElementById(id)?.classList.toggle("hidden", !canAct);
+  }
 }
 
 function isCorrectionMode(): boolean {
@@ -118,12 +164,6 @@ function formatValidationDate(iso: string): string {
 
 // ── Button wiring ─────────────────────────────────────────────────────────────
 
-function renderAIButton(): void {
-  const btn = document.getElementById("btn-validate-analyze-ai");
-  if (!btn) return;
-  btn.classList.toggle("hidden", !isAdmin());
-}
-
 function wireButtons(): void {
   document
     .getElementById("btn-validate-approve")
@@ -134,37 +174,6 @@ function wireButtons(): void {
   document
     .getElementById("btn-validate-review")
     ?.addEventListener("click", () => handleAction("review"));
-  document
-    .getElementById("btn-validate-analyze-ai")
-    ?.addEventListener("click", () => void handleAIAnalysis());
-}
-
-async function handleAIAnalysis(): Promise<void> {
-  const studyId = currentStudyId;
-  if (!studyId || !isAdmin()) return;
-
-  const btn = document.getElementById(
-    "btn-validate-analyze-ai",
-  ) as HTMLButtonElement | null;
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = t("validation.analyzing");
-  }
-
-  try {
-    const res = await triggerAnalysis(studyId);
-    if (!res.ok) {
-      showToast(res.error, "error");
-      return;
-    }
-    notifyPredictionLoaded(res.data);
-    showToast(t("validation.analysisDone"), "success");
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = t("validation.analyzeWithAI");
-    }
-  }
 }
 
 async function handleAction(action: ValidationAction): Promise<void> {

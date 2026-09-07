@@ -510,9 +510,9 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
       <span class="study-item__meta">
         <span class="study-item__badge">${modality}</span>
         ${imgLabel}
+        ${s.validation_status ? `<span class="study-item__validation-badge study-item__validation-badge--${escapeAttr(s.validation_status)}">${escapeHtml(t(`validation.status.${s.validation_status}`))}</span>` : ""}
       </span>
       ${zenodoBadges ? `<span class="study-item__zenodo-badges">${zenodoBadges}</span>` : ""}
-      ${s.validation_status ? `<span class="study-item__validation-badge study-item__validation-badge--${escapeAttr(s.validation_status)}">${escapeHtml(t(`validation.status.${s.validation_status}`))}</span>` : ""}
     </span>`;
 
   // In the listbox each <li> IS the option; in the panel each row is a button,

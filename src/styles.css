@@ -1729,6 +1729,10 @@ body {
 .btn--secondary:hover {
   background: var(--bg-hover);
 }
+.btn--dim {
+  opacity: 0.45;
+  cursor: default;
+}
 
 .btn--danger {
   background: var(--danger);
@@ -3788,10 +3792,48 @@ body {
   font-style: italic;
 }
 
+/* Validation status chip in study cards (Buscar / explorer panel) */
+.study-item__validation-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.study-item__validation-badge--approved {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.study-item__validation-badge--rejected {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.study-item__validation-badge--review {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
 .validations-row-actions {
   display: flex;
   gap: 6px;
   align-items: center;
+}
+
+.validation-ml-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.validation-ml-badge--done {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
 }
 
 .validations-empty,
@@ -3821,6 +3863,11 @@ body {
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
+}
+
+/* Push the viewport up by the bar's height so image content is never hidden. */
+.main-content:has(.validation-bar:not(.hidden)) .viewport-wrapper {
+  padding-bottom: 46px;
 }
 
 .validation-bar__status {
@@ -3856,6 +3903,12 @@ body {
 .validation-bar__correction-notice {
   font-size: 11px;
   color: var(--amber);
+  flex: 1;
+  margin: 0;
+}
+.validation-bar__readonly-notice {
+  font-size: 11px;
+  color: var(--text-dim);
   flex: 1;
   margin: 0;
 }

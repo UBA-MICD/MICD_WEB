@@ -562,6 +562,10 @@ export const es: Record<string, string> = {
   "validation.analyzing": "Analizando...",
   "validation.analysisDone": "Análisis completado.",
   "validation.analysisFailed": "Error en el análisis.",
+  "validation.readonlyNotice":
+    "Solo el administrador puede corregir esta validación.",
+  "validations.openNeedsML":
+    "Se requiere análisis de IA para visualizar el estudio.",
 
   // ── Panel de Validaciones (US-26) ────────────────────────────────────────────
   "validations.tab": "Validaciones",
@@ -587,4 +591,5 @@ export const es: Record<string, string> = {
   "validations.rejectDialog.commentLabel": "Comentario (obligatorio)",
   "validations.rejectDialog.confirm": "Rechazar",
   "validations.correctionBadge": "corrección",
+  "validations.mlDone": "✓ Con IA",
 };

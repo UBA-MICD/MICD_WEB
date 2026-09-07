@@ -19,6 +19,7 @@ import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
 import { mountValidationsPanel } from "./validations-panel.js";
+import { requestValidationMode } from "../viewer/validation-ui.js";
 import {
   loadStudyExplorer,
   getSelectedStudyId,
@@ -188,6 +189,7 @@ export function initServerScreen(): void {
   validationsPanel = mountValidationsPanel(
     $("panel-validaciones"),
     async (studyId: string) => {
+      requestValidationMode();
       await openStudy(studyId);
       closeServerScreen();
     },

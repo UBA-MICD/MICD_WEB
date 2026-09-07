@@ -6,6 +6,10 @@
 import { getViewportManager } from "./viewport-registry.js";
 import type { MLPredictionRecord } from "./prediction-api.js";
 
+// True only while the ML 1x2 layout is active — prevents clearMLView from
+// resetting a user-chosen 2x2 layout when loading a study without a prediction.
+let mlLayoutActive = false;
+
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -16,25 +20,31 @@ function capitalize(s: string): string {
  * - If prediction exists: switch to 1x2, copy vp0 data into vp1, set AI label
  *   on vp1's HUD, and render both viewports.
  */
+/**
+ * @param applyLayout - only true when opened from the validations panel;
+ *   prevents 1x2 from activating during normal study browsing.
+ */
 export function notifyPredictionLoaded(
   prediction: MLPredictionRecord | null,
+  applyLayout = false,
 ): void {
   const manager = getViewportManager();
   if (!manager) return;
 
-  if (!prediction) {
+  if (!prediction || !applyLayout) {
     clearMLView();
     return;
   }
 
   manager.setLayout("1x2");
+  mlLayoutActive = true;
 
   const viewports = manager.getAllViewports();
   const vp0 = viewports[0];
   const vp1 = viewports[1];
   if (!vp0 || !vp1) return;
 
-  // Mirror vp0's DICOM data into vp1 so the right panel shows the same image.
+  // Mirror vp0's DICOM data into vp1 so both panels show the same image.
   vp1.data.source = vp0.data.source;
   vp1.data.files = vp0.data.files;
   vp1.data.serverStudyId = vp0.data.serverStudyId;
@@ -45,6 +55,9 @@ export function notifyPredictionLoaded(
 
   const pct = Math.round(prediction.confidence * 100);
   vp1.data.mlLabel = `IA: ${capitalize(prediction.label)} ${pct}%`;
+
+  // Sync pan/zoom/slice between both viewports for pixel-by-pixel comparison.
+  manager.setSync(true);
 
   vp0.render();
   vp1.render();
@@ -58,12 +71,19 @@ export function clearMLView(): void {
   const manager = getViewportManager();
   if (!manager) return;
 
+  manager.setSync(false);
+
   for (const vp of manager.getAllViewports()) {
     vp.data.mlLabel = null;
   }
 
-  if (manager.getLayout() !== "1x1") {
-    manager.setLayout("1x1");
+  // Only collapse to 1x1 if this module activated the 1x2 ML layout.
+  // Preserves any layout the user chose independently (e.g. 2x2).
+  if (mlLayoutActive) {
+    mlLayoutActive = false;
+    if (manager.getLayout() !== "1x1") {
+      manager.setLayout("1x1");
+    }
   }
 }
 

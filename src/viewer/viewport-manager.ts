@@ -132,6 +132,10 @@ export class Viewport {
     });
 
     this.resizeObserver = new ResizeObserver(() => {
+      // Re-fit if zoom was calculated while the cell was hidden (zoom=0).
+      if (this.data.viewport.zoom <= 0 && this.data.parsed?.metadata) {
+        this.fitImage();
+      }
       this.render();
     });
     this.resizeObserver.observe(this.cellElement);

@@ -225,6 +225,7 @@ test.describe("mountValidationsPanel", () => {
     validation_status: null as null | "approved" | "rejected" | "review",
     validated_by: null,
     validated_at: null,
+    has_ml_prediction: true,
   };
 
   test("renders filter chips on mount", async () => {
@@ -302,37 +303,78 @@ test.describe("mountValidationsPanel", () => {
     assert.deepEqual(opened, ["study-abc"]);
   });
 
-  test("clicking Approve button calls submitValidation and updates the row badge", async () => {
-    const updatedRecord = {
-      validationId: 10,
-      status: "approved",
-      validatedBy: "medico@micd.local",
-      validatedAt: new Date().toISOString(),
-    };
-    let callCount = 0;
-    fetchImpl = async (url, init) => {
-      callCount++;
-      if (init?.method === "POST") {
-        return jsonResponse(201, updatedRecord);
-      }
-      return jsonResponse(200, { studies: [STUDY_ROW] });
-    };
+  test("shows AI done badge when has_ml_prediction is true", async () => {
+    fetchImpl = async () =>
+      jsonResponse(200, {
+        studies: [{ ...STUDY_ROW, has_ml_prediction: true }],
+      });
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+
+    const tbody = root.querySelector("[data-validations-tbody]")!;
+    assert.ok(
+      tbody.innerHTML.includes("validation-ml-badge--done"),
+      "should show done ML badge",
+    );
+    const analyzeBtn = root.querySelector("[data-action='analyze']");
+    assert.equal(
+      analyzeBtn,
+      null,
+      "analyze button must not appear when analysis done",
+    );
+  });
+
+  test("shows Analyze button when has_ml_prediction is false", async () => {
+    fetchImpl = async () =>
+      jsonResponse(200, {
+        studies: [{ ...STUDY_ROW, has_ml_prediction: false }],
+      });
+
+    // Adopt admin session so mlAnalysisHtml renders for admin.
+    const enc = (obj: unknown) =>
+      Buffer.from(JSON.stringify(obj)).toString("base64url");
+    const h = enc({ alg: "HS256", typ: "JWT" });
+    const p = enc({
+      sub: 2,
+      email: "admin@micd.local",
+      role: "admin",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    await adoptSession(`${h}.${p}.sig`, "rt2", {
+      id: 2,
+      email: "admin@micd.local",
+      role: "admin",
+    });
 
     const root = makeRoot();
     const handle = mountValidationsPanel(root, () => {});
     await handle.reload();
 
-    const approveBtn = root.querySelector<HTMLElement>(
-      "[data-action='approve'][data-study='study-abc']",
-    )!;
-    assert.ok(approveBtn, "approve button should exist");
-    approveBtn.click();
-    await new Promise((r) => setTimeout(r, 10));
+    const analyzeBtn = root.querySelector("[data-action='analyze']");
+    assert.ok(analyzeBtn, "analyze button should appear when no ML prediction");
+  });
 
-    const tbody = root.querySelector("[data-validations-tbody]")!;
-    assert.ok(
-      tbody.innerHTML.includes("validation-badge--approved"),
-      "row badge should update to approved",
+  test("no approve/reject/review buttons in the panel (validation happens in viewer)", async () => {
+    fetchImpl = async () => jsonResponse(200, { studies: [STUDY_ROW] });
+    const root = makeRoot();
+    const handle = mountValidationsPanel(root, () => {});
+    await handle.reload();
+
+    assert.equal(
+      root.querySelector("[data-action='approve']"),
+      null,
+      "no approve button",
+    );
+    assert.equal(
+      root.querySelector("[data-action='reject']"),
+      null,
+      "no reject button",
+    );
+    assert.equal(
+      root.querySelector("[data-action='review']"),
+      null,
+      "no review button",
     );
   });
 

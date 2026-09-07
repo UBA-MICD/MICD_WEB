@@ -34,6 +34,9 @@ interface StudyRecord {
   num_instances: number;
   zenodo_doi: string | null;
   zenodo_source_doi: string | null;
+  validation_status?: string | null;
+  validated_by?: string | null;
+  validated_at?: string | null;
 }
 
 interface StudiesResponse {
@@ -507,6 +510,7 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
       <span class="study-item__meta">
         <span class="study-item__badge">${modality}</span>
         ${imgLabel}
+        ${s.validation_status ? `<span class="study-item__validation-badge study-item__validation-badge--${escapeAttr(s.validation_status)}">${escapeHtml(t(`validation.status.${s.validation_status}`))}</span>` : ""}
       </span>
       ${zenodoBadges ? `<span class="study-item__zenodo-badges">${zenodoBadges}</span>` : ""}
     </span>`;

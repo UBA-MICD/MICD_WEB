@@ -21,6 +21,49 @@ import {
 } from "./rendering.js";
 import { updateToolbarUI } from "./interaction.js";
 import { t } from "../i18n/i18n.js";
+import { notifyStudyLoaded, isValidationBarActive } from "./validation-ui.js";
+import { fetchValidation } from "./validation-api.js";
+import { fetchPrediction } from "./prediction-api.js";
+import { notifyPredictionLoaded, clearMLView } from "./ml-view.js";
+import { getViewportManager } from "./viewport-registry.js";
+
+/**
+ * Sorts DICOM files in ascending order by Instance Number (0020,0013).
+ * Falls back to alphanumeric filename sorting when instance numbers are absent or identical.
+ */
+export async function sortFilesByInstanceNumber(
+  files: File[],
+): Promise<File[]> {
+  if (files.length <= 1) return files;
+
+  const entries = await Promise.all(
+    files.map(async (file) => {
+      try {
+        const buffer = await file.arrayBuffer();
+        const parsed = parseDicomFile(buffer);
+        const instNum = parseInt(parsed.metadata.instanceNumber, 10);
+        return { file, instanceNumber: isNaN(instNum) ? null : instNum };
+      } catch {
+        return { file, instanceNumber: null };
+      }
+    }),
+  );
+
+  entries.sort((a, b) => {
+    if (a.instanceNumber !== null && b.instanceNumber !== null) {
+      if (a.instanceNumber !== b.instanceNumber) {
+        return a.instanceNumber - b.instanceNumber;
+      }
+    } else if (a.instanceNumber !== null) {
+      return -1;
+    } else if (b.instanceNumber !== null) {
+      return 1;
+    }
+    return a.file.name.localeCompare(b.file.name, undefined, { numeric: true });
+  });
+
+  return entries.map((e) => e.file);
+}
 
 /** Load the image at state.currentIndex from whichever source is active. */
 export async function loadCurrent(): Promise<void> {
@@ -81,6 +124,8 @@ export function resetViewerToDropZone(): void {
   $("dicom-canvas").setAttribute("aria-label", t("viewer.canvasEmptyLabel"));
   updateToolbarUI();
   showDropZone();
+  notifyStudyLoaded(null);
+  clearMLView();
 }
 
 // ── Browser File Inputs ──────────────────────────────────────────────────────
@@ -99,7 +144,26 @@ export function initFileInputs(): void {
       return;
     }
     dicomCache.clear();
-    state.files = dcmFiles;
+
+    const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
+
+    const vp = getViewportManager()?.activeViewport ?? null;
+    if (vp) {
+      vp.data.source = "local";
+      vp.data.files = sortedFiles;
+      vp.data.currentIndex = 0;
+      vp.data.viewport = {
+        windowCenter: 0,
+        windowWidth: 0,
+        zoom: 0,
+        panX: 0,
+        panY: 0,
+      };
+    }
+
+    // Keep global state in sync for loadCurrent() / series nav.
+    state.source = "local";
+    state.files = sortedFiles;
     state.currentIndex = 0;
     state.viewport = {
       windowCenter: 0,
@@ -122,7 +186,26 @@ export function initFileInputs(): void {
       return;
     }
     dicomCache.clear();
-    state.files = dcmFiles;
+
+    const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
+
+    const vp = getViewportManager()?.activeViewport ?? null;
+    if (vp) {
+      vp.data.source = "local";
+      vp.data.files = sortedFiles;
+      vp.data.currentIndex = 0;
+      vp.data.viewport = {
+        windowCenter: 0,
+        windowWidth: 0,
+        zoom: 0,
+        panX: 0,
+        panY: 0,
+      };
+    }
+
+    // Keep global state in sync for loadCurrent() / series nav.
+    state.source = "local";
+    state.files = sortedFiles;
     state.currentIndex = 0;
     state.viewport = {
       windowCenter: 0,
@@ -187,6 +270,19 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
       return;
     }
     await loadCurrent();
+    const [validationResult, predictionResult] = await Promise.all([
+      fetchValidation(studyId),
+      fetchPrediction(studyId),
+    ]);
+    notifyStudyLoaded(
+      studyId,
+      validationResult.ok ? validationResult.data : null,
+    );
+    // Only apply 1x2 ML layout when opened from the validations panel.
+    notifyPredictionLoaded(
+      predictionResult.ok ? predictionResult.data : null,
+      isValidationBarActive(),
+    );
   } catch (err: any) {
     showError(
       t("viewer.serverStudyLoadError", { message: err.message || err }),
@@ -197,6 +293,8 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
 }
 
 export function displayParsed(parsed: ParsedDicom, name: string): void {
+  // Always keep global state in sync — loadCurrent() and other legacy paths
+  // still read from it for series navigation, metadata panel, etc.
   state.parsed = parsed;
 
   if (!parsed.pixelData) {
@@ -204,39 +302,81 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     return;
   }
 
-  // Preserve existing window width / center if user adjusted them, otherwise use metadata/auto
-  if (state.viewport.windowWidth <= 0) {
-    if (parsed.metadata.windowWidth > 0) {
-      state.viewport = createDefaultViewport(parsed.metadata);
-    } else {
-      const auto = calculateAutoWindowLevel(
-        parsed.pixelData,
-        parsed.metadata.rescaleSlope,
-        parsed.metadata.rescaleIntercept,
-        parsed.metadata.modality,
-      );
-      state.viewport = {
-        windowCenter: auto.windowCenter,
-        windowWidth: auto.windowWidth,
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-      };
-    }
-  }
+  const vp = getViewportManager()?.activeViewport ?? null;
 
-  const container = $("viewport-container");
-  if (state.viewport.zoom <= 0) {
-    state.viewport.zoom = fitToContainer(
-      container.clientWidth,
-      container.clientHeight,
-      parsed.metadata.columns,
-      parsed.metadata.rows,
-    );
+  if (vp) {
+    // ── Multi-viewport path ───────────────────────────────────────────────
+    vp.data.parsed = parsed;
+    // Keep server-study fields in sync so ml-view can mirror them to vp1.
+    vp.data.source = state.source;
+    vp.data.serverStudyId = state.serverStudyId;
+    vp.data.serverInstances = state.serverInstances;
+    vp.data.files = state.files;
+    vp.data.currentIndex = state.currentIndex;
+
+    // Preserve the user's W/L adjustments across slice navigations; only
+    // initialize from metadata (or auto) when the viewport is fresh (zoom=0).
+    if (vp.data.viewport.windowWidth <= 0) {
+      if (parsed.metadata.windowWidth > 0) {
+        vp.data.viewport = createDefaultViewport(parsed.metadata);
+      } else {
+        const auto = calculateAutoWindowLevel(
+          parsed.pixelData,
+          parsed.metadata.rescaleSlope,
+          parsed.metadata.rescaleIntercept,
+          parsed.metadata.modality,
+        );
+        vp.data.viewport = {
+          windowCenter: auto.windowCenter,
+          windowWidth: auto.windowWidth,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+        };
+      }
+    }
+
+    // Also keep global viewport state consistent for W/L sliders, etc.
+    state.viewport = { ...vp.data.viewport };
+
+    vp.fitImage();
+    vp.render();
+  } else {
+    // ── Legacy single-viewport path ───────────────────────────────────────
+    if (state.viewport.windowWidth <= 0) {
+      if (parsed.metadata.windowWidth > 0) {
+        state.viewport = createDefaultViewport(parsed.metadata);
+      } else {
+        const auto = calculateAutoWindowLevel(
+          parsed.pixelData,
+          parsed.metadata.rescaleSlope,
+          parsed.metadata.rescaleIntercept,
+          parsed.metadata.modality,
+        );
+        state.viewport = {
+          windowCenter: auto.windowCenter,
+          windowWidth: auto.windowWidth,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+        };
+      }
+    }
+
+    const container = $("viewport-container");
+    if (state.viewport.zoom <= 0) {
+      state.viewport.zoom = fitToContainer(
+        container.clientWidth,
+        container.clientHeight,
+        parsed.metadata.columns,
+        parsed.metadata.rows,
+      );
+    }
+
+    render();
   }
 
   hideDropZone();
-  render();
   updateMetadataPanel();
   updateSeriesNav();
   updateInfoOverlay();
@@ -285,7 +425,25 @@ export function initDropZone(): void {
 
     if (dcmFiles.length > 0) {
       dicomCache.clear();
-      state.files = dcmFiles.sort((a, b) => a.name.localeCompare(b.name));
+      const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
+
+      const vp = getViewportManager()?.activeViewport ?? null;
+      if (vp) {
+        vp.data.source = "local";
+        vp.data.files = sortedFiles;
+        vp.data.currentIndex = 0;
+        vp.data.viewport = {
+          windowCenter: 0,
+          windowWidth: 0,
+          zoom: 0,
+          panX: 0,
+          panY: 0,
+        };
+      }
+
+      // Keep global state in sync for loadCurrent() / series nav.
+      state.source = "local";
+      state.files = sortedFiles;
       state.currentIndex = 0;
       state.viewport = {
         windowCenter: 0,

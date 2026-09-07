@@ -112,6 +112,7 @@ export function stubCanvas2DContext(): void {
         return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h };
       },
       putImageData() {},
+      clearRect() {},
     };
   };
 }

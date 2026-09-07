@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "tsx --test 'src/**/*.test.ts'",
-    "test:coverage": "mkdir -p coverage && tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info 'src/**/*.test.ts'"
+    "test": "find src -name '*.test.ts' | NODE_OPTIONS='--require=./src/test-preload.cjs' xargs tsx --test",
+    "test:coverage": "mkdir -p coverage && find src -name '*.test.ts' | NODE_OPTIONS='--require=./src/test-preload.cjs' xargs tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info"
   },
   "dependencies": {
     "dicom-parser": "^1.8.21",

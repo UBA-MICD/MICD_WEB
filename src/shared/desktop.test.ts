@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import {
   isDesktop,
   initDesktopOnlyUI,
+  initApiOriginSetting,
   initDesktopApiOriginSetting,
 } from "./desktop.ts";
 
@@ -47,14 +48,17 @@ beforeEach(() => {
   // Provide a safe default document stub (overridden per-test as needed)
   (globalThis as any).document = {
     querySelectorAll: () => [],
+    querySelector: () => null,
     getElementById: () => null,
     createElement: () => ({
-      set textContent(_: string) {},
+      textContent: "",
       get innerHTML() {
         return "";
       },
     }),
   };
+  // Reset localStorage stub
+  delete (globalThis as any).localStorage;
 });
 
 // ── isDesktop ─────────────────────────────────────────────────────────────────
@@ -161,63 +165,52 @@ test("initDesktopOnlyUI handles an empty [data-desktop-only] node list", () => {
   assert.doesNotThrow(() => initDesktopOnlyUI());
 });
 
-// ── initDesktopApiOriginSetting ───────────────────────────────────────────────
+// ── initApiOriginSetting (desktop path) ──────────────────────────────────────
 
-test("initDesktopApiOriginSetting is a no-op when not in desktop mode", async () => {
-  let getIdCalled = false;
+test("initApiOriginSetting returns early when input element is missing", async () => {
+  // querySelector returns a card but getElementById returns null for input
   (globalThis as any).document = {
-    getElementById: () => {
-      getIdCalled = true;
-      return null;
-    },
+    getElementById: (_id: string) => null,
+    querySelector: () => makeFakeEl(),
     querySelectorAll: () => [],
     createElement: () => ({}),
   };
-
-  await initDesktopApiOriginSetting();
-  assert.equal(getIdCalled, false);
+  // Must not throw
+  await assert.doesNotReject(() => initApiOriginSetting());
 });
 
-test("initDesktopApiOriginSetting is a no-op when input element is missing", async () => {
-  (globalThis as any).window = {
-    api: {
-      getApiOrigin: async () => "http://localhost:3000",
-      setApiOrigin: async () => {},
-    },
-  };
-
-  (globalThis as any).document = {
-    getElementById: (_id: string) => null, // no elements found
-    querySelectorAll: () => [],
-    createElement: () => ({}),
-  };
-
-  // Must not throw even when elements are absent
-  await assert.doesNotReject(() => initDesktopApiOriginSetting());
-});
-
-test("initDesktopApiOriginSetting is a no-op when save button is missing", async () => {
+test("initApiOriginSetting returns early when save button is missing", async () => {
   const input = makeFakeEl();
-  (globalThis as any).window = {
-    api: {
-      getApiOrigin: async () => "http://localhost:3000",
-      setApiOrigin: async () => {},
-    },
-  };
-
   (globalThis as any).document = {
     getElementById: (id: string) =>
       id === "desktop-api-origin-input" ? input : null,
+    querySelector: () => makeFakeEl(),
     querySelectorAll: () => [],
     createElement: () => ({}),
   };
-
-  await assert.doesNotReject(() => initDesktopApiOriginSetting());
+  await assert.doesNotReject(() => initApiOriginSetting());
 });
 
-test("initDesktopApiOriginSetting pre-fills the input with the current API origin", async () => {
+test("initApiOriginSetting returns early when settings card element is missing", async () => {
   const input = makeFakeEl();
   const saveBtn = makeFakeEl();
+  (globalThis as any).document = {
+    getElementById: (id: string) => {
+      if (id === "desktop-api-origin-input") return input;
+      if (id === "desktop-api-origin-save") return saveBtn;
+      return null;
+    },
+    querySelector: () => null, // no card
+    querySelectorAll: () => [],
+    createElement: () => ({}),
+  };
+  await assert.doesNotReject(() => initApiOriginSetting());
+});
+
+test("initApiOriginSetting pre-fills the input with origin from window.api on desktop", async () => {
+  const input = makeFakeEl();
+  const saveBtn = makeFakeEl();
+  const card = makeFakeEl();
 
   (globalThis as any).window = {
     api: {
@@ -232,17 +225,19 @@ test("initDesktopApiOriginSetting pre-fills the input with the current API origi
       if (id === "desktop-api-origin-save") return saveBtn;
       return null;
     },
+    querySelector: () => card,
     querySelectorAll: () => [],
     createElement: () => ({}),
   };
 
-  await initDesktopApiOriginSetting();
+  await initApiOriginSetting();
   assert.equal(input.value, "http://backend.example.com");
 });
 
-test("initDesktopApiOriginSetting attaches a click listener to the save button", async () => {
+test("initApiOriginSetting attaches a click listener to the save button", async () => {
   const input = makeFakeEl();
   const saveBtn = makeFakeEl();
+  const card = makeFakeEl();
   let listenerAttached = false;
   saveBtn.addEventListener = (_ev: string, _cb: () => void) => {
     listenerAttached = true;
@@ -261,10 +256,200 @@ test("initDesktopApiOriginSetting attaches a click listener to the save button",
       if (id === "desktop-api-origin-save") return saveBtn;
       return null;
     },
+    querySelector: () => card,
     querySelectorAll: () => [],
     createElement: () => ({}),
   };
 
-  await initDesktopApiOriginSetting();
+  await initApiOriginSetting();
   assert.equal(listenerAttached, true);
+});
+
+// ── initApiOriginSetting (browser path) ──────────────────────────────────────
+
+test("initApiOriginSetting pre-fills input from localStorage on browser", async () => {
+  const input = makeFakeEl();
+  const saveBtn = makeFakeEl();
+  const card = makeFakeEl();
+
+  // No window.api → browser mode
+  (globalThis as any).localStorage = {
+    getItem: (key: string) =>
+      key === "micd_api_origin" ? "http://my-server.local:3000" : null,
+    setItem: () => {},
+  };
+
+  (globalThis as any).document = {
+    getElementById: (id: string) => {
+      if (id === "desktop-api-origin-input") return input;
+      if (id === "desktop-api-origin-save") return saveBtn;
+      return null;
+    },
+    querySelector: () => card,
+    querySelectorAll: () => [],
+    createElement: () => ({}),
+  };
+
+  await initApiOriginSetting();
+  assert.equal(input.value, "http://my-server.local:3000");
+});
+
+test("initApiOriginSetting saves to localStorage and reloads on browser save", async () => {
+  const input = makeFakeEl();
+  let savedKey = "";
+  let savedValue = "";
+  let reloaded = false;
+
+  const saveBtn = makeFakeEl();
+  const card = makeFakeEl();
+  let clickCb: (() => void) | null = null;
+  saveBtn.addEventListener = (_ev: string, cb: () => void) => {
+    clickCb = cb;
+  };
+
+  (globalThis as any).localStorage = {
+    getItem: () => null,
+    setItem: (key: string, val: string) => {
+      savedKey = key;
+      savedValue = val;
+    },
+  };
+
+  (globalThis as any).window = {
+    location: {
+      reload: () => {
+        reloaded = true;
+      },
+    },
+    // no window.api → browser mode
+  };
+
+  (globalThis as any).document = {
+    getElementById: (id: string) => {
+      if (id === "desktop-api-origin-input") return input;
+      if (id === "desktop-api-origin-save") return saveBtn;
+      return null;
+    },
+    querySelector: () => card,
+    querySelectorAll: () => [],
+    createElement: () => ({}),
+  };
+
+  await initApiOriginSetting();
+  // initApiOriginSetting pre-fills input.value from localStorage (null → "").
+  // Simulate the user typing a new URL after the field is shown.
+  input.value = "http://new-server.local:4000";
+  assert.ok(clickCb, "click listener must be attached");
+  clickCb!();
+  await new Promise((r) => setTimeout(r, 10));
+
+  assert.equal(savedKey, "micd_api_origin");
+  assert.equal(savedValue, "http://new-server.local:4000");
+  assert.equal(reloaded, true, "page must reload after saving");
+});
+
+test("initApiOriginSetting auto-prefixes http:// on browser for bare host:port", async () => {
+  const input = makeFakeEl();
+  let savedValue = "";
+
+  const saveBtn = makeFakeEl();
+  const card = makeFakeEl();
+  let clickCb: (() => void) | null = null;
+  saveBtn.addEventListener = (_ev: string, cb: () => void) => {
+    clickCb = cb;
+  };
+
+  (globalThis as any).localStorage = {
+    getItem: () => null,
+    setItem: (_key: string, val: string) => {
+      savedValue = val;
+    },
+  };
+  (globalThis as any).window = {
+    location: { reload: () => {} },
+  };
+
+  (globalThis as any).document = {
+    getElementById: (id: string) => {
+      if (id === "desktop-api-origin-input") return input;
+      if (id === "desktop-api-origin-save") return saveBtn;
+      return null;
+    },
+    querySelector: () => card,
+    querySelectorAll: () => [],
+    createElement: () => ({}),
+  };
+
+  await initApiOriginSetting();
+  input.value = "backend.local:3001";
+  clickCb!();
+  await new Promise((r) => setTimeout(r, 10));
+
+  assert.equal(savedValue, "http://backend.local:3001");
+});
+
+test("initApiOriginSetting does not save and does not reload for an invalid URL", async () => {
+  const input = makeFakeEl();
+  let saved = false;
+  let reloaded = false;
+
+  const saveBtn = makeFakeEl();
+  const card = makeFakeEl();
+  let clickCb: (() => void) | null = null;
+  saveBtn.addEventListener = (_ev: string, cb: () => void) => {
+    clickCb = cb;
+  };
+
+  (globalThis as any).localStorage = {
+    getItem: () => null,
+    setItem: () => {
+      saved = true;
+    },
+  };
+  (globalThis as any).window = {
+    location: {
+      reload: () => {
+        reloaded = true;
+      },
+    },
+  };
+
+  // Minimal toast stub
+  (globalThis as any).document = {
+    getElementById: (id: string) => {
+      if (id === "desktop-api-origin-input") return input;
+      if (id === "desktop-api-origin-save") return saveBtn;
+      if (id === "toast-container") return { appendChild: () => {} };
+      return null;
+    },
+    querySelector: () => card,
+    querySelectorAll: () => [],
+    createElement: () => ({
+      classList: { add: () => {} },
+      setAttribute: () => {},
+      querySelector: () => ({ addEventListener: () => {} }),
+      addEventListener: () => {},
+      textContent: "",
+      appendChild: () => {},
+    }),
+  };
+
+  await initApiOriginSetting();
+  input.value = "not a url !!!";
+  clickCb!();
+  await new Promise((r) => setTimeout(r, 10));
+
+  assert.equal(
+    saved,
+    false,
+    "localStorage must not be written for invalid URL",
+  );
+  assert.equal(reloaded, false, "page must not reload for invalid URL");
+});
+
+// ── initDesktopApiOriginSetting (deprecated alias) ───────────────────────────
+
+test("initDesktopApiOriginSetting delegates to initApiOriginSetting (deprecated alias)", async () => {
+  // Returns early due to missing card — just verify it doesn't throw
+  await assert.doesNotReject(() => initDesktopApiOriginSetting());
 });

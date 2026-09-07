@@ -12,7 +12,8 @@
     ".git",
     "docs/*",
     "*.md",
-    "src/i18n/locales/es.ts"
+    "src/i18n/locales/es.ts",
+    ".claude/skills/**"
   ],
   "words": [
     "micd",
@@ -70,6 +71,34 @@
     "Cargar",
     "Descomprimiendo",
     "Pérez",
-    "refetches"
+    "refetches",
+    "Aprobar",
+    "Rechazar",
+    "Marcar",
+    "revisión",
+    "Imagen",
+    "borrosa",
+    "médicos",
+    "pueden",
+    "validar",
+    "Corrección",
+    "tras",
+    "nueva",
+    "Confirmar",
+    "acción",
+    "Comentario",
+    "validación",
+    "defectuosa",
+    "interno",
+    "affordances",
+    "torax",
+    "Unvalidated",
+    "Validaciones",
+    "estudio",
+    "encontrado",
+    "García",
+    "María",
+    "Aprobado",
+    "Rechazado"
   ]
 }

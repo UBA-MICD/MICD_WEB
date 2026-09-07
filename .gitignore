@@ -40,3 +40,6 @@ dist-test/
 
 # ── Generated vendor assets (built from node_modules, see Dockerfile) ─────────
 src/vendor/fflate.js
+
+# ── Claude Code skills (vendored tool binaries, not project code) ──────────────
+.claude/skills/

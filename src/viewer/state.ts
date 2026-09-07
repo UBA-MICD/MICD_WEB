@@ -26,6 +26,13 @@ export interface AppState {
   isWlPanelOpen: boolean;
   isZoomPanelOpen: boolean;
   is3DMode: boolean;
+  /** Validation record for the currently loaded server study, or null if none. */
+  serverValidation: {
+    validationId: number;
+    status: string;
+    validatedBy: string;
+    validatedAt: string;
+  } | null;
 }
 
 export const state: AppState = {
@@ -44,6 +51,7 @@ export const state: AppState = {
   isWlPanelOpen: false,
   isZoomPanelOpen: false,
   is3DMode: false,
+  serverValidation: null,
 };
 
 /** Number of images in the current series, regardless of source. */

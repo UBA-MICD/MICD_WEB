@@ -82,7 +82,10 @@ function explorerFixture(): void {
       </div>
       <input type="date" data-explorer-date-from />
       <input type="date" data-explorer-date-to />
-      <button data-explorer-clear></button>
+      <input type="text" data-explorer-description />
+      <div data-explorer-clear-wrap class="hidden">
+        <button data-explorer-clear></button>
+      </div>
       <span data-explorer-pagination-info></span>
       <button data-explorer-prev></button>
       <button data-explorer-next></button>
@@ -430,6 +433,37 @@ test("date range inputs filter and format as YYYYMMDD", async () => {
   to.dispatchEvent(new Event("change", { bubbles: true }));
   await Promise.resolve();
   assert.match(fetchCalls[0], /date_to=20240201/);
+});
+
+test("description input is debounced and sends description param", async () => {
+  await adoptSession("t.t.t", "r", { id: 1, email: "a@b.com", role: "medico" });
+  fetchImpl = async () => jsonResponse(200, studiesPage([]));
+
+  const mod = await freshExplorer();
+  explorerFixture();
+  mod.initStudyExplorer();
+  await mod.loadStudyExplorer();
+  fetchCalls = [];
+
+  const input = document.querySelector(
+    "[data-explorer-description]",
+  ) as HTMLInputElement;
+  input.value = "torax"; // cspell:ignore torax
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+
+  // debounce: no fetch yet
+  assert.equal(fetchCalls.length, 0);
+
+  await new Promise((r) => setTimeout(r, 450));
+
+  assert.equal(fetchCalls.length, 1);
+  assert.match(fetchCalls[0], /description=torax/); // cspell:ignore torax
+
+  // syncControls keeps the clear-wrap visible when a filter is active
+  const clearWrap = document.querySelector(
+    "[data-explorer-clear-wrap]",
+  ) as HTMLElement;
+  assert.ok(!clearWrap.classList.contains("hidden"));
 });
 
 test("the clear-filters button resets every filter and refetches", async () => {

@@ -524,4 +524,72 @@ export const es: Record<string, string> = {
   "system.instances": "Instancias",
   "system.used": "usados",
   "system.loadError": "No se pudo cargar el estado del servidor.",
+
+  // ── validation (US-26) ───────────────────────────────────────────────────────
+  "validation.barAriaLabel": "Validación de diagnóstico",
+  "validation.approve": "Aprobar",
+  "validation.reject": "Rechazar",
+  "validation.review": "Marcar para revisión",
+  "validation.correctionNotice":
+    "Se registrará una corrección sobre la validación previa.",
+  "validation.dialog.title": "Confirmar acción",
+  "validation.dialog.titleCorrection": "Registrar corrección",
+  "validation.dialog.msg.approved": "¿Confirmás la aprobación de este estudio?",
+  "validation.dialog.msg.rejected":
+    "¿Confirmás el rechazo de este estudio? El comentario es obligatorio.",
+  "validation.dialog.msg.review":
+    "¿Marcás este estudio para revisión posterior?",
+  "validation.dialog.msg.correctionApproved":
+    "¿Registrás una corrección aprobando este estudio?",
+  "validation.dialog.msg.correctionRejected":
+    "¿Registrás una corrección rechazando este estudio? El comentario es obligatorio.",
+  "validation.dialog.msg.correctionReview":
+    "¿Registrás una corrección marcando este estudio para revisión?",
+  "validation.dialog.commentLabel": "Comentario",
+  "validation.dialog.commentRequired":
+    "El comentario es obligatorio para rechazar.",
+  "validation.dialog.confirm": "Confirmar",
+  "validation.status.approved": "Aprobado",
+  "validation.status.rejected": "Rechazado",
+  "validation.status.review": "Para revisión",
+  "validation.status.none": "Sin validación",
+  "validation.toast.success.approved": "Estudio aprobado.",
+  "validation.toast.success.rejected": "Estudio rechazado.",
+  "validation.toast.success.review": "Estudio marcado para revisión.",
+  "validation.toast.success.correction": "Corrección registrada.",
+  "validation.toast.error": "No se pudo registrar la validación.",
+  "validation.analyzeWithAI": "Analizar con IA",
+  "validation.analyzing": "Analizando...",
+  "validation.analysisDone": "Análisis completado.",
+  "validation.analysisFailed": "Error en el análisis.",
+  "validation.readonlyNotice":
+    "Solo el administrador puede corregir esta validación.",
+  "validations.openNeedsML":
+    "Se requiere análisis de IA para visualizar el estudio.",
+
+  // ── Panel de Validaciones (US-26) ────────────────────────────────────────────
+  "validations.tab": "Validaciones",
+  "validations.filtersLabel": "Filtrar por estado",
+  "validations.filterAll": "Todos",
+  "validations.filterPending": "Sin validar",
+  "validations.filterApproved": "Aprobados",
+  "validations.filterRejected": "Rechazados",
+  "validations.filterReview": "Para revisión",
+  "validations.colPatient": "Paciente",
+  "validations.colModality": "Modalidad",
+  "validations.colDate": "Fecha",
+  "validations.colStatus": "Estado",
+  "validations.colValidatedBy": "Validado por",
+  "validations.colActions": "Acciones",
+  "validations.openInViewer": "Ver estudio",
+  "validations.empty": "No hay estudios que coincidan con el filtro.",
+  "validations.loadError": "No se pudo cargar la lista de estudios.",
+  "validations.actionSuccess.approved": "Estudio aprobado.",
+  "validations.actionSuccess.rejected": "Estudio rechazado.",
+  "validations.actionSuccess.review": "Estudio marcado para revisión.",
+  "validations.rejectDialog.title": "Rechazar estudio",
+  "validations.rejectDialog.commentLabel": "Comentario (obligatorio)",
+  "validations.rejectDialog.confirm": "Rechazar",
+  "validations.correctionBadge": "corrección",
+  "validations.mlDone": "✓ Con IA",
 };

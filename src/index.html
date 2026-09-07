@@ -1103,6 +1103,55 @@
                 </table>
               </div>
             </aside>
+
+            <!-- Validation action bar (US-26) — staff-only, server studies -->
+            <div
+              class="validation-bar hidden"
+              id="validation-bar"
+              role="toolbar"
+              data-i18n-attr="aria-label:validation.barAriaLabel"
+              aria-label="Validación de diagnóstico"
+            >
+              <span
+                class="validation-bar__status"
+                id="validation-status-badge"
+              ></span>
+              <p
+                class="validation-bar__correction-notice hidden"
+                id="validation-correction-notice"
+                data-i18n="validation.correctionNotice"
+              >
+                Se registrará una corrección sobre la validación previa.
+              </p>
+              <p
+                class="validation-bar__readonly-notice hidden"
+                id="validation-readonly-notice"
+                data-i18n="validation.readonlyNotice"
+              >
+                Solo el administrador puede corregir esta validación.
+              </p>
+              <button
+                class="btn btn--accent btn--sm"
+                id="btn-validate-approve"
+                data-i18n="validation.approve"
+              >
+                Aprobar
+              </button>
+              <button
+                class="btn btn--danger btn--sm"
+                id="btn-validate-reject"
+                data-i18n="validation.reject"
+              >
+                Rechazar
+              </button>
+              <button
+                class="btn btn--secondary btn--sm"
+                id="btn-validate-review"
+                data-i18n="validation.review"
+              >
+                Marcar para revisión
+              </button>
+            </div>
           </div>
         </main>
 
@@ -1819,6 +1868,18 @@
           >
             Cargar
           </button>
+          <!-- Staff-only (medico + admin): diagnostic validation panel. -->
+          <button
+            class="server-tab hidden"
+            id="tab-validaciones"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-validaciones"
+            tabindex="-1"
+            data-i18n="validations.tab"
+          >
+            Validaciones
+          </button>
           <!-- Admin-only: shown/hidden by server-screen.ts renderForSession(). -->
           <button
             class="server-tab hidden"
@@ -2438,6 +2499,40 @@
       >
         <div class="server-panel__body" id="system-panel-body"></div>
       </div>
+      <!-- Staff-only: diagnostic validation panel (US-26). -->
+      <div
+        class="server-panel hidden"
+        id="panel-validaciones"
+        role="tabpanel"
+        aria-labelledby="tab-validaciones"
+        tabindex="0"
+      >
+        <div class="server-panel__body validations-panel">
+          <div
+            class="validations-filters"
+            role="group"
+            data-i18n-attr="aria-label:validations.filtersLabel"
+            aria-label="Filtrar por estado"
+            data-validations-filters
+          ></div>
+          <div class="validations-table-wrap">
+            <table class="validations-table" data-validations-table>
+              <thead data-validations-thead></thead>
+              <tbody data-validations-tbody></tbody>
+            </table>
+            <p
+              class="validations-empty hidden"
+              data-validations-empty
+              role="status"
+            ></p>
+            <p
+              class="validations-error hidden"
+              data-validations-error
+              role="alert"
+            ></p>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Public accept-invite screen (US-H04), entered from ?invite=<code>. -->
@@ -2721,6 +2816,61 @@
           </button>
         </div>
       </form>
+    </div>
+
+    <!-- Validation confirmation dialog (US-26) -->
+    <div id="validation-dialog" class="dialog-overlay hidden">
+      <div
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="validation-dialog-title"
+      >
+        <h3
+          class="dialog__title"
+          id="validation-dialog-title"
+          data-i18n="validation.dialog.title"
+        >
+          Confirmar acción
+        </h3>
+        <p class="dialog__msg" id="validation-dialog-msg"></p>
+        <div class="dialog__field">
+          <label
+            for="validation-comment"
+            data-i18n="validation.dialog.commentLabel"
+            >Comentario</label
+          >
+          <textarea
+            id="validation-comment"
+            class="dialog__textarea"
+            rows="3"
+            data-dialog-autofocus
+          ></textarea>
+          <p
+            class="dialog__field-note hidden"
+            id="validation-comment-required"
+            data-i18n="validation.dialog.commentRequired"
+          >
+            El comentario es obligatorio para rechazar.
+          </p>
+        </div>
+        <div class="dialog__actions">
+          <button
+            class="btn btn--secondary"
+            id="validation-dialog-cancel"
+            data-i18n="common.cancel"
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn--accent"
+            id="validation-dialog-confirm"
+            data-i18n="validation.dialog.confirm"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->

@@ -99,6 +99,26 @@
   border-radius: 3px;
 }
 
+/* ── Browser surfaces ─────────────────────────────────────────────────────── */
+/* Text selection — accent-tinted so it matches the design world rather than
+   the OS default blue. Text remains --text-primary so 4.5:1 is maintained. */
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+/* Caret follows the accent so the cursor landmark matches interactive affordances. */ /* cspell:ignore affordances */
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
+/* Firefox scrollbar — webkit equivalent is set on specific panels below. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-hover) transparent;
+}
+
 .skip-link {
   position: absolute;
   top: 8px;
@@ -258,7 +278,9 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(46, 230, 168, 0.06);
 }
 .auth-card__title {
   font-size: 22px;
@@ -572,19 +594,21 @@ body {
   border-radius: 8px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   font-size: 12.5px;
   animation: toast-in 0.18s ease-out;
 }
 .toast--success {
-  border-left-color: var(--accent);
+  background: rgba(46, 230, 168, 0.07);
+  border-color: var(--border-accent);
 }
 .toast--error {
-  border-left-color: var(--danger);
+  background: rgba(255, 107, 107, 0.07);
+  border-color: rgba(255, 107, 107, 0.4);
 }
 .toast--warning {
-  border-left-color: var(--amber);
+  background: rgba(224, 164, 88, 0.07);
+  border-color: rgba(224, 164, 88, 0.4);
 }
 .toast__msg {
   flex: 1;
@@ -976,6 +1000,7 @@ body {
   min-height: var(--topbar-h);
   border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .topbar__brand {
@@ -1345,7 +1370,7 @@ body {
   align-items: center;
   gap: 16px;
   padding: 48px 64px;
-  border: 2px dashed var(--text-dim);
+  border: 2px dashed var(--border-strong);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.02);
   transition: all 0.3s ease;
@@ -1704,14 +1729,19 @@ body {
 .btn--secondary:hover {
   background: var(--bg-hover);
 }
+.btn--dim {
+  opacity: 0.45;
+  cursor: default;
+}
 
 .btn--danger {
-  background: #c0392b;
+  background: var(--danger);
   color: #fff;
-  border: none;
+  border-color: var(--danger);
 }
 .btn--danger:hover {
-  background: #a93226;
+  background: #e05555;
+  border-color: #e05555;
 }
 
 .upload-status {
@@ -2008,16 +2038,19 @@ body {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   color: inherit;
   font-family: inherit;
   cursor: pointer;
   transition:
     background var(--transition),
-    border-color var(--transition);
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 .study-item:hover {
   background: var(--bg-hover);
   border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 /* aria-current carries this state for assistive tech; the styling follows it
    rather than a separate class, so the two can't drift apart. */
@@ -2264,7 +2297,7 @@ body {
     box-shadow var(--transition);
 }
 .login-field input::placeholder {
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 .login-field input:focus {
   border-color: var(--accent);
@@ -2649,11 +2682,20 @@ body {
   margin-top: 8px;
 }
 .z-empty-state--error p {
-  color: #e74c3c;
+  color: var(--danger);
 }
 
 /* ── Skeletons ────────────────────────────────────────────────────────────── */
 @keyframes z-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+@keyframes skeleton-pulse {
   0%,
   100% {
     opacity: 0.35;
@@ -2764,13 +2806,13 @@ body {
   font-family: var(--font-mono);
 }
 .z-quota--alert {
-  border: 1px solid #e74c3c;
+  border: 1px solid var(--danger);
   border-radius: 4px;
   padding: 6px 8px;
-  background: rgba(231, 76, 60, 0.08);
+  background: var(--danger-soft);
 }
 .z-quota--alert .z-quota-text {
-  color: #e74c3c;
+  color: var(--danger);
   font-weight: 600;
 }
 
@@ -2797,7 +2839,7 @@ body {
   border-color: var(--accent);
 }
 .z-token-input::placeholder {
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 /* Sync card */
@@ -2898,7 +2940,7 @@ body {
 }
 .z-field input::placeholder,
 .z-field textarea::placeholder {
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 .z-field select option {
   background: var(--bg-elevated);
@@ -2919,9 +2961,9 @@ body {
   border-radius: var(--radius-sm);
 }
 .z-pub-feedback--error {
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.08);
-  border: 1px solid rgba(231, 76, 60, 0.2);
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid rgba(255, 107, 107, 0.3);
 }
 .z-pub-feedback--success {
   color: var(--accent);
@@ -3481,9 +3523,24 @@ body {
 .user-create__field input,
 .user-create__field select {
   padding: 0.4rem 0.5rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.user-create__field input:focus,
+.user-create__field select:focus {
+  border-color: var(--accent);
+}
+.user-create__field select option {
+  background: var(--bg-elevated);
 }
 .form-error {
-  color: var(--color-danger, #c0392b);
+  color: var(--danger);
   font-size: 0.85rem;
   margin: 0.25rem 0 0;
 }
@@ -3496,12 +3553,14 @@ body {
 .users-table td {
   text-align: left;
   padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--color-border, #dcdcdc);
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 .users-table th {
   font-weight: 600;
   white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 .user-actions {
   display: flex;
@@ -3510,7 +3569,7 @@ body {
 }
 .user-empty td {
   text-align: center;
-  color: var(--color-text-muted, #777);
+  color: var(--text-muted);
   padding: 1.25rem;
 }
 .user-status {
@@ -3521,16 +3580,19 @@ body {
   border: 1px solid transparent;
 }
 .user-status--active {
-  color: #1e7e34;
-  border-color: #1e7e34;
+  color: var(--accent);
+  border-color: var(--border-accent);
+  background: var(--accent-soft);
 }
 .user-status--invited {
-  color: #8a6d1a;
-  border-color: #8a6d1a;
+  color: var(--amber);
+  border-color: rgba(224, 164, 88, 0.4);
+  background: var(--amber-soft);
 }
 .user-status--blocked {
-  color: #c0392b;
-  border-color: #c0392b;
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.4);
+  background: var(--danger-soft);
 }
 
 /* ── System panel ────────────────────────────────────────────────────────── */
@@ -3551,9 +3613,9 @@ body {
 }
 .sys-alert {
   font-size: 11px;
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.08);
-  border: 1px solid #e74c3c;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid rgba(255, 107, 107, 0.4);
   border-radius: 4px;
   padding: 6px 10px;
   margin-bottom: 10px;
@@ -3581,7 +3643,7 @@ body {
   font-family: var(--font-mono);
 }
 .sys-storage__bar--alert .sys-storage__labels {
-  color: #e74c3c;
+  color: var(--danger);
 }
 .sys-storage__labels--only {
   flex-direction: column;
@@ -3636,4 +3698,267 @@ body {
 .sys-skeleton--sm {
   height: 10px;
   width: 60%;
+}
+
+/* ── Validations panel (US-26) ───────────────────────────────────────────── */
+
+.validations-panel {
+  background: var(--bg-elevated);
+  padding-left: 20px;
+}
+
+.validations-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.validations-chip {
+  padding: 5px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.validations-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.validations-chip--active {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-color: transparent;
+}
+
+.validations-table-wrap {
+  overflow-x: auto;
+}
+
+.validations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.validations-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-family: var(--font);
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.validations-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+.validations-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.validations-table tbody tr:hover td {
+  background: var(--bg-hover);
+}
+
+.validation-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.validation-badge--approved {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.validation-badge--rejected {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.validation-badge--review {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.validation-badge--none {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Validation status chip in study cards (Buscar / explorer panel) */
+.study-item__validation-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.study-item__validation-badge--approved {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.study-item__validation-badge--rejected {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.study-item__validation-badge--review {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.validations-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.validation-ml-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.validation-ml-badge--done {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.validations-empty,
+.validations-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.validations-error {
+  color: var(--danger);
+}
+
+/* ── Validation bar (viewer) ──────────────────────────────────────────────── */
+.validation-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(13, 15, 17, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* Push the viewport up by the bar's height so image content is never hidden. */
+.main-content:has(.validation-bar:not(.hidden)) .viewport-wrapper {
+  padding-bottom: 46px;
+}
+
+.validation-bar__status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.validation-bar__status--none {
+  color: var(--text-muted);
+  border-color: var(--border-strong);
+  background: transparent;
+}
+.validation-bar__status--approved {
+  color: var(--accent);
+  border-color: var(--border-accent);
+  background: var(--accent-soft);
+}
+.validation-bar__status--rejected {
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.4);
+  background: var(--danger-soft);
+}
+.validation-bar__status--review {
+  color: var(--amber);
+  border-color: rgba(224, 164, 88, 0.4);
+  background: var(--amber-soft);
+}
+
+.validation-bar__correction-notice {
+  font-size: 11px;
+  color: var(--amber);
+  flex: 1;
+  margin: 0;
+}
+.validation-bar__readonly-notice {
+  font-size: 11px;
+  color: var(--text-dim);
+  flex: 1;
+  margin: 0;
+}
+
+/* ── Dialog fields (textarea, label, notes) ───────────────────────────────── */
+.dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dialog__field label,
+.dialog__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.dialog__textarea {
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  width: 100%;
+  resize: vertical;
+  outline: none;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+.dialog__textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.dialog__textarea::placeholder {
+  color: var(--text-muted);
+}
+.dialog__field-note,
+.dialog__error {
+  font-size: 12px;
+  color: var(--amber);
+  margin: 0;
+}
+.dialog__error {
+  color: var(--danger);
+}
+.dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }

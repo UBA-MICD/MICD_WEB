@@ -535,6 +535,122 @@ export const en: Record<string, string> = {
   "system.used": "used",
   "system.loadError": "Could not load server status.",
 
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Next",
+  "tour.controls.back": "Back",
+  "tour.controls.skip": "Skip tour",
+  "tour.controls.finish": "Finish",
+  "tour.controls.close": "Close tour",
+  "tour.progress": "Step {{n}} of {{total}}",
+  "tour.help.label": "Guided tour",
+  "tour.core.welcome.title": "Welcome to MICD",
+  "tour.core.welcome.body":
+    "A quick tour of the viewer and, if you sign in, your server features. Press Esc or Skip to leave at any time — reopen it later from the ? button.",
+  "tour.core.open.title": "Open a study",
+  "tour.core.open.body":
+    "Open a local DICOM file or folder straight from your computer — no sign-in needed. You can also drag files onto the viewer.",
+  "tour.core.wl.title": "Window / Level",
+  "tour.core.wl.body":
+    "Adjust brightness and contrast by dragging on the image, or apply a preset (bone, brain, lung, soft tissue).",
+  "tour.core.zoompan.title": "Zoom & pan",
+  "tour.core.zoompan.body":
+    "Zoom to inspect detail and pan to move around the image. The scroll wheel zooms too.",
+  "tour.core.mpr.title": "MPR & 3D",
+  "tour.core.mpr.body":
+    "For volume series, reconstruct axial, coronal and sagittal planes, or switch to a 3D view.",
+  "tour.core.metadata.title": "DICOM metadata",
+  "tour.core.metadata.body":
+    "Inspect the study's DICOM tags — patient, series and acquisition details.",
+  "tour.core.reset.title": "Reset the view",
+  "tour.core.reset.body":
+    "Return window/level, zoom and pan to their defaults in one click.",
+  "tour.core.explorer.title": "Study explorer",
+  "tour.core.explorer.body":
+    "Toggle the explorer rail to browse the series and studies you have open.",
+  "tour.core.language.title": "Language",
+  "tour.core.language.body":
+    "Switch the interface between Spanish and English at any time.",
+  "tour.core.signin.title": "Server features",
+  "tour.core.signin.body":
+    "Sign in to reach the server: search shared studies, and — depending on your role — upload, publish and manage users.",
+  "tour.investigador.search.title": "Search studies",
+  "tour.investigador.search.body":
+    "Find studies by patient, modality or date. Start typing to search the shared repository.",
+  "tour.investigador.dates.title": "Filter by date",
+  "tour.investigador.dates.body":
+    "Narrow results to an acquisition date range with the from/to fields.",
+  "tour.investigador.results.title": "Results",
+  "tour.investigador.results.body":
+    "Matching studies appear here. For your role, patient identity is anonymized — you work with de-identified data.",
+  "tour.investigador.open.title": "Open a study",
+  "tour.investigador.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.investigador.export.title": "Export",
+  "tour.investigador.export.body":
+    "Export images or a study package. Downloads for your role are anonymized.",
+  "tour.investigador.zenodo.title": "Zenodo public corpus",
+  "tour.investigador.zenodo.body":
+    "Search Zenodo's public research corpus for openly published datasets.",
+  "tour.investigador.done.title": "You're set",
+  "tour.investigador.done.body":
+    "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
+  "tour.staff.search.title": "Search studies",
+  "tour.staff.search.body":
+    "Find studies by patient, modality or date. As clinical staff you see full patient details.",
+  "tour.staff.results.title": "Results",
+  "tour.staff.results.body":
+    "Matching studies appear here with full patient information.",
+  "tour.staff.open.title": "Open a study",
+  "tour.staff.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.staff.export.title": "Export a study",
+  "tour.staff.export.body":
+    "Export images (PNG) or a full study package (ZIP), with complete metadata.",
+  "tour.staff.uploadTab.title": "Upload studies",
+  "tour.staff.uploadTab.body":
+    "Open the Upload tab to add new studies to the server.",
+  "tour.staff.uploadDrop.title": "Drag & drop",
+  "tour.staff.uploadDrop.body":
+    "Drop DICOM files here to upload them. Each file uploads with its own progress row.",
+  "tour.staff.uploadFolder.title": "Upload a folder",
+  "tour.staff.uploadFolder.body":
+    "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
+  "tour.staff.uploadStatus.title": "Progress & status",
+  "tour.staff.uploadStatus.body":
+    "Track per-file progress and status here as your studies upload.",
+  "tour.staff.zenodoImport.title": "Zenodo datasets",
+  "tour.staff.zenodoImport.body":
+    "Search Zenodo's public corpus and import datasets straight into the server.",
+  "tour.medico.done.title": "You're set",
+  "tour.medico.done.body":
+    "That's your clinical toolkit — search, review, upload, import and export with full metadata. User management, Zenodo publishing/config and the activity log are admin-only. Reopen this tour anytime from the ? button.",
+  "tour.admin.usersTab.title": "User management",
+  "tour.admin.usersTab.body":
+    "Open the Users tab to manage accounts — only administrators see it.",
+  "tour.admin.create.title": "Create a user",
+  "tour.admin.create.body":
+    "Add a user with a name, email and role. An email invitation is sent to them.",
+  "tour.admin.role.title": "Assign roles",
+  "tour.admin.role.body":
+    "Change a user's role here — researcher, clinician or administrator.",
+  "tour.admin.block.title": "Block & enable",
+  "tour.admin.block.body":
+    "Block an account to suspend access, and re-enable it later.",
+  "tour.admin.delete.title": "Delete a user",
+  "tour.admin.delete.body":
+    "Deleting is a soft-delete — the account is removed but the audit history is preserved.",
+  "tour.admin.lastAccess.title": "Last access",
+  "tour.admin.lastAccess.body":
+    "Each user's last login is tracked in this column.",
+  "tour.admin.activity.title": "Activity log",
+  "tour.admin.activity.body":
+    "Open the audit log to review actions across the system, and export it as CSV.",
+  "tour.admin.zenodo.title": "Zenodo administration",
+  "tour.admin.zenodo.body":
+    "Configure Zenodo credentials and sync, review sync logs and quota, and publish studies. Publishing is irreversible and makes data publicly available — check carefully before you publish.",
+  "tour.admin.help.title": "Reopen anytime",
+  "tour.admin.help.body":
+    "That's the full administrator toolkit. Relaunch this tour whenever you like from this ? button.",
   // ── validation (US-26) ───────────────────────────────────────────────────────
   "validation.barAriaLabel": "Diagnostic validation",
   "validation.approve": "Approve",

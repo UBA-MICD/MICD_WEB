@@ -464,32 +464,32 @@ export class MPRCamera {
 
     switch (plane) {
       case "axial":
-        // Radiological standard: Looking from feet towards head (+Z)
+        // Radiological standard (RPLA/LPS): Looking from feet towards head (+Z)
         // Screen Right: Patient Left (+X)
-        // Screen Up: Patient Anterior (-Y)
+        // Screen Up: Patient Anterior (-Y in DICOM space, inverted V for screen-to-tex)
         // Normal: Superior (+Z)
         this.uAxis = [1, 0, 0];
-        this.vAxis = [0, -1, 0];
+        this.vAxis = [0, 1, 0];
         this.normal = [0, 0, 1];
         break;
 
       case "coronal":
         // Radiological standard: Looking from Anterior towards Posterior (+Y)
         // Screen Right: Patient Left (+X)
-        // Screen Up: Patient Superior (+Z)
+        // Screen Up: Patient Superior (+Z in DICOM space, inverted V for screen-to-tex)
         // Normal: Posterior (+Y)
         this.uAxis = [1, 0, 0];
-        this.vAxis = [0, 0, 1];
+        this.vAxis = [0, 0, -1];
         this.normal = [0, 1, 0];
         break;
 
       case "sagittal":
         // Radiological standard: Looking from Patient Right towards Left (+X)
         // Screen Right: Patient Posterior (+Y)
-        // Screen Up: Patient Superior (+Z)
+        // Screen Up: Patient Superior (+Z in DICOM space, inverted V for screen-to-tex)
         // Normal: Left (+X)
         this.uAxis = [0, 1, 0];
-        this.vAxis = [0, 0, 1];
+        this.vAxis = [0, 0, -1];
         this.normal = [1, 0, 0];
         break;
     }
@@ -675,6 +675,9 @@ export class MPREngine {
   public windowCenter = 40;
   public windowWidth = 400;
 
+  public crosshairWorld: [number, number, number] = [0, 0, 0];
+  public crosshairNormalized: [number, number, number] = [0.5, 0.5, 0.5];
+
   private contextCache: Map<HTMLCanvasElement, GLContextState> = new Map();
   private volumeVersion = 0;
 
@@ -691,7 +694,9 @@ export class MPREngine {
     this.windowWidth = data.windowWidth;
     this.volumeVersion++;
 
-    // Initialize slice offsets to volume centers
+    // Initialize slice offsets and crosshair to volume centers
+    this.crosshairWorld = [0, 0, 0];
+    this.crosshairNormalized = [0.5, 0.5, 0.5];
     this.axialCamera.setSliceOffset(0);
     this.coronalCamera.setSliceOffset(0);
     this.sagittalCamera.setSliceOffset(0);
@@ -970,6 +975,314 @@ export class MPREngine {
   public setWindowLevel(center: number, width: number): void {
     this.windowCenter = center;
     this.windowWidth = Math.max(1, width);
+  }
+
+  /**
+   * Converts a 2D screen mouse delta (pixels) into a 3D world space displacement (mm)
+   * on the orthogonal viewing plane of the active camera.
+   */
+  public convert2DTo3DDelta(
+    plane: MPRPlane,
+    deltaScreenX: number,
+    deltaScreenY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): [number, number, number] {
+    if (!this.volume) return [0, 0, 0];
+    const camera = this.getCamera(plane);
+    const [sx, sy, sz] = this.volume.physicalSize;
+    let baseW = sx;
+    let baseH = sy;
+
+    if (plane === "coronal") {
+      baseW = sx;
+      baseH = sz;
+    } else if (plane === "sagittal") {
+      baseW = sy;
+      baseH = sz;
+    }
+
+    const vpAspect = (viewportWidth || 1) / (viewportHeight || 1);
+    const sliceAspect = (baseW || 1) / (baseH || 1);
+
+    let halfW: number;
+    let halfH: number;
+
+    if (vpAspect > sliceAspect) {
+      halfH = baseH / 2 / camera.zoom;
+      halfW = halfH * vpAspect;
+    } else {
+      halfW = baseW / 2 / camera.zoom;
+      halfH = halfW / vpAspect;
+    }
+
+    // Delta in NDC [-1, 1]
+    const dxNdc = (2 * deltaScreenX) / (viewportWidth || 1);
+    const dyNdc = (-2 * deltaScreenY) / (viewportHeight || 1);
+
+    // 3D world delta = (dxNdc * halfW) * uAxis + (dyNdc * halfH) * vAxis
+    const dxWorld =
+      dxNdc * halfW * camera.uAxis[0] + dyNdc * halfH * camera.vAxis[0];
+    const dyWorld =
+      dxNdc * halfW * camera.uAxis[1] + dyNdc * halfH * camera.vAxis[1];
+    const dzWorld =
+      dxNdc * halfW * camera.uAxis[2] + dyNdc * halfH * camera.vAxis[2];
+
+    return [dxWorld, dyWorld, dzWorld];
+  }
+
+  /**
+   * Translates the volume along the camera's orthogonal plane, ensuring 1:1 visual
+   * correspondence with mouse movement, clamped to prevent losing the volume.
+   */
+  public applyPanDelta2D(
+    plane: MPRPlane,
+    deltaScreenX: number,
+    deltaScreenY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): void {
+    if (!this.volume) return;
+    const [dx, dy, dz] = this.convert2DTo3DDelta(
+      plane,
+      deltaScreenX,
+      deltaScreenY,
+      viewportWidth,
+      viewportHeight,
+    );
+
+    this.volume.translate(dx, dy, dz);
+    this.clampVolumeTranslation();
+  }
+
+  /** Restricts volume translation so the patient volume cannot be lost in the void. */
+  public clampVolumeTranslation(): void {
+    if (!this.volume) return;
+    const [sx, sy, sz] = this.volume.physicalSize;
+    const s = this.volume.transform.scale;
+
+    // Bounded to 85% of volume dimensions
+    const maxTx = sx * s * 0.85;
+    const maxTy = sy * s * 0.85;
+    const maxTz = sz * s * 0.85;
+
+    const [tx, ty, tz] = this.volume.transform.translation;
+    this.volume.transform.translation[0] = Math.max(
+      -maxTx,
+      Math.min(maxTx, tx),
+    );
+    this.volume.transform.translation[1] = Math.max(
+      -maxTy,
+      Math.min(maxTy, ty),
+    );
+    this.volume.transform.translation[2] = Math.max(
+      -maxTz,
+      Math.min(maxTz, tz),
+    );
+    this.volume.updateMatrices();
+  }
+
+  public getCrosshairWorld(): [number, number, number] {
+    return [...this.crosshairWorld];
+  }
+
+  public getCrosshairNormalized(): [number, number, number] {
+    return [...this.crosshairNormalized];
+  }
+
+  /**
+   * Sets the 3D crosshair position in world space with strict boundary clamping
+   * to volume texture coordinates [0, 1]^3, updating all 3 orthogonal camera slice offsets.
+   */
+  public setCrosshairWorld(x: number, y: number, z: number): void {
+    if (!this.volume) {
+      this.crosshairWorld = [x, y, z];
+      return;
+    }
+
+    // Transform world coordinates to texture coordinates [0, 1]^3
+    const worldToTex = this.volume.getWorldToTexMatrix();
+    const texCoords = Matrix4.transformPoint(worldToTex, [x, y, z]);
+
+    // Clamping: strictly enforce [0.0, 1.0]^3
+    const clampedU = Math.max(0.0, Math.min(1.0, texCoords[0]));
+    const clampedV = Math.max(0.0, Math.min(1.0, texCoords[1]));
+    const clampedW = Math.max(0.0, Math.min(1.0, texCoords[2]));
+
+    this.crosshairNormalized = [clampedU, clampedV, clampedW];
+
+    // Transform clamped texture coords back to world space
+    const texToWorld = this.volume.getTexToWorldMatrix();
+    this.crosshairWorld = Matrix4.transformPoint(texToWorld, [
+      clampedU,
+      clampedV,
+      clampedW,
+    ]);
+
+    // Update static camera slice offsets to pass through crosshair point
+    this.axialCamera.setSliceOffset(this.crosshairWorld[2]);
+    this.coronalCamera.setSliceOffset(this.crosshairWorld[1]);
+    this.sagittalCamera.setSliceOffset(this.crosshairWorld[0]);
+  }
+
+  /**
+   * Updates crosshair position from 2D screen movement delta on the active plane.
+   */
+  public applyCrosshairDelta2D(
+    plane: MPRPlane,
+    deltaScreenX: number,
+    deltaScreenY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): void {
+    const [dx, dy, dz] = this.convert2DTo3DDelta(
+      plane,
+      deltaScreenX,
+      deltaScreenY,
+      viewportWidth,
+      viewportHeight,
+    );
+    const [x, y, z] = this.crosshairWorld;
+    this.setCrosshairWorld(x + dx, y + dy, z + dz);
+  }
+
+  /**
+   * Sets crosshair position from absolute screen click/drag coordinates on the active plane.
+   */
+  public setCrosshairFromScreen(
+    plane: MPRPlane,
+    screenX: number,
+    screenY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): void {
+    if (!this.volume) return;
+    const camera = this.getCamera(plane);
+    const [sx, sy, sz] = this.volume.physicalSize;
+    let baseW = sx;
+    let baseH = sy;
+
+    if (plane === "coronal") {
+      baseW = sx;
+      baseH = sz;
+    } else if (plane === "sagittal") {
+      baseW = sy;
+      baseH = sz;
+    }
+
+    const screenToWorld = camera.getScreenToWorldMatrix(
+      viewportWidth,
+      viewportHeight,
+      baseW,
+      baseH,
+    );
+
+    const xNdc = (2 * screenX) / (viewportWidth || 1) - 1;
+    const yNdc = 1 - (2 * screenY) / (viewportHeight || 1);
+
+    const worldPoint = Matrix4.transformPoint(screenToWorld, [xNdc, yNdc, 0]);
+    this.setCrosshairWorld(worldPoint[0], worldPoint[1], worldPoint[2]);
+  }
+
+  /**
+   * Computes the 2D screen pixel coordinates of the current 3D crosshair for a viewport.
+   */
+  public getCrosshairScreenCoords(
+    plane: MPRPlane,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): [number, number] {
+    if (!this.volume) return [viewportWidth / 2, viewportHeight / 2];
+    const camera = this.getCamera(plane);
+    const [sx, sy, sz] = this.volume.physicalSize;
+    let baseW = sx;
+    let baseH = sy;
+
+    if (plane === "coronal") {
+      baseW = sx;
+      baseH = sz;
+    } else if (plane === "sagittal") {
+      baseW = sy;
+      baseH = sz;
+    }
+
+    const screenToWorld = camera.getScreenToWorldMatrix(
+      viewportWidth,
+      viewportHeight,
+      baseW,
+      baseH,
+    );
+    const worldToScreen = Matrix4.invert(screenToWorld);
+    if (!worldToScreen) return [viewportWidth / 2, viewportHeight / 2];
+
+    const ndc = Matrix4.transformPoint(worldToScreen, this.crosshairWorld);
+    const screenX = ((ndc[0] + 1) / 2) * viewportWidth;
+    const screenY = ((1 - ndc[1]) / 2) * viewportHeight;
+
+    return [screenX, screenY];
+  }
+
+  /**
+   * Returns clinical color codes for the intersecting crosshair lines in each plane.
+   *  - Axial: Vertical is Sagittal (#f87171), Horizontal is Coronal (#34d399)
+   *  - Coronal: Vertical is Sagittal (#f87171), Horizontal is Axial (#38bdf8)
+   *  - Sagittal: Vertical is Coronal (#34d399), Horizontal is Axial (#38bdf8)
+   */
+  public getCrosshairColors(plane: MPRPlane): {
+    vertical: string;
+    horizontal: string;
+  } {
+    switch (plane) {
+      case "axial":
+        return { vertical: "#f87171", horizontal: "#34d399" };
+      case "coronal":
+        return { vertical: "#f87171", horizontal: "#38bdf8" };
+      case "sagittal":
+        return { vertical: "#34d399", horizontal: "#38bdf8" };
+    }
+  }
+
+  /**
+   * Renders high-contrast clinical crosshair lines with a center gap on a 2D canvas context.
+   */
+  public renderCrosshair(
+    plane: MPRPlane,
+    ctx: CanvasRenderingContext2D,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): void {
+    const [cx, cy] = this.getCrosshairScreenCoords(
+      plane,
+      viewportWidth,
+      viewportHeight,
+    );
+    const colors = this.getCrosshairColors(plane);
+    const gap = 8; // Center clearance gap
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+    ctx.shadowBlur = 3;
+    ctx.lineWidth = 1.5;
+
+    // Vertical line (broken by gap)
+    ctx.strokeStyle = colors.vertical;
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, Math.max(0, cy - gap));
+    ctx.moveTo(cx, Math.min(viewportHeight, cy + gap));
+    ctx.lineTo(cx, viewportHeight);
+    ctx.stroke();
+
+    // Horizontal line (broken by gap)
+    ctx.strokeStyle = colors.horizontal;
+    ctx.beginPath();
+    ctx.moveTo(0, cy);
+    ctx.lineTo(Math.max(0, cx - gap), cy);
+    ctx.moveTo(Math.min(viewportWidth, cx + gap), cy);
+    ctx.lineTo(viewportWidth, cy);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   public destroy(): void {

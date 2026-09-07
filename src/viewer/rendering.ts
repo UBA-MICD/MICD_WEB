@@ -8,7 +8,8 @@ import { getViewportManager } from "./viewport-registry.js";
 // ── Rendering ────────────────────────────────────────────────────────────────
 
 export function render(): void {
-  const canvas = $("dicom-canvas") as HTMLCanvasElement;
+  const canvas = (document.getElementById("view-3d-canvas") ||
+    $("dicom-canvas")) as HTMLCanvasElement;
 
   if (state.is3DMode && view3DViewer.isActive) {
     // 3D Unified Viewport rendering
@@ -29,6 +30,11 @@ export function render(): void {
 
   const manager = getViewportManager();
   if (manager) {
+    if (state.isMprMode) {
+      manager.getAllViewports().forEach((vp) => vp.render());
+      updateOrientationLabels();
+      return;
+    }
     // Multi-viewport Grid architecture (1x1, 1x2, 2x2)
     const activeVp = manager.activeViewport;
     if (activeVp) {
@@ -46,8 +52,9 @@ export function render(): void {
   }
 
   // Single viewport fallback (legacy)
+  const dicomCanvas = $("dicom-canvas") as HTMLCanvasElement;
   renderDicom({
-    canvas,
+    canvas: dicomCanvas,
     pixelData: state.parsed.pixelData,
     metadata: state.parsed.metadata,
     viewport: state.viewport,
@@ -55,7 +62,7 @@ export function render(): void {
 
   applyCanvasTransform(
     $("viewport-container") as HTMLCanvasElement,
-    canvas,
+    dicomCanvas,
     state.viewport,
   );
 
@@ -272,15 +279,27 @@ export function updateView3DButtonState(): void {
     return;
   }
 
-  const title = state.is3DMode
-    ? t("viewer.view3d.backTo2D") || t("viewer.mpr.backTo2D")
-    : t("viewer.view3d.enabledTitle") || t("viewer.mpr.enabledTitle");
-  buttons.forEach((btn) => {
-    btn.disabled = false;
-    btn.title = title;
-    btn.classList.remove("disabled");
-    btn.classList.toggle("active", state.is3DMode);
-  });
+  const btn3D = $("tool-view-3d") as HTMLButtonElement | null;
+  if (btn3D) {
+    btn3D.disabled = false;
+    btn3D.classList.remove("disabled");
+    btn3D.classList.toggle("active", Boolean(state.is3DMode));
+    btn3D.title = state.is3DMode
+      ? t("viewer.view3d.backTo2D") || t("viewer.mpr.backTo2D")
+      : t("viewer.view3d.enabledTitle") || t("viewer.mpr.enabledTitle");
+    btn3D.setAttribute("aria-pressed", String(Boolean(state.is3DMode)));
+  }
+
+  const btnMpr = $("tool-mpr") as HTMLButtonElement | null;
+  if (btnMpr) {
+    btnMpr.disabled = false;
+    btnMpr.classList.remove("disabled");
+    btnMpr.classList.toggle("active", Boolean(state.isMprMode));
+    btnMpr.title = state.isMprMode
+      ? t("viewer.mpr.backTo2D") || t("viewer.view3d.backTo2D")
+      : t("viewer.tool.mprStaticTitle") || t("viewer.mpr.enabledTitle");
+    btnMpr.setAttribute("aria-pressed", String(Boolean(state.isMprMode)));
+  }
 }
 
 // Backwards-compatible alias for existing tests and callers

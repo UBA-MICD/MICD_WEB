@@ -32,6 +32,7 @@ export function viewerFixtureHtml(): string {
     <button id="btn-export-menu" disabled></button>
 
     <div id="view-3d-container" class="hidden">
+      <canvas id="view-3d-canvas" class="view-3d-canvas"></canvas>
       <div class="view-3d-depth-slider-wrap hidden" id="view-3d-depth-slider-wrap">
         <span id="view-3d-depth-counter">Slice: 1/1</span>
         <input type="range" id="view-3d-depth-slider" min="0" max="0" value="0" />

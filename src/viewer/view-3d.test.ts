@@ -193,3 +193,75 @@ test("renderGizmo renders high-contrast orientation cube to 2D context", () => {
   assert.ok(fills.length > 0, "Cube faces filled");
   assert.ok(textStrokes.length > 0, "High contrast text outline stroked");
 });
+
+test("View3DViewer.setVolume updates volume and resets active texture", () => {
+  const viewer = new View3DViewer();
+  const mockGL = createMockWebGL2Context();
+  (viewer as any).gl = mockGL;
+
+  const mockVol = {
+    data: new Uint8Array([10, 20, 30, 40]),
+    depth: 2,
+    rows: 2,
+    cols: 1,
+    pixelSpacing: [1, 1] as [number, number],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  viewer.setVolume(mockVol);
+  assert.equal(viewer.volume, mockVol);
+});
+
+test("View3DViewer.startRenderLoop and stopRenderLoop control requestAnimationFrame loop", () => {
+  const viewer = new View3DViewer();
+  let rafCalled = false;
+  let cancelCalled = false;
+  const originalRaf = globalThis.requestAnimationFrame;
+  const originalCancel = globalThis.cancelAnimationFrame;
+
+  globalThis.requestAnimationFrame = ((cb: any) => {
+    rafCalled = true;
+    return 123;
+  }) as any;
+  globalThis.cancelAnimationFrame = ((id: any) => {
+    cancelCalled = true;
+  }) as any;
+
+  try {
+    viewer.isActive = true;
+    viewer.startRenderLoop();
+    assert.equal(rafCalled, true);
+
+    viewer.stopRenderLoop();
+    assert.equal(cancelCalled, true);
+  } finally {
+    globalThis.requestAnimationFrame = originalRaf;
+    globalThis.cancelAnimationFrame = originalCancel;
+  }
+});
+
+test("View3DViewer.render safely handles canvas with 0 dimensions without throwing", () => {
+  const viewer = new View3DViewer();
+  const mockGL = createMockWebGL2Context();
+  (viewer as any).gl = mockGL;
+  (viewer as any).program = {};
+  (viewer as any).volumeTexture = {};
+  (viewer as any).vao = {};
+
+  const zeroCanvas: any = {
+    width: 0,
+    height: 0,
+    clientWidth: 0,
+    clientHeight: 0,
+    getContext: (type: string) => (type === "webgl2" ? mockGL : null),
+  };
+
+  assert.doesNotThrow(() => {
+    viewer.render(zeroCanvas);
+  });
+  // Canvas should have been defaulted safely to >= 512
+  assert.equal(zeroCanvas.width, 512);
+  assert.equal(zeroCanvas.height, 512);
+});

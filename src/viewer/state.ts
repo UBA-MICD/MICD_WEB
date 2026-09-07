@@ -26,6 +26,7 @@ export interface AppState {
   isWlPanelOpen: boolean;
   isZoomPanelOpen: boolean;
   is3DMode: boolean;
+  isMprMode?: boolean;
   /** Validation record for the currently loaded server study, or null if none. */
   serverValidation: {
     validationId: number;
@@ -51,6 +52,7 @@ export const state: AppState = {
   isWlPanelOpen: false,
   isZoomPanelOpen: false,
   is3DMode: false,
+  isMprMode: false,
   serverValidation: null,
 };
 

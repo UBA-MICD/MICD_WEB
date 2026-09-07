@@ -232,7 +232,8 @@ test("updateMprButtonState disables with a reason for <=1 items, missing metadat
 });
 
 test("updateMprButtonState enables the button and reflects is3DMode in title/active class", () => {
-  const btn = document.getElementById("tool-mpr") as HTMLButtonElement;
+  const btn3D = document.getElementById("tool-view-3d") as HTMLButtonElement;
+  const btnMpr = document.getElementById("tool-mpr") as HTMLButtonElement;
   state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
   state.parsed = {
     metadata: {
@@ -245,16 +246,24 @@ test("updateMprButtonState enables the button and reflects is3DMode in title/act
   } as any;
 
   updateMprButtonState();
-  assert.equal(btn.disabled, false);
-  assert.equal(btn.classList.contains("active"), false);
+  assert.equal(btn3D.disabled, false);
+  assert.equal(btn3D.classList.contains("active"), false);
+  assert.equal(btnMpr.disabled, false);
+  assert.equal(btnMpr.classList.contains("active"), false);
 
   state.is3DMode = true;
   updateMprButtonState();
-  assert.equal(btn.classList.contains("active"), true);
+  assert.equal(btn3D.classList.contains("active"), true);
+
+  state.is3DMode = false;
+  state.isMprMode = true;
+  updateMprButtonState();
+  assert.equal(btnMpr.classList.contains("active"), true);
 });
 
 test("updateMprButtonState is a no-op when the button doesn't exist", () => {
-  document.getElementById("tool-mpr")!.remove();
+  document.getElementById("tool-view-3d")?.remove();
+  document.getElementById("tool-mpr")?.remove();
   assert.doesNotThrow(() => updateMprButtonState());
 });
 

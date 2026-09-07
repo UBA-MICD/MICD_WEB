@@ -419,6 +419,32 @@
               </button>
               <button
                 class="toolbar__tool"
+                id="tool-mpr"
+                data-i18n-attr="title:viewer.tool.mprStaticTitle"
+                title="Reconstrucción Multiplanar (MPR)"
+                disabled
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                  <path d="M10 3v18" stroke-dasharray="2 2" />
+                  <path d="M3 10h18" stroke-dasharray="2 2" />
+                </svg>
+                <span>MPR</span>
+              </button>
+              <button
+                class="toolbar__tool"
                 id="tool-layers"
                 title="Capas de Superposición"
                 aria-label="Capas"
@@ -690,10 +716,9 @@
 
             <div class="viewport-container cursor-wl" id="viewport-container">
               <!-- 3D Dedicated Container (Isolated overlay) -->
-              <div
-                id="view-3d-container"
-                class="view-3d-container hidden"
-              ></div>
+              <div id="view-3d-container" class="view-3d-container hidden">
+                <canvas id="view-3d-canvas" class="view-3d-canvas"></canvas>
+              </div>
 
               <!-- Anatomical Reference Cube (3D Gizmo) -->
               <canvas

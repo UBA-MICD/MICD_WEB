@@ -26,6 +26,31 @@ import { fetchValidation } from "./validation-api.js";
 import { fetchPrediction } from "./prediction-api.js";
 import { notifyPredictionLoaded, clearMLView } from "./ml-view.js";
 import { getViewportManager } from "./viewport-registry.js";
+import { view3DViewer, buildVolumeFromCache } from "./view-3d.js";
+import { mprEngine } from "./mpr-engine.js";
+import { itemCount } from "./state.js";
+
+/** Builds and injects the 3D volume into ViewportManager, MPREngine, and View3DViewer. */
+export async function loadVolumeIntoEngines(): Promise<boolean> {
+  const count = itemCount();
+  if (count <= 1) return false;
+  try {
+    const vol = await buildVolumeFromCache();
+    if (vol) {
+      const manager = getViewportManager();
+      if (manager) {
+        manager.setVolume(vol);
+      } else {
+        view3DViewer.setVolume(vol);
+        mprEngine.loadVolume(vol);
+      }
+      return true;
+    }
+  } catch (err) {
+    console.warn("Failed to load volume into engines:", err);
+  }
+  return false;
+}
 
 /**
  * Sorts DICOM files in ascending order by Instance Number (0020,0013).
@@ -117,6 +142,12 @@ export function resetViewerToDropZone(): void {
   state.serverInstances = [];
   state.currentIndex = 0;
   state.parsed = null;
+  state.is3DMode = false;
+  state.isMprMode = false;
+  view3DViewer.isActive = false;
+  view3DViewer.volume = null;
+  view3DViewer.stopRenderLoop();
+  mprEngine.volume = null;
   $("series-nav").classList.add("hidden");
   $("topbar-title").textContent = t("viewer.defaultTitle");
   $("topbar-title").title = "";
@@ -173,6 +204,9 @@ export function initFileInputs(): void {
       panY: 0,
     };
     await loadCurrent();
+    if (sortedFiles.length > 1) {
+      void loadVolumeIntoEngines();
+    }
   });
 
   // Folder picker — loads every DICOM image in the folder so you can walk through them
@@ -215,6 +249,9 @@ export function initFileInputs(): void {
       panY: 0,
     };
     await loadCurrent();
+    if (sortedFiles.length > 1) {
+      void loadVolumeIntoEngines();
+    }
     folderInput.value = "";
   });
 
@@ -270,6 +307,9 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
       return;
     }
     await loadCurrent();
+    if (state.serverInstances.length > 1) {
+      void loadVolumeIntoEngines();
+    }
     const [validationResult, predictionResult] = await Promise.all([
       fetchValidation(studyId),
       fetchPrediction(studyId),

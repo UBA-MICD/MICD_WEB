@@ -217,17 +217,17 @@ test("MPRVolume: transformation methods update world matrices without mutating t
 test("MPRCamera: Axial, Coronal, and Sagittal cameras have static orthogonal bases", () => {
   const axial = new MPRCamera("axial");
   assert.deepEqual(axial.uAxis, [1, 0, 0]);
-  assert.deepEqual(axial.vAxis, [0, -1, 0]);
+  assert.deepEqual(axial.vAxis, [0, 1, 0]);
   assert.deepEqual(axial.normal, [0, 0, 1]);
 
   const coronal = new MPRCamera("coronal");
   assert.deepEqual(coronal.uAxis, [1, 0, 0]);
-  assert.deepEqual(coronal.vAxis, [0, 0, 1]);
+  assert.deepEqual(coronal.vAxis, [0, 0, -1]);
   assert.deepEqual(coronal.normal, [0, 1, 0]);
 
   const sagittal = new MPRCamera("sagittal");
   assert.deepEqual(sagittal.uAxis, [0, 1, 0]);
-  assert.deepEqual(sagittal.vAxis, [0, 0, 1]);
+  assert.deepEqual(sagittal.vAxis, [0, 0, -1]);
   assert.deepEqual(sagittal.normal, [1, 0, 0]);
 });
 
@@ -261,10 +261,10 @@ test("MPRCamera: M_screenToTex extracts orthogonal slice center accurately", () 
   assert.ok(Math.abs(centerTex[1] - 0.5) < 1e-4);
   assert.ok(Math.abs(centerTex[2] - 0.5) < 1e-4);
 
-  // Screen quad top-left (-1, 1) should map to top-left voxel coordinates (u=0, v=0, w=0.5)
+  // Screen quad top-left (-1, 1) with inverted V-axis maps to (u=0, v=1, w=0.5)
   const tlTex = Matrix4.transformPoint(screenToTex, [-1, 1, 0]);
   assert.ok(Math.abs(tlTex[0] - 0.0) < 1e-4);
-  assert.ok(Math.abs(tlTex[1] - 0.0) < 1e-4);
+  assert.ok(Math.abs(tlTex[1] - 1.0) < 1e-4);
   assert.ok(Math.abs(tlTex[2] - 0.5) < 1e-4);
 });
 
@@ -277,7 +277,7 @@ test("MPRCamera: Volume rotation obliquely samples volume texture while camera r
 
   // Camera basis remains untouched (strictly static)
   assert.deepEqual(camera.uAxis, [1, 0, 0]);
-  assert.deepEqual(camera.vAxis, [0, -1, 0]);
+  assert.deepEqual(camera.vAxis, [0, 1, 0]);
   assert.deepEqual(camera.normal, [0, 0, 1]);
 
   const screenToTex = camera.getScreenToTexMatrix(volume, 512, 512);
@@ -393,4 +393,164 @@ test("MPREngine: volume manipulation updates volume transform", () => {
 
 test("mprEngine singleton instance is exported", () => {
   assert.ok(mprEngine instanceof MPREngine);
+});
+
+// ── Phase 3 Tests: 2D-to-3D Delta, Pan, Crosshair Sync & Clamping ────────────
+
+test("MPREngine: convert2DTo3DDelta maps 2D screen movement to orthogonal 3D world vectors", () => {
+  const engine = new MPREngine();
+  engine.loadVolume(sampleVolumeData());
+  const vpW = 400;
+  const vpH = 400;
+
+  // In Axial view: dx moves along +X (Sagittal), dy moves along +Y (Coronal), Z = 0
+  const axialDelta = engine.convert2DTo3DDelta("axial", 10, 20, vpW, vpH);
+  assert.ok(axialDelta[0] > 0, "dx moves +X");
+  assert.ok(axialDelta[1] < 0, "dy down moves -Y with inverted V axis");
+  assert.equal(axialDelta[2], 0, "dZ is 0 in Axial plane");
+
+  // In Coronal view: dx moves along +X (Sagittal), dy moves along +Z (inverted V), Y = 0
+  const coronalDelta = engine.convert2DTo3DDelta("coronal", 15, 25, vpW, vpH);
+  assert.ok(coronalDelta[0] > 0, "dx moves +X");
+  assert.equal(coronalDelta[1], 0, "dY is 0 in Coronal plane");
+  assert.ok(coronalDelta[2] > 0, "dy down moves +Z with inverted V axis");
+
+  // In Sagittal view: dx moves along +Y (Coronal), dy moves along +Z (inverted V), X = 0
+  const sagittalDelta = engine.convert2DTo3DDelta("sagittal", 30, 40, vpW, vpH);
+  assert.equal(sagittalDelta[0], 0, "dX is 0 in Sagittal plane");
+  assert.ok(sagittalDelta[1] > 0, "dx moves +Y (towards Posterior)");
+  assert.ok(sagittalDelta[2] > 0, "dy down moves +Z with inverted V axis");
+});
+
+test("MPREngine: applyPanDelta2D and clampVolumeTranslation bound translation within visible area", () => {
+  const engine = new MPREngine();
+  engine.loadVolume(sampleVolumeData());
+  const [sx, sy, sz] = engine.volume!.physicalSize;
+
+  // Apply reasonable pan
+  engine.applyPanDelta2D("axial", 20, -10, 400, 400);
+  const t = engine.volume!.transform.translation;
+  assert.notEqual(t[0], 0);
+  assert.notEqual(t[1], 0);
+
+  // Attempt massive pan that would lose the volume into the void
+  engine.applyPanDelta2D("axial", 50000, 50000, 400, 400);
+  const clamped = engine.volume!.transform.translation;
+
+  // Max translation is strictly bounded to 85% of volume dimensions
+  assert.ok(Math.abs(clamped[0]) <= sx * 0.85 + 1e-4);
+  assert.ok(Math.abs(clamped[1]) <= sy * 0.85 + 1e-4);
+  assert.ok(Math.abs(clamped[2]) <= sz * 0.85 + 1e-4);
+});
+
+test("MPREngine: setCrosshairWorld clamps out-of-bounds coordinates to volume texture [0, 1]^3", () => {
+  const engine = new MPREngine();
+  engine.loadVolume(sampleVolumeData());
+
+  // Inside coordinates: center [0, 0, 0] -> normalized [0.5, 0.5, 0.5]
+  engine.setCrosshairWorld(0, 0, 0);
+  assert.deepEqual(engine.getCrosshairWorld(), [0, 0, 0]);
+  assert.deepEqual(engine.getCrosshairNormalized(), [0.5, 0.5, 0.5]);
+
+  // Out-of-bounds coordinates (e.g. 5000mm, -5000mm)
+  engine.setCrosshairWorld(99999, -99999, 99999);
+  const norm = engine.getCrosshairNormalized();
+
+  // Strictly clamped inside [0, 1]^3
+  assert.equal(norm[0], 1.0);
+  assert.equal(norm[1], 0.0);
+  assert.equal(norm[2], 1.0);
+
+  // Static cameras have slice offsets synchronized to the clamped world coordinates
+  assert.equal(engine.axialCamera.sliceOffset, engine.crosshairWorld[2]);
+  assert.equal(engine.coronalCamera.sliceOffset, engine.crosshairWorld[1]);
+  assert.equal(engine.sagittalCamera.sliceOffset, engine.crosshairWorld[0]);
+});
+
+test("MPREngine: applyCrosshairDelta2D and setCrosshairFromScreen synchronize all three slice planes", () => {
+  const engine = new MPREngine();
+  engine.loadVolume(sampleVolumeData());
+
+  // Click at screen center of Axial view
+  engine.setCrosshairFromScreen("axial", 200, 200, 400, 400);
+  const worldAtCenter = engine.getCrosshairWorld();
+  assert.ok(Math.abs(worldAtCenter[0]) < 1e-4);
+  assert.ok(Math.abs(worldAtCenter[1]) < 1e-4);
+
+  // Drag in Axial view by (+20px, +30px)
+  engine.applyCrosshairDelta2D("axial", 20, 30, 400, 400);
+
+  // Axial slice (Z) remains unchanged; Sagittal (X) and Coronal (Y) update
+  assert.ok(engine.sagittalCamera.sliceOffset > 0, "Sagittal plane shifted +X");
+  assert.ok(engine.coronalCamera.sliceOffset < 0, "Coronal plane shifted -Y");
+  assert.equal(engine.axialCamera.sliceOffset, 0, "Axial plane unchanged");
+});
+
+test("MPREngine: getCrosshairColors returns clinical color code consistency", () => {
+  const engine = new MPREngine();
+
+  const axialColors = engine.getCrosshairColors("axial");
+  assert.equal(
+    axialColors.vertical,
+    "#f87171",
+    "Axial vertical is Sagittal (Coral)",
+  );
+  assert.equal(
+    axialColors.horizontal,
+    "#34d399",
+    "Axial horizontal is Coronal (Emerald)",
+  );
+
+  const coronalColors = engine.getCrosshairColors("coronal");
+  assert.equal(
+    coronalColors.vertical,
+    "#f87171",
+    "Coronal vertical is Sagittal (Coral)",
+  );
+  assert.equal(
+    coronalColors.horizontal,
+    "#38bdf8",
+    "Coronal horizontal is Axial (Sky Blue)",
+  );
+
+  const sagittalColors = engine.getCrosshairColors("sagittal");
+  assert.equal(
+    sagittalColors.vertical,
+    "#34d399",
+    "Sagittal vertical is Coronal (Emerald)",
+  );
+  assert.equal(
+    sagittalColors.horizontal,
+    "#38bdf8",
+    "Sagittal horizontal is Axial (Sky Blue)",
+  );
+});
+
+test("MPREngine: renderCrosshair draws intersecting lines with center gap on 2D context", () => {
+  const engine = new MPREngine();
+  engine.loadVolume(sampleVolumeData());
+
+  const strokes: any[] = [];
+  const paths: { x: number; y: number }[] = [];
+
+  const mockCtx: any = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: (x: number, y: number) => paths.push({ x, y }),
+    lineTo: (x: number, y: number) => paths.push({ x, y }),
+    stroke: () => strokes.push(true),
+    set strokeStyle(_v: string) {},
+    set shadowColor(_v: string) {},
+    set shadowBlur(_v: number) {},
+    set lineWidth(_v: number) {},
+  };
+
+  engine.renderCrosshair("axial", mockCtx, 400, 400);
+  assert.equal(
+    strokes.length,
+    2,
+    "Two strokes (vertical and horizontal lines)",
+  );
+  assert.ok(paths.length >= 4, "Lines broken by center gap");
 });

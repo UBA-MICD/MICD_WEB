@@ -1228,6 +1228,15 @@ body {
   transition: transform 0.05s linear;
 }
 
+.viewport-canvas-gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: none;
+}
+
 /* 2D Mode (Default) */
 #viewport-container:not(.mode-3d) #dicom-canvas {
   display: none !important;
@@ -3313,7 +3322,24 @@ body {
   position: absolute;
   inset: 0;
   z-index: 60;
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+}
+
+#view-3d-container.hidden,
+.view-3d-container.hidden {
+  display: none !important;
+}
+
+.view-3d-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 /* Right-side Depth Slider */

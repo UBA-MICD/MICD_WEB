@@ -157,28 +157,76 @@ export class View3DViewer {
     this.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
   }
 
+  public setVolume(vol: VoxelVolume): void {
+    this.volume = vol;
+    this.windowCenter = vol.windowCenter;
+    this.windowWidth = vol.windowWidth;
+    this.crosshair = {
+      x: Math.floor(vol.cols / 2),
+      y: Math.floor(vol.rows / 2),
+      z: Math.floor(vol.depth / 2),
+    };
+    if (this.gl) {
+      this.uploadVolumeTexture();
+    }
+  }
+
   private gl: WebGL2RenderingContext | null = null;
   private program: WebGLProgram | null = null;
   private volumeTexture: WebGLTexture | null = null;
   private vao: WebGLVertexArrayObject | null = null;
   private vbo: WebGLBuffer | null = null;
+  private animationFrameId: number | null = null;
+
+  public startRenderLoop(canvas?: HTMLCanvasElement): void {
+    this.stopRenderLoop();
+    const getTargetCanvas = (): HTMLCanvasElement | null =>
+      canvas ||
+      (typeof document !== "undefined"
+        ? ((document.getElementById("view-3d-canvas") ||
+            document.getElementById(
+              "dicom-canvas",
+            )) as HTMLCanvasElement | null)
+        : null);
+
+    const loop = () => {
+      if (!this.isActive) {
+        this.animationFrameId = null;
+        return;
+      }
+      const target = getTargetCanvas();
+      if (target) {
+        this.render(target);
+      }
+      if (typeof requestAnimationFrame !== "undefined") {
+        this.animationFrameId = requestAnimationFrame(loop);
+      }
+    };
+
+    if (typeof requestAnimationFrame !== "undefined") {
+      this.animationFrameId = requestAnimationFrame(loop);
+    }
+  }
+
+  public stopRenderLoop(): void {
+    if (this.animationFrameId !== null) {
+      if (typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(this.animationFrameId);
+      }
+      this.animationFrameId = null;
+    }
+  }
 
   public async toggle3DMode(): Promise<boolean> {
     if (this.isActive) {
       this.isActive = false;
+      this.stopRenderLoop();
       state.is3DMode = false;
-      const oldCanvas = document.getElementById(
-        "dicom-canvas",
-      ) as HTMLCanvasElement;
-      if (oldCanvas && oldCanvas.parentNode) {
-        const newCanvas = oldCanvas.cloneNode() as HTMLCanvasElement;
-        oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
-      }
       return false;
     }
 
     const totalSlices = itemCount();
-    if (totalSlices <= 1) {
+    if (totalSlices <= 1 && !this.volume) {
       showError(
         t("viewer.view3d.needTwoSlices") || t("viewer.mpr.needTwoSlices"),
       );
@@ -187,43 +235,43 @@ export class View3DViewer {
 
     showLoading(true);
     try {
-      const parsedSlices: ParsedDicom[] = [];
-      for (let i = 0; i < totalSlices; i++) {
-        const parsed = await dicomCache.getOrFetch(i);
-        if (!parsed || !parsed.pixelData) {
-          throw new Error(`Failed to get pixel data for slice ${i + 1}`);
+      if (!this.volume) {
+        const parsedSlices: ParsedDicom[] = [];
+        for (let i = 0; i < totalSlices; i++) {
+          const parsed = await dicomCache.getOrFetch(i);
+          if (!parsed || !parsed.pixelData) {
+            throw new Error(`Failed to get pixel data for slice ${i + 1}`);
+          }
+          parsedSlices.push(parsed);
         }
-        parsedSlices.push(parsed);
+
+        // Sort slices by Z coordinate (imagePositionPatient[2]) or instanceNumber
+        parsedSlices.sort((a, b) => {
+          const posA = a.metadata.imagePositionPatient;
+          const posB = b.metadata.imagePositionPatient;
+          if (posA && posB && posA.length >= 3 && posB.length >= 3) {
+            return posA[2] - posB[2];
+          }
+          // Fallback if imagePositionPatient is absent
+          const instA = Number(a.metadata.instanceNumber) || 0;
+          const instB = Number(b.metadata.instanceNumber) || 0;
+          return instA - instB;
+        });
+
+        this.setVolume(this.buildVolume(parsedSlices));
       }
 
-      // Sort slices by Z coordinate (imagePositionPatient[2]) or instanceNumber
-      parsedSlices.sort((a, b) => {
-        const posA = a.metadata.imagePositionPatient;
-        const posB = b.metadata.imagePositionPatient;
-        if (posA && posB && posA.length >= 3 && posB.length >= 3) {
-          return posA[2] - posB[2];
-        }
-        // Fallback if imagePositionPatient is absent
-        const instA = Number(a.metadata.instanceNumber) || 0;
-        const instB = Number(b.metadata.instanceNumber) || 0;
-        return instA - instB;
-      });
-
-      this.volume = this.buildVolume(parsedSlices);
-      this.windowCenter = this.volume.windowCenter;
-      this.windowWidth = this.volume.windowWidth;
-
-      this.crosshair = {
-        x: Math.floor(this.volume.cols / 2),
-        y: Math.floor(this.volume.rows / 2),
-        z: Math.floor(this.volume.depth / 2),
-      };
+      if (this.volume) {
+        this.windowCenter = this.volume.windowCenter;
+        this.windowWidth = this.volume.windowWidth;
+      }
 
       const container =
         document.getElementById("view-3d-container") ||
         document.getElementById("viewport-container");
       let fitZoom = 1;
       if (
+        this.volume &&
         container &&
         container.clientWidth > 0 &&
         container.clientHeight > 0
@@ -246,15 +294,16 @@ export class View3DViewer {
       this.isActive = true;
       state.is3DMode = true;
 
-      // Re-create canvas to unlock 2D / WebGL2 context
-      let canvas = document.getElementById("dicom-canvas") as HTMLCanvasElement;
-      if (canvas && canvas.parentNode) {
-        const newCanvas = canvas.cloneNode() as HTMLCanvasElement;
-        canvas.parentNode.replaceChild(newCanvas, canvas);
-        canvas = newCanvas;
-
+      const canvas =
+        (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
+        (document.getElementById("dicom-canvas") as HTMLCanvasElement);
+      if (canvas) {
         this.initGL(canvas);
-        this.uploadVolumeTexture();
+        if (this.volume) {
+          this.uploadVolumeTexture();
+        }
+        this.render(canvas);
+        this.startRenderLoop(canvas);
       }
 
       return true;
@@ -269,7 +318,7 @@ export class View3DViewer {
     }
   }
 
-  private buildVolume(slices: ParsedDicom[]): VoxelVolume {
+  public buildVolume(slices: ParsedDicom[]): VoxelVolume {
     const depth = slices.length;
     const refMeta = slices[0].metadata;
     const rows = refMeta.rows;
@@ -324,7 +373,7 @@ export class View3DViewer {
   }
 
   /** Initialize WebGL2 context, Shaders and 3D Bounding Box Geometry. */
-  private initGL(canvas: HTMLCanvasElement): boolean {
+  public initGL(canvas: HTMLCanvasElement): boolean {
     let gl = canvas.getContext("webgl2", {
       alpha: true,
       antialias: true,
@@ -339,18 +388,21 @@ export class View3DViewer {
 
     // GLSL ES 3.00 Vertex Shader — 3D Cube Bounding Box Proxy Geometry
     const vsSource = `#version 300 es
-in vec3 a_position;
-in vec3 a_texCoord;
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_texCoord;
 
 uniform mat4 u_mvp;
+uniform vec3 u_boxMin;
+uniform vec3 u_boxMax;
 
 out vec3 v_texCoord;
 out vec3 v_position;
 
 void main() {
     v_texCoord = a_texCoord;
-    v_position = a_position;
-    gl_Position = u_mvp * vec4(a_position, 1.0);
+    vec3 scaledPos = mix(u_boxMin, u_boxMax, a_position + vec3(0.5));
+    v_position = scaledPos;
+    gl_Position = u_mvp * vec4(scaledPos, 1.0);
 }
 `;
 
@@ -432,55 +484,94 @@ void main() {
         return;
     }
 
-    // Volume Ray Marching Algorithm (3D Raycasting with Early Termination)
-    const int STEPS = 160;
-    float stepSize = (tFar - tNear) / float(STEPS);
-    vec3 rayPos = u_cameraPos + rayDir * tNear;
-    vec3 stepVec = rayDir * stepSize;
-
+    // ── Mode 3: 3D Triplanar Intersecting Orthogonal Planes + Volume Ray Marching ──
     vec4 accumColor = vec4(0.0);
 
-    for (int i = 0; i < STEPS; i++) {
-        vec3 texCoord = (rayPos - u_boxMin) / (u_boxMax - u_boxMin);
+    // Analytical plane intersections for the 3 orthogonal planes
+    float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
+    float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
+    float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
 
-        if (texCoord.x >= 0.0 && texCoord.x <= 1.0 &&
-            texCoord.y >= 0.0 && texCoord.y <= 1.0 &&
-            texCoord.z >= 0.0 && texCoord.z <= 1.0) {
+    float tX = abs(rayDir.x) > 1e-5 ? (planeX - u_cameraPos.x) / rayDir.x : -1.0;
+    float tY = abs(rayDir.y) > 1e-5 ? (planeY - u_cameraPos.y) / rayDir.y : -1.0;
+    float tZ = abs(rayDir.z) > 1e-5 ? (planeZ - u_cameraPos.z) / rayDir.z : -1.0;
 
-            // Dynamic depth clipping plane
-            if (texCoord.z <= u_clipPlane) {
-                float density = texture(u_volume, texCoord).r;
-                float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
+    vec4 hits[3];
+    int hitCount = 0;
 
-                float thickness = 0.005;
-                bool onPlaneX = abs(texCoord.x - u_crosshair.x) < thickness;
-                bool onPlaneY = abs(texCoord.y - u_crosshair.y) < thickness;
-                bool onPlaneZ = abs(texCoord.z - u_crosshair.z) < thickness;
+    if (tX >= tNear && tX <= tFar) {
+        vec3 p = u_cameraPos + rayDir * tX;
+        vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        if (tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+            float d = texture(u_volume, tc).r;
+            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+            hits[hitCount++] = vec4(tX, val * 1.0, val * 0.7, val * 0.7);
+        }
+    }
+    if (tY >= tNear && tY <= tFar) {
+        vec3 p = u_cameraPos + rayDir * tY;
+        vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        if (tc.x >= 0.0 && tc.x <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+            float d = texture(u_volume, tc).r;
+            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+            hits[hitCount++] = vec4(tY, val * 0.7, val * 1.0, val * 0.7);
+        }
+    }
+    if (tZ >= tNear && tZ <= tFar) {
+        vec3 p = u_cameraPos + rayDir * tZ;
+        vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0) {
+            float d = texture(u_volume, tc).r;
+            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+            hits[hitCount++] = vec4(tZ, val * 0.7, val * 0.85, val * 1.0);
+        }
+    }
 
-                if (onPlaneX || onPlaneY || onPlaneZ) {
-                    vec3 planeColor = vec3(intensity);
-
-                    if (onPlaneX) planeColor *= vec3(1.0, 0.6, 0.6);      // Sagittal (Red)
-                    else if (onPlaneY) planeColor *= vec3(0.6, 1.0, 0.6); // Coronal (Green)
-                    else planeColor *= vec3(0.6, 0.8, 1.0);               // Axial (Blue)
-
-                    float planeAlpha = 0.25;
-
-                    accumColor.rgb += (1.0 - accumColor.a) * planeColor * planeAlpha;
-                    accumColor.a += (1.0 - accumColor.a) * planeAlpha;
-
-                    if (accumColor.a >= 0.98) {
-                        accumColor.a = 1.0;
-                        break;
-                    }
-                }
+    // Sort hits front-to-back
+    for (int i = 0; i < 2; i++) {
+        for (int j = i + 1; j < 3; j++) {
+            if (j < hitCount && hits[j].x < hits[i].x) {
+                vec4 tmp = hits[i];
+                hits[i] = hits[j];
+                hits[j] = tmp;
             }
         }
-        rayPos += stepVec;
+    }
+
+    // Composite orthogonal plane cuts
+    for (int i = 0; i < 3; i++) {
+        if (i >= hitCount) break;
+        vec3 rgb = hits[i].yzw;
+        float alpha = 0.85;
+        accumColor.rgb += (1.0 - accumColor.a) * rgb * alpha;
+        accumColor.a += (1.0 - accumColor.a) * alpha;
+        if (accumColor.a >= 0.98) break;
+    }
+
+    // Fallback volume ray march if no planes hit but within volume box
+    if (accumColor.a < 0.05) {
+        const int STEPS = 80;
+        float stepSize = (tFar - tNear) / float(STEPS);
+        vec3 rayPos = u_cameraPos + rayDir * tNear;
+        vec3 stepVec = rayDir * stepSize;
+        for (int i = 0; i < STEPS; i++) {
+            vec3 tc = (rayPos - u_boxMin) / (u_boxMax - u_boxMin);
+            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+                float d = texture(u_volume, tc).r;
+                float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+                if (val > 0.15) {
+                    float a = val * 0.05;
+                    accumColor.rgb += (1.0 - accumColor.a) * vec3(val) * a;
+                    accumColor.a += (1.0 - accumColor.a) * a;
+                    if (accumColor.a >= 0.95) break;
+                }
+            }
+            rayPos += stepVec;
+        }
     }
 
     if (accumColor.a < 0.01) discard;
-    fragColor = accumColor;
+    fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), accumColor.a);
 }
 `;
 
@@ -584,9 +675,12 @@ void main() {
     const totalVoxels = depth * rows * cols;
     const normalizedData = new Uint8Array(totalVoxels);
 
+    const slope = rescaleSlope ?? 1;
+    const intercept = rescaleIntercept ?? 0;
+
     for (let i = 0; i < totalVoxels; i++) {
       const raw = data[i];
-      const hu = raw * rescaleSlope + rescaleIntercept;
+      const hu = raw * slope + intercept;
       // Map HU [-1024..3071] into [0..255]
       const norm = Math.max(
         0,
@@ -717,17 +811,21 @@ void main() {
 
   /** Render WebGL2 3D Volume Ray Marching. */
   public render(canvas: HTMLCanvasElement): void {
-    if (!this.volume || !canvas) return;
+    if (!canvas) return;
 
     if (!this.gl || this.gl.canvas !== canvas) {
       this.initGL(canvas);
-      this.uploadVolumeTexture();
+      if (this.volume) {
+        this.uploadVolumeTexture();
+      }
     }
     const gl = this.gl;
-    if (!gl || !this.program || !this.volumeTexture || !this.vao) return;
+    if (!gl) return;
 
-    const width = canvas.clientWidth || canvas.width;
-    const height = canvas.clientHeight || canvas.height;
+    const width = canvas.clientWidth || canvas.width || 512;
+    const height = canvas.clientHeight || canvas.height || 512;
+    if (width <= 0 || height <= 0) return;
+
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
@@ -736,6 +834,26 @@ void main() {
     gl.viewport(0, 0, width, height);
     gl.clearColor(0.04, 0.04, 0.06, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // Always render 3D Anatomical Reference Cube (Gizmo)
+    const gizmoCanvas =
+      typeof document !== "undefined"
+        ? ((document.getElementById("view-3d-reference-cube") ||
+            document.getElementById(
+              "mpr-reference-cube",
+            )) as HTMLCanvasElement | null)
+        : null;
+    if (gizmoCanvas) {
+      this.renderGizmo(gizmoCanvas);
+    }
+
+    if (this.volume && !this.volumeTexture) {
+      this.uploadVolumeTexture();
+    }
+
+    if (!this.volume || !this.program || !this.volumeTexture || !this.vao)
+      return;
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -792,7 +910,7 @@ void main() {
     const view = Matrix4.lookAt(
       [eyeX, eyeY, eyeZ],
       [panOffsetX, panOffsetY, 0],
-      [0, -1, 0],
+      [0, 1, 0],
     );
 
     const mvp = Matrix4.multiply(proj, view);
@@ -880,18 +998,6 @@ void main() {
     // Draw Volume Bounding Box Cube Geometry
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 36);
-
-    // Render 3D Anatomical Reference Cube
-    const gizmoCanvas =
-      typeof document !== "undefined"
-        ? ((document.getElementById("view-3d-reference-cube") ||
-            document.getElementById(
-              "mpr-reference-cube",
-            )) as HTMLCanvasElement | null)
-        : null;
-    if (gizmoCanvas) {
-      this.renderGizmo(gizmoCanvas);
-    }
   }
 
   /** Render 3D Anatomical Reference Cube (delegates to renderGizmo). */
@@ -1174,3 +1280,29 @@ void main() {
 export const view3DViewer = new View3DViewer();
 // Backward-compatibility export alias for MPR
 export { View3DViewer as MPR3DViewer, view3DViewer as mpr3DViewer };
+
+/** Builds a VoxelVolume from cached DICOM slices if multiple slices are available. */
+export async function buildVolumeFromCache(): Promise<VoxelVolume | null> {
+  const count = itemCount();
+  if (count <= 1) return null;
+
+  const slices: ParsedDicom[] = [];
+  for (let i = 0; i < count; i++) {
+    const parsed = await dicomCache.getOrFetch(i);
+    if (!parsed || !parsed.pixelData) return null;
+    slices.push(parsed);
+  }
+
+  slices.sort((a, b) => {
+    const posA = a.metadata.imagePositionPatient;
+    const posB = b.metadata.imagePositionPatient;
+    if (posA && posB && posA.length >= 3 && posB.length >= 3) {
+      return posA[2] - posB[2];
+    }
+    const instA = Number(a.metadata.instanceNumber) || 0;
+    const instB = Number(b.metadata.instanceNumber) || 0;
+    return instA - instB;
+  });
+
+  return view3DViewer.buildVolume(slices);
+}

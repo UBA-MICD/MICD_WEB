@@ -8,9 +8,7 @@ export function isDesktop(): boolean {
 
 /**
  * Un-hides every `[data-desktop-only]` element. These start hidden in the
- * shared markup (`class="hidden"`) so the browser build never shows them —
- * e.g. the API-origin field on the server screen's auth card, meaningless
- * when nginx already proxies same-origin.
+ * shared markup (`class="hidden"`) so the browser build never shows them.
  */
 export function initDesktopOnlyUI(): void {
   if (!isDesktop()) return;
@@ -20,30 +18,43 @@ export function initDesktopOnlyUI(): void {
 }
 
 /**
- * Wires the server screen's API-origin field: pre-fills it with the current
- * value, and on save persists it via the preload bridge and reloads so the
- * new origin takes effect (it's read synchronously by preload before page
- * scripts run — see global.d.ts).
+ * Wires the server screen's API-origin settings card for all platforms (TK-29).
+ *
+ * - Desktop (Electron): reads/writes via the preload bridge (`window.api`).
+ * - Browser: reads/writes localStorage key `micd_api_origin`; the stored
+ *   value is injected into `window.MICD_API_ORIGIN` by an inline script in
+ *   index.html before auth.ts loads, so the new origin takes effect on reload.
+ *
+ * Both paths validate the URL the same way and call `window.location.reload()`
+ * after saving so the new origin is picked up by `resolveApiOrigin()`.
  */
-export async function initDesktopApiOriginSetting(): Promise<void> {
-  if (!isDesktop() || !window.api) return;
+export async function initApiOriginSetting(): Promise<void> {
   const input = document.getElementById(
     "desktop-api-origin-input",
   ) as HTMLInputElement | null;
   const saveBtn = document.getElementById("desktop-api-origin-save");
-  if (!input || !saveBtn) return;
+  const card = document.querySelector<HTMLElement>(".auth-card--settings");
+  if (!input || !saveBtn || !card) return;
 
-  input.value = await window.api.getApiOrigin();
+  card.classList.remove("hidden");
+
+  // Pre-fill with the current value.
+  if (isDesktop() && window.api) {
+    input.value = await window.api.getApiOrigin();
+  } else {
+    const ls = (
+      globalThis as { localStorage?: Pick<Storage, "getItem" | "setItem"> }
+    ).localStorage;
+    input.value = ls?.getItem("micd_api_origin") ?? "";
+  }
+
   saveBtn.addEventListener("click", () => {
     void (async () => {
-      if (!window.api) return;
       const raw = input.value.trim();
       if (!raw) return;
 
       // A bare "host:port" (no scheme) is a relative URL to fetch(), not an
-      // absolute one — it silently resolves against the app's file:// origin
-      // instead of ever reaching the backend. Default to http:// so typing
-      // "localhost:3001" does what it looks like it should.
+      // absolute one — default to http:// so "localhost:3001" works as expected.
       const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
       let origin: string;
       try {
@@ -54,8 +65,22 @@ export async function initDesktopApiOriginSetting(): Promise<void> {
       }
 
       input.value = origin;
-      await window.api.setApiOrigin(origin);
+
+      if (isDesktop() && window.api) {
+        await window.api.setApiOrigin(origin);
+      } else {
+        const ls = (
+          globalThis as { localStorage?: Pick<Storage, "getItem" | "setItem"> }
+        ).localStorage;
+        ls?.setItem("micd_api_origin", origin);
+      }
+
       window.location.reload();
     })();
   });
+}
+
+/** @deprecated Use initApiOriginSetting() — kept for callers that have not migrated. */
+export async function initDesktopApiOriginSetting(): Promise<void> {
+  return initApiOriginSetting();
 }

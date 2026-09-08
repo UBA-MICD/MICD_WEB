@@ -108,6 +108,14 @@ function renderForSession(): void {
   $("server-auth").classList.toggle("hidden", authed);
   $("server-tabs").classList.toggle("hidden", !authed);
 
+  // Re-pointing the server is an admin-only action (TK-29, spec 001): the settings
+  // gear is shown only to an admin, and hidden for guests and every non-admin role.
+  // `?.` guards partial test DOMs; isAdmin() is false for guests, so one line covers
+  // all branches (including the guest early-return below).
+  document
+    .getElementById("btn-server-settings")
+    ?.classList.toggle("hidden", !isAdmin());
+
   if (!authed) {
     TABS.forEach((name) => tabPanel(name).classList.add("hidden"));
     loginForm?.reset();

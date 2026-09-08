@@ -230,6 +230,26 @@ body {
   color: var(--text-primary);
 }
 
+/* Admin-only server-config gear (TK-29). Icon button pushed to the header's right
+   edge; matches the muted-to-primary hover of the back link. */
+.btn-server-settings {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+.btn-server-settings:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
 .server-tabs {
   display: flex;
   gap: 6px;

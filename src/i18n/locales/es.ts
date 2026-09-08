@@ -58,6 +58,7 @@ export const es: Record<string, string> = {
   "server.backToViewer": "Volver al visualizador",
   "server.tabsAriaLabel": "Acciones del servidor",
   "server.tabUpload": "Cargar",
+  "server.configButton": "Configurar servidor",
   "server.advancedSettings": "Configuración avanzada",
   "server.apiOriginLabel": "Servidor de la API",
   "server.apiOriginPlaceholder": "http://localhost:3000",

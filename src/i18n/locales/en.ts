@@ -56,6 +56,7 @@ export const en: Record<string, string> = {
   "server.backToViewer": "Back to viewer",
   "server.tabsAriaLabel": "Server actions",
   "server.tabUpload": "Upload",
+  "server.configButton": "Configure server",
   "server.advancedSettings": "Advanced settings",
   "server.apiOriginLabel": "API server",
   "server.apiOriginPlaceholder": "http://localhost:3000",

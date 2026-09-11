@@ -26,6 +26,16 @@ import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
 import { mprEngine } from "./mpr-engine.ts";
 import { dicomCache } from "./cache.ts";
 import { ViewportManager } from "./viewport-manager.ts";
+import {
+  clearAnnotations,
+  getAnnotationsForSlice,
+} from "./measurements/annotation-state.ts";
+import {
+  getActiveDrawing,
+  setActiveDrawing,
+  getSelectedAnnotationId,
+  setSelectedAnnotationId,
+} from "./measurements/measurement-overlay.ts";
 
 // Fresh jsdom document per test (not just a fresh body): initKeyboardShortcuts()
 // and parts of initViewportInteraction() bind listeners to `document` itself,
@@ -52,6 +62,7 @@ const baseMeta = {
   modality: "CT",
   instanceNumber: "1",
   sopClassUid: "1.2.840.10008.5.1.4.1.1.2",
+  sopInstanceUid: "1.2.3.4.5",
   rows: 2,
   columns: 2,
   bitsAllocated: 16,
@@ -101,6 +112,9 @@ function resetState(): void {
   mpr3DViewer.crosshair = { x: 0, y: 0, z: 0 };
   mpr3DViewer.activeView = "3d";
   dicomCache.clear();
+  clearAnnotations();
+  setActiveDrawing(null);
+  setSelectedAnnotationId(null);
 }
 
 test.beforeEach(() => {
@@ -142,6 +156,37 @@ test("initToolbar: pan is a no-op in 3D mode, crosshair is a no-op outside it", 
     .getElementById("tool-crosshair")!
     .dispatchEvent(new MouseEvent("click"));
   assert.notEqual(state.activeTool, "crosshair");
+});
+
+test("initToolbar: clicking length and ellipse tools sets activeTool and updates UI", () => {
+  initToolbar();
+  const lenBtn = document.getElementById("tool-length")!;
+  const ellBtn = document.getElementById("tool-ellipse")!;
+
+  lenBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "length");
+  assert.equal(lenBtn.classList.contains("active"), true);
+  assert.equal(lenBtn.getAttribute("aria-pressed"), "true");
+
+  ellBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "ellipse");
+  assert.equal(ellBtn.classList.contains("active"), true);
+  assert.equal(ellBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(lenBtn.classList.contains("active"), false);
+});
+
+test("initToolbar: length and ellipse tools are disabled in 3D mode", () => {
+  initToolbar();
+  state.is3DMode = true;
+  updateToolbarUI();
+
+  const lenBtn = document.getElementById("tool-length") as HTMLButtonElement;
+  const ellBtn = document.getElementById("tool-ellipse") as HTMLButtonElement;
+  assert.equal(lenBtn.disabled, true);
+  assert.equal(ellBtn.disabled, true);
+
+  lenBtn.dispatchEvent(new MouseEvent("click"));
+  assert.notEqual(state.activeTool, "length");
 });
 
 test("initToolbar: tool-reset restores the default viewport from metadata", () => {
@@ -391,6 +436,94 @@ test("initViewportInteraction: zoom and pan tools update state on drag (2D)", ()
   );
   assert.equal(state.viewport.panX, 30);
   document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+});
+
+test("initViewportInteraction: dragging with length tool creates LengthAnnotation and announces", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "length";
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 50,
+      clientY: 50,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.ok(getActiveDrawing());
+  assert.equal(getActiveDrawing()?.type, "length");
+
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 150, clientY: 150, bubbles: true }),
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(getActiveDrawing(), null);
+
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.ok(annotations.length > 0);
+  assert.equal(annotations[0].type, "length");
+
+  const announce = document.getElementById("measure-announce");
+  assert.ok(
+    announce?.textContent?.includes("Longitud") ||
+      announce?.textContent?.includes("Length"),
+  );
+});
+
+test("initViewportInteraction: dragging with ellipse tool creates EllipseAnnotation and announces", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "ellipse";
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 100,
+      clientY: 100,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.ok(getActiveDrawing());
+  assert.equal(getActiveDrawing()?.type, "ellipse");
+
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 150, clientY: 150, bubbles: true }),
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(getActiveDrawing(), null);
+
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.ok(annotations.length > 0);
+  assert.equal(annotations[0].type, "ellipse");
+
+  const announce = document.getElementById("measure-announce");
+  assert.ok(
+    announce?.textContent?.includes("Área") ||
+      announce?.textContent?.includes("Area"),
+  );
 });
 
 test("initViewportInteraction: 3D pan/zoom/orbit drag updates the mpr camera", () => {
@@ -661,9 +794,54 @@ test("keyboard: letter shortcuts click their respective tool buttons", () => {
   assert.equal(state.activeTool, "zoom");
   document.dispatchEvent(key("W"));
   assert.equal(state.activeTool, "wl");
+  document.dispatchEvent(key("l"));
+  assert.equal(state.activeTool, "length");
+  document.dispatchEvent(key("e"));
+  assert.equal(state.activeTool, "ellipse");
   document.dispatchEvent(key("r"));
   document.dispatchEvent(key("m"));
   assert.equal(state.isMetadataOpen, true);
+});
+
+test("keyboard: Escape cancels active drawing and clears selection", () => {
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+
+  setActiveDrawing({
+    type: "length",
+    start: { x: 10, y: 10 },
+  });
+  assert.ok(getActiveDrawing());
+  document.dispatchEvent(key("Escape"));
+  assert.equal(getActiveDrawing(), null);
+
+  setSelectedAnnotationId("ann-1");
+  document.dispatchEvent(key("Escape"));
+  assert.equal(getSelectedAnnotationId(), null);
+});
+
+test("keyboard: Delete or Backspace deletes selected annotation", () => {
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+
+  state.annotations["1.2.3.4.5"] = [
+    {
+      id: "ann-to-del",
+      type: "length",
+      sopInstanceUid: "1.2.3.4.5",
+      sliceIndex: 0,
+      start: { x: 0, y: 0 },
+      end: { x: 10, y: 10 },
+      distance: 14.1,
+      isCalibrated: false,
+      unit: "px",
+    },
+  ];
+  setSelectedAnnotationId("ann-to-del");
+
+  document.dispatchEvent(key("Delete"));
+  assert.equal(getSelectedAnnotationId(), null);
+  assert.equal(state.annotations["1.2.3.4.5"].length, 0);
 });
 
 test("keyboard: p is a no-op in 3D mode, c is a no-op outside it", () => {

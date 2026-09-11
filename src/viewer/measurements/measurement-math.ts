@@ -106,14 +106,15 @@ export function screenToWorld(
   panX: number,
   panY: number,
   baseScale: number = 1,
+  flipY: boolean = true,
 ): Point2D {
   const effectiveScale = baseScale * zoom;
   if (effectiveScale <= 0) return { x: 0, y: 0 };
 
   const worldX =
     (screenX - viewportWidth / 2 - panX) / effectiveScale + cols / 2;
-  const worldY =
-    (screenY - viewportHeight / 2 - panY) / effectiveScale + rows / 2;
+  const dy = (screenY - viewportHeight / 2 - panY) / effectiveScale;
+  const worldY = (flipY ? -dy : dy) + rows / 2;
 
   return { x: worldX, y: worldY };
 }
@@ -132,13 +133,14 @@ export function worldToScreen(
   panX: number,
   panY: number,
   baseScale: number = 1,
+  flipY: boolean = true,
 ): Point2D {
   const effectiveScale = baseScale * zoom;
 
   const screenX =
     viewportWidth / 2 + panX + (worldX - cols / 2) * effectiveScale;
-  const screenY =
-    viewportHeight / 2 + panY + (worldY - rows / 2) * effectiveScale;
+  const dy = (worldY - rows / 2) * effectiveScale;
+  const screenY = viewportHeight / 2 + panY + (flipY ? -dy : dy);
 
   return { x: screenX, y: screenY };
 }

@@ -43,16 +43,16 @@ Lista ordenada y ejecutable de tareas. Las tareas marcadas con `[P]` representan
   - Claves para tooltips (`viewer.tool.lengthTitle`, `viewer.tool.ellipseTitle`).
   - Claves para métricas y advertencia (`annotations.length`, `annotations.area`, `annotations.mean`, `annotations.stdDev`, `annotations.uncalibrated`).
   - Validado con `npm test` (`i18n.test.ts`).
-- [ ] T023 **Capa de Renderizado Overlay (`src/viewer/measurements/measurement-overlay.ts`):**
+- [x] T023 **Capa de Renderizado Overlay (`src/viewer/measurements/measurement-overlay.ts`):**
   - Crear e inicializar `<canvas id="annotation-overlay">` superpuesto en `index.html`.
   - Implementar dibujado de líneas de regla, cursores de anclaje, elipses y badges semitransparentes con textos de medidas y advertencias.
   - Sincronizar el redibujado en `src/viewer/rendering.ts` ante eventos de render, zoom, pan y cambio de corte.
-- [ ] T024 **Interacción y Manejo de Eventos (`src/viewer/interaction.ts`):**
+- [x] T024 **Interacción y Manejo de Eventos (`src/viewer/interaction.ts`):**
   - Registrar handlers de mouse (`mousedown`, `mousemove`, `mouseup`) para iniciar, arrastrar y consolidar mediciones lineales y elípticas.
   - Atajos de teclado para selección rápida (`L` para regla, `E` para elipse) y cancelación (`Escape`).
   - Soporte para eliminación de anotación seleccionada (`Delete` / `Backspace`).
   - Anuncio accesible en región aria-live al consolidar una medición.
-- [ ] T025 **Estilos y Maquetación (`src/styles.css`):**
+- [x] T025 **Estilos y Maquetación (`src/styles.css`):**
   - Posicionamiento absoluto y dimensiones reactivas para `#annotation-overlay`.
   - Reglas de cursor de precisión para herramientas de medición (`cursor-crosshair`).
   - Estilos de alto contraste y legibilidad para badges y advertencias de no-calibración.

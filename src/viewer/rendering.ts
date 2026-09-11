@@ -4,6 +4,8 @@ import { state, itemCount } from "./state.js";
 import { view3DViewer, mpr3DViewer } from "./view-3d.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import { getViewportManager } from "./viewport-registry.js";
+import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
+import { getActiveSopInstanceUid } from "./measurements/annotation-state.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,23 @@ export function render(): void {
     dicomCanvas,
     state.viewport,
   );
+
+  const overlayCanvas = $("annotation-overlay") as HTMLCanvasElement | null;
+  if (overlayCanvas && state.parsed?.metadata) {
+    const container = $("viewport-container");
+    const w = container?.clientWidth || dicomCanvas.width;
+    const h = container?.clientHeight || dicomCanvas.height;
+    if (overlayCanvas.width !== w) overlayCanvas.width = w;
+    if (overlayCanvas.height !== h) overlayCanvas.height = h;
+    renderMeasurementOverlay({
+      canvas: overlayCanvas,
+      viewport: state.viewport,
+      metadata: state.parsed.metadata,
+      pixelData: state.parsed.pixelData,
+      sopInstanceUid: getActiveSopInstanceUid(),
+      sliceIndex: state.currentIndex,
+    });
+  }
 
   updateInfoOverlay();
   updateOrientationLabels();

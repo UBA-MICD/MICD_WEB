@@ -17,6 +17,7 @@ export interface BaseAnnotation {
   sliceIndex: number;
   isCalibrated: boolean;
   unit: "mm" | "px" | "mm²" | "px²";
+  createdAt?: number;
 }
 
 export interface LengthAnnotation extends BaseAnnotation {

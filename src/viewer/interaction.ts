@@ -35,16 +35,52 @@ import {
 import { openServerScreen } from "../server-screen/server-screen.js";
 import { getViewportManager } from "./viewport-registry.js";
 import type { GridLayout } from "./viewport-manager.js";
+import {
+  screenToWorld,
+  calculateDistance,
+  calculateEllipseArea,
+  calculateEllipseHUStats,
+  extractCalibration,
+} from "./measurements/measurement-math.js";
+import {
+  addAnnotation,
+  deleteAnnotation,
+  getActiveSopInstanceUid,
+  getAnnotationsForSlice,
+} from "./measurements/annotation-state.js";
+import {
+  getActiveDrawing,
+  setActiveDrawing,
+  getSelectedAnnotationId,
+  setSelectedAnnotationId,
+  hitTestAnnotation,
+} from "./measurements/measurement-overlay.js";
+import type {
+  LengthAnnotation,
+  EllipseAnnotation,
+} from "./measurements/types.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
 export function initToolbar(): void {
-  const tools = ["wl", "zoom", "pan", "crosshair"] as const;
+  const tools = [
+    "wl",
+    "zoom",
+    "pan",
+    "crosshair",
+    "length",
+    "ellipse",
+  ] as const;
   tools.forEach((tool) => {
     const btn = $(`tool-${tool}`);
     if (btn) {
       btn.addEventListener("click", () => {
-        if (tool === "pan" && state.is3DMode) return;
+        if (
+          state.is3DMode &&
+          (tool === "pan" || tool === "length" || tool === "ellipse")
+        ) {
+          return;
+        }
         if (tool === "crosshair" && !state.is3DMode && !mprEngine.volume)
           return;
         if (tool === "wl") {
@@ -621,7 +657,12 @@ export async function toggleMprMode(): Promise<boolean> {
 }
 
 export function updateToolbarUI(): void {
-  if (state.is3DMode && state.activeTool === "pan") {
+  if (
+    state.is3DMode &&
+    (state.activeTool === "pan" ||
+      state.activeTool === "length" ||
+      state.activeTool === "ellipse")
+  ) {
     state.activeTool = "wl";
   } else if (
     !state.is3DMode &&
@@ -634,6 +675,16 @@ export function updateToolbarUI(): void {
   const panBtn = $("tool-pan") as HTMLButtonElement | null;
   if (panBtn) {
     panBtn.disabled = state.is3DMode;
+  }
+
+  const lengthBtn = $("tool-length") as HTMLButtonElement | null;
+  if (lengthBtn) {
+    lengthBtn.disabled = state.is3DMode;
+  }
+
+  const ellipseBtn = $("tool-ellipse") as HTMLButtonElement | null;
+  if (ellipseBtn) {
+    ellipseBtn.disabled = state.is3DMode;
   }
 
   const crosshairBtn = $("tool-crosshair") as HTMLButtonElement | null;
@@ -656,13 +707,15 @@ export function updateToolbarUI(): void {
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
   // would also strip the metadata toggle's state, leaving its class and
   // aria-expanded disagreeing with the open panel.
-  (["wl", "zoom", "pan", "crosshair"] as const).forEach((tool) => {
-    const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
-    if (!btn) return;
-    const isActive = tool === state.activeTool;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-pressed", String(isActive));
-  });
+  (["wl", "zoom", "pan", "crosshair", "length", "ellipse"] as const).forEach(
+    (tool) => {
+      const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
+      if (!btn) return;
+      const isActive = tool === state.activeTool;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", String(isActive));
+    },
+  );
 
   const wlBtn = $("tool-wl");
   if (wlBtn) {
@@ -698,6 +751,8 @@ export function updateToolbarUI(): void {
         "cursor-zoom",
         "cursor-pan",
         "cursor-crosshair",
+        "cursor-length",
+        "cursor-ellipse",
       );
     }
     viewport.classList?.add?.(`cursor-${state.activeTool}`);
@@ -773,6 +828,7 @@ export function initViewportInteraction(): void {
 
   container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
+    if (e.button !== 0) return;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
@@ -782,12 +838,148 @@ export function initViewportInteraction(): void {
       ? cell.id
       : (getViewportManager()?.activeViewport?.id ?? null);
 
+    const manager = getViewportManager();
+    const activeVp =
+      (manager && dragOriginViewportId
+        ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
+        : null) || manager?.activeViewport;
+
+    if (state.activeTool === "length" || state.activeTool === "ellipse") {
+      const targetEl = activeVp?.canvasElement || container;
+      const rect = targetEl.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const viewW =
+        activeVp?.canvasElement.clientWidth || container.clientWidth;
+      const viewH =
+        activeVp?.canvasElement.clientHeight || container.clientHeight;
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+      const sopInstanceUid =
+        (activeVp
+          ? activeVp.data.parsed?.metadata.sopInstanceUid
+          : getActiveSopInstanceUid()) ||
+        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+
+      if (metadata && viewW > 0 && viewH > 0) {
+        const existing = getAnnotationsForSlice(sopInstanceUid);
+        const hit = hitTestAnnotation(
+          clickX,
+          clickY,
+          existing,
+          vpState,
+          metadata.columns,
+          metadata.rows,
+          viewW,
+          viewH,
+        );
+
+        if (hit && !e.shiftKey) {
+          setSelectedAnnotationId(hit.id);
+          if (activeVp) activeVp.render();
+          else render();
+          e.preventDefault();
+          return;
+        }
+
+        setSelectedAnnotationId(null);
+        const worldPt = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+
+        if (state.activeTool === "length") {
+          setActiveDrawing({
+            type: "length",
+            start: worldPt,
+            end: worldPt,
+            cellId: activeVp ? activeVp.id : null,
+          });
+        } else {
+          setActiveDrawing({
+            type: "ellipse",
+            center: worldPt,
+            radiusX: 0,
+            radiusY: 0,
+            cellId: activeVp ? activeVp.id : null,
+          });
+        }
+
+        if (activeVp) activeVp.render();
+        else render();
+        e.preventDefault();
+        return;
+      }
+    }
+
     handlePointerAction(e);
     e.preventDefault();
   });
 
   document.addEventListener("mousemove", (e: MouseEvent) => {
     if (!state.isDragging || !state.parsed) return;
+
+    const drawing = getActiveDrawing();
+    if (drawing) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+
+      const targetEl = activeVp?.canvasElement || container;
+      const rect = targetEl.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const viewW =
+        activeVp?.canvasElement.clientWidth || container.clientWidth;
+      const viewH =
+        activeVp?.canvasElement.clientHeight || container.clientHeight;
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+
+      if (metadata && viewW > 0 && viewH > 0) {
+        const currentWorld = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+
+        if (drawing.type === "length") {
+          drawing.end = currentWorld;
+        } else if (drawing.type === "ellipse" && drawing.center) {
+          drawing.radiusX = Math.abs(currentWorld.x - drawing.center.x);
+          drawing.radiusY = Math.abs(currentWorld.y - drawing.center.y);
+        }
+
+        if (activeVp) activeVp.render();
+        else render();
+      }
+      return;
+    }
 
     const dx = e.clientX - state.lastMouseX;
     const dy = e.clientY - state.lastMouseY;
@@ -939,6 +1131,132 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mouseup", () => {
+    const drawing = getActiveDrawing();
+    if (drawing) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const pixelData = activeVp
+        ? activeVp.data.parsed?.pixelData
+        : state.parsed?.pixelData;
+      const sopInstanceUid =
+        (activeVp
+          ? activeVp.data.parsed?.metadata.sopInstanceUid
+          : getActiveSopInstanceUid()) ||
+        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+      const sliceIndex = activeVp
+        ? activeVp.data.currentIndex
+        : state.currentIndex;
+
+      if (metadata) {
+        const cal = extractCalibration(metadata);
+        if (drawing.type === "length" && drawing.start && drawing.end) {
+          const dx = drawing.end.x - drawing.start.x;
+          const dy = drawing.end.y - drawing.start.y;
+          if (Math.hypot(dx, dy) >= 3) {
+            const dist = calculateDistance(
+              drawing.start,
+              drawing.end,
+              cal.pixelSpacing,
+            );
+            const newAnn: LengthAnnotation = {
+              id: `ann_len_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: "length",
+              sopInstanceUid,
+              sliceIndex,
+              start: { ...drawing.start },
+              end: { ...drawing.end },
+              distance: dist,
+              isCalibrated: cal.isCalibrated,
+              unit: cal.isCalibrated ? "mm" : "px",
+              createdAt: Date.now(),
+            };
+            addAnnotation(newAnn);
+            setSelectedAnnotationId(newAnn.id);
+
+            const announceEl = $("measure-announce");
+            if (announceEl) {
+              const val = cal.isCalibrated
+                ? `${dist.toFixed(1)} mm`
+                : `${Math.round(dist)} px`;
+              announceEl.textContent = `${t("annotations.length") || "Longitud"}: ${val}`;
+            }
+          }
+        } else if (
+          drawing.type === "ellipse" &&
+          drawing.center &&
+          typeof drawing.radiusX === "number" &&
+          typeof drawing.radiusY === "number"
+        ) {
+          if (drawing.radiusX >= 3 && drawing.radiusY >= 3) {
+            const area = calculateEllipseArea(
+              drawing.radiusX,
+              drawing.radiusY,
+              cal.pixelSpacing,
+            );
+            let meanHu: number | undefined;
+            let stdDevHu: number | undefined;
+            if (pixelData) {
+              const hu = calculateEllipseHUStats(
+                drawing.center,
+                drawing.radiusX,
+                drawing.radiusY,
+                pixelData,
+                metadata.columns,
+                metadata.rows,
+                cal.rescaleSlope,
+                cal.rescaleIntercept,
+              );
+              if (hu) {
+                meanHu = hu.mean;
+                stdDevHu = hu.stdDev;
+              }
+            }
+            const newAnn: EllipseAnnotation = {
+              id: `ann_ell_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: "ellipse",
+              sopInstanceUid,
+              sliceIndex,
+              center: { ...drawing.center },
+              radiusX: drawing.radiusX,
+              radiusY: drawing.radiusY,
+              area,
+              isCalibrated: cal.isCalibrated,
+              unit: cal.isCalibrated ? "mm²" : "px²",
+              meanHu,
+              stdDevHu,
+              createdAt: Date.now(),
+            };
+            addAnnotation(newAnn);
+            setSelectedAnnotationId(newAnn.id);
+
+            const announceEl = $("measure-announce");
+            if (announceEl) {
+              const val = cal.isCalibrated
+                ? `${area.toFixed(1)} mm²`
+                : `${Math.round(area)} px²`;
+              const huStr =
+                typeof meanHu === "number"
+                  ? `, Media: ${meanHu.toFixed(1)} HU`
+                  : "";
+              announceEl.textContent = `${t("annotations.area") || "Área"}: ${val}${huStr}`;
+            }
+          }
+        }
+      }
+
+      setActiveDrawing(null);
+      if (activeVp) activeVp.render();
+      else render();
+    }
+
     if (state.isDragging && state.is3DMode) {
       console.groupCollapsed("⚙️ [3D View Debug] Post-Interaction State");
       console.log("Camera (Theta, Phi, Zoom):", view3DViewer.camera);
@@ -1353,6 +1671,41 @@ export function initKeyboardShortcuts(): void {
     } else if (e.key === "c" || e.key === "C") {
       if (state.is3DMode) {
         $("tool-crosshair")?.click();
+      }
+    } else if (e.key === "l" || e.key === "L") {
+      if (!state.is3DMode) {
+        $("tool-length")?.click();
+      }
+    } else if (e.key === "e" || e.key === "E") {
+      if (!state.is3DMode) {
+        $("tool-ellipse")?.click();
+      }
+    } else if (e.key === "Escape") {
+      if (getActiveDrawing()) {
+        setActiveDrawing(null);
+        render();
+        const manager = getViewportManager();
+        if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        }
+      } else if (getSelectedAnnotationId()) {
+        setSelectedAnnotationId(null);
+        render();
+        const manager = getViewportManager();
+        if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        }
+      }
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      const selectedId = getSelectedAnnotationId();
+      if (selectedId) {
+        deleteAnnotation(selectedId);
+        setSelectedAnnotationId(null);
+        render();
+        const manager = getViewportManager();
+        if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        }
       }
     } else if (e.key === "r" || e.key === "R") {
       $("tool-reset")?.click();

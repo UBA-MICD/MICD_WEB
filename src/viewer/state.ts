@@ -18,7 +18,9 @@ export interface AppState {
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
-  activeTool: "wl" | "zoom" | "pan" | "crosshair";
+  activeTool: "wl" | "zoom" | "pan" | "crosshair" | "length" | "ellipse";
+  /** Measurement annotations indexed by SOPInstanceUID (TK-26). */
+  annotations: Record<string, import("./measurements/types.js").Annotation[]>;
   isDragging: boolean;
   lastMouseX: number;
   lastMouseY: number;
@@ -105,9 +107,19 @@ export const state: AppState = {
   isZoomPanelOpen: false,
   is3DMode: false,
   isMprMode: false,
+  annotations: {},
   serverUrl: getStoredServerUrl(),
   serverValidation: null,
 };
+
+export {
+  getActiveSopInstanceUid,
+  addAnnotation,
+  updateAnnotation,
+  deleteAnnotation,
+  getAnnotationsForSlice,
+  clearAnnotations,
+} from "./measurements/annotation-state.js";
 
 /** Number of images in the current series, regardless of source. */
 export function itemCount(): number {

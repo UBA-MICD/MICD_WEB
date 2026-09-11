@@ -34,6 +34,7 @@ function resetState(): void {
   state.isMetadataOpen = false;
   state.isWlPanelOpen = false;
   state.is3DMode = false;
+  state.annotations = {};
 }
 
 beforeEach(resetState);

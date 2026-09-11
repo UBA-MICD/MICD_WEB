@@ -30,7 +30,7 @@ and what each of them can and cannot do as a result. Be explicit about role gati
 
 - **FR-1:** The system MUST …
 - **FR-2:** The system MUST …
-- **FR-3:** The system MUST NOT … *(state the guardrails, not only the happy path)*
+- **FR-3:** The system MUST NOT … _(state the guardrails, not only the happy path)_
 
 ## Acceptance criteria
 

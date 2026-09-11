@@ -29,8 +29,7 @@ function step(over: Partial<TourStep> = {}): TourStep {
   };
 }
 
-const raf = () =>
-  new Promise<void>((r) => requestAnimationFrame(() => r()));
+const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 async function flush(): Promise<void> {
   for (let i = 0; i < 4; i++) {
     await raf();
@@ -162,7 +161,11 @@ test("a follow-along step advances when the target fires its event", async () =>
   const { startTour } = await freshEngine();
   startTour(
     [
-      step({ id: "s1", target: "#t", advance: { on: "event", event: "click" } }),
+      step({
+        id: "s1",
+        target: "#t",
+        advance: { on: "event", event: "click" },
+      }),
       step({ id: "s2", target: "#u" }),
     ],
     { role: "admin" },
@@ -222,6 +225,8 @@ test("Back is hidden on the first step and returns on later steps", async () => 
   back().click();
   await flush();
   assert.equal(progressText(), "Step 1 of 2");
+  click("[data-tour-skip]");
+  await flush();
 });
 
 test("a guest tour writes no seen-flag", async () => {

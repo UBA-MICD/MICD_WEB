@@ -118,6 +118,39 @@ test("screenToWorld and worldToScreen invert each other consistently", () => {
   assert.ok(Math.abs(restoredWorld.y - originalWorld.y) < 1e-5);
 });
 
+test("screenToWorld and worldToScreen incorporate camera panX, panY, and zoom", () => {
+  const viewportW = 800;
+  const viewportH = 600;
+  const cols = 512;
+  const rows = 512;
+
+  // Center of image: (256, 256)
+  // At panX=50, panY=-20, zoom=2:
+  // Screen center of image is (viewportW/2 + panX, viewportH/2 + panY) = (450, 280)
+  const imageCenterWorld = { x: 256, y: 256 };
+  const screenPt = worldToScreen(
+    imageCenterWorld.x,
+    imageCenterWorld.y,
+    viewportW,
+    viewportH,
+    cols,
+    rows,
+    { zoom: 2, panX: 50, panY: -20 },
+  );
+
+  assert.equal(screenPt.x, 450);
+  assert.equal(screenPt.y, 280);
+
+  const restored = screenToWorld(450, 280, viewportW, viewportH, cols, rows, {
+    zoom: 2,
+    panX: 50,
+    panY: -20,
+  });
+
+  assert.equal(restored.x, 256);
+  assert.equal(restored.y, 256);
+});
+
 test("calculateEllipseHUStats computes exact mean, SD=0 and extremes on uniform CT buffer", () => {
   const cols = 100;
   const rows = 100;

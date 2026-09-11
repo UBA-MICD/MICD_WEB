@@ -187,6 +187,7 @@ export class Viewport {
     this.data.viewport.panX += dx;
     this.data.viewport.panY += dy;
     this.applyTransform();
+    this.renderOverlay();
   }
 
   public applyZoomFactor(factor: number): void {
@@ -196,6 +197,7 @@ export class Viewport {
     );
     this.applyTransform();
     this.updateInfoOverlay();
+    this.renderOverlay();
   }
 
   public applyWindowLevelDelta(dWidth: number, dCenter: number): void {
@@ -297,19 +299,29 @@ export class Viewport {
       );
     }
 
-    if (this.overlayCanvas && this.data.parsed?.metadata) {
-      renderMeasurementOverlay({
-        canvas: this.overlayCanvas,
-        viewport: this.data.viewport,
-        metadata: this.data.parsed.metadata,
-        pixelData: this.data.parsed.pixelData,
-        sopInstanceUid:
-          this.data.parsed.metadata.sopInstanceUid ||
-          `slice_${this.data.currentIndex}`,
-        sliceIndex: this.data.currentIndex,
-        cellId: this.id,
-      });
+    this.renderOverlay();
+  }
+
+  public renderOverlay(): void {
+    if (!this.overlayCanvas || !this.data.parsed?.metadata) return;
+    const w = this.cellElement.clientWidth || this.overlayCanvas.width || 300;
+    const h = this.cellElement.clientHeight || this.overlayCanvas.height || 300;
+    if (w > 0 && h > 0) {
+      if (this.overlayCanvas.width !== w) this.overlayCanvas.width = w;
+      if (this.overlayCanvas.height !== h) this.overlayCanvas.height = h;
     }
+
+    renderMeasurementOverlay({
+      canvas: this.overlayCanvas,
+      viewport: this.data.viewport,
+      metadata: this.data.parsed.metadata,
+      pixelData: this.data.parsed.pixelData,
+      sopInstanceUid:
+        this.data.parsed.metadata.sopInstanceUid ||
+        `slice_${this.data.currentIndex}`,
+      sliceIndex: this.data.currentIndex,
+      cellId: this.id,
+    });
   }
 
   private applyTransform(): void {

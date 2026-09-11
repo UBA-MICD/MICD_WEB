@@ -526,6 +526,55 @@ test("initViewportInteraction: dragging with ellipse tool creates EllipseAnnotat
   );
 });
 
+test("initViewportInteraction: switching from measurement tool back to pan works without interference", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "length";
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 10,
+      clientY: 10,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.ok(getActiveDrawing());
+
+  // Switch tool to pan and drag
+  state.activeTool = "pan";
+  state.viewport.panX = 0;
+  state.viewport.panY = 0;
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 0,
+      clientY: 0,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.equal(getActiveDrawing(), null);
+
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 25, clientY: 35, bubbles: true }),
+  );
+  assert.equal(state.viewport.panX, 25);
+  assert.equal(state.viewport.panY, 35);
+  assert.equal(getActiveDrawing(), null);
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+});
+
 test("initViewportInteraction: 3D pan/zoom/orbit drag updates the mpr camera", () => {
   initViewportInteraction();
   state.parsed = mockParsed();

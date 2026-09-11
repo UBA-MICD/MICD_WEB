@@ -34,7 +34,7 @@ import {
 } from "../services/export-service.js";
 import { openServerScreen } from "../server-screen/server-screen.js";
 import { getViewportManager } from "./viewport-registry.js";
-import type { GridLayout } from "./viewport-manager.js";
+import type { GridLayout, Viewport } from "./viewport-manager.js";
 import {
   screenToWorld,
   calculateDistance,
@@ -781,30 +781,55 @@ export function initViewportInteraction(): void {
 
   let dragOriginViewportId: string | null = null;
 
-  const handlePointerAction = (e: MouseEvent) => {
-    if (!state.parsed) return;
-    const rect = container.getBoundingClientRect();
+  function getTargetMetrics(
+    e: MouseEvent,
+    containerEl: HTMLElement,
+    activeVp?: Viewport | null,
+  ): { clickX: number; clickY: number; viewW: number; viewH: number } {
+    const targetEl: HTMLElement =
+      activeVp?.overlayCanvas ||
+      (document.getElementById(
+        "annotation-overlay",
+      ) as HTMLCanvasElement | null) ||
+      activeVp?.cellElement ||
+      containerEl;
+    const rect = targetEl.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
+    const viewW =
+      targetEl.clientWidth ||
+      (targetEl as HTMLCanvasElement).width ||
+      containerEl.clientWidth ||
+      300;
+    const viewH =
+      targetEl.clientHeight ||
+      (targetEl as HTMLCanvasElement).height ||
+      containerEl.clientHeight ||
+      300;
+    return { clickX, clickY, viewW, viewH };
+  }
+
+  const handlePointerAction = (e: MouseEvent) => {
+    if (!state.parsed) return;
+    const manager = getViewportManager();
+    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
+    const activeVp =
+      (manager && originId
+        ? manager.getAllViewports().find((v) => v.id === originId)
+        : null) || manager?.activeViewport;
+
+    const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+      e,
+      container,
+      activeVp,
+    );
 
     if (mprEngine.volume && state.activeTool === "crosshair") {
-      const manager = getViewportManager();
-      const originId =
-        dragOriginViewportId || manager?.activeViewport?.id || "";
       if (manager && manager.isCombined3DViewport(originId)) {
         return;
       }
-      const activeVp =
-        (manager && originId
-          ? manager.getAllViewports().find((v) => v.id === originId)
-          : null) || manager?.activeViewport;
       const plane = activeVp?.plane || "axial";
-      const w =
-        activeVp?.canvasElement.clientWidth || container.clientWidth || 300;
-      const h =
-        activeVp?.canvasElement.clientHeight || container.clientHeight || 300;
-
-      mprEngine.setCrosshairFromScreen(plane, clickX, clickY, w, h);
+      mprEngine.setCrosshairFromScreen(plane, clickX, clickY, viewW, viewH);
       if (manager) {
         for (const vp of manager.getAllViewports()) {
           vp.render();
@@ -816,12 +841,7 @@ export function initViewportInteraction(): void {
     }
 
     if (state.is3DMode && state.activeTool === "crosshair") {
-      view3DViewer.updateCrosshairFromPointer(
-        clickX,
-        clickY,
-        container.clientWidth,
-        container.clientHeight,
-      );
+      view3DViewer.updateCrosshairFromPointer(clickX, clickY, viewW, viewH);
       render();
     }
   };
@@ -844,83 +864,87 @@ export function initViewportInteraction(): void {
         ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
         : null) || manager?.activeViewport;
 
-    if (state.activeTool === "length" || state.activeTool === "ellipse") {
-      const targetEl = activeVp?.canvasElement || container;
-      const rect = targetEl.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      const viewW =
-        activeVp?.canvasElement.clientWidth || container.clientWidth;
-      const viewH =
-        activeVp?.canvasElement.clientHeight || container.clientHeight;
-      const metadata = activeVp
-        ? activeVp.data.parsed?.metadata
-        : state.parsed?.metadata;
-      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
-      const sopInstanceUid =
-        (activeVp
-          ? activeVp.data.parsed?.metadata.sopInstanceUid
-          : getActiveSopInstanceUid()) ||
-        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+    if (state.activeTool !== "length" && state.activeTool !== "ellipse") {
+      if (getActiveDrawing()) {
+        setActiveDrawing(null);
+      }
+      handlePointerAction(e);
+      e.preventDefault();
+      return;
+    }
 
-      if (metadata && viewW > 0 && viewH > 0) {
-        const existing = getAnnotationsForSlice(sopInstanceUid);
-        const hit = hitTestAnnotation(
-          clickX,
-          clickY,
-          existing,
-          vpState,
-          metadata.columns,
-          metadata.rows,
-          viewW,
-          viewH,
-        );
+    const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+      e,
+      container,
+      activeVp,
+    );
+    const metadata = activeVp
+      ? activeVp.data.parsed?.metadata
+      : state.parsed?.metadata;
+    const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+    const sopInstanceUid =
+      (activeVp
+        ? activeVp.data.parsed?.metadata.sopInstanceUid
+        : getActiveSopInstanceUid()) ||
+      `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
 
-        if (hit && !e.shiftKey) {
-          setSelectedAnnotationId(hit.id);
-          if (activeVp) activeVp.render();
-          else render();
-          e.preventDefault();
-          return;
-        }
+    if (metadata && viewW > 0 && viewH > 0) {
+      const existing = getAnnotationsForSlice(sopInstanceUid);
+      const hit = hitTestAnnotation(
+        clickX,
+        clickY,
+        existing,
+        vpState,
+        metadata.columns,
+        metadata.rows,
+        viewW,
+        viewH,
+      );
 
-        setSelectedAnnotationId(null);
-        const worldPt = screenToWorld(
-          clickX,
-          clickY,
-          viewW,
-          viewH,
-          metadata.columns,
-          metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          1,
-          true,
-        );
-
-        if (state.activeTool === "length") {
-          setActiveDrawing({
-            type: "length",
-            start: worldPt,
-            end: worldPt,
-            cellId: activeVp ? activeVp.id : null,
-          });
-        } else {
-          setActiveDrawing({
-            type: "ellipse",
-            center: worldPt,
-            radiusX: 0,
-            radiusY: 0,
-            cellId: activeVp ? activeVp.id : null,
-          });
-        }
-
-        if (activeVp) activeVp.render();
+      if (hit && !e.shiftKey) {
+        setSelectedAnnotationId(hit.id);
+        if (activeVp) activeVp.renderOverlay();
         else render();
         e.preventDefault();
         return;
       }
+
+      setSelectedAnnotationId(null);
+      const worldPt = screenToWorld(
+        clickX,
+        clickY,
+        viewW,
+        viewH,
+        metadata.columns,
+        metadata.rows,
+        vpState.zoom,
+        vpState.panX,
+        vpState.panY,
+        1,
+        true,
+      );
+
+      if (state.activeTool === "length") {
+        setActiveDrawing({
+          type: "length",
+          start: worldPt,
+          end: worldPt,
+          cellId: activeVp ? activeVp.id : null,
+        });
+      } else {
+        setActiveDrawing({
+          type: "ellipse",
+          center: worldPt,
+          radiusX: 0,
+          radiusY: 0,
+          cellId: activeVp ? activeVp.id : null,
+        });
+      }
+
+      if (activeVp) activeVp.renderOverlay();
+      else render();
+      e.preventDefault();
+      return;
     }
 
     handlePointerAction(e);
@@ -930,8 +954,11 @@ export function initViewportInteraction(): void {
   document.addEventListener("mousemove", (e: MouseEvent) => {
     if (!state.isDragging || !state.parsed) return;
 
+    const isMeasurementTool =
+      state.activeTool === "length" || state.activeTool === "ellipse";
     const drawing = getActiveDrawing();
-    if (drawing) {
+
+    if (isMeasurementTool && drawing) {
       const manager = getViewportManager();
       const originId =
         dragOriginViewportId || manager?.activeViewport?.id || "";
@@ -940,14 +967,11 @@ export function initViewportInteraction(): void {
           ? manager.getAllViewports().find((v) => v.id === originId)
           : null) || manager?.activeViewport;
 
-      const targetEl = activeVp?.canvasElement || container;
-      const rect = targetEl.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      const viewW =
-        activeVp?.canvasElement.clientWidth || container.clientWidth;
-      const viewH =
-        activeVp?.canvasElement.clientHeight || container.clientHeight;
+      const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+        e,
+        container,
+        activeVp,
+      );
       const metadata = activeVp
         ? activeVp.data.parsed?.metadata
         : state.parsed?.metadata;
@@ -975,10 +999,14 @@ export function initViewportInteraction(): void {
           drawing.radiusY = Math.abs(currentWorld.y - drawing.center.y);
         }
 
-        if (activeVp) activeVp.render();
+        if (activeVp) activeVp.renderOverlay();
         else render();
       }
       return;
+    }
+
+    if (drawing) {
+      setActiveDrawing(null);
     }
 
     const dx = e.clientX - state.lastMouseX;
@@ -1131,8 +1159,11 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mouseup", () => {
+    const isMeasurementTool =
+      state.activeTool === "length" || state.activeTool === "ellipse";
     const drawing = getActiveDrawing();
-    if (drawing) {
+
+    if (isMeasurementTool && drawing) {
       const manager = getViewportManager();
       const originId =
         dragOriginViewportId || manager?.activeViewport?.id || "";
@@ -1253,7 +1284,13 @@ export function initViewportInteraction(): void {
       }
 
       setActiveDrawing(null);
-      if (activeVp) activeVp.render();
+      if (activeVp) activeVp.renderOverlay();
+      else render();
+    } else if (drawing) {
+      setActiveDrawing(null);
+      const manager = getViewportManager();
+      const activeVp = manager?.activeViewport;
+      if (activeVp) activeVp.renderOverlay();
       else render();
     }
 

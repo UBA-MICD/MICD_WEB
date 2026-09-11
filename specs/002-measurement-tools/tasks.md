@@ -69,11 +69,11 @@ Lista ordenada y ejecutable de tareas. Las tareas marcadas con `[P]` representan
 
 ## Phase 4 — Verificación y Entrega
 
-- [ ] T040 Validar compilación limpia sin errores de tipos: `npm run build`.
-- [ ] T041 Validar pase total de la suite de tests: `npm test`.
-- [ ] T042 Ejecutar detector mecánico de calidad visual:
+- [x] T040 Validar compilación limpia sin errores de tipos: `npm run build`.
+- [x] T041 Validar pase total de la suite de tests: `npm test`.
+- [x] T042 Ejecutar detector mecánico de calidad visual:
   ```bash
   .github/skills/impeccable/scripts/impeccable detect --json src/index.html src/styles.css
   ```
-- [ ] T043 Ejecutar `pre-commit run --all-files`.
+- [x] T043 Ejecutar `pre-commit run --all-files`.
 - [ ] T044 Crear commit con convención del proyecto (`feat(viewer): measurement tools for length and ellipse area (TK-26)`).

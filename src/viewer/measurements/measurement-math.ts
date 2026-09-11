@@ -102,18 +102,36 @@ export function screenToWorld(
   viewportHeight: number,
   cols: number,
   rows: number,
-  zoom: number,
-  panX: number,
-  panY: number,
+  zoomOrViewport: number | { zoom: number; panX?: number; panY?: number },
+  panX: number = 0,
+  panY: number = 0,
   baseScale: number = 1,
   flipY: boolean = true,
 ): Point2D {
-  const effectiveScale = baseScale * zoom;
+  let zoomVal = 1;
+  let panXVal = panX;
+  let panYVal = panY;
+
+  if (typeof zoomOrViewport === "object" && zoomOrViewport !== null) {
+    zoomVal = zoomOrViewport.zoom;
+    panXVal = zoomOrViewport.panX ?? 0;
+    panYVal = zoomOrViewport.panY ?? 0;
+  } else if (typeof zoomOrViewport === "number") {
+    zoomVal = zoomOrViewport;
+  }
+
+  const currentZoom =
+    typeof zoomVal === "number" && !isNaN(zoomVal) && zoomVal > 0 ? zoomVal : 1;
+  const currentPanX =
+    typeof panXVal === "number" && !isNaN(panXVal) ? panXVal : 0;
+  const currentPanY =
+    typeof panYVal === "number" && !isNaN(panYVal) ? panYVal : 0;
+  const effectiveScale = baseScale * currentZoom;
   if (effectiveScale <= 0) return { x: 0, y: 0 };
 
   const worldX =
-    (screenX - viewportWidth / 2 - panX) / effectiveScale + cols / 2;
-  const dy = (screenY - viewportHeight / 2 - panY) / effectiveScale;
+    (screenX - viewportWidth / 2 - currentPanX) / effectiveScale + cols / 2;
+  const dy = (screenY - viewportHeight / 2 - currentPanY) / effectiveScale;
   const worldY = (flipY ? -dy : dy) + rows / 2;
 
   return { x: worldX, y: worldY };
@@ -129,18 +147,36 @@ export function worldToScreen(
   viewportHeight: number,
   cols: number,
   rows: number,
-  zoom: number,
-  panX: number,
-  panY: number,
+  zoomOrViewport: number | { zoom: number; panX?: number; panY?: number },
+  panX: number = 0,
+  panY: number = 0,
   baseScale: number = 1,
   flipY: boolean = true,
 ): Point2D {
-  const effectiveScale = baseScale * zoom;
+  let zoomVal = 1;
+  let panXVal = panX;
+  let panYVal = panY;
+
+  if (typeof zoomOrViewport === "object" && zoomOrViewport !== null) {
+    zoomVal = zoomOrViewport.zoom;
+    panXVal = zoomOrViewport.panX ?? 0;
+    panYVal = zoomOrViewport.panY ?? 0;
+  } else if (typeof zoomOrViewport === "number") {
+    zoomVal = zoomOrViewport;
+  }
+
+  const currentZoom =
+    typeof zoomVal === "number" && !isNaN(zoomVal) && zoomVal > 0 ? zoomVal : 1;
+  const currentPanX =
+    typeof panXVal === "number" && !isNaN(panXVal) ? panXVal : 0;
+  const currentPanY =
+    typeof panYVal === "number" && !isNaN(panYVal) ? panYVal : 0;
+  const effectiveScale = baseScale * currentZoom;
 
   const screenX =
-    viewportWidth / 2 + panX + (worldX - cols / 2) * effectiveScale;
+    viewportWidth / 2 + currentPanX + (worldX - cols / 2) * effectiveScale;
   const dy = (worldY - rows / 2) * effectiveScale;
-  const screenY = viewportHeight / 2 + panY + (flipY ? -dy : dy);
+  const screenY = viewportHeight / 2 + currentPanY + (flipY ? -dy : dy);
 
   return { x: screenX, y: screenY };
 }

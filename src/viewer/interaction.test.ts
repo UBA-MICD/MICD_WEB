@@ -26,6 +26,7 @@ import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
 import { mprEngine } from "./mpr-engine.ts";
 import { dicomCache } from "./cache.ts";
 import { ViewportManager } from "./viewport-manager.ts";
+import { initViewportManager } from "./viewport-registry.ts";
 import {
   clearAnnotations,
   getAnnotationsForSlice,
@@ -1363,6 +1364,162 @@ test("ViewportManager: dispatchMprCrosshair operates on orthogonal planes and bl
     );
   } finally {
     mprEngine.applyCrosshairDelta2D = originalApply;
+    manager.destroy();
+  }
+});
+
+test("pan tool in 2D mode with volume loaded dispatches standard 2D pan and not dispatchMprPan", () => {
+  setBody(viewerFixtureHtml());
+  const vpContainer = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(vpContainer);
+  initViewportInteraction();
+
+  const parsed = mockParsed();
+  state.parsed = parsed;
+  manager.activeViewport!.data.parsed = parsed;
+  state.isMprMode = false;
+  state.is3DMode = false;
+  state.activeTool = "pan";
+
+  mprEngine.volume = {
+    data: new Uint8Array(8),
+    dimensions: [2, 2, 2],
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  } as any;
+
+  let mprPanCalled = false;
+  let regularPanCalled = false;
+  const originalMprPan = manager.dispatchMprPan.bind(manager);
+  const originalPan = manager.dispatchPan.bind(manager);
+
+  manager.dispatchMprPan = (...args) => {
+    mprPanCalled = true;
+    return originalMprPan(...args);
+  };
+  manager.dispatchPan = (originId, dx, dy) => {
+    regularPanCalled = true;
+    return originalPan(originId, dx, dy);
+  };
+
+  try {
+    const vpCell = manager.activeViewport!.cellElement;
+    vpCell.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: 135,
+        clientY: 145,
+        bubbles: true,
+      }),
+    );
+
+    assert.equal(
+      regularPanCalled,
+      true,
+      "manager.dispatchPan should be called when isMprMode is false even if volume is loaded",
+    );
+    assert.equal(
+      mprPanCalled,
+      false,
+      "manager.dispatchMprPan should NOT be called in 2D mode",
+    );
+    assert.equal(manager.activeViewport!.data.viewport.panX, 35);
+    assert.equal(manager.activeViewport!.data.viewport.panY, 45);
+    assert.equal(state.viewport.panX, 35);
+    assert.equal(state.viewport.panY, 45);
+
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  } finally {
+    manager.dispatchMprPan = originalMprPan;
+    manager.dispatchPan = originalPan;
+    mprEngine.volume = null;
+    manager.destroy();
+  }
+});
+
+test("pan tool in MPR mode with volume loaded dispatches dispatchMprPan", () => {
+  setBody(viewerFixtureHtml());
+  const vpContainer = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(vpContainer);
+  initViewportInteraction();
+
+  const parsed = mockParsed();
+  state.parsed = parsed;
+  manager.activeViewport!.data.parsed = parsed;
+  state.isMprMode = true;
+  state.is3DMode = false;
+  state.activeTool = "pan";
+
+  mprEngine.volume = {
+    data: new Uint8Array(8),
+    dimensions: [2, 2, 2],
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  } as any;
+
+  let mprPanCalled = false;
+  let regularPanCalled = false;
+  const originalMprPan = manager.dispatchMprPan.bind(manager);
+  const originalPan = manager.dispatchPan.bind(manager);
+
+  manager.dispatchMprPan = (...args) => {
+    mprPanCalled = true;
+    return originalMprPan(...args);
+  };
+  manager.dispatchPan = (originId, dx, dy) => {
+    regularPanCalled = true;
+    return originalPan(originId, dx, dy);
+  };
+
+  try {
+    const vpCell = manager.activeViewport!.cellElement;
+    vpCell.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: 120,
+        clientY: 130,
+        bubbles: true,
+      }),
+    );
+
+    assert.equal(
+      mprPanCalled,
+      true,
+      "manager.dispatchMprPan should be called when isMprMode is true",
+    );
+    assert.equal(
+      regularPanCalled,
+      false,
+      "manager.dispatchPan should NOT be called in MPR mode",
+    );
+
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  } finally {
+    manager.dispatchMprPan = originalMprPan;
+    manager.dispatchPan = originalPan;
+    mprEngine.volume = null;
     manager.destroy();
   }
 });

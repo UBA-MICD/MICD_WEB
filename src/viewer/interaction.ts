@@ -944,7 +944,11 @@ export function initViewportInteraction(): void {
       activeVp,
     );
 
-    if (mprEngine.volume && state.activeTool === "crosshair") {
+    if (
+      mprEngine.volume &&
+      state.isMprMode &&
+      state.activeTool === "crosshair"
+    ) {
       if (manager && manager.isCombined3DViewport(originId)) {
         return;
       }
@@ -979,6 +983,13 @@ export function initViewportInteraction(): void {
       : (getViewportManager()?.activeViewport?.id ?? null);
 
     const manager = getViewportManager();
+    if (
+      manager &&
+      dragOriginViewportId &&
+      dragOriginViewportId !== manager.activeViewport?.id
+    ) {
+      manager.setActiveViewport(dragOriginViewportId);
+    }
     const activeVp =
       (manager && dragOriginViewportId
         ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
@@ -1179,7 +1190,11 @@ export function initViewportInteraction(): void {
 
     // ── 2D / MPR tools: route through ViewportManager so sync propagates ──
     const manager = getViewportManager();
-    const activeVp = manager?.activeViewport ?? null;
+    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
+    const activeVp =
+      (manager && originId
+        ? manager.getAllViewports().find((v) => v.id === originId)
+        : null) || manager?.activeViewport;
 
     if (activeVp && manager) {
       switch (state.activeTool) {
@@ -1194,7 +1209,7 @@ export function initViewportInteraction(): void {
           state.viewport.zoom = activeVp.data.viewport.zoom;
           break;
         case "pan":
-          if (mprEngine.volume) {
+          if (mprEngine.volume && state.isMprMode) {
             manager.dispatchMprPan(
               activeVp.id,
               dx,
@@ -1213,13 +1228,13 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
-          if (mprEngine.volume) {
-            const originId = dragOriginViewportId || activeVp.id;
-            if (manager.isCombined3DViewport(originId)) {
+          if (mprEngine.volume && state.isMprMode) {
+            const crosshairOriginId = dragOriginViewportId || activeVp.id;
+            if (manager.isCombined3DViewport(crosshairOriginId)) {
               break;
             }
             manager.dispatchMprCrosshair(
-              originId,
+              crosshairOriginId,
               dx,
               dy,
               activeVp.canvasElement.clientWidth ||
@@ -1249,7 +1264,7 @@ export function initViewportInteraction(): void {
           );
           break;
         case "pan":
-          if (mprEngine.volume) {
+          if (mprEngine.volume && state.isMprMode) {
             mprEngine.applyPanDelta2D(
               "axial",
               dx,
@@ -1263,7 +1278,7 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
-          if (mprEngine.volume) {
+          if (mprEngine.volume && state.isMprMode) {
             mprEngine.applyCrosshairDelta2D(
               "axial",
               dx,

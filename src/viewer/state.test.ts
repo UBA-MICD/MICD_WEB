@@ -9,7 +9,14 @@
  */
 import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { state, itemCount, type AppState } from "./state.ts";
+import {
+  state,
+  itemCount,
+  setMeasurementUnit,
+  setMeasurementLineWidth,
+  setMeasurementPanelOpen,
+  type AppState,
+} from "./state.ts";
 
 // Reset the singleton to its documented defaults before every test so each
 // case starts from a clean, predictable baseline.
@@ -33,6 +40,9 @@ function resetState(): void {
   state.lastMouseY = 0;
   state.isMetadataOpen = false;
   state.isWlPanelOpen = false;
+  state.isMeasurementPanelOpen = false;
+  state.measurementUnit = "mm";
+  state.measurementLineWidth = 2;
   state.is3DMode = false;
   state.annotations = {};
 }
@@ -255,4 +265,49 @@ test("itemCount reflects changes to state.serverInstances after the fact", () =>
 
   state.serverInstances = [];
   assert.equal(itemCount(), 0);
+});
+
+test("state initializes measurement defaults correctly", () => {
+  assert.equal(state.measurementUnit, "mm");
+  assert.equal(state.measurementLineWidth, 2);
+  assert.equal(state.isMeasurementPanelOpen, false);
+});
+
+test("setMeasurementUnit updates measurementUnit in state", () => {
+  setMeasurementUnit("cm");
+  assert.equal(state.measurementUnit, "cm");
+  setMeasurementUnit("mm");
+  assert.equal(state.measurementUnit, "mm");
+});
+
+test("setMeasurementLineWidth updates measurementLineWidth clamping to [1, 5]", () => {
+  setMeasurementLineWidth(4);
+  assert.equal(state.measurementLineWidth, 4);
+
+  // Clamps lower bound to 1
+  setMeasurementLineWidth(0);
+  assert.equal(state.measurementLineWidth, 1);
+  setMeasurementLineWidth(-5);
+  assert.equal(state.measurementLineWidth, 1);
+
+  // Clamps upper bound to 5
+  setMeasurementLineWidth(6);
+  assert.equal(state.measurementLineWidth, 5);
+  setMeasurementLineWidth(100);
+  assert.equal(state.measurementLineWidth, 5);
+
+  // Rounds decimals
+  setMeasurementLineWidth(3.7);
+  assert.equal(state.measurementLineWidth, 4);
+
+  // Ignores NaN
+  setMeasurementLineWidth(NaN);
+  assert.equal(state.measurementLineWidth, 4);
+});
+
+test("setMeasurementPanelOpen updates isMeasurementPanelOpen in state", () => {
+  setMeasurementPanelOpen(true);
+  assert.equal(state.isMeasurementPanelOpen, true);
+  setMeasurementPanelOpen(false);
+  assert.equal(state.isMeasurementPanelOpen, false);
 });

@@ -106,6 +106,9 @@ function resetState(): void {
   state.lastMouseY = 0;
   state.isMetadataOpen = false;
   state.isWlPanelOpen = false;
+  state.isMeasurementPanelOpen = false;
+  state.measurementUnit = "mm";
+  state.measurementLineWidth = 2;
   state.is3DMode = false;
   mpr3DViewer.isActive = false;
   mpr3DViewer.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
@@ -162,17 +165,139 @@ test("initToolbar: clicking length and ellipse tools sets activeTool and updates
   initToolbar();
   const lenBtn = document.getElementById("tool-length")!;
   const ellBtn = document.getElementById("tool-ellipse")!;
+  const panel = document.getElementById("measure-panel")!;
 
   lenBtn.dispatchEvent(new MouseEvent("click"));
   assert.equal(state.activeTool, "length");
   assert.equal(lenBtn.classList.contains("active"), true);
   assert.equal(lenBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(state.isMeasurementPanelOpen, true);
+  assert.equal(lenBtn.getAttribute("aria-expanded"), "true");
+  assert.equal(panel.classList.contains("open"), true);
 
+  // Clicking length again toggles panel closed
+  lenBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.isMeasurementPanelOpen, false);
+  assert.equal(lenBtn.getAttribute("aria-expanded"), "false");
+  assert.equal(panel.classList.contains("open"), false);
+
+  // Clicking ellipse activates it and opens panel
   ellBtn.dispatchEvent(new MouseEvent("click"));
   assert.equal(state.activeTool, "ellipse");
   assert.equal(ellBtn.classList.contains("active"), true);
   assert.equal(ellBtn.getAttribute("aria-pressed"), "true");
   assert.equal(lenBtn.classList.contains("active"), false);
+  assert.equal(state.isMeasurementPanelOpen, true);
+  assert.equal(panel.classList.contains("open"), true);
+
+  // Clicking pan switches tool and closes panel
+  document.getElementById("tool-pan")!.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "pan");
+  assert.equal(state.isMeasurementPanelOpen, false);
+  assert.equal(panel.classList.contains("open"), false);
+});
+
+test("measurement panel: unit buttons and select toggle state and update UI", () => {
+  initToolbar();
+  const btnMm = document.getElementById("btn-unit-mm")!;
+  const btnCm = document.getElementById("btn-unit-cm")!;
+  const selectUnit = document.getElementById(
+    "select-measure-unit",
+  ) as HTMLSelectElement;
+
+  // Defaults to mm
+  assert.equal(state.measurementUnit, "mm");
+  assert.equal(btnMm.classList.contains("active"), true);
+  assert.equal(btnMm.getAttribute("aria-pressed"), "true");
+  assert.equal(btnCm.classList.contains("active"), false);
+  assert.equal(btnCm.getAttribute("aria-pressed"), "false");
+
+  // Click cm
+  btnCm.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.measurementUnit, "cm");
+  assert.equal(btnCm.classList.contains("active"), true);
+  assert.equal(btnCm.getAttribute("aria-pressed"), "true");
+  assert.equal(btnMm.classList.contains("active"), false);
+  assert.equal(btnMm.getAttribute("aria-pressed"), "false");
+  assert.equal(selectUnit.value, "cm");
+
+  // Click mm
+  btnMm.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.measurementUnit, "mm");
+  assert.equal(btnMm.classList.contains("active"), true);
+  assert.equal(btnMm.getAttribute("aria-pressed"), "true");
+  assert.equal(selectUnit.value, "mm");
+
+  // Select element change
+  selectUnit.value = "cm";
+  selectUnit.dispatchEvent(new Event("change"));
+  assert.equal(state.measurementUnit, "cm");
+  assert.equal(btnCm.classList.contains("active"), true);
+});
+
+test("measurement panel: slider updates measurementLineWidth and label", () => {
+  initToolbar();
+  const slider = document.getElementById(
+    "slider-measure-width",
+  ) as HTMLInputElement;
+  const valLabel = document.getElementById("val-measure-width")!;
+
+  assert.equal(state.measurementLineWidth, 2);
+  assert.equal(valLabel.textContent, "2px");
+
+  slider.value = "4";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(state.measurementLineWidth, 4);
+  assert.equal(valLabel.textContent, "4px");
+
+  slider.value = "1";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(state.measurementLineWidth, 1);
+  assert.equal(valLabel.textContent, "1px");
+});
+
+test("measurement panel: clear button clears annotations for active slice", () => {
+  initToolbar();
+  state.parsed = mockParsed();
+  const uid = state.parsed.metadata.sopInstanceUid;
+
+  state.annotations[uid] = [
+    {
+      id: "ann-len-1",
+      type: "length",
+      sopInstanceUid: uid,
+      sliceIndex: 0,
+      start: { x: 0, y: 0 },
+      end: { x: 10, y: 10 },
+      distance: 14.1,
+      isCalibrated: true,
+      unit: "mm",
+      createdAt: Date.now(),
+    },
+  ];
+  state.annotations["other-slice"] = [
+    {
+      id: "ann-len-2",
+      type: "length",
+      sopInstanceUid: "other-slice",
+      sliceIndex: 1,
+      start: { x: 0, y: 0 },
+      end: { x: 5, y: 5 },
+      distance: 7.0,
+      isCalibrated: true,
+      unit: "mm",
+      createdAt: Date.now(),
+    },
+  ];
+
+  setSelectedAnnotationId("ann-len-1");
+  const clearBtn = document.getElementById("btn-clear-measurements")!;
+  clearBtn.dispatchEvent(new MouseEvent("click"));
+
+  assert.deepEqual(getAnnotationsForSlice(uid), []);
+  assert.equal(getSelectedAnnotationId(), null);
+  // Other slices are unaffected
+  assert.equal(getAnnotationsForSlice("other-slice").length, 1);
 });
 
 test("initToolbar: length and ellipse tools are disabled in 3D mode", () => {
@@ -867,6 +992,10 @@ test("keyboard: Escape cancels active drawing and clears selection", () => {
   setSelectedAnnotationId("ann-1");
   document.dispatchEvent(key("Escape"));
   assert.equal(getSelectedAnnotationId(), null);
+
+  state.isMeasurementPanelOpen = true;
+  document.dispatchEvent(key("Escape"));
+  assert.equal(state.isMeasurementPanelOpen, false);
 });
 
 test("keyboard: Delete or Backspace deletes selected annotation", () => {

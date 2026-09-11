@@ -10,7 +10,12 @@ import {
 import { $, showLoading, showError } from "../shared/dom.js";
 import { anyDialogOpen, openDialog, closeDialog } from "../shared/dialog.js";
 import { currentScreen } from "../shared/screen.js";
-import { state, itemCount } from "./state.js";
+import {
+  state,
+  itemCount,
+  setMeasurementUnit,
+  setMeasurementLineWidth,
+} from "./state.js";
 import {
   render,
   updateSeriesNav,
@@ -41,10 +46,13 @@ import {
   calculateEllipseArea,
   calculateEllipseHUStats,
   extractCalibration,
+  formatLength,
+  formatArea,
 } from "./measurements/measurement-math.js";
 import {
   addAnnotation,
   deleteAnnotation,
+  clearAnnotations,
   getActiveSopInstanceUid,
   getAnnotationsForSlice,
 } from "./measurements/annotation-state.js";
@@ -91,6 +99,7 @@ export function initToolbar(): void {
             state.isWlPanelOpen = true;
           }
           state.isZoomPanelOpen = false;
+          state.isMeasurementPanelOpen = false;
         } else if (tool === "zoom") {
           if (state.activeTool === "zoom") {
             state.isZoomPanelOpen = !state.isZoomPanelOpen;
@@ -99,10 +108,21 @@ export function initToolbar(): void {
             state.isZoomPanelOpen = true;
           }
           state.isWlPanelOpen = false;
+          state.isMeasurementPanelOpen = false;
+        } else if (tool === "length" || tool === "ellipse") {
+          if (state.activeTool === tool) {
+            state.isMeasurementPanelOpen = !state.isMeasurementPanelOpen;
+          } else {
+            state.activeTool = tool;
+            state.isMeasurementPanelOpen = true;
+          }
+          state.isWlPanelOpen = false;
+          state.isZoomPanelOpen = false;
         } else {
           state.activeTool = tool;
           state.isWlPanelOpen = false;
           state.isZoomPanelOpen = false;
+          state.isMeasurementPanelOpen = false;
         }
         updateToolbarUI();
       });
@@ -190,6 +210,7 @@ export function initToolbar(): void {
   initZoomControlsInteraction();
   init3DControlsInteraction();
   initLayerControlsInteraction();
+  initMeasurementControlsInteraction();
   updateToolbarUI();
 }
 
@@ -532,6 +553,91 @@ function updateZoomControlsUI(): void {
   }
 }
 
+function renderActiveMeasurementOverlays(): void {
+  const manager = getViewportManager();
+  if (manager && manager.getAllViewports().length > 0) {
+    for (const vp of manager.getAllViewports()) {
+      vp.renderOverlay();
+    }
+  } else {
+    render();
+  }
+}
+
+export function updateMeasurementControlsUI(): void {
+  const btnMm = $("btn-unit-mm");
+  const btnCm = $("btn-unit-cm");
+  const selectUnit = $("select-measure-unit") as HTMLSelectElement | null;
+  const sliderWidth = $("slider-measure-width") as HTMLInputElement | null;
+  const valWidth = $("val-measure-width");
+
+  const isMm = state.measurementUnit === "mm";
+  if (btnMm) {
+    btnMm.classList.toggle("active", isMm);
+    btnMm.setAttribute("aria-pressed", String(isMm));
+  }
+  if (btnCm) {
+    btnCm.classList.toggle("active", !isMm);
+    btnCm.setAttribute("aria-pressed", String(!isMm));
+  }
+  if (selectUnit && selectUnit.value !== state.measurementUnit) {
+    selectUnit.value = state.measurementUnit;
+  }
+  if (sliderWidth && document.activeElement !== sliderWidth) {
+    sliderWidth.value = String(state.measurementLineWidth);
+  }
+  if (valWidth) {
+    valWidth.textContent = `${state.measurementLineWidth}px`;
+  }
+}
+
+export function initMeasurementControlsInteraction(): void {
+  const btnMm = $("btn-unit-mm");
+  const btnCm = $("btn-unit-cm");
+  const selectUnit = $("select-measure-unit") as HTMLSelectElement | null;
+  const sliderWidth = $("slider-measure-width") as HTMLInputElement | null;
+  const btnClear = $("btn-clear-measurements");
+
+  const handleUnitChange = (unit: "mm" | "cm"): void => {
+    setMeasurementUnit(unit);
+    updateMeasurementControlsUI();
+    renderActiveMeasurementOverlays();
+  };
+
+  btnMm?.addEventListener("click", () => handleUnitChange("mm"));
+  btnCm?.addEventListener("click", () => handleUnitChange("cm"));
+
+  selectUnit?.addEventListener("change", () => {
+    const val = selectUnit.value === "cm" ? "cm" : "mm";
+    handleUnitChange(val);
+  });
+
+  sliderWidth?.addEventListener("input", () => {
+    const val = parseInt(sliderWidth.value, 10);
+    if (!isNaN(val)) {
+      setMeasurementLineWidth(val);
+      const valWidth = $("val-measure-width");
+      if (valWidth) {
+        valWidth.textContent = `${state.measurementLineWidth}px`;
+      }
+      renderActiveMeasurementOverlays();
+    }
+  });
+
+  btnClear?.addEventListener("click", () => {
+    const manager = getViewportManager();
+    const activeVp = manager?.activeViewport;
+    const uid =
+      activeVp?.data.parsed?.metadata?.sopInstanceUid ||
+      getActiveSopInstanceUid();
+    if (uid) {
+      clearAnnotations(uid);
+      setSelectedAnnotationId(null);
+      renderActiveMeasurementOverlays();
+    }
+  });
+}
+
 export async function toggle3DMode(): Promise<boolean> {
   const btn = ($("tool-view-3d") || $("tool-mpr")) as HTMLButtonElement | null;
   if (btn?.disabled) return false;
@@ -680,11 +786,19 @@ export function updateToolbarUI(): void {
   const lengthBtn = $("tool-length") as HTMLButtonElement | null;
   if (lengthBtn) {
     lengthBtn.disabled = state.is3DMode;
+    lengthBtn.setAttribute(
+      "aria-expanded",
+      String(state.isMeasurementPanelOpen),
+    );
   }
 
   const ellipseBtn = $("tool-ellipse") as HTMLButtonElement | null;
   if (ellipseBtn) {
     ellipseBtn.disabled = state.is3DMode;
+    ellipseBtn.setAttribute(
+      "aria-expanded",
+      String(state.isMeasurementPanelOpen),
+    );
   }
 
   const crosshairBtn = $("tool-crosshair") as HTMLButtonElement | null;
@@ -737,6 +851,11 @@ export function updateToolbarUI(): void {
     zoomPanel.classList.toggle("open", state.isZoomPanelOpen);
   }
 
+  const measurePanel = $("measure-panel");
+  if (measurePanel) {
+    measurePanel.classList.toggle("open", state.isMeasurementPanelOpen);
+  }
+
   const exportBtn = $("btn-export-menu") as HTMLButtonElement | null;
   if (exportBtn) {
     const hasLoadedStudy = itemCount() > 0 || state.parsed !== null;
@@ -760,6 +879,7 @@ export function updateToolbarUI(): void {
   }
 
   updateZoomControlsUI();
+  updateMeasurementControlsUI();
 }
 
 // ── Viewport Mouse Interaction ───────────────────────────────────────────────
@@ -1214,9 +1334,11 @@ export function initViewportInteraction(): void {
 
             const announceEl = $("measure-announce");
             if (announceEl) {
-              const val = cal.isCalibrated
-                ? `${dist.toFixed(1)} mm`
-                : `${Math.round(dist)} px`;
+              const val = formatLength(
+                dist,
+                cal.isCalibrated,
+                state.measurementUnit,
+              );
               announceEl.textContent = `${t("annotations.length") || "Longitud"}: ${val}`;
             }
           }
@@ -1270,9 +1392,11 @@ export function initViewportInteraction(): void {
 
             const announceEl = $("measure-announce");
             if (announceEl) {
-              const val = cal.isCalibrated
-                ? `${area.toFixed(1)} mm²`
-                : `${Math.round(area)} px²`;
+              const val = formatArea(
+                area,
+                cal.isCalibrated,
+                state.measurementUnit,
+              );
               const huStr =
                 typeof meanHu === "number"
                   ? `, Media: ${meanHu.toFixed(1)} HU`
@@ -1732,6 +1856,9 @@ export function initKeyboardShortcuts(): void {
         if (manager) {
           for (const vp of manager.getAllViewports()) vp.render();
         }
+      } else if (state.isMeasurementPanelOpen) {
+        state.isMeasurementPanelOpen = false;
+        updateToolbarUI();
       }
     } else if (e.key === "Delete" || e.key === "Backspace") {
       const selectedId = getSelectedAnnotationId();

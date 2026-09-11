@@ -281,3 +281,41 @@ export function calculateEllipseHUStats(
     max,
   };
 }
+
+/**
+ * Formats a distance in millimeters (or pixels if uncalibrated).
+ * When unit is 'cm', distance is divided by 10.
+ */
+export function formatLength(
+  distanceMm: number,
+  isCalibrated: boolean,
+  unit: "mm" | "cm" = "mm",
+): string {
+  if (!isCalibrated) {
+    return `${Math.round(distanceMm)} px`;
+  }
+  if (unit === "cm") {
+    const cm = distanceMm / 10;
+    return `${cm.toFixed(2)} cm`;
+  }
+  return `${distanceMm.toFixed(1)} mm`;
+}
+
+/**
+ * Formats an area in square millimeters (or square pixels if uncalibrated).
+ * When unit is 'cm', area is divided by 100 (1 cm² = 100 mm²).
+ */
+export function formatArea(
+  areaMm2: number,
+  isCalibrated: boolean,
+  unit: "mm" | "cm" = "mm",
+): string {
+  if (!isCalibrated) {
+    return `${Math.round(areaMm2)} px²`;
+  }
+  if (unit === "cm") {
+    const cm2 = areaMm2 / 100;
+    return `${cm2.toFixed(2)} cm²`;
+  }
+  return `${areaMm2.toFixed(1)} mm²`;
+}

@@ -19,6 +19,8 @@ import {
   calculateEllipseArea,
   calculateEllipseHUStats,
   extractCalibration,
+  formatArea,
+  formatLength,
   worldToScreen,
 } from "./measurement-math.js";
 import { getAnnotationsForSlice } from "./annotation-state.js";
@@ -202,7 +204,7 @@ function drawLengthAnnotation(
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = state.measurementLineWidth || 2;
   ctx.lineCap = "round";
 
   // Segment line
@@ -219,9 +221,11 @@ function drawLengthAnnotation(
   const midX = (p1.x + p2.x) / 2;
   const midY = (p1.y + p2.y) / 2;
 
-  const valueStr = ann.isCalibrated
-    ? `${ann.distance.toFixed(1)} mm`
-    : `${Math.round(ann.distance)} px`;
+  const valueStr = formatLength(
+    ann.distance,
+    ann.isCalibrated,
+    state.measurementUnit,
+  );
 
   const badgeLines = [{ text: valueStr, color: "#ffffff", bold: true }];
   if (!ann.isCalibrated) {
@@ -271,7 +275,7 @@ function drawEllipseAnnotation(
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = state.measurementLineWidth || 2;
 
   // Draw ellipse outline
   ctx.beginPath();
@@ -298,9 +302,12 @@ function drawEllipseAnnotation(
   drawHandle(ctx, center.x, center.y - ryScreen, color, 3);
 
   // Badge lines
-  const areaStr = ann.isCalibrated
-    ? `${t("annotations.area") || "Área"}: ${ann.area.toFixed(1)} mm²`
-    : `${t("annotations.area") || "Área"}: ${Math.round(ann.area)} px²`;
+  const formattedArea = formatArea(
+    ann.area,
+    ann.isCalibrated,
+    state.measurementUnit,
+  );
+  const areaStr = `${t("annotations.area") || "Área"}: ${formattedArea}`;
 
   const badgeLines = [{ text: areaStr, color: "#ffffff", bold: true }];
 
@@ -340,7 +347,7 @@ function drawActiveDrawing(
   ctx.save();
   ctx.strokeStyle = COLORS.active;
   ctx.fillStyle = COLORS.active;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = state.measurementLineWidth || 2;
   ctx.setLineDash([4, 4]);
 
   if (drawing.type === "length" && drawing.start && drawing.end) {
@@ -385,9 +392,11 @@ function drawActiveDrawing(
       drawing.end,
       cal.pixelSpacing,
     );
-    const valueStr = cal.isCalibrated
-      ? `${dist.toFixed(1)} mm`
-      : `${Math.round(dist)} px`;
+    const valueStr = formatLength(
+      dist,
+      cal.isCalibrated,
+      state.measurementUnit,
+    );
 
     const midX = (p1.x + p2.x) / 2;
     const midY = (p1.y + p2.y) / 2;
@@ -432,9 +441,12 @@ function drawActiveDrawing(
         drawing.radiusY,
         cal.pixelSpacing,
       );
-      const areaStr = cal.isCalibrated
-        ? `${t("annotations.area") || "Área"}: ${area.toFixed(1)} mm²`
-        : `${t("annotations.area") || "Área"}: ${Math.round(area)} px²`;
+      const formattedArea = formatArea(
+        area,
+        cal.isCalibrated,
+        state.measurementUnit,
+      );
+      const areaStr = `${t("annotations.area") || "Área"}: ${formattedArea}`;
 
       const lines = [{ text: areaStr, color: "#ffffff", bold: true }];
 

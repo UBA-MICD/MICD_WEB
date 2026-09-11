@@ -11,6 +11,8 @@ import {
   calculateEllipseHUStats,
   screenToWorld,
   worldToScreen,
+  formatLength,
+  formatArea,
 } from "./measurement-math.js";
 
 test("extractCalibration parses valid PixelSpacing and rescale tags", () => {
@@ -250,4 +252,34 @@ test("calculateEllipseHUStats returns null for degenerate inputs", () => {
     calculateEllipseHUStats({ x: -100, y: -100 }, 5, 5, pixelData, cols, rows),
     null,
   );
+});
+
+test("formatLength formats uncalibrated distance in pixels", () => {
+  assert.equal(formatLength(42.3, false), "42 px");
+  assert.equal(formatLength(42.8, false, "cm"), "43 px");
+});
+
+test("formatLength formats calibrated distance in mm by default", () => {
+  assert.equal(formatLength(15.46, true), "15.5 mm");
+  assert.equal(formatLength(15.46, true, "mm"), "15.5 mm");
+});
+
+test("formatLength formats calibrated distance in cm (divided by 10)", () => {
+  assert.equal(formatLength(25.4, true, "cm"), "2.54 cm");
+  assert.equal(formatLength(100.0, true, "cm"), "10.00 cm");
+});
+
+test("formatArea formats uncalibrated area in square pixels", () => {
+  assert.equal(formatArea(150.2, false), "150 px²");
+  assert.equal(formatArea(150.7, false, "cm"), "151 px²");
+});
+
+test("formatArea formats calibrated area in mm² by default", () => {
+  assert.equal(formatArea(245.67, true), "245.7 mm²");
+  assert.equal(formatArea(245.67, true, "mm"), "245.7 mm²");
+});
+
+test("formatArea formats calibrated area in cm² (divided by 100)", () => {
+  assert.equal(formatArea(250.0, true, "cm"), "2.50 cm²");
+  assert.equal(formatArea(1000.0, true, "cm"), "10.00 cm²");
 });

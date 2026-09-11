@@ -736,4 +736,10 @@ export const en: Record<string, string> = {
   "annotations.mean": "Mean",
   "annotations.stdDev": "Std Dev",
   "annotations.uncalibrated": "No spatial calibration",
+  "viewer.measure.panelTitle": "Measurement Settings",
+  "viewer.measure.unitLabel": "Units",
+  "viewer.measure.unitMm": "Millimeters (mm)",
+  "viewer.measure.unitCm": "Centimeters (cm)",
+  "viewer.measure.lineWidthLabel": "Line Width",
+  "viewer.measure.clearAnnotations": "Clear Annotations",
 };

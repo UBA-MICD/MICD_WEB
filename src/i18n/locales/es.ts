@@ -747,4 +747,10 @@ export const es: Record<string, string> = {
   "annotations.mean": "Media",
   "annotations.stdDev": "Desvío Est.",
   "annotations.uncalibrated": "Sin calibración espacial",
+  "viewer.measure.panelTitle": "Ajuste de Mediciones",
+  "viewer.measure.unitLabel": "Unidades",
+  "viewer.measure.unitMm": "Milímetros (mm)",
+  "viewer.measure.unitCm": "Centímetros (cm)",
+  "viewer.measure.lineWidthLabel": "Grosor de línea",
+  "viewer.measure.clearAnnotations": "Borrar mediciones",
 };

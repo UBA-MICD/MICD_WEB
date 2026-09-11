@@ -27,6 +27,11 @@ export interface AppState {
   isMetadataOpen: boolean;
   isWlPanelOpen: boolean;
   isZoomPanelOpen: boolean;
+  isMeasurementPanelOpen: boolean;
+  /** Unit for calibrated physical measurements (TK-26). */
+  measurementUnit: "mm" | "cm";
+  /** Stroke width in pixels for measurement overlays (1 to 5) (TK-26). */
+  measurementLineWidth: number;
   is3DMode: boolean;
   isMprMode?: boolean;
   /** Configured base URL for the PACS / Orthanc server (TK-29). */
@@ -105,12 +110,30 @@ export const state: AppState = {
   isMetadataOpen: false,
   isWlPanelOpen: false,
   isZoomPanelOpen: false,
+  isMeasurementPanelOpen: false,
+  measurementUnit: "mm",
+  measurementLineWidth: 2,
   is3DMode: false,
   isMprMode: false,
   annotations: {},
   serverUrl: getStoredServerUrl(),
   serverValidation: null,
 };
+
+export function setMeasurementUnit(unit: "mm" | "cm"): void {
+  state.measurementUnit = unit;
+}
+
+export function setMeasurementLineWidth(width: number): void {
+  const numeric = Number(width);
+  if (!isNaN(numeric)) {
+    state.measurementLineWidth = Math.max(1, Math.min(5, Math.round(numeric)));
+  }
+}
+
+export function setMeasurementPanelOpen(open: boolean): void {
+  state.isMeasurementPanelOpen = open;
+}
 
 export {
   getActiveSopInstanceUid,

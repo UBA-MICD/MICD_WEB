@@ -102,6 +102,18 @@ export function viewerFixtureHtml(): string {
       <button id="btn-zoom-200"></button>
     </aside>
 
+    <aside class="wl-panel" id="measure-panel">
+      <button id="btn-unit-mm" data-unit="mm"></button>
+      <button id="btn-unit-cm" data-unit="cm"></button>
+      <select id="select-measure-unit">
+        <option value="mm" selected>mm</option>
+        <option value="cm">cm</option>
+      </select>
+      <input type="range" id="slider-measure-width" min="1" max="5" step="1" value="2" />
+      <span id="val-measure-width">2px</span>
+      <button id="btn-clear-measurements"></button>
+    </aside>
+
     <div id="mpr-orient-top" class="mpr-orient"></div>
     <div id="mpr-orient-bottom" class="mpr-orient"></div>
     <div id="mpr-orient-left" class="mpr-orient"></div>

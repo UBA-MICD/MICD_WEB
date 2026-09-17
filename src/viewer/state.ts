@@ -135,15 +135,6 @@ export function setMeasurementPanelOpen(open: boolean): void {
   state.isMeasurementPanelOpen = open;
 }
 
-export {
-  getActiveSopInstanceUid,
-  addAnnotation,
-  updateAnnotation,
-  deleteAnnotation,
-  getAnnotationsForSlice,
-  clearAnnotations,
-} from "./measurements/annotation-state.js";
-
 /** Number of images in the current series, regardless of source. */
 export function itemCount(): number {
   return state.source === "server"

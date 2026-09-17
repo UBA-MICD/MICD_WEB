@@ -76,6 +76,10 @@ Matriz BDD detallada en [`002-measurement-tools.feature`](002-measurement-tools.
 - **Desktop parity:** Código 100% en TypeScript puro sin dependencias de Electron, consumible directamente por `MICD_APP` vía vendoring verbatim.
 - **Performance:** Muestreo de elipse acotado a la bounding box con verificación de pertenencia cuadrática para evitar bloqueos del hilo principal en ROIs grandes. Renderizado overlay a 60 fps.
 
+## Limitaciones Conocidas (MVP)
+
+- **Persistencia en memoria:** `state.annotations` vive únicamente en memoria volátil de la aplicación. Las mediciones se pierden al recargar la página (F5) o cerrar el visor, dado que la persistencia en almacenamiento persistente o como objetos DICOM PR / GSPS en el servidor Orthanc corresponde a un alcance posterior fuera de este MVP.
+
 ## Open questions
 
 _(Ninguna pregunta abierta bloqueante; requerimientos consolidados)._

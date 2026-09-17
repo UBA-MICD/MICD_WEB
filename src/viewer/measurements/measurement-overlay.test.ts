@@ -7,11 +7,11 @@ import {
   setSelectedAnnotationId,
   getSelectedAnnotationId,
   hitTestAnnotation,
-} from "./measurement-overlay.ts";
-import { addAnnotation, clearAnnotations } from "./annotation-state.ts";
-import type { LengthAnnotation, EllipseAnnotation } from "./types.ts";
-import type { DicomMetadata } from "../../dicom/dicom-parser-util.ts";
-import type { ViewportState } from "../../dicom/dicom-renderer.ts";
+} from "./measurement-overlay.js";
+import { addAnnotation, clearAnnotations } from "./annotation-state.js";
+import type { LengthAnnotation, EllipseAnnotation } from "./types.js";
+import type { DicomMetadata } from "../../dicom/dicom-parser-util.js";
+import type { ViewportState } from "../../dicom/dicom-renderer.js";
 
 function createMockCanvas(w = 500, h = 500): HTMLCanvasElement {
   const drawnCalls: string[] = [];

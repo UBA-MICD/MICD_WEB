@@ -81,7 +81,6 @@ export interface RenderOverlayOptions {
   metadata?: DicomMetadata | null;
   pixelData?: ArrayLike<number> | null;
   sopInstanceUid?: string;
-  sliceIndex?: number;
   cellId?: string | null;
 }
 

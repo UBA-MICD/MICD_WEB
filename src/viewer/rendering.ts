@@ -81,7 +81,6 @@ export function render(): void {
       metadata: state.parsed.metadata,
       pixelData: state.parsed.pixelData,
       sopInstanceUid: getActiveSopInstanceUid(),
-      sliceIndex: state.currentIndex,
     });
   }
 

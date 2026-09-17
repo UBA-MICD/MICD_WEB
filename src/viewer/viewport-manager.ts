@@ -187,7 +187,6 @@ export class Viewport {
     this.data.viewport.panX += dx;
     this.data.viewport.panY += dy;
     this.applyTransform();
-    this.renderOverlay();
   }
 
   public applyZoomFactor(factor: number): void {
@@ -197,7 +196,6 @@ export class Viewport {
     );
     this.applyTransform();
     this.updateInfoOverlay();
-    this.renderOverlay();
   }
 
   public applyWindowLevelDelta(dWidth: number, dCenter: number): void {
@@ -319,7 +317,6 @@ export class Viewport {
       sopInstanceUid:
         this.data.parsed.metadata.sopInstanceUid ||
         `slice_${this.data.currentIndex}`,
-      sliceIndex: this.data.currentIndex,
       cellId: this.id,
     });
   }

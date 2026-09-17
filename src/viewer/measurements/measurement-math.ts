@@ -105,6 +105,7 @@ export function screenToWorld(
   zoomOrViewport: number | { zoom: number; panX?: number; panY?: number },
   panX: number = 0,
   panY: number = 0,
+  // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
   baseScale: number = 1,
   flipY: boolean = true,
 ): Point2D {
@@ -150,6 +151,7 @@ export function worldToScreen(
   zoomOrViewport: number | { zoom: number; panX?: number; panY?: number },
   panX: number = 0,
   panY: number = 0,
+  // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
   baseScale: number = 1,
   flipY: boolean = true,
 ): Point2D {

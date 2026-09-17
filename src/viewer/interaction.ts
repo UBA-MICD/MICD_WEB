@@ -1051,6 +1051,7 @@ export function initViewportInteraction(): void {
         vpState.zoom,
         vpState.panX,
         vpState.panY,
+        // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
         1,
         true,
       );
@@ -1119,6 +1120,7 @@ export function initViewportInteraction(): void {
           vpState.zoom,
           vpState.panX,
           vpState.panY,
+          // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
           1,
           true,
         );

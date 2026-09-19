@@ -187,6 +187,16 @@ export const en: Record<string, string> = {
   "viewer.layers.opacity": "Opacity",
   "viewer.layers.ww": "Layer Width (WW)",
   "viewer.layers.wl": "Layer Center (WL)",
+
+  // ── viewer — AI segmentation (mock SAM3) ────────────────────────────────
+  "viewer.segmentation.buttonTitle": "AI segmentation (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "AI Seg.",
+  "viewer.segmentation.running": "Segmenting…",
+  "viewer.segmentation.simulatedBadge": "Simulated",
+  "viewer.segmentation.layerToggle": "AI segmentation",
+  "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
+  "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
+  "viewer.segmentation.failed": "The segmentation could not be generated.",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",

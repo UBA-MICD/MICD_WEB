@@ -190,6 +190,16 @@ export const es: Record<string, string> = {
   "viewer.layers.opacity": "Opacidad",
   "viewer.layers.ww": "Ancho de Capa (WW)",
   "viewer.layers.wl": "Centro de Capa (WL)",
+
+  // ── viewer — segmentación con IA (mock SAM3) ────────────────────────────
+  "viewer.segmentation.buttonTitle": "Segmentación con IA (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "IA Segm.",
+  "viewer.segmentation.running": "Segmentando…",
+  "viewer.segmentation.simulatedBadge": "Simulado",
+  "viewer.segmentation.layerToggle": "Segmentación IA",
+  "viewer.segmentation.hudLabel": "Segmentación IA (simulada)",
+  "viewer.segmentation.noImage": "Abrí una imagen DICOM antes de segmentar.",
+  "viewer.segmentation.failed": "No se pudo generar la segmentación.",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",

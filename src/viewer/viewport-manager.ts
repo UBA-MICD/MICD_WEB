@@ -17,6 +17,10 @@ import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
 import { state } from "./state.js";
 import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
+import {
+  renderSegmentationOverlay,
+  type SegmentationLayer,
+} from "./segmentation/segmentation-overlay.js";
 
 // ── Types and Contracts ───────────────────────────────────────────────────────
 
@@ -37,6 +41,8 @@ export interface ViewportData {
   parsed: ParsedDicom | null;
   viewport: ViewportState;
   overlay?: OverlayLayer | null;
+  /** Segmentación de IA dibujada sobre este viewport (US-SEG). */
+  segmentation?: SegmentationLayer | null;
   mlLabel?: string | null;
 }
 
@@ -318,6 +324,15 @@ export class Viewport {
         this.data.parsed.metadata.sopInstanceUid ||
         `slice_${this.data.currentIndex}`,
       cellId: this.id,
+    });
+
+    // Después de las mediciones: renderMeasurementOverlay limpia el canvas,
+    // así que la segmentación se dibuja encima y ambas capas conviven.
+    renderSegmentationOverlay({
+      canvas: this.overlayCanvas,
+      viewport: this.data.viewport,
+      metadata: this.data.parsed.metadata,
+      layer: this.data.segmentation,
     });
   }
 

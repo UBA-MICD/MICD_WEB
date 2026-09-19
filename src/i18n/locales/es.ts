@@ -116,6 +116,8 @@ export const es: Record<string, string> = {
   "viewer.tool.zoomTitle": "Zoom (Z)",
   "viewer.tool.panTitle": "Desplazar (P)",
   "viewer.tool.crosshairTitle": "Navegación Crosshair 3D (C)",
+  "viewer.tool.lengthTitle": "Regla de medición (L)",
+  "viewer.tool.ellipseTitle": "Medición de área y HU (E)",
   "viewer.tool.resetTitle": "Restablecer (R)",
   "viewer.tool.metadataTitle": "Etiquetas DICOM (M)",
   "viewer.tool.zenodoTitle": "Zenodo — repositorio de ciencia abierta",
@@ -738,4 +740,17 @@ export const es: Record<string, string> = {
   "serverConfig.saveSuccess": "Configuración guardada exitosamente.",
   "serverConfig.invalidUrl":
     "Formato de URL inválido. Usá http:// o https:// (ej. http://localhost:3000)",
+
+  // ── Medición y anotaciones (TK-26) ──────────────────────────────────────────
+  "annotations.length": "Longitud",
+  "annotations.area": "Área",
+  "annotations.mean": "Media",
+  "annotations.stdDev": "Desvío Est.",
+  "annotations.uncalibrated": "Sin calibración espacial",
+  "viewer.measure.panelTitle": "Ajuste de Mediciones",
+  "viewer.measure.unitLabel": "Unidades",
+  "viewer.measure.unitMm": "Milímetros (mm)",
+  "viewer.measure.unitCm": "Centímetros (cm)",
+  "viewer.measure.lineWidthLabel": "Grosor de línea",
+  "viewer.measure.clearAnnotations": "Borrar mediciones",
 };

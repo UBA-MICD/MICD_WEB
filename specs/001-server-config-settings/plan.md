@@ -5,7 +5,7 @@
 ## Summary
 
 The config modal, its DOM (`#server-config-dialog`), its validation layer
-(`services/api.ts`) and its tests already exist — only the *trigger* is wrong. Move
+(`services/api.ts`) and its tests already exist — only the _trigger_ is wrong. Move
 the trigger: point the main-page **Servidor** button (`#btn-server`) at the server
 screen, and add an **admin-only gear button** in the server-screen header that opens
 the existing modal. No modal behaviour changes.
@@ -41,10 +41,10 @@ No principle is violated; no ADR required.
 `main.ts` is where cross-screen buttons are already wired (`btn-server`,
 `btn-login`, `btn-logout`). Keep that: repoint `#btn-server` to `openServerScreen`
 and wire the new gear (`#btn-server-settings`) to `openServerConfigModal`. Wiring the
-gear's *click* in `main.ts` (rather than in `server-screen.ts`) deliberately avoids a
+gear's _click_ in `main.ts` (rather than in `server-screen.ts`) deliberately avoids a
 circular import — `server-config-modal.ts` already imports from `server-screen.ts`.
 
-The gear's *visibility* belongs with the other role gating in
+The gear's _visibility_ belongs with the other role gating in
 `renderForSession()`: one `toggle("hidden", !isAdmin())`, placed before the guest
 early-return so it is correct in every branch, using
 `getElementById(...)?.` so a partial test DOM cannot throw. Because

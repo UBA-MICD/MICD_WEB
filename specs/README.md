@@ -45,14 +45,15 @@ Folders are numbered sequentially (`001-…`, `002-…`); numbers are never reus
 
 ## Index
 
-| # | Feature | Status | Ticket |
-|---|---------|--------|--------|
-| [001](001-server-config-settings/spec.md) | Admin-only server-config settings button | Done | TK-29 |
+| #                                         | Feature                                    | Status | Ticket |
+| ----------------------------------------- | ------------------------------------------ | ------ | ------ |
+| [001](001-server-config-settings/spec.md) | Admin-only server-config settings button   | Done   | TK-29  |
+| [002](002-measurement-tools/spec.md)      | Herramientas de medición (longitud y área) | Draft  | TK-26  |
 
 ## How this relates to ADRs and `.feature` files
 
-- **ADRs** (`docs/adr/`) record *decisions* and are immutable. **Specs** record
-  *features* and evolve until the feature ships. A spec may cite the ADRs that
+- **ADRs** (`docs/adr/`) record _decisions_ and are immutable. **Specs** record
+  _features_ and evolve until the feature ships. A spec may cite the ADRs that
   constrain it; a spec that needs to overturn a decision triggers a new ADR.
 - **`.feature`** files are the acceptance layer. The house style already keeps them
   in `docs/`; new feature specs keep their `.feature` alongside the spec so WHAT and

@@ -243,7 +243,9 @@ body {
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color var(--transition), background var(--transition);
+  transition:
+    color var(--transition),
+    background var(--transition);
 }
 .btn-server-settings:hover {
   color: var(--text-primary);
@@ -1202,6 +1204,10 @@ body {
 .viewport-container.cursor-pan:active {
   cursor: grabbing;
 }
+.viewport-container.cursor-length,
+.viewport-container.cursor-ellipse {
+  cursor: crosshair;
+}
 
 /* ── Viewport Cell (Multi-Viewport Grid) ─────────────────────────────────── */
 .viewport-cell {
@@ -1255,6 +1261,15 @@ body {
   height: 100%;
   pointer-events: none;
   display: none;
+}
+
+.annotation-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
 }
 
 /* 2D Mode (Default) */
@@ -1746,6 +1761,36 @@ body {
   background: var(--bg-hover);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.preset-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #050508;
+  font-weight: 600;
+}
+
+.measure-clear-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.measure-clear-btn:hover {
+  background: var(--danger);
+  color: #ffffff;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */

@@ -18,7 +18,8 @@ function key(role: Role): string {
 export function hasSeenTour(role: Role): boolean {
   try {
     return (
-      typeof localStorage !== "undefined" && localStorage.getItem(key(role)) === "1"
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(key(role)) === "1"
     );
   } catch {
     return false;
@@ -28,7 +29,8 @@ export function hasSeenTour(role: Role): boolean {
 /** Records that the role has seen the tour, so it won't auto-start again. */
 export function markTourSeen(role: Role): void {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(key(role), "1");
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(key(role), "1");
   } catch {
     // best-effort only — a flag that resets on reload just re-shows the tour
   }

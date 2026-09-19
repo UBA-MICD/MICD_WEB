@@ -10,7 +10,12 @@ import {
 import { $, showLoading, showError } from "../shared/dom.js";
 import { anyDialogOpen, openDialog, closeDialog } from "../shared/dialog.js";
 import { currentScreen } from "../shared/screen.js";
-import { state, itemCount } from "./state.js";
+import {
+  state,
+  itemCount,
+  setMeasurementUnit,
+  setMeasurementLineWidth,
+} from "./state.js";
 import {
   render,
   updateSeriesNav,
@@ -34,17 +39,56 @@ import {
 } from "../services/export-service.js";
 import { openServerScreen } from "../server-screen/server-screen.js";
 import { getViewportManager } from "./viewport-registry.js";
-import type { GridLayout } from "./viewport-manager.js";
+import type { GridLayout, Viewport } from "./viewport-manager.js";
+import {
+  screenToWorld,
+  calculateDistance,
+  calculateEllipseArea,
+  calculateEllipseHUStats,
+  extractCalibration,
+  formatLength,
+  formatArea,
+} from "./measurements/measurement-math.js";
+import {
+  addAnnotation,
+  deleteAnnotation,
+  clearAnnotations,
+  getActiveSopInstanceUid,
+  getAnnotationsForSlice,
+} from "./measurements/annotation-state.js";
+import {
+  getActiveDrawing,
+  setActiveDrawing,
+  getSelectedAnnotationId,
+  setSelectedAnnotationId,
+  hitTestAnnotation,
+} from "./measurements/measurement-overlay.js";
+import type {
+  LengthAnnotation,
+  EllipseAnnotation,
+} from "./measurements/types.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
 export function initToolbar(): void {
-  const tools = ["wl", "zoom", "pan", "crosshair"] as const;
+  const tools = [
+    "wl",
+    "zoom",
+    "pan",
+    "crosshair",
+    "length",
+    "ellipse",
+  ] as const;
   tools.forEach((tool) => {
     const btn = $(`tool-${tool}`);
     if (btn) {
       btn.addEventListener("click", () => {
-        if (tool === "pan" && state.is3DMode) return;
+        if (
+          state.is3DMode &&
+          (tool === "pan" || tool === "length" || tool === "ellipse")
+        ) {
+          return;
+        }
         if (tool === "crosshair" && !state.is3DMode && !mprEngine.volume)
           return;
         if (tool === "wl") {
@@ -55,6 +99,7 @@ export function initToolbar(): void {
             state.isWlPanelOpen = true;
           }
           state.isZoomPanelOpen = false;
+          state.isMeasurementPanelOpen = false;
         } else if (tool === "zoom") {
           if (state.activeTool === "zoom") {
             state.isZoomPanelOpen = !state.isZoomPanelOpen;
@@ -63,10 +108,21 @@ export function initToolbar(): void {
             state.isZoomPanelOpen = true;
           }
           state.isWlPanelOpen = false;
+          state.isMeasurementPanelOpen = false;
+        } else if (tool === "length" || tool === "ellipse") {
+          if (state.activeTool === tool) {
+            state.isMeasurementPanelOpen = !state.isMeasurementPanelOpen;
+          } else {
+            state.activeTool = tool;
+            state.isMeasurementPanelOpen = true;
+          }
+          state.isWlPanelOpen = false;
+          state.isZoomPanelOpen = false;
         } else {
           state.activeTool = tool;
           state.isWlPanelOpen = false;
           state.isZoomPanelOpen = false;
+          state.isMeasurementPanelOpen = false;
         }
         updateToolbarUI();
       });
@@ -154,6 +210,7 @@ export function initToolbar(): void {
   initZoomControlsInteraction();
   init3DControlsInteraction();
   initLayerControlsInteraction();
+  initMeasurementControlsInteraction();
   updateToolbarUI();
 }
 
@@ -496,6 +553,91 @@ function updateZoomControlsUI(): void {
   }
 }
 
+function renderActiveMeasurementOverlays(): void {
+  const manager = getViewportManager();
+  if (manager && manager.getAllViewports().length > 0) {
+    for (const vp of manager.getAllViewports()) {
+      vp.renderOverlay();
+    }
+  } else {
+    render();
+  }
+}
+
+export function updateMeasurementControlsUI(): void {
+  const btnMm = $("btn-unit-mm");
+  const btnCm = $("btn-unit-cm");
+  const selectUnit = $("select-measure-unit") as HTMLSelectElement | null;
+  const sliderWidth = $("slider-measure-width") as HTMLInputElement | null;
+  const valWidth = $("val-measure-width");
+
+  const isMm = state.measurementUnit === "mm";
+  if (btnMm) {
+    btnMm.classList.toggle("active", isMm);
+    btnMm.setAttribute("aria-pressed", String(isMm));
+  }
+  if (btnCm) {
+    btnCm.classList.toggle("active", !isMm);
+    btnCm.setAttribute("aria-pressed", String(!isMm));
+  }
+  if (selectUnit && selectUnit.value !== state.measurementUnit) {
+    selectUnit.value = state.measurementUnit;
+  }
+  if (sliderWidth && document.activeElement !== sliderWidth) {
+    sliderWidth.value = String(state.measurementLineWidth);
+  }
+  if (valWidth) {
+    valWidth.textContent = `${state.measurementLineWidth}px`;
+  }
+}
+
+export function initMeasurementControlsInteraction(): void {
+  const btnMm = $("btn-unit-mm");
+  const btnCm = $("btn-unit-cm");
+  const selectUnit = $("select-measure-unit") as HTMLSelectElement | null;
+  const sliderWidth = $("slider-measure-width") as HTMLInputElement | null;
+  const btnClear = $("btn-clear-measurements");
+
+  const handleUnitChange = (unit: "mm" | "cm"): void => {
+    setMeasurementUnit(unit);
+    updateMeasurementControlsUI();
+    renderActiveMeasurementOverlays();
+  };
+
+  btnMm?.addEventListener("click", () => handleUnitChange("mm"));
+  btnCm?.addEventListener("click", () => handleUnitChange("cm"));
+
+  selectUnit?.addEventListener("change", () => {
+    const val = selectUnit.value === "cm" ? "cm" : "mm";
+    handleUnitChange(val);
+  });
+
+  sliderWidth?.addEventListener("input", () => {
+    const val = parseInt(sliderWidth.value, 10);
+    if (!isNaN(val)) {
+      setMeasurementLineWidth(val);
+      const valWidth = $("val-measure-width");
+      if (valWidth) {
+        valWidth.textContent = `${state.measurementLineWidth}px`;
+      }
+      renderActiveMeasurementOverlays();
+    }
+  });
+
+  btnClear?.addEventListener("click", () => {
+    const manager = getViewportManager();
+    const activeVp = manager?.activeViewport;
+    const uid =
+      activeVp?.data.parsed?.metadata?.sopInstanceUid ||
+      getActiveSopInstanceUid();
+    if (uid) {
+      clearAnnotations(uid);
+      setSelectedAnnotationId(null);
+      renderActiveMeasurementOverlays();
+    }
+  });
+}
+
 export async function toggle3DMode(): Promise<boolean> {
   const btn = ($("tool-view-3d") || $("tool-mpr")) as HTMLButtonElement | null;
   if (btn?.disabled) return false;
@@ -621,7 +763,12 @@ export async function toggleMprMode(): Promise<boolean> {
 }
 
 export function updateToolbarUI(): void {
-  if (state.is3DMode && state.activeTool === "pan") {
+  if (
+    state.is3DMode &&
+    (state.activeTool === "pan" ||
+      state.activeTool === "length" ||
+      state.activeTool === "ellipse")
+  ) {
     state.activeTool = "wl";
   } else if (
     !state.is3DMode &&
@@ -634,6 +781,24 @@ export function updateToolbarUI(): void {
   const panBtn = $("tool-pan") as HTMLButtonElement | null;
   if (panBtn) {
     panBtn.disabled = state.is3DMode;
+  }
+
+  const lengthBtn = $("tool-length") as HTMLButtonElement | null;
+  if (lengthBtn) {
+    lengthBtn.disabled = state.is3DMode;
+    lengthBtn.setAttribute(
+      "aria-expanded",
+      String(state.isMeasurementPanelOpen),
+    );
+  }
+
+  const ellipseBtn = $("tool-ellipse") as HTMLButtonElement | null;
+  if (ellipseBtn) {
+    ellipseBtn.disabled = state.is3DMode;
+    ellipseBtn.setAttribute(
+      "aria-expanded",
+      String(state.isMeasurementPanelOpen),
+    );
   }
 
   const crosshairBtn = $("tool-crosshair") as HTMLButtonElement | null;
@@ -656,13 +821,15 @@ export function updateToolbarUI(): void {
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
   // would also strip the metadata toggle's state, leaving its class and
   // aria-expanded disagreeing with the open panel.
-  (["wl", "zoom", "pan", "crosshair"] as const).forEach((tool) => {
-    const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
-    if (!btn) return;
-    const isActive = tool === state.activeTool;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-pressed", String(isActive));
-  });
+  (["wl", "zoom", "pan", "crosshair", "length", "ellipse"] as const).forEach(
+    (tool) => {
+      const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
+      if (!btn) return;
+      const isActive = tool === state.activeTool;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", String(isActive));
+    },
+  );
 
   const wlBtn = $("tool-wl");
   if (wlBtn) {
@@ -684,6 +851,11 @@ export function updateToolbarUI(): void {
     zoomPanel.classList.toggle("open", state.isZoomPanelOpen);
   }
 
+  const measurePanel = $("measure-panel");
+  if (measurePanel) {
+    measurePanel.classList.toggle("open", state.isMeasurementPanelOpen);
+  }
+
   const exportBtn = $("btn-export-menu") as HTMLButtonElement | null;
   if (exportBtn) {
     const hasLoadedStudy = itemCount() > 0 || state.parsed !== null;
@@ -698,6 +870,8 @@ export function updateToolbarUI(): void {
         "cursor-zoom",
         "cursor-pan",
         "cursor-crosshair",
+        "cursor-length",
+        "cursor-ellipse",
       );
     }
     viewport.classList?.add?.(`cursor-${state.activeTool}`);
@@ -705,6 +879,7 @@ export function updateToolbarUI(): void {
   }
 
   updateZoomControlsUI();
+  updateMeasurementControlsUI();
 }
 
 // ── Viewport Mouse Interaction ───────────────────────────────────────────────
@@ -726,30 +901,59 @@ export function initViewportInteraction(): void {
 
   let dragOriginViewportId: string | null = null;
 
-  const handlePointerAction = (e: MouseEvent) => {
-    if (!state.parsed) return;
-    const rect = container.getBoundingClientRect();
+  function getTargetMetrics(
+    e: MouseEvent,
+    containerEl: HTMLElement,
+    activeVp?: Viewport | null,
+  ): { clickX: number; clickY: number; viewW: number; viewH: number } {
+    const targetEl: HTMLElement =
+      activeVp?.overlayCanvas ||
+      (document.getElementById(
+        "annotation-overlay",
+      ) as HTMLCanvasElement | null) ||
+      activeVp?.cellElement ||
+      containerEl;
+    const rect = targetEl.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
+    const viewW =
+      targetEl.clientWidth ||
+      (targetEl as HTMLCanvasElement).width ||
+      containerEl.clientWidth ||
+      300;
+    const viewH =
+      targetEl.clientHeight ||
+      (targetEl as HTMLCanvasElement).height ||
+      containerEl.clientHeight ||
+      300;
+    return { clickX, clickY, viewW, viewH };
+  }
 
-    if (mprEngine.volume && state.activeTool === "crosshair") {
-      const manager = getViewportManager();
-      const originId =
-        dragOriginViewportId || manager?.activeViewport?.id || "";
+  const handlePointerAction = (e: MouseEvent) => {
+    if (!state.parsed) return;
+    const manager = getViewportManager();
+    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
+    const activeVp =
+      (manager && originId
+        ? manager.getAllViewports().find((v) => v.id === originId)
+        : null) || manager?.activeViewport;
+
+    const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+      e,
+      container,
+      activeVp,
+    );
+
+    if (
+      mprEngine.volume &&
+      state.isMprMode &&
+      state.activeTool === "crosshair"
+    ) {
       if (manager && manager.isCombined3DViewport(originId)) {
         return;
       }
-      const activeVp =
-        (manager && originId
-          ? manager.getAllViewports().find((v) => v.id === originId)
-          : null) || manager?.activeViewport;
       const plane = activeVp?.plane || "axial";
-      const w =
-        activeVp?.canvasElement.clientWidth || container.clientWidth || 300;
-      const h =
-        activeVp?.canvasElement.clientHeight || container.clientHeight || 300;
-
-      mprEngine.setCrosshairFromScreen(plane, clickX, clickY, w, h);
+      mprEngine.setCrosshairFromScreen(plane, clickX, clickY, viewW, viewH);
       if (manager) {
         for (const vp of manager.getAllViewports()) {
           vp.render();
@@ -761,18 +965,14 @@ export function initViewportInteraction(): void {
     }
 
     if (state.is3DMode && state.activeTool === "crosshair") {
-      view3DViewer.updateCrosshairFromPointer(
-        clickX,
-        clickY,
-        container.clientWidth,
-        container.clientHeight,
-      );
+      view3DViewer.updateCrosshairFromPointer(clickX, clickY, viewW, viewH);
       render();
     }
   };
 
   container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
+    if (e.button !== 0) return;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
@@ -782,12 +982,165 @@ export function initViewportInteraction(): void {
       ? cell.id
       : (getViewportManager()?.activeViewport?.id ?? null);
 
+    const manager = getViewportManager();
+    if (
+      manager &&
+      dragOriginViewportId &&
+      dragOriginViewportId !== manager.activeViewport?.id
+    ) {
+      manager.setActiveViewport(dragOriginViewportId);
+    }
+    const activeVp =
+      (manager && dragOriginViewportId
+        ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
+        : null) || manager?.activeViewport;
+
+    if (state.activeTool !== "length" && state.activeTool !== "ellipse") {
+      if (getActiveDrawing()) {
+        setActiveDrawing(null);
+      }
+      handlePointerAction(e);
+      e.preventDefault();
+      return;
+    }
+
+    const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+      e,
+      container,
+      activeVp,
+    );
+    const metadata = activeVp
+      ? activeVp.data.parsed?.metadata
+      : state.parsed?.metadata;
+    const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+    const sopInstanceUid =
+      (activeVp
+        ? activeVp.data.parsed?.metadata.sopInstanceUid
+        : getActiveSopInstanceUid()) ||
+      `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+
+    if (metadata && viewW > 0 && viewH > 0) {
+      const existing = getAnnotationsForSlice(sopInstanceUid);
+      const hit = hitTestAnnotation(
+        clickX,
+        clickY,
+        existing,
+        vpState,
+        metadata.columns,
+        metadata.rows,
+        viewW,
+        viewH,
+      );
+
+      if (hit && !e.shiftKey) {
+        setSelectedAnnotationId(hit.id);
+        if (activeVp) activeVp.renderOverlay();
+        else render();
+        e.preventDefault();
+        return;
+      }
+
+      setSelectedAnnotationId(null);
+      const worldPt = screenToWorld(
+        clickX,
+        clickY,
+        viewW,
+        viewH,
+        metadata.columns,
+        metadata.rows,
+        vpState.zoom,
+        vpState.panX,
+        vpState.panY,
+        // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
+        1,
+        true,
+      );
+
+      if (state.activeTool === "length") {
+        setActiveDrawing({
+          type: "length",
+          start: worldPt,
+          end: worldPt,
+          cellId: activeVp ? activeVp.id : null,
+        });
+      } else {
+        setActiveDrawing({
+          type: "ellipse",
+          center: worldPt,
+          radiusX: 0,
+          radiusY: 0,
+          cellId: activeVp ? activeVp.id : null,
+        });
+      }
+
+      if (activeVp) activeVp.renderOverlay();
+      else render();
+      e.preventDefault();
+      return;
+    }
+
     handlePointerAction(e);
     e.preventDefault();
   });
 
   document.addEventListener("mousemove", (e: MouseEvent) => {
     if (!state.isDragging || !state.parsed) return;
+
+    const isMeasurementTool =
+      state.activeTool === "length" || state.activeTool === "ellipse";
+    const drawing = getActiveDrawing();
+
+    if (isMeasurementTool && drawing) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+
+      const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+        e,
+        container,
+        activeVp,
+      );
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+
+      if (metadata && viewW > 0 && viewH > 0) {
+        const currentWorld = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
+          1,
+          true,
+        );
+
+        if (drawing.type === "length") {
+          drawing.end = currentWorld;
+        } else if (drawing.type === "ellipse" && drawing.center) {
+          drawing.radiusX = Math.abs(currentWorld.x - drawing.center.x);
+          drawing.radiusY = Math.abs(currentWorld.y - drawing.center.y);
+        }
+
+        if (activeVp) activeVp.renderOverlay();
+        else render();
+      }
+      return;
+    }
+
+    if (drawing) {
+      setActiveDrawing(null);
+    }
 
     const dx = e.clientX - state.lastMouseX;
     const dy = e.clientY - state.lastMouseY;
@@ -839,7 +1192,11 @@ export function initViewportInteraction(): void {
 
     // ── 2D / MPR tools: route through ViewportManager so sync propagates ──
     const manager = getViewportManager();
-    const activeVp = manager?.activeViewport ?? null;
+    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
+    const activeVp =
+      (manager && originId
+        ? manager.getAllViewports().find((v) => v.id === originId)
+        : null) || manager?.activeViewport;
 
     if (activeVp && manager) {
       switch (state.activeTool) {
@@ -854,7 +1211,7 @@ export function initViewportInteraction(): void {
           state.viewport.zoom = activeVp.data.viewport.zoom;
           break;
         case "pan":
-          if (mprEngine.volume) {
+          if (mprEngine.volume && state.isMprMode) {
             manager.dispatchMprPan(
               activeVp.id,
               dx,
@@ -873,13 +1230,13 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
-          if (mprEngine.volume) {
-            const originId = dragOriginViewportId || activeVp.id;
-            if (manager.isCombined3DViewport(originId)) {
+          if (mprEngine.volume && state.isMprMode) {
+            const crosshairOriginId = dragOriginViewportId || activeVp.id;
+            if (manager.isCombined3DViewport(crosshairOriginId)) {
               break;
             }
             manager.dispatchMprCrosshair(
-              originId,
+              crosshairOriginId,
               dx,
               dy,
               activeVp.canvasElement.clientWidth ||
@@ -909,7 +1266,7 @@ export function initViewportInteraction(): void {
           );
           break;
         case "pan":
-          if (mprEngine.volume) {
+          if (mprEngine.volume && state.isMprMode) {
             mprEngine.applyPanDelta2D(
               "axial",
               dx,
@@ -923,7 +1280,7 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
-          if (mprEngine.volume) {
+          if (mprEngine.volume && state.isMprMode) {
             mprEngine.applyCrosshairDelta2D(
               "axial",
               dx,
@@ -939,6 +1296,145 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mouseup", () => {
+    const isMeasurementTool =
+      state.activeTool === "length" || state.activeTool === "ellipse";
+    const drawing = getActiveDrawing();
+
+    if (isMeasurementTool && drawing) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const pixelData = activeVp
+        ? activeVp.data.parsed?.pixelData
+        : state.parsed?.pixelData;
+      const sopInstanceUid =
+        (activeVp
+          ? activeVp.data.parsed?.metadata.sopInstanceUid
+          : getActiveSopInstanceUid()) ||
+        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+      const sliceIndex = activeVp
+        ? activeVp.data.currentIndex
+        : state.currentIndex;
+
+      if (metadata) {
+        const cal = extractCalibration(metadata);
+        if (drawing.type === "length" && drawing.start && drawing.end) {
+          const dx = drawing.end.x - drawing.start.x;
+          const dy = drawing.end.y - drawing.start.y;
+          if (Math.hypot(dx, dy) >= 3) {
+            const dist = calculateDistance(
+              drawing.start,
+              drawing.end,
+              cal.pixelSpacing,
+            );
+            const newAnn: LengthAnnotation = {
+              id: `ann_len_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: "length",
+              sopInstanceUid,
+              sliceIndex,
+              start: { ...drawing.start },
+              end: { ...drawing.end },
+              distance: dist,
+              isCalibrated: cal.isCalibrated,
+              unit: cal.isCalibrated ? "mm" : "px",
+              createdAt: Date.now(),
+            };
+            addAnnotation(newAnn);
+            setSelectedAnnotationId(newAnn.id);
+
+            const announceEl = $("measure-announce");
+            if (announceEl) {
+              const val = formatLength(
+                dist,
+                cal.isCalibrated,
+                state.measurementUnit,
+              );
+              announceEl.textContent = `${t("annotations.length") || "Longitud"}: ${val}`;
+            }
+          }
+        } else if (
+          drawing.type === "ellipse" &&
+          drawing.center &&
+          typeof drawing.radiusX === "number" &&
+          typeof drawing.radiusY === "number"
+        ) {
+          if (drawing.radiusX >= 3 && drawing.radiusY >= 3) {
+            const area = calculateEllipseArea(
+              drawing.radiusX,
+              drawing.radiusY,
+              cal.pixelSpacing,
+            );
+            let meanHu: number | undefined;
+            let stdDevHu: number | undefined;
+            if (pixelData) {
+              const hu = calculateEllipseHUStats(
+                drawing.center,
+                drawing.radiusX,
+                drawing.radiusY,
+                pixelData,
+                metadata.columns,
+                metadata.rows,
+                cal.rescaleSlope,
+                cal.rescaleIntercept,
+              );
+              if (hu) {
+                meanHu = hu.mean;
+                stdDevHu = hu.stdDev;
+              }
+            }
+            const newAnn: EllipseAnnotation = {
+              id: `ann_ell_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: "ellipse",
+              sopInstanceUid,
+              sliceIndex,
+              center: { ...drawing.center },
+              radiusX: drawing.radiusX,
+              radiusY: drawing.radiusY,
+              area,
+              isCalibrated: cal.isCalibrated,
+              unit: cal.isCalibrated ? "mm²" : "px²",
+              meanHu,
+              stdDevHu,
+              createdAt: Date.now(),
+            };
+            addAnnotation(newAnn);
+            setSelectedAnnotationId(newAnn.id);
+
+            const announceEl = $("measure-announce");
+            if (announceEl) {
+              const val = formatArea(
+                area,
+                cal.isCalibrated,
+                state.measurementUnit,
+              );
+              const huStr =
+                typeof meanHu === "number"
+                  ? `, Media: ${meanHu.toFixed(1)} HU`
+                  : "";
+              announceEl.textContent = `${t("annotations.area") || "Área"}: ${val}${huStr}`;
+            }
+          }
+        }
+      }
+
+      setActiveDrawing(null);
+      if (activeVp) activeVp.renderOverlay();
+      else render();
+    } else if (drawing) {
+      setActiveDrawing(null);
+      const manager = getViewportManager();
+      const activeVp = manager?.activeViewport;
+      if (activeVp) activeVp.renderOverlay();
+      else render();
+    }
+
     if (state.isDragging && state.is3DMode) {
       console.groupCollapsed("⚙️ [3D View Debug] Post-Interaction State");
       console.log("Camera (Theta, Phi, Zoom):", view3DViewer.camera);
@@ -1353,6 +1849,44 @@ export function initKeyboardShortcuts(): void {
     } else if (e.key === "c" || e.key === "C") {
       if (state.is3DMode) {
         $("tool-crosshair")?.click();
+      }
+    } else if (e.key === "l" || e.key === "L") {
+      if (!state.is3DMode) {
+        $("tool-length")?.click();
+      }
+    } else if (e.key === "e" || e.key === "E") {
+      if (!state.is3DMode) {
+        $("tool-ellipse")?.click();
+      }
+    } else if (e.key === "Escape") {
+      if (getActiveDrawing()) {
+        setActiveDrawing(null);
+        render();
+        const manager = getViewportManager();
+        if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        }
+      } else if (getSelectedAnnotationId()) {
+        setSelectedAnnotationId(null);
+        render();
+        const manager = getViewportManager();
+        if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        }
+      } else if (state.isMeasurementPanelOpen) {
+        state.isMeasurementPanelOpen = false;
+        updateToolbarUI();
+      }
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      const selectedId = getSelectedAnnotationId();
+      if (selectedId) {
+        deleteAnnotation(selectedId);
+        setSelectedAnnotationId(null);
+        render();
+        const manager = getViewportManager();
+        if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        }
       }
     } else if (e.key === "r" || e.key === "R") {
       $("tool-reset")?.click();

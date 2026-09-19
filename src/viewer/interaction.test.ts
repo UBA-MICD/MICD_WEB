@@ -26,6 +26,17 @@ import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
 import { mprEngine } from "./mpr-engine.ts";
 import { dicomCache } from "./cache.ts";
 import { ViewportManager } from "./viewport-manager.ts";
+import { initViewportManager } from "./viewport-registry.ts";
+import {
+  clearAnnotations,
+  getAnnotationsForSlice,
+} from "./measurements/annotation-state.ts";
+import {
+  getActiveDrawing,
+  setActiveDrawing,
+  getSelectedAnnotationId,
+  setSelectedAnnotationId,
+} from "./measurements/measurement-overlay.ts";
 
 // Fresh jsdom document per test (not just a fresh body): initKeyboardShortcuts()
 // and parts of initViewportInteraction() bind listeners to `document` itself,
@@ -52,6 +63,7 @@ const baseMeta = {
   modality: "CT",
   instanceNumber: "1",
   sopClassUid: "1.2.840.10008.5.1.4.1.1.2",
+  sopInstanceUid: "1.2.3.4.5",
   rows: 2,
   columns: 2,
   bitsAllocated: 16,
@@ -95,12 +107,18 @@ function resetState(): void {
   state.lastMouseY = 0;
   state.isMetadataOpen = false;
   state.isWlPanelOpen = false;
+  state.isMeasurementPanelOpen = false;
+  state.measurementUnit = "mm";
+  state.measurementLineWidth = 2;
   state.is3DMode = false;
   mpr3DViewer.isActive = false;
   mpr3DViewer.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
   mpr3DViewer.crosshair = { x: 0, y: 0, z: 0 };
   mpr3DViewer.activeView = "3d";
   dicomCache.clear();
+  clearAnnotations();
+  setActiveDrawing(null);
+  setSelectedAnnotationId(null);
 }
 
 test.beforeEach(() => {
@@ -142,6 +160,159 @@ test("initToolbar: pan is a no-op in 3D mode, crosshair is a no-op outside it", 
     .getElementById("tool-crosshair")!
     .dispatchEvent(new MouseEvent("click"));
   assert.notEqual(state.activeTool, "crosshair");
+});
+
+test("initToolbar: clicking length and ellipse tools sets activeTool and updates UI", () => {
+  initToolbar();
+  const lenBtn = document.getElementById("tool-length")!;
+  const ellBtn = document.getElementById("tool-ellipse")!;
+  const panel = document.getElementById("measure-panel")!;
+
+  lenBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "length");
+  assert.equal(lenBtn.classList.contains("active"), true);
+  assert.equal(lenBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(state.isMeasurementPanelOpen, true);
+  assert.equal(lenBtn.getAttribute("aria-expanded"), "true");
+  assert.equal(panel.classList.contains("open"), true);
+
+  // Clicking length again toggles panel closed
+  lenBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.isMeasurementPanelOpen, false);
+  assert.equal(lenBtn.getAttribute("aria-expanded"), "false");
+  assert.equal(panel.classList.contains("open"), false);
+
+  // Clicking ellipse activates it and opens panel
+  ellBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "ellipse");
+  assert.equal(ellBtn.classList.contains("active"), true);
+  assert.equal(ellBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(lenBtn.classList.contains("active"), false);
+  assert.equal(state.isMeasurementPanelOpen, true);
+  assert.equal(panel.classList.contains("open"), true);
+
+  // Clicking pan switches tool and closes panel
+  document.getElementById("tool-pan")!.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "pan");
+  assert.equal(state.isMeasurementPanelOpen, false);
+  assert.equal(panel.classList.contains("open"), false);
+});
+
+test("measurement panel: unit buttons and select toggle state and update UI", () => {
+  initToolbar();
+  const btnMm = document.getElementById("btn-unit-mm")!;
+  const btnCm = document.getElementById("btn-unit-cm")!;
+  const selectUnit = document.getElementById(
+    "select-measure-unit",
+  ) as HTMLSelectElement;
+
+  // Defaults to mm
+  assert.equal(state.measurementUnit, "mm");
+  assert.equal(btnMm.classList.contains("active"), true);
+  assert.equal(btnMm.getAttribute("aria-pressed"), "true");
+  assert.equal(btnCm.classList.contains("active"), false);
+  assert.equal(btnCm.getAttribute("aria-pressed"), "false");
+
+  // Click cm
+  btnCm.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.measurementUnit, "cm");
+  assert.equal(btnCm.classList.contains("active"), true);
+  assert.equal(btnCm.getAttribute("aria-pressed"), "true");
+  assert.equal(btnMm.classList.contains("active"), false);
+  assert.equal(btnMm.getAttribute("aria-pressed"), "false");
+  assert.equal(selectUnit.value, "cm");
+
+  // Click mm
+  btnMm.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.measurementUnit, "mm");
+  assert.equal(btnMm.classList.contains("active"), true);
+  assert.equal(btnMm.getAttribute("aria-pressed"), "true");
+  assert.equal(selectUnit.value, "mm");
+
+  // Select element change
+  selectUnit.value = "cm";
+  selectUnit.dispatchEvent(new Event("change"));
+  assert.equal(state.measurementUnit, "cm");
+  assert.equal(btnCm.classList.contains("active"), true);
+});
+
+test("measurement panel: slider updates measurementLineWidth and label", () => {
+  initToolbar();
+  const slider = document.getElementById(
+    "slider-measure-width",
+  ) as HTMLInputElement;
+  const valLabel = document.getElementById("val-measure-width")!;
+
+  assert.equal(state.measurementLineWidth, 2);
+  assert.equal(valLabel.textContent, "2px");
+
+  slider.value = "4";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(state.measurementLineWidth, 4);
+  assert.equal(valLabel.textContent, "4px");
+
+  slider.value = "1";
+  slider.dispatchEvent(new Event("input"));
+  assert.equal(state.measurementLineWidth, 1);
+  assert.equal(valLabel.textContent, "1px");
+});
+
+test("measurement panel: clear button clears annotations for active slice", () => {
+  initToolbar();
+  state.parsed = mockParsed();
+  const uid = state.parsed.metadata.sopInstanceUid;
+
+  state.annotations[uid] = [
+    {
+      id: "ann-len-1",
+      type: "length",
+      sopInstanceUid: uid,
+      sliceIndex: 0,
+      start: { x: 0, y: 0 },
+      end: { x: 10, y: 10 },
+      distance: 14.1,
+      isCalibrated: true,
+      unit: "mm",
+      createdAt: Date.now(),
+    },
+  ];
+  state.annotations["other-slice"] = [
+    {
+      id: "ann-len-2",
+      type: "length",
+      sopInstanceUid: "other-slice",
+      sliceIndex: 1,
+      start: { x: 0, y: 0 },
+      end: { x: 5, y: 5 },
+      distance: 7.0,
+      isCalibrated: true,
+      unit: "mm",
+      createdAt: Date.now(),
+    },
+  ];
+
+  setSelectedAnnotationId("ann-len-1");
+  const clearBtn = document.getElementById("btn-clear-measurements")!;
+  clearBtn.dispatchEvent(new MouseEvent("click"));
+
+  assert.deepEqual(getAnnotationsForSlice(uid), []);
+  assert.equal(getSelectedAnnotationId(), null);
+  // Other slices are unaffected
+  assert.equal(getAnnotationsForSlice("other-slice").length, 1);
+});
+
+test("initToolbar: length and ellipse tools are disabled in 3D mode", () => {
+  initToolbar();
+  state.is3DMode = true;
+  updateToolbarUI();
+
+  const lenBtn = document.getElementById("tool-length") as HTMLButtonElement;
+  const ellBtn = document.getElementById("tool-ellipse") as HTMLButtonElement;
+  assert.equal(lenBtn.disabled, true);
+  assert.equal(ellBtn.disabled, true);
+
+  lenBtn.dispatchEvent(new MouseEvent("click"));
+  assert.notEqual(state.activeTool, "length");
 });
 
 test("initToolbar: tool-reset restores the default viewport from metadata", () => {
@@ -390,6 +561,143 @@ test("initViewportInteraction: zoom and pan tools update state on drag (2D)", ()
     new MouseEvent("mousemove", { clientX: 30, clientY: 15, bubbles: true }),
   );
   assert.equal(state.viewport.panX, 30);
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+});
+
+test("initViewportInteraction: dragging with length tool creates LengthAnnotation and announces", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "length";
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 50,
+      clientY: 50,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.ok(getActiveDrawing());
+  assert.equal(getActiveDrawing()?.type, "length");
+
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 150, clientY: 150, bubbles: true }),
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(getActiveDrawing(), null);
+
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.ok(annotations.length > 0);
+  assert.equal(annotations[0].type, "length");
+
+  const announce = document.getElementById("measure-announce");
+  assert.ok(
+    announce?.textContent?.includes("Longitud") ||
+      announce?.textContent?.includes("Length"),
+  );
+});
+
+test("initViewportInteraction: dragging with ellipse tool creates EllipseAnnotation and announces", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "ellipse";
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 100,
+      clientY: 100,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.ok(getActiveDrawing());
+  assert.equal(getActiveDrawing()?.type, "ellipse");
+
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 150, clientY: 150, bubbles: true }),
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(getActiveDrawing(), null);
+
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.ok(annotations.length > 0);
+  assert.equal(annotations[0].type, "ellipse");
+
+  const announce = document.getElementById("measure-announce");
+  assert.ok(
+    announce?.textContent?.includes("Área") ||
+      announce?.textContent?.includes("Area"),
+  );
+});
+
+test("initViewportInteraction: switching from measurement tool back to pan works without interference", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "length";
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 10,
+      clientY: 10,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.ok(getActiveDrawing());
+
+  // Switch tool to pan and drag
+  state.activeTool = "pan";
+  state.viewport.panX = 0;
+  state.viewport.panY = 0;
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 0,
+      clientY: 0,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.equal(getActiveDrawing(), null);
+
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 25, clientY: 35, bubbles: true }),
+  );
+  assert.equal(state.viewport.panX, 25);
+  assert.equal(state.viewport.panY, 35);
+  assert.equal(getActiveDrawing(), null);
   document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 });
 
@@ -661,9 +969,58 @@ test("keyboard: letter shortcuts click their respective tool buttons", () => {
   assert.equal(state.activeTool, "zoom");
   document.dispatchEvent(key("W"));
   assert.equal(state.activeTool, "wl");
+  document.dispatchEvent(key("l"));
+  assert.equal(state.activeTool, "length");
+  document.dispatchEvent(key("e"));
+  assert.equal(state.activeTool, "ellipse");
   document.dispatchEvent(key("r"));
   document.dispatchEvent(key("m"));
   assert.equal(state.isMetadataOpen, true);
+});
+
+test("keyboard: Escape cancels active drawing and clears selection", () => {
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+
+  setActiveDrawing({
+    type: "length",
+    start: { x: 10, y: 10 },
+  });
+  assert.ok(getActiveDrawing());
+  document.dispatchEvent(key("Escape"));
+  assert.equal(getActiveDrawing(), null);
+
+  setSelectedAnnotationId("ann-1");
+  document.dispatchEvent(key("Escape"));
+  assert.equal(getSelectedAnnotationId(), null);
+
+  state.isMeasurementPanelOpen = true;
+  document.dispatchEvent(key("Escape"));
+  assert.equal(state.isMeasurementPanelOpen, false);
+});
+
+test("keyboard: Delete or Backspace deletes selected annotation", () => {
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+
+  state.annotations["1.2.3.4.5"] = [
+    {
+      id: "ann-to-del",
+      type: "length",
+      sopInstanceUid: "1.2.3.4.5",
+      sliceIndex: 0,
+      start: { x: 0, y: 0 },
+      end: { x: 10, y: 10 },
+      distance: 14.1,
+      isCalibrated: false,
+      unit: "px",
+    },
+  ];
+  setSelectedAnnotationId("ann-to-del");
+
+  document.dispatchEvent(key("Delete"));
+  assert.equal(getSelectedAnnotationId(), null);
+  assert.equal(state.annotations["1.2.3.4.5"].length, 0);
 });
 
 test("keyboard: p is a no-op in 3D mode, c is a no-op outside it", () => {
@@ -1007,6 +1364,162 @@ test("ViewportManager: dispatchMprCrosshair operates on orthogonal planes and bl
     );
   } finally {
     mprEngine.applyCrosshairDelta2D = originalApply;
+    manager.destroy();
+  }
+});
+
+test("pan tool in 2D mode with volume loaded dispatches standard 2D pan and not dispatchMprPan", () => {
+  setBody(viewerFixtureHtml());
+  const vpContainer = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(vpContainer);
+  initViewportInteraction();
+
+  const parsed = mockParsed();
+  state.parsed = parsed;
+  manager.activeViewport!.data.parsed = parsed;
+  state.isMprMode = false;
+  state.is3DMode = false;
+  state.activeTool = "pan";
+
+  mprEngine.volume = {
+    data: new Uint8Array(8),
+    dimensions: [2, 2, 2],
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  } as any;
+
+  let mprPanCalled = false;
+  let regularPanCalled = false;
+  const originalMprPan = manager.dispatchMprPan.bind(manager);
+  const originalPan = manager.dispatchPan.bind(manager);
+
+  manager.dispatchMprPan = (...args) => {
+    mprPanCalled = true;
+    return originalMprPan(...args);
+  };
+  manager.dispatchPan = (originId, dx, dy) => {
+    regularPanCalled = true;
+    return originalPan(originId, dx, dy);
+  };
+
+  try {
+    const vpCell = manager.activeViewport!.cellElement;
+    vpCell.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: 135,
+        clientY: 145,
+        bubbles: true,
+      }),
+    );
+
+    assert.equal(
+      regularPanCalled,
+      true,
+      "manager.dispatchPan should be called when isMprMode is false even if volume is loaded",
+    );
+    assert.equal(
+      mprPanCalled,
+      false,
+      "manager.dispatchMprPan should NOT be called in 2D mode",
+    );
+    assert.equal(manager.activeViewport!.data.viewport.panX, 35);
+    assert.equal(manager.activeViewport!.data.viewport.panY, 45);
+    assert.equal(state.viewport.panX, 35);
+    assert.equal(state.viewport.panY, 45);
+
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  } finally {
+    manager.dispatchMprPan = originalMprPan;
+    manager.dispatchPan = originalPan;
+    mprEngine.volume = null;
+    manager.destroy();
+  }
+});
+
+test("pan tool in MPR mode with volume loaded dispatches dispatchMprPan", () => {
+  setBody(viewerFixtureHtml());
+  const vpContainer = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(vpContainer);
+  initViewportInteraction();
+
+  const parsed = mockParsed();
+  state.parsed = parsed;
+  manager.activeViewport!.data.parsed = parsed;
+  state.isMprMode = true;
+  state.is3DMode = false;
+  state.activeTool = "pan";
+
+  mprEngine.volume = {
+    data: new Uint8Array(8),
+    dimensions: [2, 2, 2],
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  } as any;
+
+  let mprPanCalled = false;
+  let regularPanCalled = false;
+  const originalMprPan = manager.dispatchMprPan.bind(manager);
+  const originalPan = manager.dispatchPan.bind(manager);
+
+  manager.dispatchMprPan = (...args) => {
+    mprPanCalled = true;
+    return originalMprPan(...args);
+  };
+  manager.dispatchPan = (originId, dx, dy) => {
+    regularPanCalled = true;
+    return originalPan(originId, dx, dy);
+  };
+
+  try {
+    const vpCell = manager.activeViewport!.cellElement;
+    vpCell.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+    document.dispatchEvent(
+      new MouseEvent("mousemove", {
+        clientX: 120,
+        clientY: 130,
+        bubbles: true,
+      }),
+    );
+
+    assert.equal(
+      mprPanCalled,
+      true,
+      "manager.dispatchMprPan should be called when isMprMode is true",
+    );
+    assert.equal(
+      regularPanCalled,
+      false,
+      "manager.dispatchPan should NOT be called in MPR mode",
+    );
+
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  } finally {
+    manager.dispatchMprPan = originalMprPan;
+    manager.dispatchPan = originalPan;
+    mprEngine.volume = null;
     manager.destroy();
   }
 });

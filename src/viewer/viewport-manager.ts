@@ -16,6 +16,7 @@ import { escapeHtml } from "../shared/dom.js";
 import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
 import { state } from "./state.js";
+import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
 
 // ── Types and Contracts ───────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export class Viewport {
   public readonly id: string;
   public readonly cellElement: HTMLDivElement;
   public readonly canvasElement: HTMLCanvasElement;
+  public readonly overlayCanvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D | null;
 
   // HUD overlay elements
@@ -95,6 +97,9 @@ export class Viewport {
     this.canvasElement.setAttribute("role", "img");
     this.canvasElement.setAttribute("aria-label", `Viewport ${id}`);
 
+    this.overlayCanvas = document.createElement("canvas");
+    this.overlayCanvas.className = "annotation-overlay";
+
     this.ctx = this.canvasElement.getContext("2d");
 
     // HUD overlays
@@ -130,6 +135,7 @@ export class Viewport {
   private attachDom(): void {
     this.cellElement.appendChild(this.glCanvasElement);
     this.cellElement.appendChild(this.canvasElement);
+    this.cellElement.appendChild(this.overlayCanvas);
     this.cellElement.appendChild(this.orientTop);
     this.cellElement.appendChild(this.orientBottom);
     this.cellElement.appendChild(this.orientLeft);
@@ -153,6 +159,8 @@ export class Viewport {
         if (this.canvasElement.height !== h) this.canvasElement.height = h;
         if (this.glCanvasElement.width !== w) this.glCanvasElement.width = w;
         if (this.glCanvasElement.height !== h) this.glCanvasElement.height = h;
+        if (this.overlayCanvas.width !== w) this.overlayCanvas.width = w;
+        if (this.overlayCanvas.height !== h) this.overlayCanvas.height = h;
       }
       // Re-fit if zoom was calculated while the cell was hidden (zoom=0).
       if (this.data.viewport.zoom <= 0 && this.data.parsed?.metadata) {
@@ -288,6 +296,29 @@ export class Viewport {
         this.canvasElement.height,
       );
     }
+
+    this.renderOverlay();
+  }
+
+  public renderOverlay(): void {
+    if (!this.overlayCanvas || !this.data.parsed?.metadata) return;
+    const w = this.cellElement.clientWidth || this.overlayCanvas.width || 300;
+    const h = this.cellElement.clientHeight || this.overlayCanvas.height || 300;
+    if (w > 0 && h > 0) {
+      if (this.overlayCanvas.width !== w) this.overlayCanvas.width = w;
+      if (this.overlayCanvas.height !== h) this.overlayCanvas.height = h;
+    }
+
+    renderMeasurementOverlay({
+      canvas: this.overlayCanvas,
+      viewport: this.data.viewport,
+      metadata: this.data.parsed.metadata,
+      pixelData: this.data.parsed.pixelData,
+      sopInstanceUid:
+        this.data.parsed.metadata.sopInstanceUid ||
+        `slice_${this.data.currentIndex}`,
+      cellId: this.id,
+    });
   }
 
   private applyTransform(): void {
@@ -305,6 +336,8 @@ export class Viewport {
       this.canvasElement.width,
       this.canvasElement.height,
     );
+    const ovCtx = this.overlayCanvas?.getContext("2d");
+    ovCtx?.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
   }
 
   private updateOrientationLabels(): void {

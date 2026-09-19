@@ -47,18 +47,18 @@
 
 ## Decisions (locked)
 
-| Question | Decision |
-|---|---|
-| Engine | In-house, ~1 module. No new dependency. |
-| Highlight technique | Full-screen dimmer with a **cut-out spotlight** over the target (SVG mask or 4-rect overlay) + an outline ring; a **popover** anchored to the target. |
-| Advance model | Per-step: **follow-along** (`advance: {on:"event"}`) waits for the real interaction; informational steps use a **Next** button (`advance:{on:"next"}`). This satisfies "highlights in real-time as the user interacts" while still allowing pure-explainer steps. |
-| Cross-screen steps | Each step may declare `screen`/`tab`; the engine navigates there (via `showScreen` / `openServerScreen` / tab switch) **before** spotlighting. |
-| Role branching | Every step tagged `roles: Role[]`. The active script is `steps.filter(s => s.roles.includes(currentRole))`, further skipping any step whose target is missing/hidden (`optional`). |
-| Trigger | First successful login **per role** (flag `micd.tour.seen.<role>` in `localStorage`) auto-launches; a persistent **Help (?) button** relaunches on demand for anyone. |
-| Skip/close | `X`, a **Skip tour** button, and **Esc** end it at any step; ending sets the seen-flag (with a "Show me again from Help" line). |
-| Persistence granularity | Per-role flag, so a user promoted `medico → admin` gets the admin-only additions on next login. |
-| Reduced motion | Respect `prefers-reduced-motion`: no spotlight animation, instant repositioning. |
-| Scope of v1 | Guided coverage of existing features only; no feature changes. Burned-in-pixel / backend behavior untouched. |
+| Question                | Decision                                                                                                                                                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine                  | In-house, ~1 module. No new dependency.                                                                                                                                                                                                                           |
+| Highlight technique     | Full-screen dimmer with a **cut-out spotlight** over the target (SVG mask or 4-rect overlay) + an outline ring; a **popover** anchored to the target.                                                                                                             |
+| Advance model           | Per-step: **follow-along** (`advance: {on:"event"}`) waits for the real interaction; informational steps use a **Next** button (`advance:{on:"next"}`). This satisfies "highlights in real-time as the user interacts" while still allowing pure-explainer steps. |
+| Cross-screen steps      | Each step may declare `screen`/`tab`; the engine navigates there (via `showScreen` / `openServerScreen` / tab switch) **before** spotlighting.                                                                                                                    |
+| Role branching          | Every step tagged `roles: Role[]`. The active script is `steps.filter(s => s.roles.includes(currentRole))`, further skipping any step whose target is missing/hidden (`optional`).                                                                                |
+| Trigger                 | First successful login **per role** (flag `micd.tour.seen.<role>` in `localStorage`) auto-launches; a persistent **Help (?) button** relaunches on demand for anyone.                                                                                             |
+| Skip/close              | `X`, a **Skip tour** button, and **Esc** end it at any step; ending sets the seen-flag (with a "Show me again from Help" line).                                                                                                                                   |
+| Persistence granularity | Per-role flag, so a user promoted `medico → admin` gets the admin-only additions on next login.                                                                                                                                                                   |
+| Reduced motion          | Respect `prefers-reduced-motion`: no spotlight animation, instant repositioning.                                                                                                                                                                                  |
+| Scope of v1             | Guided coverage of existing features only; no feature changes. Burned-in-pixel / backend behavior untouched.                                                                                                                                                      |
 
 ---
 
@@ -76,6 +76,7 @@ walkthrough/
 ```
 
 Wired in `main.ts`:
+
 - `initWalkthrough()` in `startApp()` (registers Help button + keyboard).
 - In the login success path (`login-form` `onSuccess` and/or `onAuthChange`):
   `maybeAutoStartTour(getCurrentRole())` → launches iff `!hasSeenTour(role)`.
@@ -85,17 +86,17 @@ Wired in `main.ts`:
 ```ts
 export interface TourStep {
   id: string;
-  roles: Role[];                 // who sees this step
-  target: string;                // element id ("#tool-wl") or CSS selector
-  titleKey: string;              // i18n key
-  bodyKey: string;               // i18n key
-  screen?: ScreenName;           // ensure this screen is active first
-  tab?: ServerTab;               // ensure this server tab is active first
-  placement?: "top"|"bottom"|"left"|"right"|"center";
+  roles: Role[]; // who sees this step
+  target: string; // element id ("#tool-wl") or CSS selector
+  titleKey: string; // i18n key
+  bodyKey: string; // i18n key
+  screen?: ScreenName; // ensure this screen is active first
+  tab?: ServerTab; // ensure this server tab is active first
+  placement?: "top" | "bottom" | "left" | "right" | "center";
   advance:
-    | { on: "next" }                             // informational → Next button
+    | { on: "next" } // informational → Next button
     | { on: "event"; event: string; selector?: string }; // follow-along
-  optional?: boolean;            // if target missing/hidden, skip silently
+  optional?: boolean; // if target missing/hidden, skip silently
   onEnter?: () => void | Promise<void>;
   onExit?: () => void;
 }
@@ -141,18 +142,18 @@ and advance mode. `▶` = follow-along (waits for the real interaction);
 
 ### A. Common core — viewer basics (all roles, pre- and post-login)
 
-| # | Target | Teach | Advance |
-|---|---|---|---|
-| 1 | center | Welcome + "you can skip anytime (Esc)" | ▷ |
-| 2 | `#btn-open` / `#upload-drop` | Open a local DICOM (no login needed) | ▶ open / drop |
-| 3 | `#tool-wl` + presets `#btn-preset-*` | Window/Level + presets (bone/brain/lung/soft) | ▶ activate W/L |
-| 4 | `#tool-zoom`, `#tool-pan` | Zoom & pan | ▶ activate |
-| 5 | `#tool-mpr`, `#btn-view-axial/coronal/sagittal/3d` | MPR planes & 3D | ▷ |
-| 6 | `#tool-metadata` | Inspect DICOM tags | ▷ |
-| 7 | `#tool-reset` | Reset viewport | ▷ |
-| 8 | `#btn-toggle-explorer` / `#explorer-panel` | The study explorer rail | ▷ |
-| 9 | `#locale-select` | Switch language ES/EN | ▷ |
-| 10 | `#btn-login` / `#btn-server` | "Sign in to reach server features" | ▶ opens server |
+| #   | Target                                             | Teach                                         | Advance        |
+| --- | -------------------------------------------------- | --------------------------------------------- | -------------- |
+| 1   | center                                             | Welcome + "you can skip anytime (Esc)"        | ▷              |
+| 2   | `#btn-open` / `#upload-drop`                       | Open a local DICOM (no login needed)          | ▶ open / drop  |
+| 3   | `#tool-wl` + presets `#btn-preset-*`               | Window/Level + presets (bone/brain/lung/soft) | ▶ activate W/L |
+| 4   | `#tool-zoom`, `#tool-pan`                          | Zoom & pan                                    | ▶ activate     |
+| 5   | `#tool-mpr`, `#btn-view-axial/coronal/sagittal/3d` | MPR planes & 3D                               | ▷              |
+| 6   | `#tool-metadata`                                   | Inspect DICOM tags                            | ▷              |
+| 7   | `#tool-reset`                                      | Reset viewport                                | ▷              |
+| 8   | `#btn-toggle-explorer` / `#explorer-panel`         | The study explorer rail                       | ▷              |
+| 9   | `#locale-select`                                   | Switch language ES/EN                         | ▷              |
+| 10  | `#btn-login` / `#btn-server`                       | "Sign in to reach server features"            | ▶ opens server |
 
 > Steps 2–7 target the **viewer** screen; the engine ensures `screen:"viewer"`.
 
@@ -160,15 +161,15 @@ and advance mode. `▶` = follow-along (waits for the real interaction);
 
 Everything in the core, then (server screen, `buscar` tab):
 
-| # | Target | Teach | Advance |
-|---|---|---|---|
-| I1 | `#tab-buscar` / `#server-search-studies` | Search studies by patient/modality/date | ▶ type/search |
-| I2 | `#server-date-from`,`#server-date-to` | Date-range filter | ▷ |
-| I3 | `#study-list` | Results — **note: identity is anonymized for your role** | ▷ |
-| I4 | `#btn-open-selected` / `#study-detail-panel` | Open a study into the viewer | ▶ open |
-| I5 | `#btn-export-explorer` / export dialog | Export — **downloads are anonymized** | ▷ |
-| I6 | `#btn-open-zenodo` → `#z-tab-search` | Zenodo **public-corpus search** (the only Zenodo area a researcher sees) | ▷ |
-| I7 | center | "That's your toolkit — upload, user admin and publishing aren't part of the researcher role." | ▷ |
+| #   | Target                                       | Teach                                                                                         | Advance       |
+| --- | -------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------- |
+| I1  | `#tab-buscar` / `#server-search-studies`     | Search studies by patient/modality/date                                                       | ▶ type/search |
+| I2  | `#server-date-from`,`#server-date-to`        | Date-range filter                                                                             | ▷             |
+| I3  | `#study-list`                                | Results — **note: identity is anonymized for your role**                                      | ▷             |
+| I4  | `#btn-open-selected` / `#study-detail-panel` | Open a study into the viewer                                                                  | ▶ open        |
+| I5  | `#btn-export-explorer` / export dialog       | Export — **downloads are anonymized**                                                         | ▷             |
+| I6  | `#btn-open-zenodo` → `#z-tab-search`         | Zenodo **public-corpus search** (the only Zenodo area a researcher sees)                      | ▷             |
+| I7  | center                                       | "That's your toolkit — upload, user admin and publishing aren't part of the researcher role." | ▷             |
 
 Explicitly **not shown** (hidden for role → `optional` skip): `cargar`,
 `usuarios`, Zenodo config/logs/publish, activity log, delete.
@@ -178,14 +179,14 @@ Explicitly **not shown** (hidden for role → `optional` skip): `cargar`,
 Core + everything a researcher sees **without** the "anonymized" framing (medico
 sees full PHI), plus:
 
-| # | Target | Teach | Advance |
-|---|---|---|---|
-| M1 | `#tab-cargar` / `#upload-drop` | Upload studies (drag-drop) | ▶ open upload tab |
-| M2 | `#btn-upload-folder` / `#upload-folder-input` | Upload a whole folder | ▷ |
-| M3 | `#upload-rows` / `#upload-status` | Progress & per-file status | ▷ |
-| M4 | `#btn-open-zenodo` → `#z-tab-search` + import | Search **and import** public datasets | ▷ |
-| M5 | `#btn-export-explorer` / study-detail export | Export a study (PNG / ZIP) with full metadata | ▷ |
-| M6 | center | "User management, Zenodo publishing/config and the activity log are admin-only." | ▷ |
+| #   | Target                                        | Teach                                                                            | Advance           |
+| --- | --------------------------------------------- | -------------------------------------------------------------------------------- | ----------------- |
+| M1  | `#tab-cargar` / `#upload-drop`                | Upload studies (drag-drop)                                                       | ▶ open upload tab |
+| M2  | `#btn-upload-folder` / `#upload-folder-input` | Upload a whole folder                                                            | ▷                 |
+| M3  | `#upload-rows` / `#upload-status`             | Progress & per-file status                                                       | ▷                 |
+| M4  | `#btn-open-zenodo` → `#z-tab-search` + import | Search **and import** public datasets                                            | ▷                 |
+| M5  | `#btn-export-explorer` / study-detail export  | Export a study (PNG / ZIP) with full metadata                                    | ▷                 |
+| M6  | center                                        | "User management, Zenodo publishing/config and the activity log are admin-only." | ▷                 |
 
 Not shown: `usuarios`, Zenodo `config`/`publish`, activity log, study delete.
 
@@ -193,19 +194,19 @@ Not shown: `usuarios`, Zenodo `config`/`publish`, activity log, study delete.
 
 Core + all of medico's, plus the admin-only surfaces:
 
-| # | Target | Teach | Advance |
-|---|---|---|---|
-| A1 | `#tab-usuarios` / `#panel-usuarios` | The user-management panel | ▶ open tab |
-| A2 | create-user form (name/email/role) | Create a user → email invite is issued | ▷ |
-| A3 | user row: role select | Assign / change roles | ▷ |
-| A4 | user row: block / enable | Block & re-enable accounts | ▷ |
-| A5 | user row: delete | **Soft-delete** (audit-preserving) | ▷ |
-| A6 | last-access column | "Last login is tracked here" | ▷ |
-| A7 | `#btn-activity` / `#activity-dialog` | Audit log + `#btn-export-activity` | ▷ |
-| A8 | `#btn-open-zenodo` → `#z-tab-config` | Zenodo credentials & sync config | ▷ |
-| A9 | `#z-tab-publish` / `#z-publish-content` | Publish a study to Zenodo (irreversible, outward-facing) | ▷ |
-| A10 | `#z-tab-logs` | Sync logs / quota / status | ▷ |
-| A11 | `#btn-help` (to add) | "Relaunch this tour anytime from here" | ▷ |
+| #   | Target                                  | Teach                                                    | Advance    |
+| --- | --------------------------------------- | -------------------------------------------------------- | ---------- |
+| A1  | `#tab-usuarios` / `#panel-usuarios`     | The user-management panel                                | ▶ open tab |
+| A2  | create-user form (name/email/role)      | Create a user → email invite is issued                   | ▷          |
+| A3  | user row: role select                   | Assign / change roles                                    | ▷          |
+| A4  | user row: block / enable                | Block & re-enable accounts                               | ▷          |
+| A5  | user row: delete                        | **Soft-delete** (audit-preserving)                       | ▷          |
+| A6  | last-access column                      | "Last login is tracked here"                             | ▷          |
+| A7  | `#btn-activity` / `#activity-dialog`    | Audit log + `#btn-export-activity`                       | ▷          |
+| A8  | `#btn-open-zenodo` → `#z-tab-config`    | Zenodo credentials & sync config                         | ▷          |
+| A9  | `#z-tab-publish` / `#z-publish-content` | Publish a study to Zenodo (irreversible, outward-facing) | ▷          |
+| A10 | `#z-tab-logs`                           | Sync logs / quota / status                               | ▷          |
+| A11 | `#btn-help` (to add)                    | "Relaunch this tour anytime from here"                   | ▷          |
 
 > A2–A6 target elements the `users-panel` renders from live data; those steps use
 > selectors on the panel's own markup and are `optional` (skip cleanly if the
@@ -277,16 +278,16 @@ Branch `feat/walkthrough-guide`, one commit per step, plain imperative messages
 (match web history), **no `Co-Authored-By`/Claude trailers**, and per FE commit
 vendor to desktop (`make sync-web` + `make parity`).
 
-| Step | Scope |
-|---|---|
-| 1 | Engine skeleton: `walkthrough.ts` + `overlay.ts` + `tour-state.ts`, spotlight/popover, keyboard, Skip/Esc/X. No content yet. Unit tests for state + advance. |
-| 2 | `#btn-help` in the top bar + `initWalkthrough()` wiring in `main.ts`; manual relaunch works. |
-| 3 | **Common core** steps (viewer basics) + i18n keys + tests. |
-| 4 | **investigador** script (search / view / anonymized export / Zenodo search). |
-| 5 | **medico** script (upload, import, full-PHI export). |
-| 6 | **admin** script (users panel, activity log, Zenodo config/publish/logs); add `data-tour` hooks in `users-panel` where needed. |
-| 7 | First-login auto-start (per-role flag) in the login success path. |
-| 8 | Docs: short `web/docs/walkthrough.md` (how it works + how to add a step) and an ADR if the team wants the "in-house engine, no dep" decision recorded. |
+| Step | Scope                                                                                                                                                        |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | Engine skeleton: `walkthrough.ts` + `overlay.ts` + `tour-state.ts`, spotlight/popover, keyboard, Skip/Esc/X. No content yet. Unit tests for state + advance. |
+| 2    | `#btn-help` in the top bar + `initWalkthrough()` wiring in `main.ts`; manual relaunch works.                                                                 |
+| 3    | **Common core** steps (viewer basics) + i18n keys + tests.                                                                                                   |
+| 4    | **investigador** script (search / view / anonymized export / Zenodo search).                                                                                 |
+| 5    | **medico** script (upload, import, full-PHI export).                                                                                                         |
+| 6    | **admin** script (users panel, activity log, Zenodo config/publish/logs); add `data-tour` hooks in `users-panel` where needed.                               |
+| 7    | First-login auto-start (per-role flag) in the login success path.                                                                                            |
+| 8    | Docs: short `web/docs/walkthrough.md` (how it works + how to add a step) and an ADR if the team wants the "in-house engine, no dep" decision recorded.       |
 
 Each step vendored to `desktop` and green (`npm run build && npm test` in a
 `node:22-alpine` container per repo convention).

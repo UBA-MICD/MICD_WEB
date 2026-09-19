@@ -64,7 +64,7 @@ Every interpolation of DICOM-derived or user-supplied data is escaped
 (`escapeHtml`/`escapeAttr`); `data-i18n-html` is only for trusted app-authored
 markup. The front-end talks **only** to the backend's `/api/*` and `/auth/*` — never
 to Postgres/Orthanc directly. Access is role-gated (`admin` / `medico` /
-`investigador`, guests) and the client hides what a role cannot use *and* the
+`investigador`, guests) and the client hides what a role cannot use _and_ the
 backend enforces it. JWT: short-lived in-memory access token, rotated refresh token.
 
 ### VII. Tested where it counts, DOM-free where it can be

@@ -4348,6 +4348,17 @@ body {
   --segmentation-border: rgba(26, 188, 156, 0.4);
 }
 
+/* Botón del visor que muestra u oculta la segmentación ya calculada. */
+.toolbar__tool--ai.active,
+.toolbar__tool--ai:hover:not(:disabled) {
+  color: var(--segmentation);
+  background: var(--segmentation-soft);
+  border-color: var(--segmentation-border);
+}
+.toolbar__tool--ai.active svg {
+  filter: drop-shadow(0 0 4px var(--segmentation-border));
+}
+
 /* Acción de segmentación en la fila de Validaciones. Turquesa apagado: es una
    acción secundaria dentro de la tabla, no la principal. */
 .btn--ai {

@@ -1,13 +1,16 @@
-// ── Segmentación con IA — dibujado del overlay ───────────────────────────────
+// ── Segmentación con IA — dibujado sobre la imagen ───────────────────────────
 //
-// Dibuja el contorno (y el relleno opcional) sobre el canvas de anotaciones del
-// viewport, encima del DICOM ya renderizado. Se apoya en el mismo
-// `worldToScreen` que las mediciones, así que la segmentación sigue el zoom y
-// el paneo del visor sin trabajo extra.
+// El contorno se dibuja DENTRO del canvas del DICOM, en coordenadas de píxel de
+// la imagen, igual que la capa de superposición (ver `renderDicom`).
+//
+// Es deliberado y es lo que hace que la segmentación acompañe al zoom y al
+// paneo: ese canvas se mueve por CSS transform (`translate/scale/scaleY(-1)`),
+// que aplica por igual a los píxeles y a lo que dibujemos encima. La alternativa
+// —dibujar en el canvas de anotaciones, en coordenadas de pantalla— obliga a
+// recalcular en cada gesto, y `applyPanDelta`/`applyZoomFactor` sólo tocan el
+// transform sin redibujar: la imagen se movía y el contorno se quedaba fijo.
 
 import type { DicomMetadata } from "../../dicom/dicom-parser-util.js";
-import type { ViewportState } from "../../dicom/dicom-renderer.js";
-import { worldToScreen } from "../measurements/measurement-math.js";
 import type { Point2D, SegmentationMask } from "./segmentation-api.js";
 
 /** Capa de segmentación adjunta a un viewport. */
@@ -29,58 +32,59 @@ export const SEGMENTATION_COLORS = {
   fill: "rgba(26, 188, 156, 0.22)", // 22 % de opacidad
 };
 
-export const SEGMENTATION_LINE_WIDTH = 2; // px de pantalla
+/** Grosor del borde en píxeles de pantalla (se compensa por el zoom). */
+export const SEGMENTATION_LINE_WIDTH = 2;
 
 export interface RenderSegmentationOptions {
+  /** El canvas de la imagen (Columns x Rows), no el de anotaciones. */
   canvas: HTMLCanvasElement | null;
-  viewport: ViewportState;
   metadata?: DicomMetadata | null;
   layer?: SegmentationLayer | null;
+  /** Zoom actual del viewport, para que el borde no engorde al ampliar. */
+  zoom?: number;
   /** false para dibujar sólo el borde. */
   fill?: boolean;
 }
 
 /**
- * Dibuja la segmentación sobre el canvas de overlay.
+ * Dibuja la segmentación sobre el canvas de la imagen.
  *
- * NO limpia el canvas: se llama después de `renderMeasurementOverlay`, que ya
- * lo limpió, para que mediciones y segmentación coexistan.
+ * Se llama justo después de `renderDicom`, que repinta el canvas entero con
+ * `putImageData` — por eso el contorno se redibuja en cada render en vez de
+ * quedar persistido.
  */
 export function renderSegmentationOverlay(
   options: RenderSegmentationOptions,
 ): void {
-  const { canvas, viewport, metadata, layer } = options;
+  const { canvas, metadata, layer } = options;
   if (!canvas || !metadata || !layer || !layer.visible) return;
   if (layer.contorno.length < 3) return;
+  if (metadata.columns <= 0 || metadata.rows <= 0) return;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const width = canvas.width;
-  const height = canvas.height;
-  const cols = metadata.columns;
-  const rows = metadata.rows;
-  if (cols <= 0 || rows <= 0 || width <= 0 || height <= 0) return;
-
-  const path = new Path2D();
-  for (let i = 0; i < layer.contorno.length; i++) {
-    const p = layer.contorno[i];
-    const s = worldToScreen(p.x, p.y, width, height, cols, rows, viewport);
-    if (i === 0) path.moveTo(s.x, s.y);
-    else path.lineTo(s.x, s.y);
-  }
-  path.closePath();
-
   ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(layer.contorno[0].x, layer.contorno[0].y);
+  for (let i = 1; i < layer.contorno.length; i++) {
+    ctx.lineTo(layer.contorno[i].x, layer.contorno[i].y);
+  }
+  ctx.closePath();
+
   if (options.fill !== false) {
     ctx.fillStyle = SEGMENTATION_COLORS.fill;
-    ctx.fill(path);
+    ctx.fill();
   }
+
+  // El canvas está en píxeles de imagen y la pantalla lo escala por `zoom`:
+  // dividir mantiene el borde en ~2 px reales en cualquier ampliación.
+  const zoom = options.zoom && options.zoom > 0 ? options.zoom : 1;
   ctx.strokeStyle = SEGMENTATION_COLORS.stroke;
-  ctx.lineWidth = SEGMENTATION_LINE_WIDTH;
+  ctx.lineWidth = SEGMENTATION_LINE_WIDTH / zoom;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.stroke(path);
+  ctx.stroke();
   ctx.restore();
 }
 

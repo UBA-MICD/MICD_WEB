@@ -205,6 +205,14 @@ export class Viewport {
       0.1,
       Math.min(10, this.data.viewport.zoom * factor),
     );
+    if (this.data.segmentation?.visible) {
+      // El contorno vive en el canvas de la imagen, en píxeles de imagen: el
+      // CSS transform ya lo mueve y lo escala solo, pero el grosor del borde
+      // se compensa por zoom, así que hay que repintarlo para que no engorde.
+      // Guardado tras el `if` para no pagar un render completo sin segmentación.
+      this.render();
+      return;
+    }
     this.applyTransform();
     this.updateInfoOverlay();
   }
@@ -295,6 +303,15 @@ export class Viewport {
       overlayViewport: this.data.overlay?.viewport,
     });
 
+    // Sobre el canvas de la imagen, no sobre el de anotaciones: así el
+    // contorno acompaña al zoom y al paneo por el mismo CSS transform.
+    renderSegmentationOverlay({
+      canvas: this.canvasElement,
+      metadata: this.data.parsed.metadata,
+      layer: this.data.segmentation,
+      zoom: this.data.viewport.zoom,
+    });
+
     this.applyTransform();
     this.updateInfoOverlay();
     this.updateOrientationLabels();
@@ -329,15 +346,6 @@ export class Viewport {
         this.data.parsed.metadata.sopInstanceUid ||
         `slice_${this.data.currentIndex}`,
       cellId: this.id,
-    });
-
-    // Después de las mediciones: renderMeasurementOverlay limpia el canvas,
-    // así que la segmentación se dibuja encima y ambas capas conviven.
-    renderSegmentationOverlay({
-      canvas: this.overlayCanvas,
-      viewport: this.data.viewport,
-      metadata: this.data.parsed.metadata,
-      layer: this.data.segmentation,
     });
   }
 

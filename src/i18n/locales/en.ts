@@ -194,6 +194,10 @@ export const en: Record<string, string> = {
   "viewer.segmentation.running": "Segmenting…",
   "viewer.segmentation.simulatedBadge": "Simulated",
   "viewer.segmentation.layerToggle": "AI segmentation",
+  "viewer.segmentation.showTitle": "Show AI segmentation",
+  "viewer.segmentation.showLabel": "AI Seg.",
+  "viewer.segmentation.none":
+    "No segmentation available. Generate one from Server → Validations.",
   "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
   "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
   "viewer.segmentation.failed": "The segmentation could not be generated.",

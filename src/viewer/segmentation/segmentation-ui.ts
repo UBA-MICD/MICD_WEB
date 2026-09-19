@@ -1,9 +1,13 @@
 // ── Segmentación con IA — cableado de la UI (mock SAM3) ──────────────────────
 //
-// Botón "Segmentación con IA" → estado de carga → vista comparativa 1x2 con el
-// DICOM original a la izquierda y el derivado (con el contorno turquesa) a la
-// derecha. El interruptor de visibilidad vive en la herramienta de capas, junto
-// al resto de los overlays.
+// Dos superficies, a propósito:
+//   - GENERAR la segmentación se hace desde Servidor → Validaciones, porque es
+//     una acción sobre un estudio a validar y cuesta una inferencia.
+//   - MOSTRARLA se hace desde el visor (`tool-show-seg`), que sólo enciende o
+//     apaga lo que ya está en memoria y no vuelve a llamar al backend.
+//
+// El resultado vive en memoria del módulo, sin persistencia: al recargar la
+// página no hay nada que mostrar, y el botón lo dice en pantalla.
 
 import { $ } from "../../shared/dom.js";
 import { t } from "../../i18n/i18n.js";
@@ -43,9 +47,23 @@ function setBadgeVisible(visible: boolean): void {
 
 function syncToggle(enabled: boolean, checked: boolean): void {
   const toggle = $("chk-segmentation-visible") as HTMLInputElement | null;
-  if (!toggle) return;
-  toggle.disabled = !enabled;
-  toggle.checked = checked;
+  if (toggle) {
+    toggle.disabled = !enabled;
+    toggle.checked = checked;
+  }
+  // El botón del visor y la casilla de capas son dos mandos para lo mismo:
+  // se actualizan juntos para que no muestren estados contradictorios.
+  const btn = $("tool-show-seg");
+  btn?.classList.toggle("active", enabled && checked);
+  btn?.setAttribute("aria-pressed", String(enabled && checked));
+}
+
+/** true si algún viewport tiene la segmentación encendida. */
+function isSegmentationVisible(): boolean {
+  const manager = getViewportManager();
+  return (manager?.getAllViewports() ?? []).some(
+    (vp) => vp.data.segmentation?.visible === true,
+  );
 }
 
 // ── Vista comparativa ────────────────────────────────────────────────────────
@@ -129,7 +147,9 @@ export function clearSegmentation(): void {
     if (vp.data.mlLabel?.startsWith(t("viewer.segmentation.hudLabel"))) {
       vp.data.mlLabel = null;
     }
-    vp.renderOverlay();
+    // render() y no renderOverlay(): el contorno se dibuja sobre el canvas de
+    // la imagen, que se repinta entero en cada render.
+    vp.render();
   }
   setBadgeVisible(false);
   syncToggle(false, false);
@@ -142,7 +162,7 @@ export function setSegmentationVisible(visible: boolean): void {
   for (const vp of manager?.getAllViewports() ?? []) {
     if (vp.data.segmentation) {
       vp.data.segmentation.visible = visible;
-      vp.renderOverlay();
+      vp.render();
       touched = true;
     }
   }
@@ -185,14 +205,48 @@ export async function runSegmentation(): Promise<void> {
   }
 }
 
+/**
+ * Muestra la segmentación que ya está en memoria, o avisa si no hay ninguna.
+ *
+ * Nunca dispara una inferencia: si no hay resultado, el único camino es
+ * generarlo desde Validaciones. Con una ya cargada, funciona como interruptor.
+ */
+export function toggleLastSegmentation(): void {
+  if (!lastResult) {
+    showBanner(t("viewer.segmentation.none"), "warning");
+    syncToggle(false, false);
+    return;
+  }
+
+  const alreadyShown = getViewportManager()
+    ?.getAllViewports()
+    .some((vp) => vp.data.segmentation);
+
+  if (!alreadyShown) {
+    // Se perdió al cambiar de estudio o de grilla: se vuelve a armar la vista
+    // comparativa con el mismo resultado, sin pedir otra inferencia.
+    openSegmentationComparison(lastResult);
+    setBadgeVisible(lastResult.simulado);
+    syncToggle(true, true);
+    return;
+  }
+
+  const next = !isSegmentationVisible();
+  setSegmentationVisible(next);
+  syncToggle(true, next);
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 export function initSegmentation(): void {
-  // No hay botón en el visor: `runSegmentation` se invoca desde el panel de
-  // Validaciones (server-screen.ts). Acá sólo queda el interruptor de la capa.
+  // `runSegmentation` (generar) se invoca desde Validaciones; acá sólo se
+  // muestra u oculta lo que ya está en memoria.
+  $("tool-show-seg")?.addEventListener("click", () => toggleLastSegmentation());
+
   const toggle = $("chk-segmentation-visible") as HTMLInputElement | null;
   toggle?.addEventListener("change", () => {
     setSegmentationVisible(toggle.checked);
+    syncToggle(true, toggle.checked);
   });
 
   syncToggle(false, false);

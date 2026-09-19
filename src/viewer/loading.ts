@@ -6,6 +6,7 @@ import {
 import {
   createDefaultViewport,
   fitToContainer,
+  type ViewportState,
 } from "../dicom/dicom-renderer.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { fetchStudyInstances } from "../services/api.js";
@@ -30,6 +31,9 @@ import { getViewportManager } from "./viewport-registry.js";
 import { view3DViewer, buildVolumeFromCache } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
 import { itemCount } from "./state.js";
+
+/** Serie cuyo W/L tiene cargado el visor legacy (sin ViewportManager). */
+let legacyWlSeriesKey: string | null = null;
 
 /** Builds and injects the 3D volume into ViewportManager, MPREngine, and View3DViewer. */
 export async function loadVolumeIntoEngines(): Promise<boolean> {
@@ -331,6 +335,43 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
   }
 }
 
+/**
+ * Identifica la serie a la que pertenece el window/level de un viewport.
+ *
+ * Se usa para decidir cuándo reiniciar el brillo/contraste: conservarlo al
+ * cambiar de corte dentro de la misma serie es deliberado (si no, cada scroll
+ * pisaría el ajuste del usuario), pero conservarlo al abrir OTRO estudio deja
+ * la ventana del anterior — y una ventana de HU ajena hace que la imagen nueva
+ * se vea negra o quemada.
+ */
+export function seriesKeyFor(parsed: ParsedDicom): string {
+  const m = parsed.metadata;
+  return (
+    m.seriesInstanceUid ||
+    `${m.studyInstanceUid}|${m.seriesNumber}|${m.modality}|${m.rows}x${m.columns}`
+  );
+}
+
+/** Ventana inicial de una imagen: la del DICOM, o uno automático si no trae. */
+export function initialViewportFor(parsed: ParsedDicom): ViewportState {
+  if (parsed.metadata.windowWidth > 0) {
+    return createDefaultViewport(parsed.metadata);
+  }
+  const auto = calculateAutoWindowLevel(
+    parsed.pixelData!,
+    parsed.metadata.rescaleSlope,
+    parsed.metadata.rescaleIntercept,
+    parsed.metadata.modality,
+  );
+  return {
+    windowCenter: auto.windowCenter,
+    windowWidth: auto.windowWidth,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+}
+
 export function displayParsed(parsed: ParsedDicom, name: string): void {
   // Always keep global state in sync — loadCurrent() and other legacy paths
   // still read from it for series navigation, metadata panel, etc.
@@ -353,27 +394,14 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     vp.data.files = state.files;
     vp.data.currentIndex = state.currentIndex;
 
-    // Preserve the user's W/L adjustments across slice navigations; only
-    // initialize from metadata (or auto) when the viewport is fresh (zoom=0).
-    if (vp.data.viewport.windowWidth <= 0) {
-      if (parsed.metadata.windowWidth > 0) {
-        vp.data.viewport = createDefaultViewport(parsed.metadata);
-      } else {
-        const auto = calculateAutoWindowLevel(
-          parsed.pixelData,
-          parsed.metadata.rescaleSlope,
-          parsed.metadata.rescaleIntercept,
-          parsed.metadata.modality,
-        );
-        vp.data.viewport = {
-          windowCenter: auto.windowCenter,
-          windowWidth: auto.windowWidth,
-          zoom: 1,
-          panX: 0,
-          panY: 0,
-        };
-      }
+    // Preserve the user's W/L adjustments across slice navigations, but reset
+    // it whenever a different series is opened: inheriting the previous
+    // study's window is what rendered a freshly-opened image black.
+    const seriesKey = seriesKeyFor(parsed);
+    if (vp.data.viewport.windowWidth <= 0 || vp.data.wlSeriesKey !== seriesKey) {
+      vp.data.viewport = initialViewportFor(parsed);
     }
+    vp.data.wlSeriesKey = seriesKey;
 
     // Also keep global viewport state consistent for W/L sliders, etc.
     state.viewport = { ...vp.data.viewport };
@@ -382,25 +410,11 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     vp.render();
   } else {
     // ── Legacy single-viewport path ───────────────────────────────────────
-    if (state.viewport.windowWidth <= 0) {
-      if (parsed.metadata.windowWidth > 0) {
-        state.viewport = createDefaultViewport(parsed.metadata);
-      } else {
-        const auto = calculateAutoWindowLevel(
-          parsed.pixelData,
-          parsed.metadata.rescaleSlope,
-          parsed.metadata.rescaleIntercept,
-          parsed.metadata.modality,
-        );
-        state.viewport = {
-          windowCenter: auto.windowCenter,
-          windowWidth: auto.windowWidth,
-          zoom: 1,
-          panX: 0,
-          panY: 0,
-        };
-      }
+    const legacyKey = seriesKeyFor(parsed);
+    if (state.viewport.windowWidth <= 0 || legacyWlSeriesKey !== legacyKey) {
+      state.viewport = initialViewportFor(parsed);
     }
+    legacyWlSeriesKey = legacyKey;
 
     const container = $("viewport-container");
     if (state.viewport.zoom <= 0) {

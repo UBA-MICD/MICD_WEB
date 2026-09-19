@@ -30,14 +30,7 @@ let lastResult: SegmentationResult | null = null;
 // ── Estado visual ────────────────────────────────────────────────────────────
 
 function setLoading(loading: boolean): void {
-  const btn = $("tool-ai-seg") as HTMLButtonElement | null;
   const status = $("segmentation-status");
-
-  if (btn) {
-    btn.disabled = loading;
-    btn.classList.toggle("is-loading", loading);
-    btn.setAttribute("aria-busy", String(loading));
-  }
   if (status) {
     status.classList.toggle("hidden", !loading);
     status.textContent = loading ? t("viewer.segmentation.running") : "";
@@ -195,8 +188,8 @@ export async function runSegmentation(): Promise<void> {
 // ── Init ─────────────────────────────────────────────────────────────────────
 
 export function initSegmentation(): void {
-  $("tool-ai-seg")?.addEventListener("click", () => void runSegmentation());
-
+  // No hay botón en el visor: `runSegmentation` se invoca desde el panel de
+  // Validaciones (server-screen.ts). Acá sólo queda el interruptor de la capa.
   const toggle = $("chk-segmentation-visible") as HTMLInputElement | null;
   toggle?.addEventListener("change", () => {
     setSegmentationVisible(toggle.checked);

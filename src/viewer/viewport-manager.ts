@@ -43,6 +43,11 @@ export interface ViewportData {
   overlay?: OverlayLayer | null;
   /** Segmentación de IA dibujada sobre este viewport (US-SEG). */
   segmentation?: SegmentationLayer | null;
+  /**
+   * Serie a la que pertenece el window/level actual. Cambia de serie ⇒ el W/L
+   * se reinicia; mismo valor ⇒ se conserva al navegar entre cortes.
+   */
+  wlSeriesKey?: string | null;
   mlLabel?: string | null;
 }
 

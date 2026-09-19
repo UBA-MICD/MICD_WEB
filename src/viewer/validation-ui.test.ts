@@ -242,17 +242,17 @@ test("clicking Aprobar and confirming calls submitValidation with approved actio
   );
 });
 
-// ── Tests: reject requires comment ───────────────────────────────────────────
+// ── Tests: the comment is optional, rejection included ───────────────────────
 
-test("clicking Rechazar without comment keeps dialog open and shows required note", async () => {
+test("clicking Rechazar without comment submits anyway", async () => {
   setupFixture();
   await loginAs("medico");
   state.source = "server";
   state.serverValidation = null;
 
-  let fetchCalled = false;
-  fetchImpl = async () => {
-    fetchCalled = true;
+  let capturedBody: unknown;
+  fetchImpl = async (_url, init) => {
+    capturedBody = JSON.parse(String(init?.body));
     return jsonResponse(201, MOCK_RECORD);
   };
 
@@ -263,20 +263,21 @@ test("clicking Rechazar without comment keeps dialog open and shows required not
   document.getElementById("btn-validate-reject")!.click();
   await new Promise((r) => setTimeout(r, 0));
 
-  // Clear comment and confirm
+  // Confirm with an empty comment box.
   (document.getElementById("validation-comment") as HTMLTextAreaElement).value =
     "";
   document.getElementById("validation-dialog-confirm")!.click();
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.ok(
-    !fetchCalled,
-    "API must not be called without a comment for rejection",
+  assert.deepEqual(
+    capturedBody,
+    { action: "rejected" },
+    "rejection must be sent with no comment field",
   );
-  const requiredNote = document.getElementById("validation-comment-required")!;
+  const dialog = document.getElementById("validation-dialog")!;
   assert.ok(
-    !requiredNote.classList.contains("hidden"),
-    "required note should be visible",
+    dialog.classList.contains("hidden"),
+    "the dialog must close instead of blocking on the comment",
   );
 });
 

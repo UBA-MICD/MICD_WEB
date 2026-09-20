@@ -2,12 +2,8 @@
  * api.ts — Dynamic DICOM & PACS API client layer (TK-29).
  * Consumes dynamically configured serverUrl from state/localStorage.
  */
-import {
-  state,
-  getStoredServerUrl,
-  persistServerUrl,
-} from "../viewer/state.js";
-import { authFetch, updateApiOrigin } from "../auth/auth.js";
+import { persistServerUrl } from "../viewer/state.js";
+import { authFetch, getApiOrigin } from "../auth/auth.js";
 
 /** Validates a user-supplied server URL. Supports http:// and https://. */
 export function validateServerUrl(rawUrl: string): {
@@ -60,9 +56,9 @@ export function validateServerUrl(rawUrl: string): {
   }
 }
 
-/** Returns the active base API origin (dynamically resolved). */
+/** Returns the active base API origin — the single origin auth.ts resolved. */
 export function getServerUrl(): string {
-  return state.serverUrl || getStoredServerUrl();
+  return getApiOrigin();
 }
 
 /** Returns the active /api prefix. */
@@ -71,10 +67,9 @@ export function getApiBaseUrl(): string {
   return origin ? `${origin}/api` : "/api";
 }
 
-/** Updates active server URL in state, storage, and auth module. */
+/** Updates the active server URL (persists + updates the resolved origin). */
 export function setServerUrl(url: string): void {
   persistServerUrl(url);
-  updateApiOrigin(url);
 }
 
 /** Dynamic fetch wrapper targeting the configured server URL. */

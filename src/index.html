@@ -40,6 +40,14 @@
       aria-live="polite"
     ></div>
 
+    <!-- Live region for announcing measurement values to assistive tech -->
+    <div
+      id="measure-announce"
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
     <!-- The viewer screen. Hidden (and inert) while the server screen is up,
          but never torn down, so viewport state survives the round trip. -->
     <div id="viewer-screen" class="screen">
@@ -387,6 +395,60 @@
                   <line x1="3" y1="12" x2="21" y2="12" />
                 </svg>
                 <span>Crosshair</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-length"
+                data-i18n-attr="title:viewer.tool.lengthTitle"
+                title="Regla de medición (L)"
+                aria-pressed="false"
+                aria-expanded="false"
+                aria-controls="measure-panel"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m15 5 4 4" />
+                  <path d="m13 7 2 2" />
+                  <path d="m11 9 2 2" />
+                  <path d="m9 11 2 2" />
+                  <path d="m7 13 2 2" />
+                  <path d="m5 15 2 2" />
+                  <path d="m2 22 20-20" />
+                </svg>
+                <span data-i18n="annotations.length">Regla</span>
+              </button>
+              <button
+                class="toolbar__tool"
+                id="tool-ellipse"
+                data-i18n-attr="title:viewer.tool.ellipseTitle"
+                title="Medición de área y HU (E)"
+                aria-pressed="false"
+                aria-expanded="false"
+                aria-controls="measure-panel"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <ellipse cx="12" cy="12" rx="9" ry="6" />
+                  <line x1="12" y1="9" x2="12" y2="15" stroke-dasharray="1 2" />
+                  <line x1="7" y1="12" x2="17" y2="12" stroke-dasharray="1 2" />
+                </svg>
+                <span data-i18n="annotations.area">Elipse</span>
               </button>
             </div>
 
@@ -826,6 +888,11 @@
                 data-i18n-attr="aria-label:viewer.canvasEmptyLabel"
                 aria-label="Sin imagen cargada"
               ></canvas>
+              <canvas
+                id="annotation-overlay"
+                class="annotation-overlay"
+                aria-hidden="true"
+              ></canvas>
 
               <!-- Drop zone -->
               <div class="drop-zone" id="drop-zone">
@@ -1085,6 +1152,97 @@
                       200%
                     </button>
                   </div>
+                </div>
+              </div>
+            </aside>
+
+            <!-- Measurement Settings Panel (TK-26) -->
+            <aside
+              class="wl-panel"
+              id="measure-panel"
+              data-i18n-attr="aria-label:viewer.measure.panelTitle"
+              aria-label="Ajuste de Mediciones"
+            >
+              <div class="wl-header">
+                <h2 data-i18n="viewer.measure.panelTitle">
+                  Ajuste de Mediciones
+                </h2>
+              </div>
+              <div class="wl-body">
+                <!-- Unit Selector Section -->
+                <div class="wl-section">
+                  <span
+                    class="wl-section-title"
+                    data-i18n="viewer.measure.unitLabel"
+                    >Unidades</span
+                  >
+                  <div
+                    class="presets preset-grid"
+                    role="group"
+                    aria-label="Unidades de medida"
+                  >
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn active"
+                      id="btn-unit-mm"
+                      data-unit="mm"
+                      aria-pressed="true"
+                    >
+                      mm
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--outline preset-btn"
+                      id="btn-unit-cm"
+                      data-unit="cm"
+                      aria-pressed="false"
+                    >
+                      cm
+                    </button>
+                  </div>
+                  <select
+                    id="select-measure-unit"
+                    class="sr-only"
+                    aria-label="Unidad de medida"
+                  >
+                    <option value="mm" selected>Milímetros (mm)</option>
+                    <option value="cm">Centímetros (cm)</option>
+                  </select>
+                </div>
+
+                <!-- Line Width Slider Section -->
+                <div class="wl-section">
+                  <div class="slider-control">
+                    <div class="slider-header">
+                      <label
+                        for="slider-measure-width"
+                        data-i18n="viewer.measure.lineWidthLabel"
+                        >Grosor de línea</label
+                      >
+                      <span class="slider-val" id="val-measure-width">2px</span>
+                    </div>
+                    <input
+                      type="range"
+                      id="slider-measure-width"
+                      class="wl-slider"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value="2"
+                    />
+                  </div>
+                </div>
+
+                <!-- Actions Section -->
+                <div class="wl-section">
+                  <button
+                    type="button"
+                    class="btn btn--danger measure-clear-btn"
+                    id="btn-clear-measurements"
+                    data-i18n="viewer.measure.clearAnnotations"
+                  >
+                    Borrar mediciones
+                  </button>
                 </div>
               </div>
             </aside>
@@ -1973,6 +2131,33 @@
             Sistema
           </button>
         </div>
+        <!-- Admin-only server configuration (TK-29, spec 001). Starts hidden;
+             server-screen.ts renderForSession() reveals it only for admins. The
+             main page has no path to change the server on purpose. -->
+        <button
+          type="button"
+          class="btn-server-settings hidden"
+          id="btn-server-settings"
+          data-i18n-attr="aria-label:server.configButton; title:server.configButton"
+          aria-label="Configurar servidor"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+            ></path>
+          </svg>
+        </button>
       </header>
 
       <!-- Screen 02: the only thing a guest sees here. -->

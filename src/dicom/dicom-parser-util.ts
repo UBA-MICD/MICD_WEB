@@ -30,6 +30,7 @@ export interface DicomMetadata {
   // Instance
   instanceNumber: string;
   sopClassUid: string;
+  sopInstanceUid?: string;
 
   // Image
   rows: number;
@@ -175,6 +176,7 @@ function extractMetadata(dataSet: any): DicomMetadata {
     // Instance
     instanceNumber: safeString(dataSet, "x00200013"),
     sopClassUid: safeString(dataSet, "x00080016"),
+    sopInstanceUid: safeString(dataSet, "x00080018") || undefined,
 
     // Image
     rows: safeUint16(dataSet, "x00280010"),

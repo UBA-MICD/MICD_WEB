@@ -101,8 +101,15 @@ async function initApp(): Promise<void> {
   $("btn-login").addEventListener("click", (e) =>
     openServerScreen("buscar", e.currentTarget as HTMLElement),
   );
-  // Opens server configuration modal (TK-29)
+  // The main-page Servidor button routes to the server interface (search/upload),
+  // never to the config modal — re-pointing the server from the main page can put
+  // the app in an inconsistent state (TK-29, spec 001). Server configuration is an
+  // admin-only action reachable from the gear inside the server screen instead.
   $("btn-server").addEventListener("click", (e) =>
+    openServerScreen("buscar", e.currentTarget as HTMLElement),
+  );
+  // Admin-only settings gear inside the server screen opens the config modal (TK-29).
+  $("btn-server-settings").addEventListener("click", (e) =>
     openServerConfigModal(e.currentTarget as HTMLElement),
   );
   // cspell:enable

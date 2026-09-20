@@ -19,6 +19,9 @@ export function viewerFixtureHtml(): string {
     <button id="tool-zoom" aria-pressed="false"></button>
     <button id="tool-pan" aria-pressed="false"></button>
     <button id="tool-crosshair" aria-pressed="false"></button>
+    <button id="tool-length" aria-pressed="false"></button>
+    <button id="tool-ellipse" aria-pressed="false"></button>
+    <div id="measure-announce" class="sr-only"></div>
     <button id="tool-reset"></button>
     <button id="tool-metadata" aria-expanded="false"></button>
     <button id="tool-view-3d" disabled></button>
@@ -67,6 +70,7 @@ export function viewerFixtureHtml(): string {
 
     <div class="viewport-container cursor-wl" id="viewport-container">
       <canvas id="dicom-canvas"></canvas>
+      <canvas id="annotation-overlay" class="annotation-overlay"></canvas>
       <div class="overlay overlay--tl" id="overlay-tl"></div>
       <div class="overlay overlay--tr" id="overlay-tr"></div>
       <div class="overlay overlay--bl" id="overlay-bl"></div>
@@ -96,6 +100,18 @@ export function viewerFixtureHtml(): string {
       <button id="btn-zoom-fit"></button>
       <button id="btn-zoom-100"></button>
       <button id="btn-zoom-200"></button>
+    </aside>
+
+    <aside class="wl-panel" id="measure-panel">
+      <button id="btn-unit-mm" data-unit="mm"></button>
+      <button id="btn-unit-cm" data-unit="cm"></button>
+      <select id="select-measure-unit">
+        <option value="mm" selected>mm</option>
+        <option value="cm">cm</option>
+      </select>
+      <input type="range" id="slider-measure-width" min="1" max="5" step="1" value="2" />
+      <span id="val-measure-width">2px</span>
+      <button id="btn-clear-measurements"></button>
     </aside>
 
     <div id="mpr-orient-top" class="mpr-orient"></div>
@@ -132,11 +148,40 @@ export function stubCanvas2DContext(): void {
       canvas: this,
       imageSmoothingEnabled: true,
       imageSmoothingQuality: "high",
+      font: "10px sans-serif",
+      fillStyle: "#000",
+      strokeStyle: "#000",
+      lineWidth: 1,
+      lineCap: "butt",
+      textAlign: "left",
+      textBaseline: "alphabetic",
+      shadowColor: "transparent",
+      shadowBlur: 0,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
       createImageData(w: number, h: number) {
         return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h };
       },
       putImageData() {},
       clearRect() {},
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      stroke() {},
+      fill() {},
+      arc() {},
+      ellipse() {},
+      save() {},
+      restore() {},
+      fillRect() {},
+      strokeRect() {},
+      fillText() {},
+      strokeText() {},
+      setLineDash() {},
+      measureText(text: string) {
+        return { width: (text || "").length * 7 };
+      },
+      roundRect() {},
     };
   };
 }

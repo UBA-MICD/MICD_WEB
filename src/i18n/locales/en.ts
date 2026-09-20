@@ -56,6 +56,7 @@ export const en: Record<string, string> = {
   "server.backToViewer": "Back to viewer",
   "server.tabsAriaLabel": "Server actions",
   "server.tabUpload": "Upload",
+  "server.configButton": "Configure server",
   "server.advancedSettings": "Advanced settings",
   "server.apiOriginLabel": "API server",
   "server.apiOriginPlaceholder": "http://localhost:3000",
@@ -113,6 +114,8 @@ export const en: Record<string, string> = {
   "viewer.tool.zoomTitle": "Zoom (Z)",
   "viewer.tool.panTitle": "Pan (P)",
   "viewer.tool.crosshairTitle": "3D crosshair navigation (C)",
+  "viewer.tool.lengthTitle": "Ruler measurement (L)",
+  "viewer.tool.ellipseTitle": "Area and HU measurement (E)",
   "viewer.tool.resetTitle": "Reset (R)",
   "viewer.tool.metadataTitle": "DICOM tags (M)",
   "viewer.tool.zenodoTitle": "Zenodo — open science repository",
@@ -726,4 +729,17 @@ export const en: Record<string, string> = {
   "serverConfig.saveSuccess": "Configuration saved successfully.",
   "serverConfig.invalidUrl":
     "Invalid URL format. Use http:// or https:// (e.g. http://localhost:3000)",
+
+  // ── Measurement and annotations (TK-26) ────────────────────────────────────
+  "annotations.length": "Length",
+  "annotations.area": "Area",
+  "annotations.mean": "Mean",
+  "annotations.stdDev": "Std Dev",
+  "annotations.uncalibrated": "No spatial calibration",
+  "viewer.measure.panelTitle": "Measurement Settings",
+  "viewer.measure.unitLabel": "Units",
+  "viewer.measure.unitMm": "Millimeters (mm)",
+  "viewer.measure.unitCm": "Centimeters (cm)",
+  "viewer.measure.lineWidthLabel": "Line Width",
+  "viewer.measure.clearAnnotations": "Clear Annotations",
 };

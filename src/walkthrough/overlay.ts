@@ -323,7 +323,12 @@ export function createOverlay(cb: OverlayCallbacks): Overlay {
     // One full-screen scrim, no cut-out, for centered steps.
     ring.classList.add("hidden");
     const vp = viewport();
-    applyRect(scrims.top, { top: 0, left: 0, width: vp.width, height: vp.height });
+    applyRect(scrims.top, {
+      top: 0,
+      left: 0,
+      width: vp.width,
+      height: vp.height,
+    });
     scrims.top.classList.remove("hidden");
     [scrims.bottom, scrims.left, scrims.right].forEach((s) =>
       s.classList.add("hidden"),

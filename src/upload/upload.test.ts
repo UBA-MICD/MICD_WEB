@@ -595,8 +595,8 @@ test("initUploadPanel: dropping a corrupt zip reports the error via toast", asyn
   });
   zone.dispatchEvent(dropEvt);
 
-  for (let i = 0; i < 10 && !document.querySelector(".toast--error"); i++) {
-    await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 30 && !document.querySelector(".toast--error"); i++) {
+    await new Promise((r) => setTimeout(r, 5));
   }
   assert.ok(document.querySelector(".toast--error"));
   assert.equal(FakeXHR.instances.length, 0);

@@ -32,9 +32,7 @@ export interface TourStep {
    *  server-screen module graph into the engine. */
   tab?: string;
   placement?: Placement;
-  advance:
-    | { on: "next" }
-    | { on: "event"; event: string; selector?: string };
+  advance: { on: "next" } | { on: "event"; event: string; selector?: string };
   /** If the target is missing/hidden, skip silently instead of stalling. */
   optional?: boolean;
   onEnter?: () => void | Promise<void>;

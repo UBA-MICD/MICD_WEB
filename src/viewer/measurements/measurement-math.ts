@@ -321,3 +321,120 @@ export function formatArea(
   }
   return `${areaMm2.toFixed(1)} mm²`;
 }
+
+/**
+ * Calculates the area of a polygon using the Shoelace algorithm (Gauss's area formula).
+ * Points are in image pixel space (World-Space).
+ *
+ * If pixelSpacing is provided as [rowSpacing, colSpacing], the area is scaled
+ * by (rowSpacing * colSpacing) and returned in square millimeters (mm²).
+ * Otherwise returns area in square pixels (px²).
+ *
+ * Formula: Area = 0.5 * |sum_{i=0}^{N-1} (x_i * y_{i+1} - x_{i+1} * y_i)| * (colSpacing * rowSpacing)
+ */
+export function calculatePolygonArea(
+  points: Point2D[],
+  pixelSpacing: [number, number] = [1.0, 1.0],
+): number {
+  if (points.length < 3) return 0;
+
+  let sum = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const next = (i + 1) % n;
+    sum += points[i].x * points[next].y - points[next].x * points[i].y;
+  }
+
+  const areaPx = Math.abs(sum) / 2;
+  const [rowSpacing, colSpacing] = pixelSpacing;
+  return areaPx * (rowSpacing * colSpacing);
+}
+
+/**
+ * Calculates the perimeter of a polygon in image space.
+ * If pixelSpacing is provided as [rowSpacing, colSpacing], the perimeter is calculated
+ * with anisotropic physical distances in millimeters (mm).
+ * Otherwise returns perimeter in pixels (px).
+ *
+ * @param points Ordered array of vertices
+ * @param pixelSpacing [rowSpacing, colSpacing]
+ * @param isClosed Whether the polygon is closed (connecting the last vertex to the first)
+ */
+export function calculatePolygonPerimeter(
+  points: Point2D[],
+  pixelSpacing: [number, number] = [1.0, 1.0],
+  isClosed: boolean = true,
+): number {
+  if (points.length < 2) return 0;
+
+  let totalDistance = 0;
+  const segmentCount = isClosed ? points.length : points.length - 1;
+
+  for (let i = 0; i < segmentCount; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    totalDistance += calculateDistance(p1, p2, pixelSpacing);
+  }
+
+  return totalDistance;
+}
+
+/**
+ * Determines whether a 2D point lies inside a polygon using the Ray-Casting algorithm
+ * (even-odd rule / Jordan curve theorem).
+ * Works for both convex and non-convex (concave) polygons.
+ *
+ * @param point The test point in image coordinates (World-Space)
+ * @param polygonPoints Ordered array of polygon vertices
+ */
+export function isPointInPolygon(
+  point: Point2D,
+  polygonPoints: Point2D[],
+): boolean {
+  if (polygonPoints.length < 3) return false;
+
+  let inside = false;
+  const { x, y } = point;
+  const n = polygonPoints.length;
+
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = polygonPoints[i].x;
+    const yi = polygonPoints[i].y;
+    const xj = polygonPoints[j].x;
+    const yj = polygonPoints[j].y;
+
+    // Check if the horizontal ray from (x, y) extending to the right (+X)
+    // crosses the segment between (xi, yi) and (xj, yj).
+    const intersect =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+    if (intersect) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+/**
+ * Calculates the shortest Euclidean distance from a point to a finite line segment (lineStart to lineEnd).
+ * Used for edge hit-testing on polygons and linear annotations.
+ */
+export function distancePointToSegment(
+  point: Point2D,
+  lineStart: Point2D,
+  lineEnd: Point2D,
+): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) {
+    return Math.hypot(point.x - lineStart.x, point.y - lineStart.y);
+  }
+  let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(
+    point.x - (lineStart.x + t * dx),
+    point.y - (lineStart.y + t * dy),
+  );
+}

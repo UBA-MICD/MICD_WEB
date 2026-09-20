@@ -18,7 +18,8 @@ export interface AppState {
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
-  activeTool: "wl" | "zoom" | "pan" | "crosshair" | "length" | "ellipse";
+  activeTool:
+    "wl" | "zoom" | "pan" | "crosshair" | "length" | "ellipse" | "polygon";
   /** Measurement annotations indexed by SOPInstanceUID (TK-26). */
   annotations: Record<string, import("./measurements/types.js").Annotation[]>;
   isDragging: boolean;

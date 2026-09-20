@@ -13,6 +13,10 @@ import {
   worldToScreen,
   formatLength,
   formatArea,
+  calculatePolygonArea,
+  calculatePolygonPerimeter,
+  isPointInPolygon,
+  distancePointToSegment,
 } from "./measurement-math.js";
 
 test("extractCalibration parses valid PixelSpacing and rescale tags", () => {
@@ -282,4 +286,187 @@ test("formatArea formats calibrated area in mm² by default", () => {
 test("formatArea formats calibrated area in cm² (divided by 100)", () => {
   assert.equal(formatArea(250.0, true, "cm"), "2.50 cm²");
   assert.equal(formatArea(1000.0, true, "cm"), "10.00 cm²");
+});
+
+test("calculatePolygonArea computes exact area of a known square (Shoelace algorithm)", () => {
+  // 10x10 square -> Area = 100 px²
+  const squareCCW = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ];
+  assert.equal(calculatePolygonArea(squareCCW), 100);
+
+  // Winding order reversed (clockwise) -> Absolute value should still yield 100
+  const squareCW = [
+    { x: 0, y: 0 },
+    { x: 0, y: 10 },
+    { x: 10, y: 10 },
+    { x: 10, y: 0 },
+  ];
+  assert.equal(calculatePolygonArea(squareCW), 100);
+});
+
+test("calculatePolygonArea applies anisotropic PixelSpacing calibration correctly", () => {
+  // 10x10 px square
+  // colSpacing = 0.5 mm/px (width in mm = 10 * 0.5 = 5 mm)
+  // rowSpacing = 2.0 mm/px (height in mm = 10 * 2.0 = 20 mm)
+  // Calibrated area = 5 * 20 = 100 mm²
+  const square = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ];
+  const areaCalibrated = calculatePolygonArea(square, [2.0, 0.5]);
+  assert.equal(areaCalibrated, 100);
+
+  // rowSpacing = 1.5, colSpacing = 0.5 -> Area = 100 * (1.5 * 0.5) = 75 mm²
+  const areaAniso = calculatePolygonArea(square, [1.5, 0.5]);
+  assert.equal(areaAniso, 75);
+});
+
+test("calculatePolygonArea computes area for non-convex (L-shaped) polygon", () => {
+  // 10x10 bounding square with a 5x5 quadrant removed -> Area = 100 - 25 = 75 px²
+  const lShape = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 5 },
+    { x: 5, y: 5 },
+    { x: 5, y: 10 },
+    { x: 0, y: 10 },
+  ];
+  assert.equal(calculatePolygonArea(lShape), 75);
+});
+
+test("calculatePolygonArea handles degenerate polygon inputs gracefully", () => {
+  assert.equal(calculatePolygonArea([]), 0);
+  assert.equal(calculatePolygonArea([{ x: 5, y: 5 }]), 0);
+  assert.equal(
+    calculatePolygonArea([
+      { x: 0, y: 0 },
+      { x: 10, y: 10 },
+    ]),
+    0,
+  );
+  // Collinear points
+  const collinear = [
+    { x: 0, y: 0 },
+    { x: 5, y: 5 },
+    { x: 10, y: 10 },
+  ];
+  assert.equal(calculatePolygonArea(collinear), 0);
+});
+
+test("calculatePolygonPerimeter computes perimeter for uncalibrated and calibrated polygons", () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ];
+  // Uncalibrated closed perimeter: 10 + 10 + 10 + 10 = 40 px
+  assert.equal(calculatePolygonPerimeter(square, [1.0, 1.0], true), 40);
+
+  // Uncalibrated open perimeter: 10 + 10 + 10 = 30 px
+  assert.equal(calculatePolygonPerimeter(square, [1.0, 1.0], false), 30);
+
+  // Anisotropic calibration:
+  // Horizontal sides dx = 10, colSpacing = 0.5 -> 5 mm
+  // Vertical sides dy = 10, rowSpacing = 2.0 -> 20 mm
+  // Total perimeter = 5 + 20 + 5 + 20 = 50 mm
+  assert.equal(calculatePolygonPerimeter(square, [2.0, 0.5], true), 50);
+
+  // Degenerate inputs
+  assert.equal(calculatePolygonPerimeter([]), 0);
+  assert.equal(calculatePolygonPerimeter([{ x: 5, y: 5 }]), 0);
+});
+
+test("isPointInPolygon (Ray-Casting) correctly identifies points inside and outside a convex polygon", () => {
+  const square = [
+    { x: 10, y: 10 },
+    { x: 30, y: 10 },
+    { x: 30, y: 30 },
+    { x: 10, y: 30 },
+  ];
+
+  // Point strictly inside
+  assert.equal(isPointInPolygon({ x: 20, y: 20 }, square), true);
+  assert.equal(isPointInPolygon({ x: 11, y: 11 }, square), true);
+  assert.equal(isPointInPolygon({ x: 29, y: 29 }, square), true);
+
+  // Points clearly outside
+  assert.equal(isPointInPolygon({ x: 5, y: 20 }, square), false); // left
+  assert.equal(isPointInPolygon({ x: 35, y: 20 }, square), false); // right
+  assert.equal(isPointInPolygon({ x: 20, y: 5 }, square), false); // above
+  assert.equal(isPointInPolygon({ x: 20, y: 35 }, square), false); // below
+  assert.equal(isPointInPolygon({ x: 0, y: 0 }, square), false); // diagonal
+
+  // Degenerate inputs
+  assert.equal(isPointInPolygon({ x: 20, y: 20 }, []), false);
+  assert.equal(isPointInPolygon({ x: 20, y: 20 }, [{ x: 10, y: 10 }]), false);
+  assert.equal(
+    isPointInPolygon({ x: 20, y: 20 }, [
+      { x: 10, y: 10 },
+      { x: 20, y: 20 },
+    ]),
+    false,
+  );
+});
+
+test("isPointInPolygon (Ray-Casting) correctly handles non-convex concave (C-shaped) polygons", () => {
+  // C-shaped polygon with an inner notch
+  // (0,0) ----------- (30,0)
+  //   |                 |
+  //   |   (20,10) - (20,20)
+  //   |     |         |
+  // (0,10)-(20,10)   (0,20)-(30,20) ...
+  const cShape = [
+    { x: 0, y: 0 },
+    { x: 30, y: 0 },
+    { x: 30, y: 30 },
+    { x: 0, y: 30 },
+    { x: 0, y: 20 },
+    { x: 20, y: 20 },
+    { x: 20, y: 10 },
+    { x: 0, y: 10 },
+  ];
+
+  // Inside bottom wing
+  assert.equal(isPointInPolygon({ x: 10, y: 5 }, cShape), true);
+  // Inside top wing
+  assert.equal(isPointInPolygon({ x: 10, y: 25 }, cShape), true);
+  // Inside vertical back bar
+  assert.equal(isPointInPolygon({ x: 25, y: 15 }, cShape), true);
+
+  // In the notch (cavity) -> Should be strictly OUTSIDE
+  assert.equal(isPointInPolygon({ x: 10, y: 15 }, cShape), false);
+  assert.equal(isPointInPolygon({ x: 5, y: 15 }, cShape), false);
+});
+
+test("distancePointToSegment computes exact perpendicular and endpoint distances", () => {
+  const start = { x: 0, y: 0 };
+  const end = { x: 10, y: 0 };
+
+  // Perpendicular projection directly onto the segment
+  assert.equal(distancePointToSegment({ x: 5, y: 4 }, start, end), 4);
+  assert.equal(distancePointToSegment({ x: 5, y: -6 }, start, end), 6);
+
+  // Directly on the segment
+  assert.equal(distancePointToSegment({ x: 3, y: 0 }, start, end), 0);
+
+  // Beyond start point (t < 0): closest point is start (0, 0)
+  // dist((-3, 4) to (0, 0)) = sqrt((-3)^2 + 4^2) = 5
+  assert.equal(distancePointToSegment({ x: -3, y: 4 }, start, end), 5);
+
+  // Beyond end point (t > 1): closest point is end (10, 0)
+  // dist((13, 4) to (10, 0)) = sqrt((3)^2 + 4^2) = 5
+  assert.equal(distancePointToSegment({ x: 13, y: 4 }, start, end), 5);
+
+  // Degenerate segment where start == end
+  assert.equal(
+    distancePointToSegment({ x: 3, y: 4 }, { x: 0, y: 0 }, { x: 0, y: 0 }),
+    5,
+  );
 });

@@ -7,7 +7,7 @@ export interface Point2D {
   y: number;
 }
 
-export type MeasurementType = "length" | "ellipse";
+export type MeasurementType = "length" | "ellipse" | "polygon";
 
 export interface BaseAnnotation {
   id: string;
@@ -39,7 +39,20 @@ export interface EllipseAnnotation extends BaseAnnotation {
   maxHu?: number;
 }
 
-export type Annotation = LengthAnnotation | EllipseAnnotation;
+export interface PolygonAnnotation extends BaseAnnotation {
+  type: "polygon";
+  points: Point2D[]; // Ordered array of vertices in image pixel coordinates (World-Space)
+  isClosed: boolean;
+  area: number; // in mm² if isCalibrated, else px²
+  perimeter: number; // in mm if isCalibrated, else px
+  meanHu?: number;
+  stdDevHu?: number;
+  minHu?: number;
+  maxHu?: number;
+}
+
+export type Annotation =
+  LengthAnnotation | EllipseAnnotation | PolygonAnnotation;
 
 export interface DicomCalibration {
   pixelSpacing: [number, number]; // [rowSpacing, colSpacing] in mm/pixel

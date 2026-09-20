@@ -2261,48 +2261,6 @@
           </button>
         </form>
 
-        <!-- API-origin settings card: shown for all platforms (TK-29).
-             Browser users persist via localStorage; desktop users via the
-             Electron preload bridge. initApiOriginSetting() unhides it. -->
-        <div class="auth-card auth-card--settings hidden">
-          <p class="auth-settings__label" aria-hidden="true">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="3"></circle>
-              <path
-                d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"
-              ></path>
-            </svg>
-            <span data-i18n="server.advancedSettings"
-              >Configuración avanzada</span
-            >
-          </p>
-          <label class="login-field">
-            <span data-i18n="server.apiOriginLabel">Servidor de la API</span>
-            <input
-              type="text"
-              id="desktop-api-origin-input"
-              data-i18n-attr="placeholder:server.apiOriginPlaceholder"
-              placeholder="http://localhost:3000"
-            />
-          </label>
-          <button
-            type="button"
-            class="btn btn--secondary btn--full"
-            id="desktop-api-origin-save"
-            data-i18n="server.apiOriginSave"
-          >
-            Guardar y reiniciar
-          </button>
-        </div>
       </div>
 
       <!-- Screen 03: this panel's only job is finding and opening a study. -->

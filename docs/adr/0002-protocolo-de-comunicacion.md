@@ -81,10 +81,13 @@ saltos, con Orthanc alcanzable sólo desde el backend**:
   `img-src`).
 - **Mismo origen en producción**: nginx (`nginx.conf` del repo web) proxea
   `location /api/` y `location /auth/` a `http://backend:3000` por nombre de
-  servicio en la red `micd`. El cliente resuelve el origen una sola vez en
+  servicio en la red `micd`. El cliente resuelve el origen en **un único lugar**,
   `src/auth/auth.ts` (`API_ORIGIN`/`API_BASE`): `window.MICD_API_ORIGIN = ""`
   para el mismo origen en Docker, `http://localhost:3000` para desarrollo
-  suelto. **En producción no hay CORS ni preflight**; `cors` en el backend sólo
+  suelto. El cliente dinámico de PACS/DICOM (`src/services/api.ts`,
+  `getServerUrl()`) consume ese mismo origen vía `getApiOrigin()` en vez de
+  resolverlo por su cuenta, así que hay un solo default y no pueden divergir.
+  **En producción no hay CORS ni preflight**; `cors` en el backend sólo
   cubre el caso de desarrollo con orígenes distintos.
 - **Backend → Orthanc**: REST nativa de Orthanc sobre HTTP con basic auth, desde
   un único cliente (ADR-0003). **No se usa DIMSE**: el puerto DICOM 4242 queda

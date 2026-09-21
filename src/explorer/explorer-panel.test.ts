@@ -239,3 +239,21 @@ test("dropping nothing (no files) does not throw", async () => {
   );
   await Promise.resolve();
 });
+
+test("dropping a corrupt .zip expands it and reports the read error", async () => {
+  initExplorerPanel();
+  const panel = document.getElementById("explorer-panel")!;
+
+  // A .zip is accepted by collectServerUploadFiles, so the drop handler reaches
+  // the new zip-expansion branch; the bytes aren't a real archive, so fflate
+  // fails and it surfaces a zipReadError toast (no upload is attempted).
+  const dt = { files: [new File(["not a real zip"], "study.zip")] };
+  panel.dispatchEvent(dragEvent("drop", { dataTransfer: dt }));
+
+  // expandFiles dynamically imports fflate and unzips on a callback — give it
+  // a couple of macrotasks to settle.
+  await new Promise((r) => setTimeout(r, 50));
+
+  const toast = document.querySelector("#toast-container .toast--error");
+  assert.ok(toast, "expected an error toast for a corrupt zip");
+});

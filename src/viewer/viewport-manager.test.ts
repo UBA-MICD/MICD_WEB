@@ -1,0 +1,161 @@
+// Focused tests for ViewportManager mutation paths that were otherwise only
+// exercised indirectly: Viewport.resetCamera (including the auto window/level
+// fallback when the DICOM carries none) and the sync dispatch fan-out.
+import test, { beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { installDom, uninstallDom } from "../../test/dom-setup.ts";
+import { stubCanvas2DContext } from "../../test/viewer-fixture.ts";
+import { initViewportManager } from "./viewport-registry.ts";
+import type { ViewportManager } from "./viewport-manager.ts";
+import type { ParsedDicom } from "../dicom/dicom-parser-util.ts";
+
+test.before(() => {
+  installDom();
+  stubCanvas2DContext();
+});
+test.after(() => uninstallDom());
+
+let manager: ViewportManager;
+
+beforeEach(() => {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  manager = initViewportManager(container);
+});
+
+afterEach(() => {
+  manager.destroy();
+  document.body.innerHTML = "";
+});
+
+function fakeDicom(windowWidth: number): ParsedDicom {
+  // A pixel ramp so calculateAutoWindowLevel has a real range to work with.
+  const pixelData = new Uint16Array(16);
+  for (let i = 0; i < pixelData.length; i++) pixelData[i] = i * 40;
+  return {
+    metadata: {
+      rows: 4,
+      columns: 4,
+      windowWidth,
+      windowCenter: windowWidth > 0 ? 40 : 0,
+      rescaleSlope: 1,
+      rescaleIntercept: 0,
+      modality: "CT",
+    } as any,
+    pixelData,
+    rawDataSet: {},
+  } as ParsedDicom;
+}
+
+test("resetCamera uses the DICOM's own window/level when present", () => {
+  const vp = manager.activeViewport!;
+  vp.data.parsed = fakeDicom(400);
+  vp.data.viewport = {
+    windowCenter: 5,
+    windowWidth: 5,
+    zoom: 3,
+    panX: 9,
+    panY: 9,
+  };
+
+  vp.resetCamera();
+
+  assert.equal(vp.data.viewport.windowWidth, 400, "restored from metadata");
+  assert.equal(vp.data.viewport.panX, 0, "pan is reset by fitImage");
+  assert.equal(vp.data.viewport.panY, 0);
+});
+
+test("resetCamera derives an auto window/level when the DICOM carries none", () => {
+  const vp = manager.activeViewport!;
+  vp.data.parsed = fakeDicom(0); // windowWidth 0 → must not stay dark
+  vp.data.viewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+
+  vp.resetCamera();
+
+  assert.ok(
+    vp.data.viewport.windowWidth > 0,
+    "auto W/L must produce a visible (non-zero) window width",
+  );
+});
+
+test("resetCamera is a no-op without parsed data", () => {
+  const vp = manager.activeViewport!;
+  vp.data.parsed = null;
+  vp.data.viewport = {
+    windowCenter: 7,
+    windowWidth: 7,
+    zoom: 2,
+    panX: 1,
+    panY: 1,
+  };
+
+  assert.doesNotThrow(() => vp.resetCamera());
+  assert.equal(
+    vp.data.viewport.windowWidth,
+    7,
+    "untouched when there is nothing to show",
+  );
+});
+
+test("dispatchWindowLevel fans out to other viewports only when synced", () => {
+  manager.setLayout("1x2");
+  const [vp0, vp1] = manager.getAllViewports();
+  vp0!.data.parsed = fakeDicom(400);
+  vp1!.data.parsed = fakeDicom(400);
+  vp0!.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+  vp1!.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+
+  // Not synced: only the origin changes.
+  manager.setSync(false);
+  manager.dispatchWindowLevel("vp-0", 100, 0);
+  assert.equal(vp0!.data.viewport.windowWidth, 500);
+  assert.equal(vp1!.data.viewport.windowWidth, 400, "untouched while unsynced");
+
+  // Synced: the change fans out.
+  manager.setSync(true);
+  manager.dispatchWindowLevel("vp-0", 100, 0);
+  assert.equal(vp0!.data.viewport.windowWidth, 600);
+  assert.equal(
+    vp1!.data.viewport.windowWidth,
+    500,
+    "follows the origin when synced",
+  );
+});
+
+test("dispatchSliceDelta advances synced viewports that share a stack", async () => {
+  manager.setLayout("1x2");
+  const [vp0, vp1] = manager.getAllViewports();
+  for (const vp of [vp0!, vp1!]) {
+    vp.data.source = "local";
+    vp.data.files = [new File(["a"], "0.dcm"), new File(["b"], "1.dcm")];
+    vp.data.currentIndex = 0;
+  }
+  manager.setSync(true);
+
+  const loaded: string[] = [];
+  await manager.dispatchSliceDelta("vp-0", 1, async (vp) => {
+    loaded.push(vp.id);
+  });
+
+  assert.equal(vp0!.data.currentIndex, 1);
+  assert.equal(vp1!.data.currentIndex, 1, "synced viewport advanced too");
+  assert.deepEqual(loaded.sort(), ["vp-0", "vp-1"]);
+});

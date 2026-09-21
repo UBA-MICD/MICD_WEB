@@ -745,4 +745,8 @@ export const en: Record<string, string> = {
   "viewer.measure.unitCm": "Centimeters (cm)",
   "viewer.measure.lineWidthLabel": "Line Width",
   "viewer.measure.clearAnnotations": "Clear Annotations",
+  "viewer.measure.exportSegmentation": "Export Segmentation",
+  "viewer.measure.noSegmentationToExport":
+    "No polygon segmentations to export on this slice.",
+  "viewer.measure.exportSuccess": "Segmentation exported successfully.",
 };

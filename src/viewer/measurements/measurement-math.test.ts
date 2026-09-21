@@ -323,8 +323,8 @@ test("calculatePolygonArea applies anisotropic PixelSpacing calibration correctl
   assert.equal(areaCalibrated, 100);
 
   // rowSpacing = 1.5, colSpacing = 0.5 -> Area = 100 * (1.5 * 0.5) = 75 mm²
-  const areaAniso = calculatePolygonArea(square, [1.5, 0.5]);
-  assert.equal(areaAniso, 75);
+  const areaAnisotropic = calculatePolygonArea(square, [1.5, 0.5]);
+  assert.equal(areaAnisotropic, 75);
 });
 
 test("calculatePolygonArea computes area for non-convex (L-shaped) polygon", () => {

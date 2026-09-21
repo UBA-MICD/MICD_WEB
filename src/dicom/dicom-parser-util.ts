@@ -25,6 +25,7 @@ export interface DicomMetadata {
   // Series
   seriesDescription: string;
   seriesNumber: string;
+  seriesInstanceUid?: string;
   modality: string;
 
   // Instance
@@ -171,6 +172,7 @@ function extractMetadata(dataSet: any): DicomMetadata {
     // Series
     seriesDescription: safeString(dataSet, "x0008103e"),
     seriesNumber: safeString(dataSet, "x00200011"),
+    seriesInstanceUid: safeString(dataSet, "x0020000e") || undefined,
     modality: safeString(dataSet, "x00080060"),
 
     // Instance

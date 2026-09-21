@@ -28,6 +28,7 @@ import { dicomCache } from "./cache.ts";
 import { ViewportManager } from "./viewport-manager.ts";
 import { initViewportManager } from "./viewport-registry.ts";
 import {
+  addAnnotation,
   clearAnnotations,
   getAnnotationsForSlice,
 } from "./measurements/annotation-state.ts";
@@ -37,6 +38,7 @@ import {
   getSelectedAnnotationId,
   setSelectedAnnotationId,
 } from "./measurements/measurement-overlay.ts";
+import type { PolygonAnnotation } from "./measurements/types.ts";
 
 // Fresh jsdom document per test (not just a fresh body): initKeyboardShortcuts()
 // and parts of initViewportInteraction() bind listeners to `document` itself,
@@ -196,6 +198,31 @@ test("initToolbar: clicking length and ellipse tools sets activeTool and updates
   assert.equal(state.activeTool, "pan");
   assert.equal(state.isMeasurementPanelOpen, false);
   assert.equal(panel.classList.contains("open"), false);
+});
+
+test("initToolbar: clicking polygon tool sets activeTool and updates UI", () => {
+  initToolbar();
+  const polyBtn = document.getElementById("tool-polygon")!;
+  const panel = document.getElementById("measure-panel")!;
+
+  polyBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "polygon");
+  assert.equal(polyBtn.classList.contains("active"), true);
+  assert.equal(polyBtn.getAttribute("aria-pressed"), "true");
+  assert.equal(state.isMeasurementPanelOpen, true);
+  assert.equal(polyBtn.getAttribute("aria-expanded"), "true");
+  assert.equal(panel.classList.contains("open"), true);
+
+  // Clicking polygon again toggles panel closed
+  polyBtn.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.isMeasurementPanelOpen, false);
+  assert.equal(polyBtn.getAttribute("aria-expanded"), "false");
+  assert.equal(panel.classList.contains("open"), false);
+
+  // Clicking pan switches tool
+  document.getElementById("tool-pan")!.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.activeTool, "pan");
+  assert.equal(polyBtn.classList.contains("active"), false);
 });
 
 test("measurement panel: unit buttons and select toggle state and update UI", () => {
@@ -649,6 +676,236 @@ test("initViewportInteraction: dragging with ellipse tool creates EllipseAnnotat
   assert.ok(
     announce?.textContent?.includes("Área") ||
       announce?.textContent?.includes("Area"),
+  );
+});
+
+test("initViewportInteraction: drawing polygon with successive clicks and closing near start creates PolygonAnnotation and announces", () => {
+  initViewportInteraction();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+  const overlay = document.getElementById(
+    "annotation-overlay",
+  ) as HTMLCanvasElement;
+  if (overlay) {
+    overlay.width = 500;
+    overlay.height = 500;
+  }
+
+  state.activeTool = "polygon";
+
+  // Click 1 (Start)
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 50,
+      clientY: 50,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+  const drawing = getActiveDrawing();
+  assert.ok(drawing);
+  assert.equal(drawing?.type, "polygon");
+  assert.equal(drawing?.points?.length, 1);
+
+  // Guide line mousemove
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 100, clientY: 50, bubbles: true }),
+  );
+  assert.ok(drawing?.end);
+
+  // Click 2
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 100,
+      clientY: 50,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(drawing?.points?.length, 2);
+
+  // Click 3
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 100,
+      clientY: 100,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(drawing?.points?.length, 3);
+
+  // Click 4: Close polygon near start (50, 50)
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 52,
+      clientY: 51,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+  assert.equal(getActiveDrawing(), null);
+
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.equal(annotations.length, 1);
+  const poly = annotations[0] as PolygonAnnotation;
+  assert.equal(poly.type, "polygon");
+  assert.equal(poly.isClosed, true);
+  assert.equal(poly.points.length, 3);
+  assert.ok(poly.area > 0);
+  assert.ok(poly.perimeter > 0);
+
+  const announce = document.getElementById("measure-announce");
+  assert.ok(
+    announce?.textContent?.includes("Polígono") ||
+      announce?.textContent?.includes("Polygon"),
+  );
+});
+
+test("initViewportInteraction: Enter key completes active polygon drawing", () => {
+  initViewportInteraction();
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "polygon";
+
+  // 3 clicks
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 20,
+      clientY: 20,
+      button: 0,
+      bubbles: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 80,
+      clientY: 20,
+      button: 0,
+      bubbles: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 80,
+      clientY: 80,
+      button: 0,
+      bubbles: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+  assert.equal(getActiveDrawing()?.points?.length, 3);
+
+  // Press Enter to complete
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+  );
+
+  assert.equal(getActiveDrawing(), null);
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.equal(annotations.length, 1);
+  assert.equal(annotations[0].type, "polygon");
+});
+
+test("initViewportInteraction: Escape cancels active polygon drawing", () => {
+  initViewportInteraction();
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "polygon";
+
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 20,
+      clientY: 20,
+      button: 0,
+      bubbles: true,
+    }),
+  );
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.ok(getActiveDrawing());
+
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  assert.equal(getActiveDrawing(), null);
+});
+
+test("initKeyboardShortcuts: Delete key removes selected polygon", () => {
+  initKeyboardShortcuts();
+  state.parsed = mockParsed();
+
+  const poly: PolygonAnnotation = {
+    id: "poly-delete-me",
+    type: "polygon",
+    sopInstanceUid: "1.2.3.4.5",
+    sliceIndex: 0,
+    points: [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+    ],
+    isClosed: true,
+    area: 0.5,
+    perimeter: 3,
+    isCalibrated: false,
+    unit: "px",
+    createdAt: Date.now(),
+  };
+  addAnnotation(poly);
+  setSelectedAnnotationId("poly-delete-me");
+
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
+  );
+
+  assert.equal(getSelectedAnnotationId(), null);
+  const annotations = getAnnotationsForSlice("1.2.3.4.5");
+  assert.equal(
+    annotations.find((a) => a.id === "poly-delete-me"),
+    undefined,
   );
 });
 

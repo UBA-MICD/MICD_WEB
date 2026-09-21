@@ -21,6 +21,7 @@ export function viewerFixtureHtml(): string {
     <button id="tool-crosshair" aria-pressed="false"></button>
     <button id="tool-length" aria-pressed="false"></button>
     <button id="tool-ellipse" aria-pressed="false"></button>
+    <button id="tool-polygon" aria-pressed="false"></button>
     <div id="measure-announce" class="sr-only"></div>
     <button id="tool-reset"></button>
     <button id="tool-metadata" aria-expanded="false"></button>
@@ -111,6 +112,7 @@ export function viewerFixtureHtml(): string {
       </select>
       <input type="range" id="slider-measure-width" min="1" max="5" step="1" value="2" />
       <span id="val-measure-width">2px</span>
+      <button id="btn-export-segmentation"></button>
       <button id="btn-clear-measurements"></button>
     </aside>
 
@@ -165,6 +167,7 @@ export function stubCanvas2DContext(): void {
       putImageData() {},
       clearRect() {},
       beginPath() {},
+      closePath() {},
       moveTo() {},
       lineTo() {},
       stroke() {},

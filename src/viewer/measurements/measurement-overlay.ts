@@ -21,24 +21,28 @@ import {
   extractCalibration,
   formatArea,
   formatLength,
+  screenToWorld,
   worldToScreen,
+  isPointInPolygon,
 } from "./measurement-math.js";
 import { getAnnotationsForSlice } from "./annotation-state.js";
 import type {
   Annotation,
   LengthAnnotation,
   EllipseAnnotation,
+  PolygonAnnotation,
   Point2D,
 } from "./types.js";
 import { t } from "../../i18n/i18n.js";
 
 export interface ActiveDrawing {
-  type: "length" | "ellipse";
+  type: "length" | "ellipse" | "polygon";
   start?: Point2D;
   end?: Point2D;
   center?: Point2D;
   radiusX?: number;
   radiusY?: number;
+  points?: Point2D[];
   cellId?: string | null;
 }
 
@@ -123,6 +127,17 @@ export function renderMeasurementOverlay(options: RenderOverlayOptions): void {
       );
     } else if (ann.type === "ellipse") {
       drawEllipseAnnotation(
+        ctx,
+        ann,
+        viewport,
+        cols,
+        rows,
+        width,
+        height,
+        isSelected,
+      );
+    } else if (ann.type === "polygon") {
+      drawPolygonAnnotation(
         ctx,
         ann,
         viewport,
@@ -331,6 +346,120 @@ function drawEllipseAnnotation(
   ctx.restore();
 }
 
+function drawPolygonAnnotation(
+  ctx: CanvasRenderingContext2D,
+  ann: PolygonAnnotation,
+  viewport: ViewportState,
+  cols: number,
+  rows: number,
+  viewW: number,
+  viewH: number,
+  isSelected: boolean,
+): void {
+  if (!ann.points || ann.points.length === 0) return;
+
+  const screenPts = ann.points.map((p) =>
+    worldToScreen(
+      p.x,
+      p.y,
+      viewW,
+      viewH,
+      cols,
+      rows,
+      viewport.zoom,
+      viewport.panX,
+      viewport.panY,
+      1,
+      true,
+    ),
+  );
+
+  const color = isSelected
+    ? COLORS.selected
+    : ann.isCalibrated
+      ? COLORS.calibrated
+      : COLORS.uncalibrated;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = state.measurementLineWidth || 2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  // Draw polygon perimeter path
+  ctx.beginPath();
+  ctx.moveTo(screenPts[0].x, screenPts[0].y);
+  for (let i = 1; i < screenPts.length; i++) {
+    ctx.lineTo(screenPts[i].x, screenPts[i].y);
+  }
+  if (ann.isClosed && screenPts.length >= 3) {
+    ctx.closePath();
+  }
+  ctx.stroke();
+
+  // Semitransparent fill if closed
+  if (ann.isClosed && screenPts.length >= 3) {
+    ctx.fillStyle = isSelected
+      ? "rgba(255, 255, 255, 0.15)"
+      : ann.isCalibrated
+        ? "rgba(46, 230, 168, 0.20)"
+        : "rgba(250, 204, 21, 0.18)";
+    ctx.fill();
+  }
+
+  // Draw handles (circles) on vertices if selected
+  if (isSelected) {
+    for (const pt of screenPts) {
+      drawHandle(ctx, pt.x, pt.y, color, 4);
+    }
+  }
+
+  // Badge with Area and Perimeter
+  if (ann.isClosed && screenPts.length >= 3) {
+    const sumX = screenPts.reduce((acc, p) => acc + p.x, 0);
+    const sumY = screenPts.reduce((acc, p) => acc + p.y, 0);
+    const centroidX = sumX / screenPts.length;
+    const centroidY = sumY / screenPts.length;
+
+    const areaStr = formatArea(
+      ann.area,
+      ann.isCalibrated,
+      state.measurementUnit,
+    );
+    const perimeterStr = formatLength(
+      ann.perimeter,
+      ann.isCalibrated,
+      state.measurementUnit,
+    );
+
+    const badgeLines: Array<{ text: string; color?: string; bold?: boolean }> =
+      [
+        {
+          text: `${t("annotations.area") || "Área"}: ${areaStr}`,
+          color: "#ffffff",
+          bold: true,
+        },
+        {
+          text: `${t("annotations.perimeter") || "Perímetro"}: ${perimeterStr}`,
+          color: COLORS.subText,
+          bold: false,
+        },
+      ];
+
+    if (!ann.isCalibrated) {
+      badgeLines.push({
+        text: t("annotations.uncalibrated") || "Sin calibración espacial",
+        color: COLORS.badgeWarning,
+        bold: false,
+      });
+    }
+
+    drawBadge(ctx, centroidX, centroidY, badgeLines);
+  }
+
+  ctx.restore();
+}
+
 function drawActiveDrawing(
   ctx: CanvasRenderingContext2D,
   drawing: ActiveDrawing,
@@ -471,6 +600,85 @@ function drawActiveDrawing(
       }
 
       drawBadge(ctx, center.x, center.y + ryScreen + 16, lines);
+    }
+  } else if (
+    drawing.type === "polygon" &&
+    drawing.points &&
+    drawing.points.length > 0
+  ) {
+    const screenPts = drawing.points.map((p) =>
+      worldToScreen(
+        p.x,
+        p.y,
+        viewW,
+        viewH,
+        cols,
+        rows,
+        viewport.zoom,
+        viewport.panX,
+        viewport.panY,
+        1,
+        true,
+      ),
+    );
+
+    ctx.beginPath();
+    ctx.moveTo(screenPts[0].x, screenPts[0].y);
+    for (let i = 1; i < screenPts.length; i++) {
+      ctx.lineTo(screenPts[i].x, screenPts[i].y);
+    }
+
+    if (drawing.end) {
+      const endScreen = worldToScreen(
+        drawing.end.x,
+        drawing.end.y,
+        viewW,
+        viewH,
+        cols,
+        rows,
+        viewport.zoom,
+        viewport.panX,
+        viewport.panY,
+        1,
+        true,
+      );
+      ctx.lineTo(endScreen.x, endScreen.y);
+    }
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    for (const pt of screenPts) {
+      drawHandle(ctx, pt.x, pt.y, COLORS.active, 4);
+    }
+
+    // Highlight starting node when cursor is close enough to close (<= 10px)
+    if (drawing.end && screenPts.length >= 3) {
+      const endScreen = worldToScreen(
+        drawing.end.x,
+        drawing.end.y,
+        viewW,
+        viewH,
+        cols,
+        rows,
+        viewport.zoom,
+        viewport.panX,
+        viewport.panY,
+        1,
+        true,
+      );
+      const distToStart = Math.hypot(
+        endScreen.x - screenPts[0].x,
+        endScreen.y - screenPts[0].y,
+      );
+      if (distToStart <= 10) {
+        ctx.beginPath();
+        ctx.arc(screenPts[0].x, screenPts[0].y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.calibrated;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+      }
     }
   }
 
@@ -635,6 +843,59 @@ export function hitTestAnnotation(
           ((screenY - center.y) / ryScreen) ** 2;
         if (norm <= 1.25) return ann;
       }
+    } else if (ann.type === "polygon") {
+      if (ann.points && ann.points.length >= 2) {
+        const screenPts = ann.points.map((p) =>
+          worldToScreen(
+            p.x,
+            p.y,
+            viewW,
+            viewH,
+            cols,
+            rows,
+            viewport.zoom,
+            viewport.panX,
+            viewport.panY,
+            1,
+            true,
+          ),
+        );
+
+        // 1. Proximity to any edge
+        const segmentCount = ann.isClosed
+          ? screenPts.length
+          : screenPts.length - 1;
+        let hit = false;
+        for (let j = 0; j < segmentCount; j++) {
+          const p1 = screenPts[j];
+          const p2 = screenPts[(j + 1) % screenPts.length];
+          if (distToSegment(screenX, screenY, p1.x, p1.y, p2.x, p2.y) <= 8) {
+            hit = true;
+            break;
+          }
+        }
+        if (hit) return ann;
+
+        // 2. Interior check if closed
+        if (ann.isClosed && screenPts.length >= 3) {
+          const worldPt = screenToWorld(
+            screenX,
+            screenY,
+            viewW,
+            viewH,
+            cols,
+            rows,
+            viewport.zoom,
+            viewport.panX,
+            viewport.panY,
+            1,
+            true,
+          );
+          if (isPointInPolygon(worldPt, ann.points)) {
+            return ann;
+          }
+        }
+      }
     }
   }
   return null;
@@ -655,4 +916,80 @@ function distToSegment(
   let t = ((px - x1) * dx + (py - y1) * dy) / l2;
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+export interface VertexHit {
+  annotationId: string;
+  vertexIndex: number;
+}
+
+/**
+ * Checks if a pointer click in screen-space hits a polygon vertex (handle).
+ * Prioritizes the currently selected annotation if it's a polygon, then checks all polygons.
+ * Returns { annotationId, vertexIndex } if hit (within radius px), or null.
+ */
+export function hitTestPolygonVertex(
+  screenX: number,
+  screenY: number,
+  annotations: Annotation[],
+  selectedId: string | null,
+  viewport: ViewportState,
+  cols: number,
+  rows: number,
+  viewW: number,
+  viewH: number,
+  radius: number = 8,
+): VertexHit | null {
+  if (selectedId) {
+    const selectedAnn = annotations.find((a) => a.id === selectedId);
+    if (selectedAnn && selectedAnn.type === "polygon" && selectedAnn.points) {
+      for (let i = 0; i < selectedAnn.points.length; i++) {
+        const pt = selectedAnn.points[i];
+        const s = worldToScreen(
+          pt.x,
+          pt.y,
+          viewW,
+          viewH,
+          cols,
+          rows,
+          viewport.zoom,
+          viewport.panX,
+          viewport.panY,
+          1,
+          true,
+        );
+        if (Math.hypot(screenX - s.x, screenY - s.y) <= radius) {
+          return { annotationId: selectedAnn.id, vertexIndex: i };
+        }
+      }
+    }
+  }
+
+  for (let a = annotations.length - 1; a >= 0; a--) {
+    const ann = annotations[a];
+    if (ann.id === selectedId) continue;
+    if (ann.type === "polygon" && ann.points) {
+      for (let i = 0; i < ann.points.length; i++) {
+        const pt = ann.points[i];
+        const s = worldToScreen(
+          pt.x,
+          pt.y,
+          viewW,
+          viewH,
+          cols,
+          rows,
+          viewport.zoom,
+          viewport.panX,
+          viewport.panY,
+          1,
+          true,
+        );
+        if (Math.hypot(screenX - s.x, screenY - s.y) <= radius) {
+          return { annotationId: ann.id, vertexIndex: i };
+        }
+      }
+    }
+  }
+
+  return null;
 }

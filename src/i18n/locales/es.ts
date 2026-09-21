@@ -756,4 +756,8 @@ export const es: Record<string, string> = {
   "viewer.measure.unitCm": "Centímetros (cm)",
   "viewer.measure.lineWidthLabel": "Grosor de línea",
   "viewer.measure.clearAnnotations": "Borrar mediciones",
+  "viewer.measure.exportSegmentation": "Exportar Segmentación",
+  "viewer.measure.noSegmentationToExport":
+    "No hay segmentaciones poligonales para exportar en este corte.",
+  "viewer.measure.exportSuccess": "Segmentación exportada exitosamente.",
 };

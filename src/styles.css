@@ -1205,7 +1205,8 @@ body {
   cursor: grabbing;
 }
 .viewport-container.cursor-length,
-.viewport-container.cursor-ellipse {
+.viewport-container.cursor-ellipse,
+.viewport-container.cursor-polygon {
   cursor: crosshair;
 }
 
@@ -1768,6 +1769,29 @@ body {
   border-color: var(--accent);
   color: #050508;
   font-weight: 600;
+}
+
+.measure-export-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.measure-export-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .measure-clear-btn {

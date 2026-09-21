@@ -2,6 +2,7 @@ import {
   calculateAutoWindowLevel,
   parseDicomFile,
   WINDOW_PRESETS,
+  type DicomMetadata,
 } from "../dicom/dicom-parser-util.js";
 import {
   createDefaultViewport,
@@ -48,9 +49,13 @@ import {
   extractCalibration,
   formatLength,
   formatArea,
+  calculatePolygonArea,
+  calculatePolygonPerimeter,
+  worldToScreen,
 } from "./measurements/measurement-math.js";
 import {
   addAnnotation,
+  updateAnnotation,
   deleteAnnotation,
   clearAnnotations,
   getActiveSopInstanceUid,
@@ -62,11 +67,16 @@ import {
   getSelectedAnnotationId,
   setSelectedAnnotationId,
   hitTestAnnotation,
+  hitTestPolygonVertex,
+  type ActiveDrawing,
 } from "./measurements/measurement-overlay.js";
 import type {
   LengthAnnotation,
   EllipseAnnotation,
+  PolygonAnnotation,
+  Point2D,
 } from "./measurements/types.js";
+import { exportSegmentation } from "./measurements/export-annotation.js";
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +88,7 @@ export function initToolbar(): void {
     "crosshair",
     "length",
     "ellipse",
+    "polygon",
   ] as const;
   tools.forEach((tool) => {
     const btn = $(`tool-${tool}`);
@@ -85,7 +96,10 @@ export function initToolbar(): void {
       btn.addEventListener("click", () => {
         if (
           state.is3DMode &&
-          (tool === "pan" || tool === "length" || tool === "ellipse")
+          (tool === "pan" ||
+            tool === "length" ||
+            tool === "ellipse" ||
+            tool === "polygon")
         ) {
           return;
         }
@@ -109,7 +123,11 @@ export function initToolbar(): void {
           }
           state.isWlPanelOpen = false;
           state.isMeasurementPanelOpen = false;
-        } else if (tool === "length" || tool === "ellipse") {
+        } else if (
+          tool === "length" ||
+          tool === "ellipse" ||
+          tool === "polygon"
+        ) {
           if (state.activeTool === tool) {
             state.isMeasurementPanelOpen = !state.isMeasurementPanelOpen;
           } else {
@@ -624,6 +642,11 @@ export function initMeasurementControlsInteraction(): void {
     }
   });
 
+  const btnExport = $("btn-export-segmentation");
+  btnExport?.addEventListener("click", async () => {
+    await exportSegmentation();
+  });
+
   btnClear?.addEventListener("click", () => {
     const manager = getViewportManager();
     const activeVp = manager?.activeViewport;
@@ -767,7 +790,8 @@ export function updateToolbarUI(): void {
     state.is3DMode &&
     (state.activeTool === "pan" ||
       state.activeTool === "length" ||
-      state.activeTool === "ellipse")
+      state.activeTool === "ellipse" ||
+      state.activeTool === "polygon")
   ) {
     state.activeTool = "wl";
   } else if (
@@ -801,6 +825,15 @@ export function updateToolbarUI(): void {
     );
   }
 
+  const polygonBtn = $("tool-polygon") as HTMLButtonElement | null;
+  if (polygonBtn) {
+    polygonBtn.disabled = state.is3DMode;
+    polygonBtn.setAttribute(
+      "aria-expanded",
+      String(state.isMeasurementPanelOpen),
+    );
+  }
+
   const crosshairBtn = $("tool-crosshair") as HTMLButtonElement | null;
   if (crosshairBtn) {
     crosshairBtn.disabled = !state.is3DMode && !mprEngine.volume;
@@ -821,15 +854,15 @@ export function updateToolbarUI(): void {
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
   // would also strip the metadata toggle's state, leaving its class and
   // aria-expanded disagreeing with the open panel.
-  (["wl", "zoom", "pan", "crosshair", "length", "ellipse"] as const).forEach(
-    (tool) => {
-      const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
-      if (!btn) return;
-      const isActive = tool === state.activeTool;
-      btn.classList.toggle("active", isActive);
-      btn.setAttribute("aria-pressed", String(isActive));
-    },
-  );
+  (
+    ["wl", "zoom", "pan", "crosshair", "length", "ellipse", "polygon"] as const
+  ).forEach((tool) => {
+    const btn = $(`tool-${tool}`) as HTMLButtonElement | null;
+    if (!btn) return;
+    const isActive = tool === state.activeTool;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
+  });
 
   const wlBtn = $("tool-wl");
   if (wlBtn) {
@@ -872,6 +905,7 @@ export function updateToolbarUI(): void {
         "cursor-crosshair",
         "cursor-length",
         "cursor-ellipse",
+        "cursor-polygon",
       );
     }
     viewport.classList?.add?.(`cursor-${state.activeTool}`);
@@ -883,6 +917,90 @@ export function updateToolbarUI(): void {
 }
 
 // ── Viewport Mouse Interaction ───────────────────────────────────────────────
+
+let draggingNode: { annotationId: string; vertexIndex: number } | null = null;
+let draggingShape: {
+  annotationId: string;
+  startWorld: Point2D;
+  initialPoints: Point2D[];
+} | null = null;
+
+export function finishPolygonDrawing(
+  drawing: ActiveDrawing,
+  metadata: DicomMetadata,
+  sopInstanceUid: string,
+  sliceIndex: number,
+  activeVp?: Viewport | null,
+): void {
+  if (!drawing.points || drawing.points.length < 3) {
+    setActiveDrawing(null);
+    if (activeVp) activeVp.renderOverlay();
+    else render();
+    return;
+  }
+
+  const cal = extractCalibration(metadata);
+  const area = calculatePolygonArea(drawing.points, cal.pixelSpacing);
+  const perimeter = calculatePolygonPerimeter(drawing.points, cal.pixelSpacing);
+
+  const newAnn: PolygonAnnotation = {
+    id: `ann_poly_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    type: "polygon",
+    sopInstanceUid,
+    sliceIndex,
+    points: drawing.points.map((p) => ({ x: p.x, y: p.y })),
+    isClosed: true,
+    area,
+    perimeter,
+    isCalibrated: cal.isCalibrated,
+    unit: cal.isCalibrated ? "mm" : "px",
+    createdAt: Date.now(),
+  };
+
+  addAnnotation(newAnn);
+  setSelectedAnnotationId(newAnn.id);
+  setActiveDrawing(null);
+
+  const announceEl = $("measure-announce");
+  if (announceEl) {
+    const areaStr = formatArea(area, cal.isCalibrated, state.measurementUnit);
+    const perimeterStr = formatLength(
+      perimeter,
+      cal.isCalibrated,
+      state.measurementUnit,
+    );
+    announceEl.textContent = `${t("annotations.polygon") || "Polígono"}: ${t("annotations.area") || "Área"} ${areaStr}, ${t("annotations.perimeter") || "Perímetro"} ${perimeterStr}`;
+  }
+
+  if (activeVp) activeVp.renderOverlay();
+  else render();
+}
+
+export function completeActivePolygon(): void {
+  const drawing = getActiveDrawing();
+  if (
+    !drawing ||
+    drawing.type !== "polygon" ||
+    !drawing.points ||
+    drawing.points.length < 3
+  ) {
+    return;
+  }
+  const manager = getViewportManager();
+  const activeVp = manager?.activeViewport;
+  const metadata = activeVp
+    ? activeVp.data.parsed?.metadata
+    : state.parsed?.metadata;
+  if (!metadata) return;
+  const sopInstanceUid =
+    (activeVp
+      ? activeVp.data.parsed?.metadata.sopInstanceUid
+      : getActiveSopInstanceUid()) ||
+    `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+  const sliceIndex = activeVp ? activeVp.data.currentIndex : state.currentIndex;
+
+  finishPolygonDrawing(drawing, metadata, sopInstanceUid, sliceIndex, activeVp);
+}
 
 export function initViewportInteraction(): void {
   const container = $("viewport-container");
@@ -995,7 +1113,11 @@ export function initViewportInteraction(): void {
         ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
         : null) || manager?.activeViewport;
 
-    if (state.activeTool !== "length" && state.activeTool !== "ellipse") {
+    if (
+      state.activeTool !== "length" &&
+      state.activeTool !== "ellipse" &&
+      state.activeTool !== "polygon"
+    ) {
       if (getActiveDrawing()) {
         setActiveDrawing(null);
       }
@@ -1018,9 +1140,102 @@ export function initViewportInteraction(): void {
         ? activeVp.data.parsed?.metadata.sopInstanceUid
         : getActiveSopInstanceUid()) ||
       `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+    const sliceIndex = activeVp
+      ? activeVp.data.currentIndex
+      : state.currentIndex;
 
     if (metadata && viewW > 0 && viewH > 0) {
       const existing = getAnnotationsForSlice(sopInstanceUid);
+      const activeD = getActiveDrawing();
+
+      // If already tracing a polygon with activeDrawing, handle adding points or closing
+      if (
+        state.activeTool === "polygon" &&
+        activeD &&
+        activeD.type === "polygon" &&
+        activeD.points &&
+        activeD.points.length > 0
+      ) {
+        const p0Screen = worldToScreen(
+          activeD.points[0].x,
+          activeD.points[0].y,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+        const distToStart = Math.hypot(
+          clickX - p0Screen.x,
+          clickY - p0Screen.y,
+        );
+
+        if (distToStart <= 10 && activeD.points.length >= 3) {
+          finishPolygonDrawing(
+            activeD,
+            metadata,
+            sopInstanceUid,
+            sliceIndex,
+            activeVp,
+          );
+          e.preventDefault();
+          return;
+        }
+
+        const worldPt = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+        activeD.points.push(worldPt);
+        activeD.end = worldPt;
+        if (activeVp) activeVp.renderOverlay();
+        else render();
+        e.preventDefault();
+        return;
+      }
+
+      // Layer 1: Vertex hit-testing (editing node)
+      const selectedId = getSelectedAnnotationId();
+      const vertexHit = hitTestPolygonVertex(
+        clickX,
+        clickY,
+        existing,
+        selectedId,
+        vpState,
+        metadata.columns,
+        metadata.rows,
+        viewW,
+        viewH,
+        8,
+      );
+
+      if (vertexHit && !e.shiftKey) {
+        setSelectedAnnotationId(vertexHit.annotationId);
+        draggingNode = {
+          annotationId: vertexHit.annotationId,
+          vertexIndex: vertexHit.vertexIndex,
+        };
+        container.style.cursor = "crosshair";
+        if (activeVp) activeVp.renderOverlay();
+        else render();
+        e.preventDefault();
+        return;
+      }
+
+      // Layer 2: Shape hit-testing (edge or interior)
       const hit = hitTestAnnotation(
         clickX,
         clickY,
@@ -1034,12 +1249,34 @@ export function initViewportInteraction(): void {
 
       if (hit && !e.shiftKey) {
         setSelectedAnnotationId(hit.id);
+        if (hit.type === "polygon") {
+          const worldPt = screenToWorld(
+            clickX,
+            clickY,
+            viewW,
+            viewH,
+            metadata.columns,
+            metadata.rows,
+            vpState.zoom,
+            vpState.panX,
+            vpState.panY,
+            1,
+            true,
+          );
+          draggingShape = {
+            annotationId: hit.id,
+            startWorld: worldPt,
+            initialPoints: hit.points.map((p) => ({ ...p })),
+          };
+          container.style.cursor = "move";
+        }
         if (activeVp) activeVp.renderOverlay();
         else render();
         e.preventDefault();
         return;
       }
 
+      // Layer 3: Drawing new annotation
       setSelectedAnnotationId(null);
       const worldPt = screenToWorld(
         clickX,
@@ -1051,7 +1288,6 @@ export function initViewportInteraction(): void {
         vpState.zoom,
         vpState.panX,
         vpState.panY,
-        // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
         1,
         true,
       );
@@ -1063,12 +1299,19 @@ export function initViewportInteraction(): void {
           end: worldPt,
           cellId: activeVp ? activeVp.id : null,
         });
-      } else {
+      } else if (state.activeTool === "ellipse") {
         setActiveDrawing({
           type: "ellipse",
           center: worldPt,
           radiusX: 0,
           radiusY: 0,
+          cellId: activeVp ? activeVp.id : null,
+        });
+      } else if (state.activeTool === "polygon") {
+        setActiveDrawing({
+          type: "polygon",
+          points: [worldPt],
+          end: worldPt,
           cellId: activeVp ? activeVp.id : null,
         });
       }
@@ -1084,11 +1327,173 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mousemove", (e: MouseEvent) => {
-    if (!state.isDragging || !state.parsed) return;
+    if (!state.parsed) return;
+
+    // 1. Polygon elastic guide line when cursor moves between clicks
+    const drawing = getActiveDrawing();
+    if (!state.isDragging && drawing && drawing.type === "polygon") {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+
+      const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+        e,
+        container,
+        activeVp,
+      );
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+
+      if (metadata && viewW > 0 && viewH > 0) {
+        const currentWorld = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+        drawing.end = currentWorld;
+        if (activeVp) activeVp.renderOverlay();
+        else render();
+      }
+      return;
+    }
+
+    if (!state.isDragging) return;
+
+    // 2. Dragging polygon node (Layer 1)
+    if (draggingNode) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+
+      const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+        e,
+        container,
+        activeVp,
+      );
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+      const sopInstanceUid =
+        (activeVp
+          ? activeVp.data.parsed?.metadata.sopInstanceUid
+          : getActiveSopInstanceUid()) ||
+        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+
+      if (metadata && viewW > 0 && viewH > 0) {
+        const currentWorld = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+        const ann = getAnnotationsForSlice(sopInstanceUid).find(
+          (a) => a.id === draggingNode!.annotationId,
+        );
+        if (
+          ann &&
+          ann.type === "polygon" &&
+          ann.points[draggingNode.vertexIndex]
+        ) {
+          ann.points[draggingNode.vertexIndex] = { ...currentWorld };
+          const cal = extractCalibration(metadata);
+          ann.area = calculatePolygonArea(ann.points, cal.pixelSpacing);
+          ann.perimeter = calculatePolygonPerimeter(
+            ann.points,
+            cal.pixelSpacing,
+          );
+          updateAnnotation(ann);
+          if (activeVp) activeVp.renderOverlay();
+          else render();
+        }
+      }
+      return;
+    }
+
+    // 3. Dragging polygon shape (Layer 2)
+    if (draggingShape) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+
+      const { clickX, clickY, viewW, viewH } = getTargetMetrics(
+        e,
+        container,
+        activeVp,
+      );
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const vpState = activeVp ? activeVp.data.viewport : state.viewport;
+      const sopInstanceUid =
+        (activeVp
+          ? activeVp.data.parsed?.metadata.sopInstanceUid
+          : getActiveSopInstanceUid()) ||
+        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+
+      if (metadata && viewW > 0 && viewH > 0) {
+        const currentWorld = screenToWorld(
+          clickX,
+          clickY,
+          viewW,
+          viewH,
+          metadata.columns,
+          metadata.rows,
+          vpState.zoom,
+          vpState.panX,
+          vpState.panY,
+          1,
+          true,
+        );
+        const ann = getAnnotationsForSlice(sopInstanceUid).find(
+          (a) => a.id === draggingShape!.annotationId,
+        );
+        if (ann && ann.type === "polygon") {
+          const deltaX = currentWorld.x - draggingShape.startWorld.x;
+          const deltaY = currentWorld.y - draggingShape.startWorld.y;
+          ann.points = draggingShape.initialPoints.map((p) => ({
+            x: p.x + deltaX,
+            y: p.y + deltaY,
+          }));
+          updateAnnotation(ann);
+          if (activeVp) activeVp.renderOverlay();
+          else render();
+        }
+      }
+      return;
+    }
 
     const isMeasurementTool =
       state.activeTool === "length" || state.activeTool === "ellipse";
-    const drawing = getActiveDrawing();
 
     if (isMeasurementTool && drawing) {
       const manager = getViewportManager();
@@ -1138,7 +1543,7 @@ export function initViewportInteraction(): void {
       return;
     }
 
-    if (drawing) {
+    if (drawing && drawing.type !== "polygon") {
       setActiveDrawing(null);
     }
 
@@ -1296,6 +1701,54 @@ export function initViewportInteraction(): void {
   });
 
   document.addEventListener("mouseup", () => {
+    if (draggingNode) {
+      const manager = getViewportManager();
+      const originId =
+        dragOriginViewportId || manager?.activeViewport?.id || "";
+      const activeVp =
+        (manager && originId
+          ? manager.getAllViewports().find((v) => v.id === originId)
+          : null) || manager?.activeViewport;
+      const metadata = activeVp
+        ? activeVp.data.parsed?.metadata
+        : state.parsed?.metadata;
+      const sopInstanceUid =
+        (activeVp
+          ? activeVp.data.parsed?.metadata.sopInstanceUid
+          : getActiveSopInstanceUid()) ||
+        `slice_${activeVp ? activeVp.data.currentIndex : state.currentIndex}`;
+
+      if (metadata) {
+        const ann = getAnnotationsForSlice(sopInstanceUid).find(
+          (a) => a.id === draggingNode!.annotationId,
+        );
+        if (ann && ann.type === "polygon") {
+          const cal = extractCalibration(metadata);
+          const announceEl = $("measure-announce");
+          if (announceEl) {
+            const areaStr = formatArea(
+              ann.area,
+              cal.isCalibrated,
+              state.measurementUnit,
+            );
+            const perimeterStr = formatLength(
+              ann.perimeter,
+              cal.isCalibrated,
+              state.measurementUnit,
+            );
+            announceEl.textContent = `${t("annotations.polygon") || "Polígono"}: ${t("annotations.area") || "Área"} ${areaStr}, ${t("annotations.perimeter") || "Perímetro"} ${perimeterStr}`;
+          }
+        }
+      }
+      draggingNode = null;
+      container.style.cursor = "";
+    }
+
+    if (draggingShape) {
+      draggingShape = null;
+      container.style.cursor = "";
+    }
+
     const isMeasurementTool =
       state.activeTool === "length" || state.activeTool === "ellipse";
     const drawing = getActiveDrawing();
@@ -1427,7 +1880,7 @@ export function initViewportInteraction(): void {
       setActiveDrawing(null);
       if (activeVp) activeVp.renderOverlay();
       else render();
-    } else if (drawing) {
+    } else if (drawing && drawing.type !== "polygon") {
       setActiveDrawing(null);
       const manager = getViewportManager();
       const activeVp = manager?.activeViewport;
@@ -1449,6 +1902,13 @@ export function initViewportInteraction(): void {
     }
     state.isDragging = false;
     dragOriginViewportId = null;
+  });
+
+  container.addEventListener("dblclick", (e: MouseEvent) => {
+    if (state.activeTool === "polygon") {
+      completeActivePolygon();
+      e.preventDefault();
+    }
   });
 
   // Mouse wheel interaction
@@ -1857,6 +2317,15 @@ export function initKeyboardShortcuts(): void {
     } else if (e.key === "e" || e.key === "E") {
       if (!state.is3DMode) {
         $("tool-ellipse")?.click();
+      }
+    } else if (e.key === "Enter") {
+      if (
+        state.activeTool === "polygon" &&
+        getActiveDrawing()?.type === "polygon"
+      ) {
+        completeActivePolygon();
+        e.preventDefault();
+        return;
       }
     } else if (e.key === "Escape") {
       if (getActiveDrawing()) {

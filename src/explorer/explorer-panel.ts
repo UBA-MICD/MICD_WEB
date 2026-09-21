@@ -1,6 +1,10 @@
 /* cspell:disable */
 import { exportCurrentStudyAsZip } from "../services/export-service.js";
-import { collectServerUploadFiles } from "../shared/folder-files.js";
+import {
+  collectServerUploadFiles,
+  collectDicomFiles,
+} from "../shared/folder-files.js";
+import { expandFiles } from "../upload/zip-expand.js";
 import { startExplorerUpload } from "../upload/upload.js";
 import { showToast } from "../shared/banner.js";
 import { t } from "../i18n/i18n.js";
@@ -132,14 +136,47 @@ function initExplorerDropZone(): void {
     }
 
     if (valid.length > 0) {
-      await startExplorerUpload(valid, statusEl);
+      // Expand any .zip archives client-side before uploading — the backend
+      // ingests individual DICOM instances, not archives (same as the Cargar tab).
+      const hasZip = valid.some((f) => f.name.toLowerCase().endsWith(".zip"));
+      if (hasZip) {
+        statusEl.textContent = t("upload.unzippingGeneric");
+        statusEl.classList.remove("hidden");
+      }
+      const {
+        files: expanded,
+        corruptZips,
+        tooBigZips,
+      } = await expandFiles(valid, null);
+      if (corruptZips.length > 0) {
+        showToast(
+          t("upload.zipReadError", { files: corruptZips.join(", ") }),
+          "error",
+        );
+      }
+      if (tooBigZips.length > 0) {
+        showToast(
+          t("upload.zipTooBig", { files: tooBigZips.join(", ") }),
+          "warning",
+        );
+      }
+      const dcmFiles = collectDicomFiles(expanded);
+      if (dcmFiles.length === 0) {
+        statusEl.classList.add("hidden");
+        statusEl.textContent = "";
+        if (corruptZips.length === 0 && tooBigZips.length === 0) {
+          showToast(t("explorerPanel.unsupportedFileType"), "error");
+        }
+        return;
+      }
+      await startExplorerUpload(dcmFiles, statusEl);
     }
   });
 }
 
 export function initExplorerPanel(): void {
-  // Panel starts open — mark the toolbar button as active to match.
-  document.getElementById("btn-toggle-explorer")?.classList.add("active");
+  // Panel starts collapsed; the toolbar toggle opens it on demand.
+  setCollapsed(true);
   document
     .getElementById("btn-export-explorer")
     ?.addEventListener("click", () => {

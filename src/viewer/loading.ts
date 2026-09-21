@@ -20,7 +20,7 @@ import {
   updateSeriesNav,
   updateInfoOverlay,
 } from "./rendering.js";
-import { updateToolbarUI } from "./interaction.js";
+import { updateToolbarUI, setViewportSync } from "./interaction.js";
 import { t } from "../i18n/i18n.js";
 import { notifyStudyLoaded, isValidationBarActive } from "./validation-ui.js";
 import { fetchValidation } from "./validation-api.js";
@@ -162,6 +162,52 @@ export function resetViewerToDropZone(): void {
 
 // ── Browser File Inputs ──────────────────────────────────────────────────────
 
+/**
+ * Shared local-load path for the file picker, folder picker, and drop zone:
+ * expand any .zip archives, keep only DICOM images (incl. extension-less PACS
+ * exports), reset the viewport so the new study recomputes its window/level,
+ * and display the first slice.
+ */
+async function loadLocalFiles(selected: File[]): Promise<void> {
+  const { files: expanded } = await expandFiles(selected, null);
+  const dcmFiles = collectDicomFiles(expanded);
+  if (dcmFiles.length === 0) {
+    showError(t("viewer.folderNoDicom"));
+    return;
+  }
+  dicomCache.clear();
+
+  const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
+  const freshViewport = {
+    windowCenter: 0,
+    windowWidth: 0,
+    zoom: 0,
+    panX: 0,
+    panY: 0,
+  };
+
+  const vp = getViewportManager()?.activeViewport ?? null;
+  if (vp) {
+    vp.data.source = "local";
+    vp.data.files = sortedFiles;
+    vp.data.currentIndex = 0;
+    vp.data.viewport = { ...freshViewport };
+  }
+
+  // A new file set is a fresh comparison: viewport sync resets to off.
+  setViewportSync(false);
+
+  // Keep global state in sync for loadCurrent() / series nav.
+  state.source = "local";
+  state.files = sortedFiles;
+  state.currentIndex = 0;
+  state.viewport = { ...freshViewport };
+  await loadCurrent();
+  if (sortedFiles.length > 1) {
+    void loadVolumeIntoEngines();
+  }
+}
+
 export function initFileInputs(): void {
   // Single/multi file picker
   const filesInput = $("open-files-input") as HTMLInputElement;
@@ -169,45 +215,7 @@ export function initFileInputs(): void {
     if (!filesInput.files || filesInput.files.length === 0) return;
     const selected = Array.from(filesInput.files);
     filesInput.value = "";
-    const { files: expanded } = await expandFiles(selected, null);
-    const dcmFiles = collectDicomFiles(expanded);
-    if (dcmFiles.length === 0) {
-      showError(t("viewer.folderNoDicom"));
-      return;
-    }
-    dicomCache.clear();
-
-    const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
-
-    const vp = getViewportManager()?.activeViewport ?? null;
-    if (vp) {
-      vp.data.source = "local";
-      vp.data.files = sortedFiles;
-      vp.data.currentIndex = 0;
-      vp.data.viewport = {
-        windowCenter: 0,
-        windowWidth: 0,
-        zoom: 0,
-        panX: 0,
-        panY: 0,
-      };
-    }
-
-    // Keep global state in sync for loadCurrent() / series nav.
-    state.source = "local";
-    state.files = sortedFiles;
-    state.currentIndex = 0;
-    state.viewport = {
-      windowCenter: 0,
-      windowWidth: 0,
-      zoom: 0,
-      panX: 0,
-      panY: 0,
-    };
-    await loadCurrent();
-    if (sortedFiles.length > 1) {
-      void loadVolumeIntoEngines();
-    }
+    await loadLocalFiles(selected);
   });
 
   // Folder picker — loads every DICOM image in the folder so you can walk through them
@@ -215,44 +223,8 @@ export function initFileInputs(): void {
   folderInput.setAttribute("webkitdirectory", "");
   folderInput.addEventListener("change", async () => {
     if (!folderInput.files || folderInput.files.length === 0) return;
-    const dcmFiles = collectDicomFiles(Array.from(folderInput.files));
-    if (dcmFiles.length === 0) {
-      showError(t("viewer.folderNoDicom"));
-      return;
-    }
-    dicomCache.clear();
-
-    const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
-
-    const vp = getViewportManager()?.activeViewport ?? null;
-    if (vp) {
-      vp.data.source = "local";
-      vp.data.files = sortedFiles;
-      vp.data.currentIndex = 0;
-      vp.data.viewport = {
-        windowCenter: 0,
-        windowWidth: 0,
-        zoom: 0,
-        panX: 0,
-        panY: 0,
-      };
-    }
-
-    // Keep global state in sync for loadCurrent() / series nav.
-    state.source = "local";
-    state.files = sortedFiles;
-    state.currentIndex = 0;
-    state.viewport = {
-      windowCenter: 0,
-      windowWidth: 0,
-      zoom: 0,
-      panX: 0,
-      panY: 0,
-    };
-    await loadCurrent();
-    if (sortedFiles.length > 1) {
-      void loadVolumeIntoEngines();
-    }
+    const selected = Array.from(folderInput.files);
+    await loadLocalFiles(selected);
     folderInput.value = "";
   });
 
@@ -293,6 +265,24 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
     panX: 0,
     panY: 0,
   };
+
+  // Reset the active viewport too. Otherwise displayParsed() preserves the
+  // previous study's window/level/zoom (it only recomputes when windowWidth<=0),
+  // so a freshly opened server study — including the comparative validation
+  // view — would inherit the last study's settings. Mirrors the local paths.
+  const activeVp = getViewportManager()?.activeViewport ?? null;
+  if (activeVp) {
+    activeVp.data.viewport = {
+      windowCenter: 0,
+      windowWidth: 0,
+      zoom: 0,
+      panX: 0,
+      panY: 0,
+    };
+  }
+
+  // Opening a different study resets viewport sync to off.
+  setViewportSync(false);
 
   try {
     const res = await fetchStudyInstances(studyId);
@@ -453,46 +443,9 @@ export function initDropZone(): void {
     dropZone.classList.remove("drag-over");
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
-
-    const dcmFiles: File[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.name.toLowerCase().endsWith(".dcm")) {
-        dcmFiles.push(file);
-      }
-    }
-
-    if (dcmFiles.length > 0) {
-      dicomCache.clear();
-      const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
-
-      const vp = getViewportManager()?.activeViewport ?? null;
-      if (vp) {
-        vp.data.source = "local";
-        vp.data.files = sortedFiles;
-        vp.data.currentIndex = 0;
-        vp.data.viewport = {
-          windowCenter: 0,
-          windowWidth: 0,
-          zoom: 0,
-          panX: 0,
-          panY: 0,
-        };
-      }
-
-      // Keep global state in sync for loadCurrent() / series nav.
-      state.source = "local";
-      state.files = sortedFiles;
-      state.currentIndex = 0;
-      state.viewport = {
-        windowCenter: 0,
-        windowWidth: 0,
-        zoom: 0,
-        panX: 0,
-        panY: 0,
-      };
-      await loadCurrent();
-    }
+    // Same path as the file/folder pickers: expand .zip archives and keep
+    // extension-less PACS exports, not just literal *.dcm files.
+    await loadLocalFiles(Array.from(files));
   });
 
   $("drop-zone-open").addEventListener("click", openFiles);

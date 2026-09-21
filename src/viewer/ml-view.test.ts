@@ -8,6 +8,7 @@ import { installDom, uninstallDom } from "../../test/dom-setup.ts";
 import { stubCanvas2DContext } from "../../test/viewer-fixture.ts";
 import { initViewportManager } from "./viewport-registry.ts";
 import { notifyPredictionLoaded, clearMLView, initMLView } from "./ml-view.ts";
+import { state } from "./state.ts";
 import type { MLPredictionRecord } from "./prediction-api.ts";
 import type { ViewportManager } from "./viewport-manager.ts";
 
@@ -32,6 +33,14 @@ beforeEach(() => {
   const container = document.createElement("div");
   document.body.appendChild(container);
   manager = initViewportManager(container);
+  // ml-view now seeds viewports from global state; start each test from a
+  // known baseline so leftover values don't bleed across tests.
+  state.source = "local";
+  state.files = [];
+  state.serverStudyId = null;
+  state.serverInstances = [];
+  state.currentIndex = 0;
+  state.parsed = null;
 });
 
 afterEach(() => {
@@ -71,11 +80,11 @@ test("notifyPredictionLoaded with prediction and applyLayout=true switches to 1x
   assert.equal(manager.getLayout(), "1x2");
 });
 
-test("notifyPredictionLoaded enables viewport sync", () => {
+test("notifyPredictionLoaded leaves viewport sync off by default", () => {
   notifyPredictionLoaded(MOCK_PREDICTION, true);
   assert.ok(
-    manager.isSynchronized,
-    "isSynchronized must be true after ML layout",
+    !manager.isSynchronized,
+    "sync must start disabled after ML layout (the user enables it manually)",
   );
 });
 
@@ -99,20 +108,22 @@ test("notifyPredictionLoaded does not set mlLabel on vp0", () => {
   assert.equal(vp0.data.mlLabel ?? null, null);
 });
 
-test("notifyPredictionLoaded copies vp0 fields into vp1", () => {
-  const vp0 = manager.getAllViewports()[0]!;
-  vp0.data.source = "server";
-  vp0.data.serverStudyId = "study-xyz";
-  vp0.data.currentIndex = 5;
-  vp0.data.serverInstances = ["i1", "i2"];
+test("notifyPredictionLoaded seeds both viewports from global state", () => {
+  state.source = "server";
+  state.serverStudyId = "study-xyz";
+  state.currentIndex = 5;
+  state.serverInstances = ["i1", "i2"];
 
   notifyPredictionLoaded(MOCK_PREDICTION, true);
 
-  const vp1 = manager.getAllViewports()[1]!;
-  assert.equal(vp1.data.source, "server");
-  assert.equal(vp1.data.serverStudyId, "study-xyz");
-  assert.equal(vp1.data.currentIndex, 5);
-  assert.deepEqual(vp1.data.serverInstances, ["i1", "i2"]);
+  // Both panels take the loaded study from global state (not by copying vp0),
+  // so the left panel is always populated even if vp1 was the active viewport.
+  for (const vp of manager.getAllViewports()) {
+    assert.equal(vp.data.source, "server");
+    assert.equal(vp.data.serverStudyId, "study-xyz");
+    assert.equal(vp.data.currentIndex, 5);
+    assert.deepEqual(vp.data.serverInstances, ["i1", "i2"]);
+  }
 });
 
 test("notifyPredictionLoaded rounds confidence to nearest integer", () => {

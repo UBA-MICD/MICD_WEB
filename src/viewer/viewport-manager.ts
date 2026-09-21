@@ -4,7 +4,10 @@
  * camera transforms (Pan, Zoom, Window/Level, slice scroll) across viewports.
  */
 
-import type { ParsedDicom } from "../dicom/dicom-parser-util.js";
+import {
+  type ParsedDicom,
+  calculateAutoWindowLevel,
+} from "../dicom/dicom-parser-util.js";
 import {
   type ViewportState,
   renderDicom,
@@ -236,8 +239,28 @@ export class Viewport {
   }
 
   public resetCamera(): void {
-    if (!this.data.parsed?.metadata) return;
-    this.data.viewport = createDefaultViewport(this.data.parsed.metadata);
+    const parsed = this.data.parsed;
+    if (!parsed?.metadata) return;
+    // Prefer the DICOM's own window/level; when it carries none, derive one from
+    // the pixels — otherwise createDefaultViewport() yields W/L 0 and the image
+    // renders all black (the "reset shows a dark DICOM" bug in the comparison view).
+    if (parsed.metadata.windowWidth > 0) {
+      this.data.viewport = createDefaultViewport(parsed.metadata);
+    } else if (parsed.pixelData) {
+      const auto = calculateAutoWindowLevel(
+        parsed.pixelData,
+        parsed.metadata.rescaleSlope,
+        parsed.metadata.rescaleIntercept,
+        parsed.metadata.modality,
+      );
+      this.data.viewport = {
+        windowCenter: auto.windowCenter,
+        windowWidth: auto.windowWidth,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+      };
+    }
     this.fitImage();
     this.render();
   }

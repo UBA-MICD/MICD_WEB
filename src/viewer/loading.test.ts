@@ -269,6 +269,27 @@ test("initDropZone: dropping .dcm files loads the first one", async () => {
   assert.equal(dropZone.classList.contains("drag-over"), false);
 });
 
+test("initDropZone: dropping extension-less PACS files loads them (not just *.dcm)", async () => {
+  initDropZone();
+  const dropZone = document.getElementById("drop-zone")!;
+  const dropEvt = new Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(dropEvt, "dataTransfer", {
+    value: {
+      files: [new File(["x"], "IM000002"), new File(["x"], "IM000001")],
+    },
+  });
+
+  await withFakeDicomParser(fakeDataSet(), async () => {
+    dropZone.dispatchEvent(dropEvt);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  // Numeric-aware sort: IM000001 before IM000002.
+  assert.equal(state.files[0]?.name, "IM000001");
+  assert.equal(state.files.length, 2);
+});
+
 test("initDropZone: dropping only non-dcm files is a no-op", async () => {
   initDropZone();
   const dropZone = document.getElementById("drop-zone")!;

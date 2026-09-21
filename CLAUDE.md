@@ -22,7 +22,8 @@ make check             # curl-check the frontend is serving, and that /api proxi
 make test               # npm test (node:test unit tests)
 make hooks                # install pre-commit git hooks
 
-npm run build   # tsc -p tsconfig.json, compiles src/**/*.ts -> dist/
+npm run build   # prebuild (assemble src/index.html from html/ partials) + tsc src/**/*.ts -> dist/
+npm run build:html  # just re-assemble src/index.html (build-html.mjs)
 npm test         # tsx --test 'src/**/*.test.ts' (tsx is a pinned devDependency)
 ```
 
@@ -53,7 +54,7 @@ Two top-level **screens** are registered with `shared/screen.ts` and exactly one
 - **`src/viewer/`** — `state.ts` (the shared mutable `AppState`), `loading.ts` (file/folder pickers, drag-drop, `displayDicom`), `rendering.ts` (canvas render, metadata panel, info overlays — all DICOM-derived text is escaped, and the canvas `aria-label` is written here), `interaction.ts` (toolbar, mouse and **keyboard** window/level-zoom-pan, resize observer, Electron menu hooks).
 - **`src/shared/`** — `dom.ts` (`$`, `escapeHtml`/`escapeAttr`, `showLoading`/`showError`, `formatDate`), `screen.ts` (viewer↔server switching), `dialog.ts` (`openDialog`/`closeDialog`: focus trap, Escape, background `inert`, focus restore; `anyDialogOpen()` lets global shortcuts stand down), `roving.ts` (single-tab-stop groups; `nextRovingIndex` is pure and unit-tested), `banner.ts` (the confirmation strip), `folder-files.ts` (DICOM filtering/sorting, unit-tested), `token-store.ts` and `desktop.ts` (see Desktop parity below).
 - **`src/i18n/`** — see Internationalization below.
-- **`src/index.html`** — one document holding both screens plus the duplicate-upload and activity dialogs. Loads `./dicomParser.min.js` (UMD) before `./main.js`.
+- **`src/index.html`** — one document holding both screens plus the duplicate-upload and activity dialogs. Loads `./dicomParser.min.js` (UMD) before `./main.js`. **This file is generated — do not hand-edit it.** Because there's no bundler and the same document is served by nginx _and_ loaded from `file://` by Electron under a strict `default-src 'self'` CSP (runtime `fetch` of HTML fragments is not possible), the markup is authored as fragments under **`src/html/`** and concatenated at build time: `src/html/index.template.html` is the document skeleton, `src/html/partials/*.html` are the sections (`topbar`, `sidebar`, `main-content`, `explorer-panel`, `zenodo-panel`, `server-screen`, `invite-screen`, `dialogs`), and `scripts/build-html.mjs` resolves the `<!-- @include html/partials/NAME.html -->` directives into `src/index.html`. It runs as `prebuild` (so `npm run build` keeps it in sync). `src/index.html` is a **generated artifact and is git-ignored** — like `dist/` and `src/vendor/fflate.js` — so it never appears in diffs; the build produces it (the Dockerfile copies the builder's freshly-assembled copy, and any environment that loads it directly, e.g. the Electron renderer, must run the build first, which it already does for `dist/`). To change the markup, edit the template/partial and run `npm run build` (or `npm run build:html`); never edit `src/index.html` directly, as it will be overwritten.
 - **`src/dicom/dicom-parser-util.ts`** / **`src/dicom/dicom-renderer.ts`** — pure DICOM parsing and canvas window/level/zoom/pan rendering.
 
 ## Internationalization

@@ -20,7 +20,7 @@ import {
   updateSeriesNav,
   updateInfoOverlay,
 } from "./rendering.js";
-import { updateToolbarUI } from "./interaction.js";
+import { updateToolbarUI, setViewportSync } from "./interaction.js";
 import { t } from "../i18n/i18n.js";
 import { notifyStudyLoaded, isValidationBarActive } from "./validation-ui.js";
 import { fetchValidation } from "./validation-api.js";
@@ -194,6 +194,9 @@ async function loadLocalFiles(selected: File[]): Promise<void> {
     vp.data.viewport = { ...freshViewport };
   }
 
+  // A new file set is a fresh comparison: viewport sync resets to off.
+  setViewportSync(false);
+
   // Keep global state in sync for loadCurrent() / series nav.
   state.source = "local";
   state.files = sortedFiles;
@@ -277,6 +280,9 @@ export async function loadStudyFromServer(studyId: string): Promise<void> {
       panY: 0,
     };
   }
+
+  // Opening a different study resets viewport sync to off.
+  setViewportSync(false);
 
   try {
     const res = await fetchStudyInstances(studyId);

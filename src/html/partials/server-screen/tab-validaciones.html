@@ -1,0 +1,34 @@
+<!-- Staff-only: diagnostic validation panel (US-26). -->
+<div
+  class="server-panel hidden"
+  id="panel-validaciones"
+  role="tabpanel"
+  aria-labelledby="tab-validaciones"
+  tabindex="0"
+>
+  <div class="server-panel__body validations-panel">
+    <div
+      class="validations-filters"
+      role="group"
+      data-i18n-attr="aria-label:validations.filtersLabel"
+      aria-label="Filtrar por estado"
+      data-validations-filters
+    ></div>
+    <div class="validations-table-wrap">
+      <table class="validations-table" data-validations-table>
+        <thead data-validations-thead></thead>
+        <tbody data-validations-tbody></tbody>
+      </table>
+      <p
+        class="validations-empty hidden"
+        data-validations-empty
+        role="status"
+      ></p>
+      <p
+        class="validations-error hidden"
+        data-validations-error
+        role="alert"
+      ></p>
+    </div>
+  </div>
+</div>

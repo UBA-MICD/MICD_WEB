@@ -178,6 +178,20 @@ function wireView(view: ExplorerView): void {
     }
   });
 
+  // Double-click is a shortcut for "select + confirm" on the Buscar surface, so
+  // a study opens without a separate trip to the "Abrir estudio seleccionado"
+  // button. Goes through activateListener (like Enter) so the owning screen
+  // opens it and navigates away.
+  if (view.mode === "select") {
+    view.list.addEventListener("dblclick", (e) => {
+      const item = (e.target as HTMLElement).closest<HTMLElement>("[data-id]");
+      const studyId = item?.dataset.id;
+      if (!studyId) return;
+      setSelected(studyId);
+      activateListener?.(studyId);
+    });
+  }
+
   if (view.mode === "select") wireListboxKeys(view);
 
   // Search, debounced. The other view's box is kept in step by syncControls().

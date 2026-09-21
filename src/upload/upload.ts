@@ -104,9 +104,28 @@ export function initUploadPanel(): void {
   folderInput.setAttribute("webkitdirectory", "");
   folderInput.setAttribute("multiple", "");
   folderInput.addEventListener("change", () => {
-    const files = collectDicomFiles(Array.from(folderInput.files ?? []));
+    const selected = Array.from(folderInput.files ?? []);
     folderInput.value = "";
-    void startUpload(files);
+    void (async () => {
+      // Expand any .zip archives found inside the chosen folder, the same as the
+      // "Seleccionar archivos" and drag-drop paths — otherwise zips are dropped.
+      const {
+        files: expanded,
+        corruptZips,
+        tooBigZips,
+      } = await expandFiles(selected, null);
+      if (corruptZips.length > 0)
+        showToast(
+          t("upload.zipReadError", { files: corruptZips.join(", ") }),
+          "error",
+        );
+      if (tooBigZips.length > 0)
+        showToast(
+          t("upload.zipTooBig", { files: tooBigZips.join(", ") }),
+          "warning",
+        );
+      void startUpload(collectDicomFiles(expanded));
+    })();
   });
   $("btn-upload-folder")?.addEventListener("click", async () => {
     if (await ensureAuthenticated()) folderInput.click();

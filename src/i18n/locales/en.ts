@@ -254,6 +254,7 @@ export const en: Record<string, string> = {
 
   // ── upload ───────────────────────────────────────────────────────────────
   "upload.dropHint": "Drag .dcm, .zip files or a folder here",
+  "upload.selectFiles": "Select files or ZIP",
   "upload.selectFolder": "Select folder",
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",

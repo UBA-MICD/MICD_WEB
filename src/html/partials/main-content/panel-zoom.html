@@ -1,0 +1,66 @@
+<!-- Zoom Panel -->
+<aside
+  class="wl-panel"
+  id="zoom-panel"
+  data-i18n-attr="aria-label:viewer.zoom.panelTitle"
+  aria-label="Ajuste de Zoom"
+>
+  <div class="wl-header">
+    <h2 data-i18n="viewer.zoom.panelTitle">Ajuste de Zoom</h2>
+  </div>
+  <div class="wl-body">
+    <!-- Sliders Section -->
+    <div class="wl-section">
+      <div class="slider-control">
+        <div class="slider-header">
+          <label for="slider-zoom" data-i18n="viewer.zoom.levelLabel"
+            >Nivel de Zoom</label
+          >
+          <span class="slider-val" id="val-zoom">1.0x</span>
+        </div>
+        <input
+          type="range"
+          id="slider-zoom"
+          class="wl-slider"
+          min="0.1"
+          max="5.0"
+          step="0.1"
+          value="1.0"
+        />
+      </div>
+    </div>
+
+    <!-- Presets Section -->
+    <div class="wl-section">
+      <span class="wl-section-title" data-i18n="viewer.zoom.presetsTitle"
+        >Accesos Rápidos</span
+      >
+      <div class="presets preset-grid">
+        <button
+          type="button"
+          class="btn btn--outline preset-btn"
+          id="btn-zoom-fit"
+          data-i18n="viewer.zoom.fit"
+        >
+          Ajustar a pantalla
+        </button>
+        <button
+          type="button"
+          class="btn btn--outline preset-btn"
+          id="btn-zoom-100"
+          data-i18n="viewer.zoom.100"
+        >
+          100%
+        </button>
+        <button
+          type="button"
+          class="btn btn--outline preset-btn"
+          id="btn-zoom-200"
+          data-i18n="viewer.zoom.200"
+        >
+          200%
+        </button>
+      </div>
+    </div>
+  </div>
+</aside>

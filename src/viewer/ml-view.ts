@@ -4,6 +4,7 @@
 // Left viewport: original DICOM. Right viewport: same DICOM + AI label in HUD.
 
 import { getViewportManager } from "./viewport-registry.js";
+import { state } from "./state.js";
 import type { MLPredictionRecord } from "./prediction-api.js";
 
 // True only while the ML 1x2 layout is active — prevents clearMLView from
@@ -44,21 +45,31 @@ export function notifyPredictionLoaded(
   const vp1 = viewports[1];
   if (!vp0 || !vp1) return;
 
-  // Mirror vp0's DICOM data into vp1 so both panels show the same image.
-  vp1.data.source = vp0.data.source;
-  vp1.data.files = vp0.data.files;
-  vp1.data.serverStudyId = vp0.data.serverStudyId;
-  vp1.data.serverInstances = vp0.data.serverInstances;
-  vp1.data.currentIndex = vp0.data.currentIndex;
-  vp1.data.parsed = vp0.data.parsed;
-  vp1.data.viewport = { ...vp0.data.viewport };
+  // Seed BOTH panels from the authoritative global state that loadCurrent()
+  // just populated. We must not copy vp0 into vp1 and assume vp0 is loaded:
+  // displayParsed() only ever writes the *active* viewport, which may be vp1
+  // (e.g. opening a second validation study over a leftover 1x2). When vp0 was
+  // left empty the left panel rendered dark and Reset no-op'd (parsed was null).
+  for (const vp of [vp0, vp1]) {
+    vp.data.source = state.source;
+    vp.data.files = state.files;
+    vp.data.serverStudyId = state.serverStudyId;
+    vp.data.serverInstances = state.serverInstances;
+    vp.data.currentIndex = state.currentIndex;
+    vp.data.parsed = state.parsed;
+    vp.data.viewport = { ...state.viewport };
+  }
 
+  vp0.data.mlLabel = null;
   const pct = Math.round(prediction.confidence * 100);
   vp1.data.mlLabel = `IA: ${capitalize(prediction.label)} ${pct}%`;
 
-  // Sync pan/zoom/slice between both viewports for pixel-by-pixel comparison.
-  manager.setSync(true);
+  // Sync starts OFF: the user turns on paired scrolling with the sync button
+  // when they want it, and every new study resets it back off (see loading.ts).
+  manager.setSync(false);
 
+  vp0.fitImage();
+  vp1.fitImage();
   vp0.render();
   vp1.render();
 }

@@ -1,0 +1,471 @@
+<!-- Sidebar -->
+<aside class="sidebar">
+  <!-- One tab stop; the arrow keys move between tools (WCAG toolbar). -->
+  <div
+    class="sidebar__tools"
+    id="viewer-toolbar"
+    role="toolbar"
+    data-i18n-attr="aria-label:viewer.toolbar.ariaLabel"
+    aria-label="Herramientas de visualización"
+    aria-orientation="vertical"
+  >
+    <!-- Grupo 1: Interacción -->
+    <div class="toolbar-group">
+      <button
+        class="toolbar__tool active"
+        id="tool-wl"
+        data-i18n-attr="title:viewer.tool.wlTitle"
+        title="Brillo / contraste (W)"
+        aria-pressed="true"
+        aria-expanded="false"
+        aria-controls="wl-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" opacity="0.3" />
+        </svg>
+        <span>W/L</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-zoom"
+        data-i18n-attr="title:viewer.tool.zoomTitle"
+        title="Zoom (Z)"
+        aria-pressed="false"
+        aria-expanded="false"
+        aria-controls="zoom-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="10" cy="10" r="7" />
+          <line x1="15" y1="15" x2="21" y2="21" />
+          <line x1="7" y1="10" x2="13" y2="10" />
+          <line x1="10" y1="7" x2="10" y2="13" />
+        </svg>
+        <span>Zoom</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-pan"
+        data-i18n-attr="title:viewer.tool.panTitle"
+        title="Desplazar (P)"
+        aria-pressed="false"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            d="M12 2l0 20M2 12l20 0M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"
+          />
+        </svg>
+        <span>Pan</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-crosshair"
+        data-i18n-attr="title:viewer.tool.crosshairTitle"
+        title="Navegación Crosshair 3D (C)"
+        aria-pressed="false"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <line x1="12" y1="3" x2="12" y2="21" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+        </svg>
+        <span>Crosshair</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-length"
+        data-i18n-attr="title:viewer.tool.lengthTitle"
+        title="Regla de medición (L)"
+        aria-pressed="false"
+        aria-expanded="false"
+        aria-controls="measure-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m15 5 4 4" />
+          <path d="m13 7 2 2" />
+          <path d="m11 9 2 2" />
+          <path d="m9 11 2 2" />
+          <path d="m7 13 2 2" />
+          <path d="m5 15 2 2" />
+          <path d="m2 22 20-20" />
+        </svg>
+        <span data-i18n="annotations.length">Regla</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-ellipse"
+        data-i18n-attr="title:viewer.tool.ellipseTitle"
+        title="Medición de área y HU (E)"
+        aria-pressed="false"
+        aria-expanded="false"
+        aria-controls="measure-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <ellipse cx="12" cy="12" rx="9" ry="6" />
+          <line x1="12" y1="9" x2="12" y2="15" stroke-dasharray="1 2" />
+          <line x1="7" y1="12" x2="17" y2="12" stroke-dasharray="1 2" />
+        </svg>
+        <span data-i18n="annotations.area">Elipse</span>
+      </button>
+    </div>
+
+    <!-- Grupo 2: Vistas y Capas -->
+    <div class="toolbar-group">
+      <button
+        class="toolbar__tool"
+        id="tool-metadata"
+        data-i18n-attr="title:viewer.tool.metadataTitle"
+        title="Etiquetas DICOM (M)"
+        aria-expanded="false"
+        aria-controls="metadata-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="7" y1="8" x2="17" y2="8" />
+          <line x1="7" y1="12" x2="17" y2="12" />
+          <line x1="7" y1="16" x2="13" y2="16" />
+        </svg>
+        <span>Tags</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-view-3d"
+        data-i18n-attr="title:viewer.tool.view3dStaticTitle"
+        title="Vista 3D"
+        disabled
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+          />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+        <span>Vista 3D</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-mpr"
+        data-i18n-attr="title:viewer.tool.mprStaticTitle"
+        title="Reconstrucción Multiplanar (MPR)"
+        disabled
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+          <path d="M10 3v18" stroke-dasharray="2 2" />
+          <path d="M3 10h18" stroke-dasharray="2 2" />
+        </svg>
+        <span>MPR</span>
+      </button>
+      <button
+        class="toolbar__tool"
+        id="tool-layers"
+        title="Capas de Superposición"
+        aria-label="Capas"
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 12 12 17 22 12"></polyline>
+          <polyline points="2 17 12 22 22 17"></polyline>
+        </svg>
+        <span>Capas</span>
+      </button>
+    </div>
+
+    <!-- Grupo 3: Datos y Sistema -->
+    <div class="toolbar-group">
+      <button
+        class="toolbar__tool"
+        id="tool-reset"
+        data-i18n-attr="title:viewer.tool.resetTitle"
+        title="Restablecer (R)"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M3 12a9 9 0 1 1 3 7" />
+          <path d="M3 22v-7h7" />
+        </svg>
+        <span>Reset</span>
+      </button>
+      <button
+        class="toolbar__tool toolbar__tool--explorer"
+        id="btn-toggle-explorer"
+        data-i18n-attr="title:explorer.panelTitle"
+        title="Estudios en servidor"
+        aria-expanded="false"
+        aria-controls="explorer-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="12" cy="12" r="4" />
+          <line x1="3" y1="12" x2="8" y2="12" />
+          <line x1="16" y1="12" x2="21" y2="12" />
+        </svg>
+        <span data-i18n="explorer.toolbarLabel">Estudios</span>
+      </button>
+      <button
+        class="toolbar__tool toolbar__tool--zenodo"
+        id="btn-open-zenodo"
+        data-i18n-attr="title:viewer.tool.zenodoTitle"
+        title="Zenodo — repositorio de ciencia abierta"
+        aria-expanded="false"
+        aria-controls="zenodo-panel"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8 12h8M12 8l4 4-4 4" />
+        </svg>
+        <span>Zenodo</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sidebar__footer">
+    <!-- Hidden inputs for local file viewing -->
+    <input
+      type="file"
+      id="open-files-input"
+      multiple
+      accept=".dcm,.zip"
+      class="hidden"
+    />
+    <input type="file" id="open-folder-input" class="hidden" />
+
+    <!-- Primary action -->
+    <button class="btn btn--accent btn--full" id="btn-open">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        aria-hidden="true"
+      >
+        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+        <polyline points="13 2 13 9 20 9" />
+      </svg>
+      <span data-i18n="viewer.openFile">Abrir archivo</span>
+    </button>
+
+    <!-- Secondary actions -->
+    <div class="sidebar-actions">
+      <button class="sidebar-action" id="btn-open-folder">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path
+            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+          />
+        </svg>
+        <span data-i18n="viewer.openFolder">Abrir carpeta</span>
+      </button>
+      <button class="sidebar-action sidebar-action--server" id="btn-server">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <rect x="2" y="2" width="20" height="8" rx="2" />
+          <rect x="2" y="14" width="20" height="8" rx="2" />
+          <line x1="6" y1="6" x2="6.01" y2="6" />
+          <line x1="6" y1="18" x2="6.01" y2="18" />
+        </svg>
+        <span data-i18n="server.navLabel">Servidor</span>
+        <svg
+          class="sidebar-action__chevron"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          aria-hidden="true"
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Export action -->
+    <div class="sidebar-actions">
+      <button
+        class="sidebar-action"
+        id="btn-export-menu"
+        data-i18n-attr="title:export.menuTitle"
+        title="Exportar estudio o imagen"
+        disabled
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span data-i18n="export.menuLabel">Exportar</span>
+      </button>
+    </div>
+
+    <!-- Session card. Logged-out is the default; updateAuthUI() repaints. -->
+    <div class="session-card hidden" id="session-block">
+      <span class="session__avatar" id="session-avatar" aria-hidden="true"
+        >··</span
+      >
+      <div class="session__info">
+        <span class="session__email" id="session-email"></span>
+        <span
+          class="session__expiry"
+          id="session-expiry"
+          data-i18n="auth.sessionActive"
+          >Sesión activa</span
+        >
+      </div>
+      <button
+        class="session-card__logout"
+        id="btn-logout"
+        data-i18n-attr="title:auth.logout; aria-label:auth.logout"
+        title="Cerrar sesión"
+        aria-label="Cerrar sesión"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      </button>
+    </div>
+    <button
+      class="btn btn--outline btn--full"
+      id="btn-login"
+      data-i18n="auth.login"
+    >
+      Iniciar sesión
+    </button>
+  </div>
+</aside>

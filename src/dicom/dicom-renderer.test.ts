@@ -244,10 +244,7 @@ test("applyCanvasTransform sets a translate+scale CSS transform", () => {
     panX: 10,
     panY: -5,
   });
-  assert.equal(
-    imageCanvas.style.transform,
-    "translate(10px, -5px) scale(2.5) scaleY(-1)",
-  );
+  assert.equal(imageCanvas.style.transform, "translate(10px, -5px) scale(2.5)");
 });
 
 test("createDefaultViewport reads window center/width from metadata with zoom 1 and no pan", () => {

@@ -1,4 +1,5 @@
 import { ParsedDicom } from "../dicom/dicom-parser-util.js";
+import { getCanonicalFlip } from "../dicom/spatial-math.js";
 import { dicomCache } from "./cache.js";
 import { $, showLoading, showError } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
@@ -28,6 +29,9 @@ export interface VoxelVolume {
   rescaleIntercept: number;
   windowCenter: number;
   windowWidth: number;
+  imageOrientationPatient?: [number, number, number, number, number, number];
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 export interface Camera3D {
@@ -58,6 +62,31 @@ export class Matrix4 {
 
   public static identity(): Float32Array {
     return Matrix4.create();
+  }
+
+  public static scale(
+    m: Float32Array,
+    v: [number, number, number],
+  ): Float32Array {
+    const s = new Float32Array([
+      v[0],
+      0,
+      0,
+      0,
+      0,
+      v[1],
+      0,
+      0,
+      0,
+      0,
+      v[2],
+      0,
+      0,
+      0,
+      0,
+      1,
+    ]);
+    return Matrix4.multiply(m, s);
   }
 
   public static perspective(
@@ -380,6 +409,9 @@ export class View3DViewer {
       windowWidth = 400;
     }
 
+    const iop = refMeta.imageOrientationPatient;
+    const { flipX, flipY } = getCanonicalFlip(iop);
+
     return {
       depth,
       rows,
@@ -391,6 +423,9 @@ export class View3DViewer {
       rescaleIntercept: refMeta.rescaleIntercept,
       windowCenter,
       windowWidth,
+      imageOrientationPatient: iop as any,
+      flipX,
+      flipY,
     };
   }
 
@@ -446,6 +481,7 @@ uniform vec3 u_crosshair;      // Normalized crosshair position [0, 1]^3
 uniform int u_activeView;      // 0: Axial, 1: Coronal, 2: Sagittal, 3: Full 3D Volume
 uniform float u_clipPlane;     // Clipping plane ratio [0..1]
 uniform int u_debugAABB;       // Debug flag: 1 = flat red debug color
+uniform bool u_flipY;          // IOP canonical flip Y flag
 
 out vec4 fragColor;
 
@@ -462,6 +498,14 @@ bool intersectBox(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax, out flo
     tNear = max(max(t1.x, t1.y), t1.z);
     tFar = min(min(t2.x, t2.y), t2.z);
     return tFar >= max(tNear, 0.0);
+}
+
+vec3 getTexCoord(vec3 p) {
+    vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+    if (!u_flipY) {
+        tc.y = 1.0 - tc.y;
+    }
+    return tc;
 }
 
 void main() {
@@ -487,7 +531,7 @@ void main() {
         float t = (planeZ - u_cameraPos.z) / rayDir.z;
         if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
         vec3 p = u_cameraPos + rayDir * t;
-        vec3 texCoord = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        vec3 texCoord = getTexCoord(p);
         float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
         float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
         fragColor = vec4(vec3(intensity), 1.0);
@@ -498,7 +542,7 @@ void main() {
         float t = (planeY - u_cameraPos.y) / rayDir.y;
         if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
         vec3 p = u_cameraPos + rayDir * t;
-        vec3 texCoord = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        vec3 texCoord = getTexCoord(p);
         float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
         float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
         fragColor = vec4(vec3(intensity), 1.0);
@@ -509,7 +553,7 @@ void main() {
         float t = (planeX - u_cameraPos.x) / rayDir.x;
         if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
         vec3 p = u_cameraPos + rayDir * t;
-        vec3 texCoord = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        vec3 texCoord = getTexCoord(p);
         float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
         float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
         fragColor = vec4(vec3(intensity), 1.0);
@@ -535,7 +579,7 @@ void main() {
     // Sagittal Plane (X cut)
     if (tX >= tNear - 1e-3 && tX <= tFar + 1e-3) {
         vec3 p = u_cameraPos + rayDir * tX;
-        vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        vec3 tc = getTexCoord(p);
         if (tc.y >= -1e-3 && tc.y <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
             float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
             float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
@@ -551,7 +595,7 @@ void main() {
     // Coronal Plane (Y cut)
     if (tY >= tNear - 1e-3 && tY <= tFar + 1e-3) {
         vec3 p = u_cameraPos + rayDir * tY;
-        vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        vec3 tc = getTexCoord(p);
         if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
             float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
             float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
@@ -567,7 +611,7 @@ void main() {
     // Axial Plane (Z cut)
     if (tZ >= tNear - 1e-3 && tZ <= tFar + 1e-3) {
         vec3 p = u_cameraPos + rayDir * tZ;
-        vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+        vec3 tc = getTexCoord(p);
         if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.y >= -1e-3 && tc.y <= 1.001) {
             float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
             float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
@@ -611,7 +655,7 @@ void main() {
         vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
         vec3 stepVec = rayDir * stepSize;
         for (int i = 0; i < STEPS; i++) {
-            vec3 tc = (rayPos - u_boxMin) / (u_boxMax - u_boxMin);
+            vec3 tc = getTexCoord(rayPos);
             if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
                 float d = texture(u_volume, tc).r;
                 float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
@@ -1072,6 +1116,9 @@ void main() {
     gl.bindTexture(gl.TEXTURE_3D, this.volumeTexture);
     gl.uniform1i(gl.getUniformLocation(this.program, "u_volume"), 0);
 
+    const flipY = this.volume.flipY ?? false;
+    gl.uniform1i(gl.getUniformLocation(this.program, "u_flipY"), flipY ? 1 : 0);
+
     gl.uniform3f(
       gl.getUniformLocation(this.program, "u_cameraPos"),
       eyeX,
@@ -1490,16 +1537,6 @@ export async function buildVolumeFromCache(): Promise<VoxelVolume | null> {
     slices.push(parsed);
   }
 
-  slices.sort((a, b) => {
-    const posA = a.metadata.imagePositionPatient;
-    const posB = b.metadata.imagePositionPatient;
-    if (posA && posB && posA.length >= 3 && posB.length >= 3) {
-      return posA[2] - posB[2];
-    }
-    const instA = Number(a.metadata.instanceNumber) || 0;
-    const instB = Number(b.metadata.instanceNumber) || 0;
-    return instA - instB;
-  });
-
+  // Slices from dicomCache are already strictly sorted by 3D spatial projection (StudyBuilder)
   return view3DViewer.buildVolume(slices);
 }

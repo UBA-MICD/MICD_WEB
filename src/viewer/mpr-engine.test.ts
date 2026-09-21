@@ -212,22 +212,65 @@ test("MPRVolume: transformation methods update world matrices without mutating t
   assert.equal(volume.transform.scale, 1.0);
 });
 
+test("MPRVolume: applies canonical flip from imageOrientationPatient or explicit flip flags", () => {
+  // Prone acquisition: iop = [-1, 0, 0, 0, -1, 0] -> flipX: true, flipY: true
+  const dataProne = {
+    ...sampleVolumeData(),
+    imageOrientationPatient: [-1, 0, 0, 0, -1, 0] as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ],
+  };
+  const volumeProne = new MPRVolume(dataProne);
+  assert.equal(volumeProne.flipX, true);
+  assert.equal(volumeProne.flipY, true);
+
+  // Check that texToWorld inverts the Y mapping
+  const center = Matrix4.transformPoint(
+    volumeProne.getTexToWorldMatrix(),
+    [0.5, 0.5, 0.5],
+  );
+  assert.ok(Math.abs(center[0]) < 1e-4);
+  assert.ok(Math.abs(center[1]) < 1e-4);
+
+  // Top (v = 1.0) maps to negative Y instead of positive Y due to flipY
+  const topPoint = Matrix4.transformPoint(
+    volumeProne.getTexToWorldMatrix(),
+    [0.5, 1.0, 0.5],
+  );
+  assert.ok(topPoint[1] < 0, "flipY inverts physical Y mapping in world space");
+
+  // Explicit flip flags override
+  const dataExplicit = {
+    ...sampleVolumeData(),
+    flipX: false,
+    flipY: true,
+  };
+  const volumeExplicit = new MPRVolume(dataExplicit);
+  assert.equal(volumeExplicit.flipX, false);
+  assert.equal(volumeExplicit.flipY, true);
+});
+
 // ── MPRCamera & Static Orthogonal Projection Tests ───────────────────────────
 
 test("MPRCamera: Axial, Coronal, and Sagittal cameras have static orthogonal bases", () => {
   const axial = new MPRCamera("axial");
   assert.deepEqual(axial.uAxis, [1, 0, 0]);
-  assert.deepEqual(axial.vAxis, [0, 1, 0]);
+  assert.deepEqual(axial.vAxis, [0, -1, 0]);
   assert.deepEqual(axial.normal, [0, 0, 1]);
 
   const coronal = new MPRCamera("coronal");
   assert.deepEqual(coronal.uAxis, [1, 0, 0]);
-  assert.deepEqual(coronal.vAxis, [0, 0, -1]);
+  assert.deepEqual(coronal.vAxis, [0, 0, 1]);
   assert.deepEqual(coronal.normal, [0, 1, 0]);
 
   const sagittal = new MPRCamera("sagittal");
   assert.deepEqual(sagittal.uAxis, [0, 1, 0]);
-  assert.deepEqual(sagittal.vAxis, [0, 0, -1]);
+  assert.deepEqual(sagittal.vAxis, [0, 0, 1]);
   assert.deepEqual(sagittal.normal, [1, 0, 0]);
 });
 
@@ -261,10 +304,10 @@ test("MPRCamera: M_screenToTex extracts orthogonal slice center accurately", () 
   assert.ok(Math.abs(centerTex[1] - 0.5) < 1e-4);
   assert.ok(Math.abs(centerTex[2] - 0.5) < 1e-4);
 
-  // Screen quad top-left (-1, 1) with inverted V-axis maps to (u=0, v=1, w=0.5)
+  // Screen quad top-left (-1, 1) with Anterior (-Y) at top maps to (u=0, v=0, w=0.5)
   const tlTex = Matrix4.transformPoint(screenToTex, [-1, 1, 0]);
   assert.ok(Math.abs(tlTex[0] - 0.0) < 1e-4);
-  assert.ok(Math.abs(tlTex[1] - 1.0) < 1e-4);
+  assert.ok(Math.abs(tlTex[1] - 0.0) < 1e-4);
   assert.ok(Math.abs(tlTex[2] - 0.5) < 1e-4);
 });
 
@@ -277,7 +320,7 @@ test("MPRCamera: Volume rotation obliquely samples volume texture while camera r
 
   // Camera basis remains untouched (strictly static)
   assert.deepEqual(camera.uAxis, [1, 0, 0]);
-  assert.deepEqual(camera.vAxis, [0, 1, 0]);
+  assert.deepEqual(camera.vAxis, [0, -1, 0]);
   assert.deepEqual(camera.normal, [0, 0, 1]);
 
   const screenToTex = camera.getScreenToTexMatrix(volume, 512, 512);
@@ -403,23 +446,23 @@ test("MPREngine: convert2DTo3DDelta maps 2D screen movement to orthogonal 3D wor
   const vpW = 400;
   const vpH = 400;
 
-  // In Axial view: dx moves along +X (Sagittal), dy moves along +Y (Coronal), Z = 0
+  // In Axial view: dx moves along +X (Sagittal), dy moves along +Y towards Posterior (Coronal), Z = 0
   const axialDelta = engine.convert2DTo3DDelta("axial", 10, 20, vpW, vpH);
   assert.ok(axialDelta[0] > 0, "dx moves +X");
-  assert.ok(axialDelta[1] < 0, "dy down moves -Y with inverted V axis");
+  assert.ok(axialDelta[1] > 0, "dy down moves +Y towards Posterior");
   assert.equal(axialDelta[2], 0, "dZ is 0 in Axial plane");
 
-  // In Coronal view: dx moves along +X (Sagittal), dy moves along +Z (inverted V), Y = 0
+  // In Coronal view: dx moves along +X (Sagittal), dy moves along -Z towards Inferior/Feet, Y = 0
   const coronalDelta = engine.convert2DTo3DDelta("coronal", 15, 25, vpW, vpH);
   assert.ok(coronalDelta[0] > 0, "dx moves +X");
   assert.equal(coronalDelta[1], 0, "dY is 0 in Coronal plane");
-  assert.ok(coronalDelta[2] > 0, "dy down moves +Z with inverted V axis");
+  assert.ok(coronalDelta[2] < 0, "dy down moves -Z towards Inferior/Feet");
 
-  // In Sagittal view: dx moves along +Y (Coronal), dy moves along +Z (inverted V), X = 0
+  // In Sagittal view: dx moves along +Y (Coronal), dy moves along -Z towards Inferior/Feet, X = 0
   const sagittalDelta = engine.convert2DTo3DDelta("sagittal", 30, 40, vpW, vpH);
   assert.equal(sagittalDelta[0], 0, "dX is 0 in Sagittal plane");
   assert.ok(sagittalDelta[1] > 0, "dx moves +Y (towards Posterior)");
-  assert.ok(sagittalDelta[2] > 0, "dy down moves +Z with inverted V axis");
+  assert.ok(sagittalDelta[2] < 0, "dy down moves -Z towards Inferior/Feet");
 });
 
 test("MPREngine: applyPanDelta2D and clampVolumeTranslation bound translation within visible area", () => {
@@ -482,7 +525,7 @@ test("MPREngine: applyCrosshairDelta2D and setCrosshairFromScreen synchronize al
 
   // Axial slice (Z) remains unchanged; Sagittal (X) and Coronal (Y) update
   assert.ok(engine.sagittalCamera.sliceOffset > 0, "Sagittal plane shifted +X");
-  assert.ok(engine.coronalCamera.sliceOffset < 0, "Coronal plane shifted -Y");
+  assert.ok(engine.coronalCamera.sliceOffset > 0, "Coronal plane shifted +Y");
   assert.equal(engine.axialCamera.sliceOffset, 0, "Axial plane unchanged");
 });
 

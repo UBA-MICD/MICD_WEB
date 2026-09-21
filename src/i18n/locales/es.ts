@@ -760,4 +760,9 @@ export const es: Record<string, string> = {
   "viewer.measure.noSegmentationToExport":
     "No hay segmentaciones poligonales para exportar en este corte.",
   "viewer.measure.exportSuccess": "Segmentación exportada exitosamente.",
+  "viewer.measure.toggleVisibility": "Esconder/Mostrar",
+  "viewer.measure.hideAnnotations": "Ocultar anotaciones",
+  "viewer.measure.showAnnotations": "Mostrar anotaciones",
+  "viewer.measure.saveAnnotations": "Guardar",
+  "viewer.measure.savedSuccess": "¡Guardado!",
 };

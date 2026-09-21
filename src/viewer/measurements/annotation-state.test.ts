@@ -11,6 +11,8 @@ import {
   getAnnotationsForSlice,
   clearAnnotations,
   getActiveSopInstanceUid,
+  saveToLocalStorage,
+  loadFromLocalStorage,
 } from "./annotation-state.js";
 import type { LengthAnnotation, EllipseAnnotation } from "./types.js";
 import { state } from "../state.js";
@@ -159,4 +161,43 @@ test("clearAnnotations removes either a specific slice group or all annotations"
   // Clear all
   clearAnnotations();
   assert.deepEqual(state.annotations, {});
+});
+
+test("saveToLocalStorage and loadFromLocalStorage persist and restore annotations", () => {
+  const mockStorage: Record<string, string> = {};
+  const originalLocalStorage = globalThis.localStorage;
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => mockStorage[k] ?? null,
+    setItem: (k: string, v: string) => {
+      mockStorage[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete mockStorage[k];
+    },
+    clear: () => {
+      for (const k of Object.keys(mockStorage)) delete mockStorage[k];
+    },
+  };
+
+  try {
+    const uid = "1.2.840.test.save";
+    const ann = makeLengthAnnotation("saved-1", uid, 30);
+    addAnnotation(ann);
+
+    const saved = saveToLocalStorage(uid);
+    assert.equal(saved, true);
+    assert.ok(mockStorage[`micd_saves_${uid}`]);
+
+    // Clear state in-memory
+    clearAnnotations(uid);
+    assert.equal(getAnnotationsForSlice(uid).length, 0);
+
+    // Restore from localStorage
+    const restored = loadFromLocalStorage(uid);
+    assert.equal(restored.length, 1);
+    assert.equal(restored[0].id, "saved-1");
+    assert.equal(getAnnotationsForSlice(uid).length, 1);
+  } finally {
+    (globalThis as any).localStorage = originalLocalStorage;
+  }
 });

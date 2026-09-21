@@ -138,9 +138,56 @@ export function screenToWorld(
   return { x: worldX, y: worldY };
 }
 
+export interface BoundingBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Calculates axis-aligned bounding box (AABB) for a set of points (Polygon).
+ */
+export function getPolygonBoundingBox(points: Point2D[]): BoundingBox {
+  if (!points || points.length === 0) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+  }
+  let minX = points[0].x;
+  let maxX = points[0].x;
+  let minY = points[0].y;
+  let maxY = points[0].y;
+
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i];
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
 /**
  * Converts intrinsic image pixel coordinates (World-Space) to screen viewport coordinates.
  */
+export function worldToScreen(
+  worldPoint: Point2D,
+  viewport: { zoom: number; panX?: number; panY?: number },
+  viewportWidth?: number,
+  viewportHeight?: number,
+  cols?: number,
+  rows?: number,
+): Point2D;
 export function worldToScreen(
   worldX: number,
   worldY: number,
@@ -149,22 +196,52 @@ export function worldToScreen(
   cols: number,
   rows: number,
   zoomOrViewport: number | { zoom: number; panX?: number; panY?: number },
+  panX?: number,
+  panY?: number,
+  baseScale?: number,
+  flipY?: boolean,
+): Point2D;
+export function worldToScreen(
+  pointOrX: Point2D | number,
+  yOrViewport: number | { zoom: number; panX?: number; panY?: number },
+  viewportWidth: number = 300,
+  viewportHeight: number = 300,
+  cols: number = 512,
+  rows: number = 512,
+  zoomOrViewport?: number | { zoom: number; panX?: number; panY?: number },
   panX: number = 0,
   panY: number = 0,
-  // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
   baseScale: number = 1,
   flipY: boolean = true,
 ): Point2D {
+  let worldX: number;
+  let worldY: number;
+  let vWidth = viewportWidth;
+  let vHeight = viewportHeight;
+  let cCols = cols;
+  let cRows = rows;
+  let zOrV: number | { zoom: number; panX?: number; panY?: number };
+
+  if (typeof pointOrX === "object" && pointOrX !== null && "x" in pointOrX) {
+    worldX = pointOrX.x;
+    worldY = pointOrX.y;
+    zOrV = yOrViewport;
+  } else {
+    worldX = pointOrX as number;
+    worldY = yOrViewport as number;
+    zOrV = zoomOrViewport ?? yOrViewport;
+  }
+
   let zoomVal = 1;
   let panXVal = panX;
   let panYVal = panY;
 
-  if (typeof zoomOrViewport === "object" && zoomOrViewport !== null) {
-    zoomVal = zoomOrViewport.zoom;
-    panXVal = zoomOrViewport.panX ?? 0;
-    panYVal = zoomOrViewport.panY ?? 0;
-  } else if (typeof zoomOrViewport === "number") {
-    zoomVal = zoomOrViewport;
+  if (typeof zOrV === "object" && zOrV !== null) {
+    zoomVal = zOrV.zoom;
+    panXVal = zOrV.panX ?? 0;
+    panYVal = zOrV.panY ?? 0;
+  } else if (typeof zOrV === "number") {
+    zoomVal = zOrV;
   }
 
   const currentZoom =
@@ -176,9 +253,9 @@ export function worldToScreen(
   const effectiveScale = baseScale * currentZoom;
 
   const screenX =
-    viewportWidth / 2 + currentPanX + (worldX - cols / 2) * effectiveScale;
-  const dy = (worldY - rows / 2) * effectiveScale;
-  const screenY = viewportHeight / 2 + currentPanY + (flipY ? -dy : dy);
+    vWidth / 2 + currentPanX + (worldX - cCols / 2) * effectiveScale;
+  const dy = (worldY - cRows / 2) * effectiveScale;
+  const screenY = vHeight / 2 + currentPanY + (flipY ? -dy : dy);
 
   return { x: screenX, y: screenY };
 }

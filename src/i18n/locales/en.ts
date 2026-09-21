@@ -749,4 +749,9 @@ export const en: Record<string, string> = {
   "viewer.measure.noSegmentationToExport":
     "No polygon segmentations to export on this slice.",
   "viewer.measure.exportSuccess": "Segmentation exported successfully.",
+  "viewer.measure.toggleVisibility": "Hide/Show",
+  "viewer.measure.hideAnnotations": "Hide annotations",
+  "viewer.measure.showAnnotations": "Show annotations",
+  "viewer.measure.saveAnnotations": "Save",
+  "viewer.measure.savedSuccess": "Saved!",
 };

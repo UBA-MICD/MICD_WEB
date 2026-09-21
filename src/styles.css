@@ -1771,6 +1771,8 @@ body {
   font-weight: 600;
 }
 
+.measure-toggle-btn,
+.measure-save-btn,
 .measure-export-btn {
   width: 100%;
   display: flex;
@@ -1788,10 +1790,17 @@ body {
   transition: all var(--transition);
 }
 
+.measure-toggle-btn:hover,
+.measure-save-btn:hover,
 .measure-export-btn:hover {
   background: var(--bg-hover);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.measure-save-btn.saved {
+  border-color: #2ee6a8;
+  color: #2ee6a8;
 }
 
 .measure-clear-btn {

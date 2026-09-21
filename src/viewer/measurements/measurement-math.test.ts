@@ -17,6 +17,7 @@ import {
   calculatePolygonPerimeter,
   isPointInPolygon,
   distancePointToSegment,
+  getPolygonBoundingBox,
 } from "./measurement-math.js";
 
 test("extractCalibration parses valid PixelSpacing and rescale tags", () => {
@@ -469,4 +470,32 @@ test("distancePointToSegment computes exact perpendicular and endpoint distances
     distancePointToSegment({ x: 3, y: 4 }, { x: 0, y: 0 }, { x: 0, y: 0 }),
     5,
   );
+});
+
+test("getPolygonBoundingBox computes exact extents and dimensions", () => {
+  const points = [
+    { x: 10, y: 20 },
+    { x: 50, y: 5 },
+    { x: 30, y: 80 },
+    { x: 5, y: 40 },
+  ];
+  const bbox = getPolygonBoundingBox(points);
+  assert.equal(bbox.minX, 5);
+  assert.equal(bbox.maxX, 50);
+  assert.equal(bbox.minY, 5);
+  assert.equal(bbox.maxY, 80);
+  assert.equal(bbox.width, 45);
+  assert.equal(bbox.height, 75);
+
+  const empty = getPolygonBoundingBox([]);
+  assert.equal(empty.width, 0);
+  assert.equal(empty.height, 0);
+});
+
+test("worldToScreen accepts Point2D as first argument", () => {
+  const pt = { x: 256, y: 256 };
+  const vp = { zoom: 2, panX: 50, panY: -20 };
+  const screenPt = worldToScreen(pt, vp, 800, 600, 512, 512);
+  assert.equal(screenPt.x, 450);
+  assert.equal(screenPt.y, 280);
 });

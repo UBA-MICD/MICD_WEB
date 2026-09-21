@@ -112,6 +112,8 @@ export function viewerFixtureHtml(): string {
       </select>
       <input type="range" id="slider-measure-width" min="1" max="5" step="1" value="2" />
       <span id="val-measure-width">2px</span>
+      <button id="btn-toggle-annotations"></button>
+      <button id="btn-save-annotations"></button>
       <button id="btn-export-segmentation"></button>
       <button id="btn-clear-measurements"></button>
     </aside>

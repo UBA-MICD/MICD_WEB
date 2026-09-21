@@ -20,6 +20,7 @@ import {
   initResizeObserver,
   toggleMprMode,
   toggle3DMode,
+  initMeasurementControlsInteraction,
 } from "./interaction.ts";
 import { state, itemCount } from "./state.ts";
 import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
@@ -1778,5 +1779,75 @@ test("pan tool in MPR mode with volume loaded dispatches dispatchMprPan", () => 
     manager.dispatchPan = originalPan;
     mprEngine.volume = null;
     manager.destroy();
+  }
+});
+
+test("btn-toggle-annotations toggles areAnnotationsVisible state and attribute", () => {
+  setBody(viewerFixtureHtml);
+  initMeasurementControlsInteraction();
+
+  const btnToggle = document.getElementById(
+    "btn-toggle-annotations",
+  ) as HTMLButtonElement;
+  assert.ok(btnToggle, "btn-toggle-annotations should exist in DOM");
+
+  state.areAnnotationsVisible = true;
+  btnToggle.click();
+
+  assert.equal(state.areAnnotationsVisible, false);
+  assert.equal(btnToggle.getAttribute("aria-pressed"), "false");
+
+  btnToggle.click();
+  assert.equal(state.areAnnotationsVisible, true);
+  assert.equal(btnToggle.getAttribute("aria-pressed"), "true");
+});
+
+test("btn-save-annotations triggers saveToLocalStorage and visual feedback", () => {
+  setBody(viewerFixtureHtml);
+  initMeasurementControlsInteraction();
+
+  const btnSave = document.getElementById(
+    "btn-save-annotations",
+  ) as HTMLButtonElement;
+  assert.ok(btnSave, "btn-save-annotations should exist in DOM");
+
+  const mockStorage: Record<string, string> = {};
+  const originalLocalStorage = globalThis.localStorage;
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => mockStorage[k] ?? null,
+    setItem: (k: string, v: string) => {
+      mockStorage[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete mockStorage[k];
+    },
+  };
+
+  try {
+    const uid = "slice_0";
+    addAnnotation({
+      id: "ann-save-test",
+      type: "polygon",
+      sopInstanceUid: uid,
+      sliceIndex: 0,
+      points: [
+        { x: 10, y: 10 },
+        { x: 20, y: 10 },
+        { x: 20, y: 20 },
+      ],
+      isClosed: true,
+      isCalibrated: false,
+      unit: "px",
+      area: 50,
+      perimeter: 30,
+    });
+
+    btnSave.click();
+
+    assert.ok(mockStorage[`micd_saves_${uid}`]);
+    assert.ok(btnSave.classList.contains("saved"));
+    assert.equal(btnSave.textContent, "¡Guardado!");
+  } finally {
+    (globalThis as any).localStorage = originalLocalStorage;
   }
 });

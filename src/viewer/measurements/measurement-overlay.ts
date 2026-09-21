@@ -24,6 +24,7 @@ import {
   screenToWorld,
   worldToScreen,
   isPointInPolygon,
+  getPolygonBoundingBox,
 } from "./measurement-math.js";
 import { getAnnotationsForSlice } from "./annotation-state.js";
 import type {
@@ -103,6 +104,10 @@ export function renderMeasurementOverlay(options: RenderOverlayOptions): void {
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
+
+  if (state.areAnnotationsVisible === false) {
+    return;
+  }
 
   const cols = metadata.columns;
   const rows = metadata.rows;
@@ -388,9 +393,18 @@ function drawPolygonAnnotation(
 
   // Draw polygon perimeter path
   ctx.beginPath();
-  ctx.moveTo(screenPts[0].x, screenPts[0].y);
-  for (let i = 1; i < screenPts.length; i++) {
-    ctx.lineTo(screenPts[i].x, screenPts[i].y);
+  const firstPt = worldToScreen(
+    ann.points[0],
+    viewport,
+    viewW,
+    viewH,
+    cols,
+    rows,
+  );
+  ctx.moveTo(firstPt.x, firstPt.y);
+  for (let i = 1; i < ann.points.length; i++) {
+    const pt = worldToScreen(ann.points[i], viewport, viewW, viewH, cols, rows);
+    ctx.lineTo(pt.x, pt.y);
   }
   if (ann.isClosed && screenPts.length >= 3) {
     ctx.closePath();
@@ -414,12 +428,11 @@ function drawPolygonAnnotation(
     }
   }
 
-  // Badge with Area and Perimeter
+  // Badge with Area and Perimeter anchored below lowest vertex (highest Y in screen-space)
   if (ann.isClosed && screenPts.length >= 3) {
-    const sumX = screenPts.reduce((acc, p) => acc + p.x, 0);
-    const sumY = screenPts.reduce((acc, p) => acc + p.y, 0);
-    const centroidX = sumX / screenPts.length;
-    const centroidY = sumY / screenPts.length;
+    const bbox = getPolygonBoundingBox(screenPts);
+    const badgeX = (bbox.minX + bbox.maxX) / 2;
+    const badgeY = bbox.maxY + 15;
 
     const areaStr = formatArea(
       ann.area,
@@ -454,7 +467,7 @@ function drawPolygonAnnotation(
       });
     }
 
-    drawBadge(ctx, centroidX, centroidY, badgeLines);
+    drawBadge(ctx, badgeX, badgeY, badgeLines);
   }
 
   ctx.restore();

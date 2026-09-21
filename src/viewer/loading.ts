@@ -30,6 +30,7 @@ import { getViewportManager } from "./viewport-registry.js";
 import { view3DViewer, buildVolumeFromCache } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
 import { itemCount } from "./state.js";
+import { loadFromLocalStorage } from "./measurements/annotation-state.js";
 
 /** Builds and injects the 3D volume into ViewportManager, MPREngine, and View3DViewer. */
 export async function loadVolumeIntoEngines(): Promise<boolean> {
@@ -340,6 +341,10 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     showError(t("viewer.noPixelsFound"));
     return;
   }
+
+  const sopInstanceUid =
+    parsed.metadata.sopInstanceUid || `slice_${state.currentIndex}`;
+  loadFromLocalStorage(sopInstanceUid);
 
   const vp = getViewportManager()?.activeViewport ?? null;
 

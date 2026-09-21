@@ -60,6 +60,7 @@ import {
   clearAnnotations,
   getActiveSopInstanceUid,
   getAnnotationsForSlice,
+  saveToLocalStorage,
 } from "./measurements/annotation-state.js";
 import {
   getActiveDrawing,
@@ -640,6 +641,36 @@ export function initMeasurementControlsInteraction(): void {
       }
       renderActiveMeasurementOverlays();
     }
+  });
+
+  const btnToggle = $("btn-toggle-annotations");
+  btnToggle?.addEventListener("click", () => {
+    state.areAnnotationsVisible = !state.areAnnotationsVisible;
+    btnToggle.setAttribute("aria-pressed", String(state.areAnnotationsVisible));
+    btnToggle.textContent = state.areAnnotationsVisible
+      ? t("viewer.measure.hideAnnotations") || "Ocultar anotaciones"
+      : t("viewer.measure.showAnnotations") || "Mostrar anotaciones";
+    renderActiveMeasurementOverlays();
+  });
+
+  const btnSave = $("btn-save-annotations");
+  btnSave?.addEventListener("click", () => {
+    const manager = getViewportManager();
+    const activeVp = manager?.activeViewport;
+    const uid =
+      activeVp?.data.parsed?.metadata?.sopInstanceUid ||
+      getActiveSopInstanceUid();
+    saveToLocalStorage(uid);
+
+    const originalText =
+      btnSave.textContent || t("viewer.measure.saveAnnotations") || "Guardar";
+    btnSave.textContent = t("viewer.measure.savedSuccess") || "¡Guardado!";
+    btnSave.classList.add("saved");
+
+    setTimeout(() => {
+      btnSave.textContent = originalText;
+      btnSave.classList.remove("saved");
+    }, 2000);
   });
 
   const btnExport = $("btn-export-segmentation");

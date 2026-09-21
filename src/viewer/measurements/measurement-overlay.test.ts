@@ -17,6 +17,7 @@ import type {
 } from "./types.js";
 import type { DicomMetadata } from "../../dicom/dicom-parser-util.js";
 import type { ViewportState } from "../../dicom/dicom-renderer.js";
+import { state } from "../state.js";
 
 function createMockCanvas(w = 500, h = 500): HTMLCanvasElement {
   const drawnCalls: string[] = [];
@@ -471,4 +472,35 @@ test("hitTestPolygonVertex: detects polygon vertices accurately", () => {
     8,
   );
   assert.equal(miss, null);
+});
+
+test("renderMeasurementOverlay returns early when areAnnotationsVisible is false", () => {
+  const canvas = createMockCanvas();
+  clearAnnotations("1.2.3.4.5");
+  addAnnotation({
+    id: "ann-vis",
+    type: "length",
+    sopInstanceUid: "1.2.3.4.5",
+    sliceIndex: 0,
+    start: { x: 10, y: 10 },
+    end: { x: 50, y: 50 },
+    distance: 40,
+    isCalibrated: true,
+    unit: "mm",
+  });
+
+  state.areAnnotationsVisible = false;
+  renderMeasurementOverlay({
+    canvas,
+    viewport: mockViewport,
+    metadata: mockMetadata,
+    sopInstanceUid: "1.2.3.4.5",
+  });
+
+  const calls = (canvas as any)._drawnCalls;
+  // Should only have clearRect, nothing else drawn
+  assert.deepEqual(calls, ["clearRect"]);
+
+  // Reset
+  state.areAnnotationsVisible = true;
 });

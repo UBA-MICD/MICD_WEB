@@ -163,14 +163,16 @@ test("validation bar is visible when medico opens a server study", async () => {
   state.source = "server";
   state.serverValidation = null;
 
-  const { initValidation, notifyStudyLoaded } = await freshUi();
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
   initValidation();
+  requestValidationMode();
   notifyStudyLoaded("study-001");
 
   const bar = document.getElementById("validation-bar")!;
   assert.ok(
     !bar.classList.contains("hidden"),
-    "bar should be visible for medico + server study",
+    "bar should be visible for medico + server study opened in validation mode",
   );
 });
 
@@ -199,8 +201,10 @@ test("status badge shows 'Sin validación' when serverValidation is null", async
   state.source = "server";
   state.serverValidation = null;
 
-  const { initValidation, notifyStudyLoaded } = await freshUi();
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
   initValidation();
+  requestValidationMode();
   notifyStudyLoaded("study-001");
 
   const badge = document.getElementById("validation-status-badge")!;
@@ -563,7 +567,7 @@ test("error toast has role=alert for screen reader interruption", async () => {
 
 // ── Tests: requestValidationMode / pendingValidationBar one-shot ──────────────
 
-test("bar is visible when notifyStudyLoaded is called without requestValidationMode (free path)", async () => {
+test("bar is hidden when notifyStudyLoaded is called without requestValidationMode (normal browsing)", async () => {
   setupFixture();
   await loginAs("medico");
   state.source = "server";
@@ -575,8 +579,8 @@ test("bar is visible when notifyStudyLoaded is called without requestValidationM
 
   const bar = document.getElementById("validation-bar")!;
   assert.ok(
-    !bar.classList.contains("hidden"),
-    "bar must be visible for staff + server study without requestValidationMode",
+    bar.classList.contains("hidden"),
+    "bar must stay hidden for a study opened outside validation mode",
   );
 });
 

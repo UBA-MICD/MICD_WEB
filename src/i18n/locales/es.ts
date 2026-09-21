@@ -273,6 +273,7 @@ export const es: Record<string, string> = {
 
   // ── upload ───────────────────────────────────────────────────────────────
   "upload.dropHint": "Arrastrá archivos .dcm, .zip o una carpeta aquí",
+  "upload.selectFiles": "Seleccionar archivos o ZIP",
   "upload.selectFolder": "Seleccionar carpeta",
   "upload.finish": "Finalizar",
   "upload.duplicateTitle": "Estudio duplicado",

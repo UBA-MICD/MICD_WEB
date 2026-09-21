@@ -1,0 +1,106 @@
+<header class="server-screen__header">
+  <button class="btn-back" id="btn-server-back">
+    <span aria-hidden="true">‹</span>
+    <span data-i18n="server.backToViewer">Volver al visualizador</span>
+  </button>
+  <h2
+    class="server-screen__title"
+    id="server-title"
+    data-screen-heading
+    tabindex="-1"
+    data-i18n="server.title"
+  >
+    Servidor
+  </h2>
+  <div
+    class="server-tabs hidden"
+    id="server-tabs"
+    role="tablist"
+    data-i18n-attr="aria-label:server.tabsAriaLabel"
+    aria-label="Acciones del servidor"
+  >
+    <button
+      class="server-tab server-tab--active"
+      id="tab-buscar"
+      role="tab"
+      aria-selected="true"
+      aria-controls="panel-buscar"
+      data-i18n="common.search"
+    >
+      Buscar
+    </button>
+    <button
+      class="server-tab"
+      id="tab-cargar"
+      role="tab"
+      aria-selected="false"
+      aria-controls="panel-cargar"
+      data-i18n="server.tabUpload"
+    >
+      Cargar
+    </button>
+    <!-- Staff-only (medico + admin): diagnostic validation panel. -->
+    <button
+      class="server-tab hidden"
+      id="tab-validaciones"
+      role="tab"
+      aria-selected="false"
+      aria-controls="panel-validaciones"
+      tabindex="-1"
+      data-i18n="validations.tab"
+    >
+      Validaciones
+    </button>
+    <!-- Admin-only: shown/hidden by server-screen.ts renderForSession(). -->
+    <button
+      class="server-tab hidden"
+      id="tab-usuarios"
+      role="tab"
+      aria-selected="false"
+      aria-controls="panel-usuarios"
+      tabindex="-1"
+      data-i18n="users.tab"
+    >
+      Usuarios
+    </button>
+    <!-- Admin-only: system status panel. -->
+    <button
+      class="server-tab hidden"
+      id="tab-sistema"
+      role="tab"
+      aria-selected="false"
+      aria-controls="panel-sistema"
+      tabindex="-1"
+      data-i18n="system.tab"
+    >
+      Sistema
+    </button>
+  </div>
+  <!-- Admin-only server configuration (TK-29, spec 001). Starts hidden;
+             server-screen.ts renderForSession() reveals it only for admins. The
+             main page has no path to change the server on purpose. -->
+  <button
+    type="button"
+    class="btn-server-settings hidden"
+    id="btn-server-settings"
+    data-i18n-attr="aria-label:server.configButton; title:server.configButton"
+    aria-label="Configurar servidor"
+  >
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3"></circle>
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+      ></path>
+    </svg>
+  </button>
+</header>

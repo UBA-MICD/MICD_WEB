@@ -7,7 +7,7 @@ import {
   closeServerConfigModal,
   _resetServerConfigModalForTest,
 } from "./server-config-modal.ts";
-import { state, persistServerUrl } from "../viewer/state.ts";
+import { persistServerUrl } from "../viewer/state.ts";
 import { isDialogOpen } from "../shared/dialog.ts";
 import { getServerUrl } from "../services/api.ts";
 
@@ -167,7 +167,6 @@ test("submitting valid URL updates serverUrl and closes dialog", () => {
   input.value = "https://pacs.radiology.org:8443/dicom-web";
   form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
 
-  assert.equal(state.serverUrl, "https://pacs.radiology.org:8443");
   assert.equal(getServerUrl(), "https://pacs.radiology.org:8443");
   assert.equal(store.get("micd_server_url"), "https://pacs.radiology.org:8443");
   assert.equal(isDialogOpen(overlay), false);

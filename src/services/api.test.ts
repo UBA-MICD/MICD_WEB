@@ -10,7 +10,7 @@ import {
   fetchInstanceFile,
   checkServerHealth,
 } from "./api.ts";
-import { state, persistServerUrl } from "../viewer/state.ts";
+import { persistServerUrl } from "../viewer/state.ts";
 import { API_BASE, API_ORIGIN, updateApiOrigin } from "../auth/auth.ts";
 
 let store: Map<string, string>;
@@ -91,7 +91,6 @@ test("validateServerUrl rejects unsupported protocols", () => {
 test("setServerUrl updates state, localStorage, and API base origin", () => {
   setServerUrl("https://hospital-pacs.local:9000");
 
-  assert.equal(state.serverUrl, "https://hospital-pacs.local:9000");
   assert.equal(getServerUrl(), "https://hospital-pacs.local:9000");
   assert.equal(getApiBaseUrl(), "https://hospital-pacs.local:9000/api");
   assert.equal(

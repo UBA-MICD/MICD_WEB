@@ -1,0 +1,296 @@
+<!-- Study Explorer panel -->
+<aside
+  class="explorer-panel explorer-panel--collapsed"
+  id="explorer-panel"
+  data-explorer-view
+>
+  <div
+    class="explorer-panel__resize-handle"
+    id="explorer-resize-handle"
+    aria-hidden="true"
+  ></div>
+  <div class="explorer-panel__header">
+    <h2 data-i18n="explorer.panelTitle">Estudios en servidor</h2>
+    <div class="explorer-panel__header-actions">
+      <button
+        class="icon-btn"
+        id="btn-export-explorer"
+        data-i18n-attr="title:export.studyZipTitle; aria-label:export.studyZipTitle"
+        title="Exportar estudio (.zip anonimizado)"
+        aria-label="Exportar estudio (.zip anonimizado)"
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+      </button>
+      <button
+        class="icon-btn hidden"
+        id="btn-activity"
+        data-i18n-attr="title:dialog.activityTitle; aria-label:dialog.activityTitle"
+        title="Historial de actividad"
+        aria-label="Historial de actividad"
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 8v4l3 3" />
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+      </button>
+      <button
+        class="icon-btn"
+        id="btn-refresh-studies"
+        data-i18n-attr="title:explorer.reload"
+        title="Recargar"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <path d="M3 12a9 9 0 1 1 3 7" />
+          <path d="M3 22v-7h7" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="explorer-filters">
+    <div class="filter-search">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        class="filter-search__icon"
+      >
+        <circle cx="10" cy="10" r="7" />
+        <line x1="15" y1="15" x2="21" y2="21" />
+      </svg>
+      <label
+        class="sr-only"
+        for="search-studies"
+        data-i18n="explorer.searchLabel"
+        >Buscar paciente o ID</label
+      >
+      <input
+        type="text"
+        id="search-studies"
+        class="filter-search__input"
+        data-explorer-search
+        data-i18n-attr="placeholder:explorer.searchLabel"
+        placeholder="Buscar paciente o ID"
+        autocomplete="off"
+      />
+      <button
+        class="filter-search__clear hidden"
+        id="btn-clear-search"
+        data-explorer-search-clear
+        data-i18n-attr="aria-label:explorer.clearSearch"
+        aria-label="Limpiar búsqueda"
+      >
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    <div
+      class="filter-chips"
+      id="filter-modality-chips"
+      data-explorer-chips
+      role="group"
+      data-i18n-attr="aria-label:explorer.modalityLabel"
+      aria-label="Modalidad"
+    >
+      <button
+        class="filter-chip filter-chip--active"
+        data-modality=""
+        aria-pressed="true"
+        data-i18n="explorer.modalityAll"
+      >
+        Todas
+      </button>
+      <button class="filter-chip" data-modality="CT" aria-pressed="false">
+        CT
+      </button>
+      <button class="filter-chip" data-modality="MR" aria-pressed="false">
+        MR
+      </button>
+      <button class="filter-chip" data-modality="DX" aria-pressed="false">
+        RX
+      </button>
+      <button class="filter-chip" data-modality="CR" aria-pressed="false">
+        CR
+      </button>
+      <button class="filter-chip" data-modality="US" aria-pressed="false">
+        US
+      </button>
+      <button class="filter-chip" data-modality="NM" aria-pressed="false">
+        NM
+      </button>
+      <button class="filter-chip" data-modality="PT" aria-pressed="false">
+        PET
+      </button>
+      <button class="filter-chip" data-modality="MG" aria-pressed="false">
+        MG
+      </button>
+      <button class="filter-chip" data-modality="XA" aria-pressed="false">
+        XA
+      </button>
+      <button
+        class="filter-chip filter-chip--zenodo"
+        data-zenodo-linked
+        aria-pressed="false"
+        data-i18n="zenodo.linkedFilter"
+      >
+        Vinculado a Zenodo
+      </button>
+    </div>
+
+    <div class="filter-dates">
+      <label
+        class="sr-only"
+        for="filter-date-from"
+        data-i18n="explorer.dateFromLabel"
+        >Desde</label
+      >
+      <input
+        type="date"
+        id="filter-date-from"
+        class="filter-date"
+        data-explorer-date-from
+        data-i18n-attr="title:explorer.dateFromLabel"
+        title="Desde"
+      />
+      <label
+        class="sr-only"
+        for="filter-date-to"
+        data-i18n="explorer.dateToLabel"
+        >Hasta</label
+      >
+      <input
+        type="date"
+        id="filter-date-to"
+        class="filter-date"
+        data-explorer-date-to
+        data-i18n-attr="title:explorer.dateToLabel"
+        title="Hasta"
+      />
+    </div>
+
+    <div class="filter-search">
+      <label
+        class="sr-only"
+        for="filter-description"
+        data-i18n="explorer.descriptionLabel"
+        >Descripción</label
+      >
+      <input
+        type="text"
+        id="filter-description"
+        class="filter-search__input"
+        data-explorer-description
+        data-i18n-attr="placeholder:explorer.descriptionPlaceholder"
+        placeholder="Filtrar por descripción"
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="filter-clear-wrap hidden" data-explorer-clear-wrap>
+      <button
+        data-explorer-clear
+        class="filter-clear-btn"
+        data-i18n="explorer.clearFilters"
+      >
+        Limpiar filtros
+      </button>
+    </div>
+  </div>
+
+  <ul id="study-list" class="study-list" data-explorer-list></ul>
+
+  <!-- Pagination -->
+  <div class="explorer-pagination">
+    <button
+      class="icon-btn"
+      data-explorer-prev
+      data-i18n-attr="title:explorer.prevPage; aria-label:explorer.prevPage"
+      title="Página anterior"
+      aria-label="Página anterior"
+    >
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+      >
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
+    </button>
+    <span class="pagination-info" data-explorer-pagination-info>—</span>
+    <button
+      class="icon-btn"
+      data-explorer-next
+      data-i18n-attr="title:explorer.nextPage; aria-label:explorer.nextPage"
+      title="Página siguiente"
+      aria-label="Página siguiente"
+    >
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+      >
+        <polyline points="9 6 15 12 9 18" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Transient upload status shown while dropping files on the panel. -->
+  <div
+    id="explorer-upload-status"
+    class="explorer-upload-status hidden"
+    role="status"
+    aria-live="polite"
+  ></div>
+
+  <!-- Session state lives here rather than behind a modal. -->
+  <div class="explorer-footer" id="explorer-footer">
+    <span id="explorer-session-line" data-i18n="auth.noSessionReadOnly"
+      >Sin sesión · solo lectura local</span
+    >
+  </div>
+</aside>

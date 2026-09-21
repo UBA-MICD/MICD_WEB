@@ -1,0 +1,45 @@
+<!-- Validation action bar (US-26) — staff-only, server studies -->
+<div
+  class="validation-bar hidden"
+  id="validation-bar"
+  role="toolbar"
+  data-i18n-attr="aria-label:validation.barAriaLabel"
+  aria-label="Validación de diagnóstico"
+>
+  <span class="validation-bar__status" id="validation-status-badge"></span>
+  <p
+    class="validation-bar__correction-notice hidden"
+    id="validation-correction-notice"
+    data-i18n="validation.correctionNotice"
+  >
+    Se registrará una corrección sobre la validación previa.
+  </p>
+  <p
+    class="validation-bar__readonly-notice hidden"
+    id="validation-readonly-notice"
+    data-i18n="validation.readonlyNotice"
+  >
+    Solo el administrador puede corregir esta validación.
+  </p>
+  <button
+    class="btn btn--accent btn--sm"
+    id="btn-validate-approve"
+    data-i18n="validation.approve"
+  >
+    Aprobar
+  </button>
+  <button
+    class="btn btn--danger btn--sm"
+    id="btn-validate-reject"
+    data-i18n="validation.reject"
+  >
+    Rechazar
+  </button>
+  <button
+    class="btn btn--secondary btn--sm"
+    id="btn-validate-review"
+    data-i18n="validation.review"
+  >
+    Marcar para revisión
+  </button>
+</div>

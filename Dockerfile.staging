@@ -1,0 +1,50 @@
+# Staging image — static SPA served by nginx. Same shape as the production
+# Dockerfile, kept as its own file so the staging pipeline builds a predictable
+# artifact. Built on GitHub runners and pushed to GHCR; the 4 GB VPS only pulls
+# this image (docs/staging-deployment/plan.md §4). No API base is baked: the app
+# is served same-origin and the Caddy edge routes /api and /auth to the backend.
+
+# ── Stage 1: Builder ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json ./
+RUN npm install
+
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+RUN npm run build
+
+# ── Stage 2: Vendored deps (offline-safe assets) ──────────────────────────────
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+
+# ── Stage 3: Runtime (nginx) ──────────────────────────────────────────────────
+FROM nginx:1.27-alpine AS runtime
+
+RUN rm -rf /usr/share/nginx/html/*
+
+# Compiled JS
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+COPY src/index.html /usr/share/nginx/html/index.html
+COPY src/styles.css /usr/share/nginx/html/styles.css
+COPY src/favicon.svg /usr/share/nginx/html/favicon.svg
+
+# Vendored, offline-safe assets (fonts + generated fflate bundle).
+COPY src/vendor /usr/share/nginx/html/vendor
+COPY --from=deps /app/node_modules/fflate/esm/browser.js /usr/share/nginx/html/vendor/fflate.js
+
+# dicom-parser UMD bundle
+COPY --from=deps /app/node_modules/dicom-parser/dist/dicomParser.min.js /usr/share/nginx/html/dicomParser.min.js
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

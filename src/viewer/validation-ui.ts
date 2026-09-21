@@ -27,10 +27,11 @@ import {
 // ── Internal state ────────────────────────────────────────────────────────────
 
 let currentStudyId: string | null = null;
-// Once requestValidationMode() is ever called, bar visibility is gated by the
-// one-shot pendingValidationBar flag. Before that first call the bar shows for
-// any staff + server study without an explicit request.
-let requestedOnce = false;
+// The validation bar only appears when a study is opened via "Ver estudio"
+// (the validations panel), which calls requestValidationMode() first. Normal
+// browsing — Buscar, the explorer panel, a fresh upload — shows the plain
+// viewer with no Aprobar/Rechazar controls. pendingValidationBar is the
+// one-shot request flag; notifyStudyLoaded() consumes it into validationBarActive.
 let pendingValidationBar = false;
 let validationBarActive = false;
 
@@ -53,7 +54,6 @@ export function initValidation(): void {
  * The flag is consumed (cleared) by notifyStudyLoaded().
  */
 export function requestValidationMode(): void {
-  requestedOnce = true;
   pendingValidationBar = true;
 }
 
@@ -76,7 +76,7 @@ export function notifyStudyLoaded(
     : null;
   if (studyId === null) {
     validationBarActive = false;
-  } else if (requestedOnce) {
+  } else {
     validationBarActive = pendingValidationBar;
     pendingValidationBar = false;
   }
@@ -93,7 +93,7 @@ function refreshBar(): void {
     currentStudyId !== null &&
     state.source === "server" &&
     isStaff() &&
-    (!requestedOnce || validationBarActive);
+    validationBarActive;
 
   bar.classList.toggle("hidden", !shouldShow);
 

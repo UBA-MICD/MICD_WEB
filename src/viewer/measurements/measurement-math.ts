@@ -102,7 +102,15 @@ export function screenToWorld(
   viewportHeight: number,
   cols: number,
   rows: number,
-  zoomOrViewport: number | { zoom: number; panX?: number; panY?: number },
+  zoomOrViewport:
+    | number
+    | {
+        zoom: number;
+        panX?: number;
+        panY?: number;
+        flipX?: boolean;
+        flipY?: boolean;
+      },
   panX: number = 0,
   panY: number = 0,
   // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
@@ -112,11 +120,19 @@ export function screenToWorld(
   let zoomVal = 1;
   let panXVal = panX;
   let panYVal = panY;
+  let isFlipY = flipY;
+  let isFlipX = false;
 
   if (typeof zoomOrViewport === "object" && zoomOrViewport !== null) {
     zoomVal = zoomOrViewport.zoom;
     panXVal = zoomOrViewport.panX ?? 0;
     panYVal = zoomOrViewport.panY ?? 0;
+    if (typeof (zoomOrViewport as any).flipY === "boolean") {
+      isFlipY = (zoomOrViewport as any).flipY;
+    }
+    if (typeof (zoomOrViewport as any).flipX === "boolean") {
+      isFlipX = (zoomOrViewport as any).flipX;
+    }
   } else if (typeof zoomOrViewport === "number") {
     zoomVal = zoomOrViewport;
   }
@@ -130,10 +146,11 @@ export function screenToWorld(
   const effectiveScale = baseScale * currentZoom;
   if (effectiveScale <= 0) return { x: 0, y: 0 };
 
-  const worldX =
-    (screenX - viewportWidth / 2 - currentPanX) / effectiveScale + cols / 2;
+  const dx = (screenX - viewportWidth / 2 - currentPanX) / effectiveScale;
+  const worldX = (isFlipX ? -dx : dx) + cols / 2;
+
   const dy = (screenY - viewportHeight / 2 - currentPanY) / effectiveScale;
-  const worldY = (flipY ? -dy : dy) + rows / 2;
+  const worldY = (isFlipY ? -dy : dy) + rows / 2;
 
   return { x: worldX, y: worldY };
 }
@@ -203,12 +220,28 @@ export function worldToScreen(
 ): Point2D;
 export function worldToScreen(
   pointOrX: Point2D | number,
-  yOrViewport: number | { zoom: number; panX?: number; panY?: number },
+  yOrViewport:
+    | number
+    | {
+        zoom: number;
+        panX?: number;
+        panY?: number;
+        flipX?: boolean;
+        flipY?: boolean;
+      },
   viewportWidth: number = 300,
   viewportHeight: number = 300,
   cols: number = 512,
   rows: number = 512,
-  zoomOrViewport?: number | { zoom: number; panX?: number; panY?: number },
+  zoomOrViewport?:
+    | number
+    | {
+        zoom: number;
+        panX?: number;
+        panY?: number;
+        flipX?: boolean;
+        flipY?: boolean;
+      },
   panX: number = 0,
   panY: number = 0,
   baseScale: number = 1,
@@ -220,7 +253,15 @@ export function worldToScreen(
   let vHeight = viewportHeight;
   let cCols = cols;
   let cRows = rows;
-  let zOrV: number | { zoom: number; panX?: number; panY?: number };
+  let zOrV:
+    | number
+    | {
+        zoom: number;
+        panX?: number;
+        panY?: number;
+        flipX?: boolean;
+        flipY?: boolean;
+      };
 
   if (typeof pointOrX === "object" && pointOrX !== null && "x" in pointOrX) {
     worldX = pointOrX.x;
@@ -235,11 +276,19 @@ export function worldToScreen(
   let zoomVal = 1;
   let panXVal = panX;
   let panYVal = panY;
+  let isFlipY = flipY;
+  let isFlipX = false;
 
   if (typeof zOrV === "object" && zOrV !== null) {
     zoomVal = zOrV.zoom;
     panXVal = zOrV.panX ?? 0;
     panYVal = zOrV.panY ?? 0;
+    if (typeof (zOrV as any).flipY === "boolean") {
+      isFlipY = (zOrV as any).flipY;
+    }
+    if (typeof (zOrV as any).flipX === "boolean") {
+      isFlipX = (zOrV as any).flipX;
+    }
   } else if (typeof zOrV === "number") {
     zoomVal = zOrV;
   }
@@ -252,10 +301,11 @@ export function worldToScreen(
     typeof panYVal === "number" && !isNaN(panYVal) ? panYVal : 0;
   const effectiveScale = baseScale * currentZoom;
 
-  const screenX =
-    vWidth / 2 + currentPanX + (worldX - cCols / 2) * effectiveScale;
+  const dx = (worldX - cCols / 2) * effectiveScale;
+  const screenX = vWidth / 2 + currentPanX + (isFlipX ? -dx : dx);
+
   const dy = (worldY - cRows / 2) * effectiveScale;
-  const screenY = vHeight / 2 + currentPanY + (flipY ? -dy : dy);
+  const screenY = vHeight / 2 + currentPanY + (isFlipY ? -dy : dy);
 
   return { x: screenX, y: screenY };
 }

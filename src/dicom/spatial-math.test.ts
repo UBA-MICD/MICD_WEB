@@ -202,3 +202,41 @@ test("getOrientationLabels determines viewport cardinal labels for clinical view
   assert.equal(getOrientationLabels(undefined), null);
   assert.equal(getOrientationLabels([1, 0, 0]), null);
 });
+
+test("getCanonicalFlip calculates RLPA flips correctly", () => {
+  const { getCanonicalFlip } = require("./spatial-math.js");
+
+  // Standard Axial (Supine): no flip needed
+  assert.deepEqual(getCanonicalFlip([1, 0, 0, 0, 1, 0]), {
+    flipX: false,
+    flipY: false,
+  });
+
+  // Prone Axial (inverted rows and cols): both flip
+  assert.deepEqual(getCanonicalFlip([-1, 0, 0, 0, -1, 0]), {
+    flipX: true,
+    flipY: true,
+  });
+
+  // Axial with inverted Y only: flipY true
+  assert.deepEqual(getCanonicalFlip([1, 0, 0, 0, -1, 0]), {
+    flipX: false,
+    flipY: true,
+  });
+
+  // Standard Coronal (C = [0, 0, -1]): no flip
+  assert.deepEqual(getCanonicalFlip([1, 0, 0, 0, 0, -1]), {
+    flipX: false,
+    flipY: false,
+  });
+
+  // Inverted Coronal (C = [0, 0, 1]): flipY true
+  assert.deepEqual(getCanonicalFlip([1, 0, 0, 0, 0, 1]), {
+    flipX: false,
+    flipY: true,
+  });
+
+  // Missing or degenerate IOP: no flip
+  assert.deepEqual(getCanonicalFlip(undefined), { flipX: false, flipY: false });
+  assert.deepEqual(getCanonicalFlip([1, 0]), { flipX: false, flipY: false });
+});

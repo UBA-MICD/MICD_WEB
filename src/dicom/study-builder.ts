@@ -17,7 +17,9 @@ import {
   calculateSpatialDistance,
   computePlaneNormal,
   getOrientationLabels,
+  getCanonicalFlip,
   type OrientationLabels,
+  type CanonicalFlip,
   type Vector3D,
 } from "./spatial-math.js";
 
@@ -34,6 +36,7 @@ export interface BuiltSlice {
   parsed: ParsedDicom;
   projectedDistance: number | null;
   instanceNumber: number | null;
+  file?: File;
 }
 
 export interface BuiltSeries {
@@ -44,6 +47,7 @@ export interface BuiltSeries {
   slices: BuiltSlice[];
   planeNormal: Vector3D | null;
   orientationLabels: OrientationLabels | null;
+  canonicalFlip: CanonicalFlip | null;
   spacingBetweenSlices: number | null;
 }
 
@@ -67,14 +71,20 @@ export interface StudyBuilderOptions {
 }
 
 /**
- * Extracts the ArrayBuffer and filename from a StudyRawInput item.
+ * Extracts the ArrayBuffer, filename and optional File from a StudyRawInput item.
  */
 async function extractBufferAndName(
   input: StudyRawInput,
-): Promise<{ name: string; buffer: ArrayBuffer }> {
+): Promise<{ name: string; buffer: ArrayBuffer; file?: File }> {
+  if (typeof File !== "undefined" && input instanceof File) {
+    const buffer = await input.arrayBuffer();
+    return { name: input.name, buffer, file: input };
+  }
   if ("arrayBuffer" in input && typeof input.arrayBuffer === "function") {
     const buffer = await input.arrayBuffer();
-    return { name: input.name, buffer };
+    const file =
+      "size" in input && "name" in input ? (input as File) : undefined;
+    return { name: input.name, buffer, file };
   }
   if ("buffer" in input && input.buffer instanceof ArrayBuffer) {
     return { name: input.name, buffer: input.buffer };
@@ -153,6 +163,7 @@ export class StudyBuilder {
     const rawSlices: Array<{
       name: string;
       buffer: ArrayBuffer;
+      file?: File;
       parsed: ParsedDicom;
       projectedDistance: number | null;
       instanceNumber: number | null;
@@ -161,7 +172,7 @@ export class StudyBuilder {
 
     for (const input of inputs) {
       try {
-        const { name, buffer } = await extractBufferAndName(input);
+        const { name, buffer, file } = await extractBufferAndName(input);
         const parsed = this.parseFn(buffer);
 
         const ipp = parsed.metadata.imagePositionPatient;
@@ -179,6 +190,7 @@ export class StudyBuilder {
         rawSlices.push({
           name,
           buffer,
+          file,
           parsed,
           projectedDistance,
           instanceNumber,
@@ -196,6 +208,7 @@ export class StudyBuilder {
       Array<{
         name: string;
         buffer: ArrayBuffer;
+        file?: File;
         parsed: ParsedDicom;
         projectedDistance: number | null;
         instanceNumber: number | null;
@@ -226,6 +239,7 @@ export class StudyBuilder {
         index: idx,
         name: s.name,
         buffer: s.buffer,
+        file: s.file,
         parsed: s.parsed,
         projectedDistance: s.projectedDistance,
         instanceNumber: s.instanceNumber,
@@ -240,15 +254,17 @@ export class StudyBuilder {
         patientId = refMeta.patientId || "";
       }
 
-      // Compute plane normal and orientation labels from the first slice with valid IOP
+      // Compute plane normal, orientation labels and canonical flip from the first slice with valid IOP
       let planeNormal: Vector3D | null = null;
       let orientationLabels: OrientationLabels | null = null;
+      let canonicalFlip: CanonicalFlip | null = null;
 
       for (const sl of builtSlices) {
         const iop = sl.parsed.metadata.imageOrientationPatient;
         if (iop && iop.length >= 6) {
           planeNormal = computePlaneNormal(iop);
           orientationLabels = getOrientationLabels(iop);
+          canonicalFlip = getCanonicalFlip(iop);
           break;
         }
       }
@@ -278,6 +294,7 @@ export class StudyBuilder {
         slices: builtSlices,
         planeNormal,
         orientationLabels,
+        canonicalFlip,
         spacingBetweenSlices,
       });
     }

@@ -15,6 +15,10 @@ import {
   createDefaultViewport,
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
+import {
+  getCanonicalFlip,
+  getOrientationLabels,
+} from "../dicom/spatial-math.js";
 import { escapeHtml } from "../shared/dom.js";
 import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
@@ -276,13 +280,19 @@ export class Viewport {
         parsed.metadata.rescaleIntercept,
         parsed.metadata.modality,
       );
-      this.data.viewport = {
+      const { flipX, flipY } = getCanonicalFlip(
+        parsed.metadata.imageOrientationPatient,
+      );
+      const vp: ViewportState = {
         windowCenter: auto.windowCenter,
         windowWidth: auto.windowWidth,
         zoom: 1,
         panX: 0,
         panY: 0,
       };
+      if (flipX) vp.flipX = true;
+      if (flipY) vp.flipY = true;
+      this.data.viewport = vp;
     }
     this.fitImage();
     this.render();
@@ -405,21 +415,38 @@ export class Viewport {
       return;
     }
 
-    if (this.plane === "coronal") {
-      this.orientTop.textContent = "S";
-      this.orientBottom.textContent = "I";
-      this.orientLeft.textContent = "R";
-      this.orientRight.textContent = "L";
-    } else if (this.plane === "sagittal") {
-      this.orientTop.textContent = "S";
-      this.orientBottom.textContent = "I";
-      this.orientLeft.textContent = "A";
-      this.orientRight.textContent = "P";
+    if (state.isMprMode) {
+      if (this.plane === "coronal") {
+        this.orientTop.textContent = "S";
+        this.orientBottom.textContent = "I";
+        this.orientLeft.textContent = "R";
+        this.orientRight.textContent = "L";
+      } else if (this.plane === "sagittal") {
+        this.orientTop.textContent = "S";
+        this.orientBottom.textContent = "I";
+        this.orientLeft.textContent = "A";
+        this.orientRight.textContent = "P";
+      } else {
+        this.orientTop.textContent = "A";
+        this.orientBottom.textContent = "P";
+        this.orientLeft.textContent = "R";
+        this.orientRight.textContent = "L";
+      }
+      return;
+    }
+
+    const iop = this.data.parsed?.metadata?.imageOrientationPatient;
+    const labels = getOrientationLabels(iop);
+    if (labels) {
+      this.orientTop.textContent = labels.top;
+      this.orientBottom.textContent = labels.bottom;
+      this.orientLeft.textContent = labels.left;
+      this.orientRight.textContent = labels.right;
     } else {
-      this.orientTop.textContent = "A";
-      this.orientBottom.textContent = "P";
-      this.orientLeft.textContent = "R";
-      this.orientRight.textContent = "L";
+      this.orientTop.textContent = "";
+      this.orientBottom.textContent = "";
+      this.orientLeft.textContent = "";
+      this.orientRight.textContent = "";
     }
   }
 

@@ -178,6 +178,68 @@ export function getAnatomicalName(
   }
 }
 
+export interface CanonicalFlip {
+  flipX: boolean;
+  flipY: boolean;
+}
+
+/**
+ * Determines whether a 2D slice should be flipped horizontally or vertically
+ * to adhere to canonical medical display conventions (RLPA: Right-Left, Posterior-Anterior, Head-Foot).
+ *
+ * Medical Display Conventions:
+ *  - Axial:
+ *      Horizontal: Left edge = Patient Right (-X), Right edge = Patient Left (+X) -> R[0] > 0.
+ *      Vertical: Top edge = Anterior (-Y), Bottom edge = Posterior (+Y) -> C[1] > 0.
+ *      If C[1] < 0 (e.g. prone scan or inverted acquisition), vertical flip is required.
+ *  - Coronal:
+ *      Horizontal: Left edge = Patient Right (-X), Right edge = Patient Left (+X) -> R[0] > 0.
+ *      Vertical: Top edge = Superior (+Z), Bottom edge = Inferior (-Z) -> C[2] < 0.
+ *      If C[2] > 0, vertical flip is required.
+ *  - Sagittal:
+ *      Horizontal: Left edge = Anterior (-Y), Right edge = Posterior (+Y) -> R[1] > 0.
+ *      Vertical: Top edge = Superior (+Z), Bottom edge = Inferior (-Z) -> C[2] < 0.
+ *      If C[2] > 0, vertical flip is required.
+ */
+export function getCanonicalFlip(
+  iop: readonly number[] | undefined | null,
+): CanonicalFlip {
+  if (!iop || iop.length < 6) {
+    return { flipX: false, flipY: false };
+  }
+
+  const normal = computePlaneNormal(iop);
+  if (!normal) {
+    return { flipX: false, flipY: false };
+  }
+
+  const absNx = Math.abs(normal[0]);
+  const absNy = Math.abs(normal[1]);
+  const absNz = Math.abs(normal[2]);
+
+  const r0 = iop[0];
+  const r1 = iop[1];
+  const c1 = iop[4];
+  const c2 = iop[5];
+
+  if (absNz >= absNx && absNz >= absNy) {
+    // Axial plane
+    const flipX = r0 < 0;
+    const flipY = c1 < 0;
+    return { flipX, flipY };
+  } else if (absNy >= absNx && absNy >= absNz) {
+    // Coronal plane
+    const flipX = r0 < 0;
+    const flipY = c2 > 0;
+    return { flipX, flipY };
+  } else {
+    // Sagittal plane
+    const flipX = r1 < 0;
+    const flipY = c2 > 0;
+    return { flipX, flipY };
+  }
+}
+
 /**
  * Cardinal orientation labels for the four viewport borders (Top, Bottom, Left, Right).
  */

@@ -159,3 +159,47 @@ test("dispatchSliceDelta advances synced viewports that share a stack", async ()
   assert.equal(vp1!.data.currentIndex, 1, "synced viewport advanced too");
   assert.deepEqual(loaded.sort(), ["vp-0", "vp-1"]);
 });
+
+test("ViewportCell dynamically renders orientation labels from ImageOrientationPatient", () => {
+  const vp = manager.activeViewport!;
+  const dcm = fakeDicom(400);
+  dcm.metadata.imageOrientationPatient = [1, 0, 0, 0, 1, 0]; // Axial: R->L, A->P
+  vp.data.parsed = dcm;
+  vp.render();
+
+  const top = vp.cellElement.querySelector(".viewport-orient-label--top");
+  const bottom = vp.cellElement.querySelector(".viewport-orient-label--bottom");
+  const left = vp.cellElement.querySelector(".viewport-orient-label--left");
+  const right = vp.cellElement.querySelector(".viewport-orient-label--right");
+
+  assert.equal(top?.textContent, "A");
+  assert.equal(bottom?.textContent, "P");
+  assert.equal(left?.textContent, "R");
+  assert.equal(right?.textContent, "L");
+
+  // Coronal: [1, 0, 0, 0, 0, -1] -> S, I, R, L
+  dcm.metadata.imageOrientationPatient = [1, 0, 0, 0, 0, -1];
+  vp.render();
+  assert.equal(top?.textContent, "S");
+  assert.equal(bottom?.textContent, "I");
+  assert.equal(left?.textContent, "R");
+  assert.equal(right?.textContent, "L");
+
+  // Missing IOP -> empty labels (AC-5)
+  dcm.metadata.imageOrientationPatient = undefined;
+  vp.render();
+  assert.equal(top?.textContent, "");
+  assert.equal(bottom?.textContent, "");
+  assert.equal(left?.textContent, "");
+  assert.equal(right?.textContent, "");
+});
+
+test("ViewportCell resetCamera sets flipY for inverted IOP", () => {
+  const vp = manager.activeViewport!;
+  const dcm = fakeDicom(400);
+  dcm.metadata.imageOrientationPatient = [1, 0, 0, 0, -1, 0]; // Inverted axial (prone)
+  vp.data.parsed = dcm;
+  vp.resetCamera();
+
+  assert.equal(vp.data.viewport.flipY, true);
+});

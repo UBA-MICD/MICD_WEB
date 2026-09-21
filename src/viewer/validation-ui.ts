@@ -252,6 +252,8 @@ function openValidationDialog(
     titleEl.textContent = t(titleKey);
     msgEl.textContent = t(msgKey);
     commentEl.value = "";
+    // El comentario es opcional en toda acción, rechazo incluido: la nota
+    // sólo recuerda que conviene dejarlo al rechazar, no bloquea el envío.
     requiredNote.classList.toggle("hidden", action !== "rejected");
 
     const opener =
@@ -268,11 +270,6 @@ function openValidationDialog(
     }
 
     function onConfirm(): void {
-      if (action === "rejected" && !commentEl.value.trim()) {
-        requiredNote!.classList.remove("hidden");
-        commentEl.focus();
-        return;
-      }
       finish(true);
     }
 

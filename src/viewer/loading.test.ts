@@ -19,9 +19,12 @@ import {
   initDropZone,
   displayParsed,
   loadStudyFromServer,
+  seriesKeyFor,
+  initialViewportFor,
 } from "./loading.ts";
 import { state } from "./state.ts";
 import { dicomCache } from "./cache.ts";
+import { getViewportManager } from "./viewport-registry.ts";
 import { adoptSession, logout, type AuthUser } from "../auth/auth.ts";
 
 test.before(() => {
@@ -392,4 +395,123 @@ test("loadStudyFromServer loads the first instance on success", async () => {
 
   assert.equal(state.serverStudyId, "study-1");
   assert.equal(state.serverInstances.length, 1);
+});
+
+// ── Window/level reset across series (imagen negra al abrir otro estudio) ────
+
+function parsedWith(
+  overrides: Partial<import("../dicom/dicom-parser-util.ts").DicomMetadata>,
+): import("../dicom/dicom-parser-util.ts").ParsedDicom {
+  return {
+    metadata: {
+      patientName: "Anon",
+      patientId: "1",
+      patientBirthDate: "",
+      patientSex: "",
+      studyDate: "",
+      studyDescription: "",
+      studyInstanceUid: "1.2.3",
+      accessionNumber: "",
+      referringPhysician: "",
+      seriesDescription: "S",
+      seriesNumber: "1",
+      modality: "CT",
+      instanceNumber: "1",
+      sopClassUid: "1.2.840.10008.5.1.4.1.1.2",
+      rows: 8,
+      columns: 8,
+      bitsAllocated: 16,
+      bitsStored: 12,
+      highBit: 11,
+      pixelRepresentation: 0,
+      samplesPerPixel: 1,
+      photometricInterpretation: "MONOCHROME2",
+      rescaleIntercept: 0,
+      rescaleSlope: 1,
+      windowCenter: 40,
+      windowWidth: 400,
+      transferSyntaxUid: "1.2.840.10008.1.2.1",
+      ...overrides,
+    },
+    pixelData: new Uint16Array(64),
+    rawDataSet: null,
+  };
+}
+
+test("seriesKeyFor prefers SeriesInstanceUID", () => {
+  assert.equal(
+    seriesKeyFor(parsedWith({ seriesInstanceUid: "1.2.9.9" })),
+    "1.2.9.9",
+  );
+});
+
+test("seriesKeyFor falls back to a composite key without SeriesInstanceUID", () => {
+  const key = seriesKeyFor(parsedWith({}));
+  assert.ok(key.includes("1.2.3"), "should carry the study UID");
+  assert.ok(key.includes("CT"), "should carry the modality");
+  assert.ok(key.includes("8x8"), "should carry the dimensions");
+});
+
+test("seriesKeyFor separates two series of the same study", () => {
+  assert.notEqual(
+    seriesKeyFor(parsedWith({ seriesInstanceUid: "1.2.3.1" })),
+    seriesKeyFor(parsedWith({ seriesInstanceUid: "1.2.3.2" })),
+  );
+});
+
+test("initialViewportFor takes the window stored in the DICOM", () => {
+  const vp = initialViewportFor(parsedWith({ windowCenter: 50, windowWidth: 350 }));
+  assert.equal(vp.windowCenter, 50);
+  assert.equal(vp.windowWidth, 350);
+});
+
+test("initialViewportFor computes an automatic window when the DICOM has none", () => {
+  const vp = initialViewportFor(parsedWith({ windowWidth: 0, windowCenter: 0 }));
+  assert.ok(vp.windowWidth > 0, "an automatic window must be non-degenerate");
+});
+
+test("displayParsed resets the window when a different series is opened", () => {
+  stubCanvas2DContext();
+  // Primera serie, con el usuario ajustando el brillo a mano.
+  displayParsed(parsedWith({ seriesInstanceUid: "serie-A" }), "A");
+  state.viewport.windowCenter = -600;
+  state.viewport.windowWidth = 1500;
+
+  // Otra serie: hereda -600/1500 ⇒ se ve negra. Debe reiniciarse.
+  displayParsed(
+    parsedWith({
+      seriesInstanceUid: "serie-B",
+      windowCenter: 40,
+      windowWidth: 400,
+    }),
+    "B",
+  );
+
+  assert.equal(state.viewport.windowCenter, 40);
+  assert.equal(state.viewport.windowWidth, 400);
+});
+
+test("displayParsed keeps the user's window while scrolling the same series", () => {
+  stubCanvas2DContext();
+  displayParsed(parsedWith({ seriesInstanceUid: "serie-A" }), "corte 1");
+
+  const manager = getViewportManager();
+  const vp = manager?.activeViewport;
+  if (vp) {
+    vp.data.viewport.windowCenter = -600;
+    vp.data.viewport.windowWidth = 1500;
+  } else {
+    state.viewport.windowCenter = -600;
+    state.viewport.windowWidth = 1500;
+  }
+
+  // Mismo SeriesInstanceUID, otro corte: el ajuste manual debe sobrevivir.
+  displayParsed(
+    parsedWith({ seriesInstanceUid: "serie-A", instanceNumber: "2" }),
+    "corte 2",
+  );
+
+  const current = vp ? vp.data.viewport : state.viewport;
+  assert.equal(current.windowCenter, -600, "el W/L manual no debe reiniciarse");
+  assert.equal(current.windowWidth, 1500);
 });

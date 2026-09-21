@@ -190,6 +190,20 @@ export const es: Record<string, string> = {
   "viewer.layers.opacity": "Opacidad",
   "viewer.layers.ww": "Ancho de Capa (WW)",
   "viewer.layers.wl": "Centro de Capa (WL)",
+
+  // ── viewer — segmentación con IA (mock SAM3) ────────────────────────────
+  "viewer.segmentation.buttonTitle": "Segmentación con IA (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "IA Segm.",
+  "viewer.segmentation.running": "Segmentando…",
+  "viewer.segmentation.simulatedBadge": "Simulado",
+  "viewer.segmentation.layerToggle": "Segmentación IA",
+  "viewer.segmentation.showTitle": "Mostrar segmentación de IA",
+  "viewer.segmentation.showLabel": "Segm. IA",
+  "viewer.segmentation.none":
+    "No hay segmentación disponible. Generala desde Servidor → Validaciones.",
+  "viewer.segmentation.hudLabel": "Segmentación IA (simulada)",
+  "viewer.segmentation.noImage": "Abrí una imagen DICOM antes de segmentar.",
+  "viewer.segmentation.failed": "No se pudo generar la segmentación.",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",
@@ -684,8 +698,7 @@ export const es: Record<string, string> = {
   "validation.dialog.msg.correctionReview":
     "¿Registrás una corrección marcando este estudio para revisión?",
   "validation.dialog.commentLabel": "Comentario",
-  "validation.dialog.commentRequired":
-    "El comentario es obligatorio para rechazar.",
+  "validation.dialog.commentRequired": "Se recomienda dejar un comentario al rechazar.",
   "validation.dialog.confirm": "Confirmar",
   "validation.status.approved": "Aprobado",
   "validation.status.rejected": "Rechazado",
@@ -696,14 +709,10 @@ export const es: Record<string, string> = {
   "validation.toast.success.review": "Estudio marcado para revisión.",
   "validation.toast.success.correction": "Corrección registrada.",
   "validation.toast.error": "No se pudo registrar la validación.",
-  "validation.analyzeWithAI": "Analizar con IA",
-  "validation.analyzing": "Analizando...",
   "validation.analysisDone": "Análisis completado.",
   "validation.analysisFailed": "Error en el análisis.",
   "validation.readonlyNotice":
     "Solo el administrador puede corregir esta validación.",
-  "validations.openNeedsML":
-    "Se requiere análisis de IA para visualizar el estudio.",
 
   // ── Panel de Validaciones (US-26) ────────────────────────────────────────────
   "validations.tab": "Validaciones",
@@ -719,17 +728,16 @@ export const es: Record<string, string> = {
   "validations.colStatus": "Estado",
   "validations.colValidatedBy": "Validado por",
   "validations.colActions": "Acciones",
-  "validations.openInViewer": "Ver estudio",
+  "validations.segmentWithAI": "Segmentar con IA",
   "validations.empty": "No hay estudios que coincidan con el filtro.",
   "validations.loadError": "No se pudo cargar la lista de estudios.",
   "validations.actionSuccess.approved": "Estudio aprobado.",
   "validations.actionSuccess.rejected": "Estudio rechazado.",
   "validations.actionSuccess.review": "Estudio marcado para revisión.",
   "validations.rejectDialog.title": "Rechazar estudio",
-  "validations.rejectDialog.commentLabel": "Comentario (obligatorio)",
+  "validations.rejectDialog.commentLabel": "Comentario (opcional)",
   "validations.rejectDialog.confirm": "Rechazar",
   "validations.correctionBadge": "corrección",
-  "validations.mlDone": "✓ Con IA",
 
   // ── Configuración de Servidor (TK-29) ───────────────────────────────────────
   "serverConfig.title": "Configuración del Servidor",

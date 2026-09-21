@@ -20,6 +20,10 @@ import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
 import { state } from "./state.js";
 import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
+import {
+  renderSegmentationOverlay,
+  type SegmentationLayer,
+} from "./segmentation/segmentation-overlay.js";
 
 // ── Types and Contracts ───────────────────────────────────────────────────────
 
@@ -40,6 +44,13 @@ export interface ViewportData {
   parsed: ParsedDicom | null;
   viewport: ViewportState;
   overlay?: OverlayLayer | null;
+  /** Segmentación de IA dibujada sobre este viewport (US-SEG). */
+  segmentation?: SegmentationLayer | null;
+  /**
+   * Serie a la que pertenece el window/level actual. Cambia de serie ⇒ el W/L
+   * se reinicia; mismo valor ⇒ se conserva al navegar entre cortes.
+   */
+  wlSeriesKey?: string | null;
   mlLabel?: string | null;
 }
 
@@ -197,6 +208,14 @@ export class Viewport {
       0.1,
       Math.min(10, this.data.viewport.zoom * factor),
     );
+    if (this.data.segmentation?.visible) {
+      // El contorno vive en el canvas de la imagen, en píxeles de imagen: el
+      // CSS transform ya lo mueve y lo escala solo, pero el grosor del borde
+      // se compensa por zoom, así que hay que repintarlo para que no engorde.
+      // Guardado tras el `if` para no pagar un render completo sin segmentación.
+      this.render();
+      return;
+    }
     this.applyTransform();
     this.updateInfoOverlay();
   }
@@ -305,6 +324,15 @@ export class Viewport {
       overlayPixelData: this.data.overlay?.parsed?.pixelData,
       overlayMetadata: this.data.overlay?.parsed?.metadata,
       overlayViewport: this.data.overlay?.viewport,
+    });
+
+    // Sobre el canvas de la imagen, no sobre el de anotaciones: así el
+    // contorno acompaña al zoom y al paneo por el mismo CSS transform.
+    renderSegmentationOverlay({
+      canvas: this.canvasElement,
+      metadata: this.data.parsed.metadata,
+      layer: this.data.segmentation,
+      zoom: this.data.viewport.zoom,
     });
 
     this.applyTransform();

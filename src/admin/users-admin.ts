@@ -20,7 +20,9 @@ export interface AdminUser {
   last_login_at: string | null;
 }
 
-const USERS_URL = `${API_BASE}/v1/users`;
+// A function, not a const: API_BASE is reassigned when the user changes the
+// server origin (updateApiOrigin), so this must read the live value each call.
+const usersUrl = (): string => `${API_BASE}/v1/users`;
 
 // ── API ──────────────────────────────────────────────────────────────────────
 
@@ -58,7 +60,7 @@ async function request<T>(
 const json = { "Content-Type": "application/json" };
 
 export function fetchUsers(): Promise<ApiResult<AdminUser[]>> {
-  return request(USERS_URL, {}, (res) => res.json());
+  return request(usersUrl(), {}, (res) => res.json());
 }
 
 export function createUser(input: {
@@ -67,7 +69,7 @@ export function createUser(input: {
   role: Role;
 }): Promise<ApiResult<AdminUser>> {
   return request(
-    USERS_URL,
+    usersUrl(),
     { method: "POST", headers: json, body: JSON.stringify(input) },
     (res) => res.json(),
   );
@@ -78,7 +80,7 @@ export function setUserRole(
   role: Role,
 ): Promise<ApiResult<AdminUser>> {
   return request(
-    `${USERS_URL}/${id}/role`,
+    `${usersUrl()}/${id}/role`,
     { method: "PATCH", headers: json, body: JSON.stringify({ role }) },
     (res) => res.json(),
   );
@@ -89,14 +91,14 @@ export function setUserStatus(
   status: "blocked" | "active",
 ): Promise<ApiResult<AdminUser>> {
   return request(
-    `${USERS_URL}/${id}/status`,
+    `${usersUrl()}/${id}/status`,
     { method: "PATCH", headers: json, body: JSON.stringify({ status }) },
     (res) => res.json(),
   );
 }
 
 export function deleteUser(id: number): Promise<ApiResult<null>> {
-  return request(`${USERS_URL}/${id}`, { method: "DELETE" }, async () => null);
+  return request(`${usersUrl()}/${id}`, { method: "DELETE" }, async () => null);
 }
 
 /** Audit log CSV export (TK-06) — admin-only server route, gated the same way. */

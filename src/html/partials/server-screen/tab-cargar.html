@@ -1,0 +1,74 @@
+<!-- Screen 04: upload on its own tab. -->
+<div
+  class="server-panel hidden"
+  id="panel-cargar"
+  role="tabpanel"
+  aria-labelledby="tab-cargar"
+  tabindex="0"
+>
+  <div class="server-panel__body">
+    <input type="file" id="upload-input" accept=".dcm,.zip" class="hidden" />
+    <input type="file" id="upload-folder-input" class="hidden" />
+
+    <div class="upload-drop" id="upload-drop">
+      <p data-i18n="upload.dropHint">
+        Arrastrá archivos .dcm, .zip o una carpeta aquí
+      </p>
+      <div class="upload-drop__actions">
+        <button
+          class="btn btn--accent"
+          id="btn-upload-server"
+          data-i18n="upload.selectFiles"
+        >
+          Seleccionar archivos o ZIP
+        </button>
+        <button
+          class="btn btn--outline"
+          id="btn-upload-folder"
+          data-i18n="upload.selectFolder"
+        >
+          Seleccionar carpeta
+        </button>
+      </div>
+    </div>
+
+    <!-- One row per file. Not a live region: per-byte updates would
+               flood a screen reader. The per-file count below is announced
+               instead, and each bar carries aria-valuenow for on-demand
+               reading. -->
+    <ul class="upload-rows" id="upload-rows"></ul>
+
+    <p class="upload-summary">
+      <span
+        id="upload-status"
+        class="upload-status"
+        role="status"
+        aria-live="polite"
+      ></span>
+      <span
+        id="upload-percent"
+        class="upload-percent"
+        aria-hidden="true"
+      ></span>
+    </p>
+
+    <p class="upload-note" id="upload-note"></p>
+  </div>
+
+  <footer class="server-panel__actions">
+    <button
+      class="btn btn--secondary"
+      id="btn-upload-cancel"
+      data-i18n="common.cancel"
+    >
+      Cancelar
+    </button>
+    <button
+      class="btn btn--accent"
+      id="btn-upload-finish"
+      data-i18n="upload.finish"
+    >
+      Finalizar
+    </button>
+  </footer>
+</div>

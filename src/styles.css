@@ -4370,3 +4370,123 @@ body {
   flex-direction: column;
   gap: 10px;
 }
+
+/* ── Segmentación con IA (mock SAM3) ──────────────────────────────────────── */
+/* Turquesa propio de la capa de segmentación: el esmeralda --accent ya
+   identifica las mediciones calibradas, y ambas capas pueden convivir en el
+   mismo viewport. Contraste del turquesa sobre #09090b: 8.4:1. */
+:root {
+  --segmentation: #1abc9c;
+  --segmentation-soft: rgba(26, 188, 156, 0.14);
+  --segmentation-border: rgba(26, 188, 156, 0.4);
+}
+
+/* Botón del visor que muestra u oculta la segmentación ya calculada. */
+.toolbar__tool--ai.active,
+.toolbar__tool--ai:hover:not(:disabled) {
+  color: var(--segmentation);
+  background: var(--segmentation-soft);
+  border-color: var(--segmentation-border);
+}
+.toolbar__tool--ai.active svg {
+  filter: drop-shadow(0 0 4px var(--segmentation-border));
+}
+
+/* Acción de segmentación en la fila de Validaciones. Turquesa apagado: es una
+   acción secundaria dentro de la tabla, no la principal. */
+.btn--ai {
+  border-color: var(--segmentation-border);
+  color: var(--segmentation);
+}
+.btn--ai:hover:not(:disabled) {
+  background: var(--segmentation-soft);
+  border-color: var(--segmentation);
+}
+
+@keyframes segmentation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.segmentation-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(18, 18, 24, 0.92);
+  border: 1px solid var(--segmentation-border);
+  color: var(--segmentation);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+.segmentation-status::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--segmentation-border);
+  border-top-color: var(--segmentation);
+  border-radius: 50%;
+  animation: segmentation-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmentation-status::before {
+    animation: none;
+  }
+}
+
+/* El resultado no viene de un modelo real: el aviso queda permanentemente a la
+   vista mientras la capa esté encendida, no como un toast que se desvanece. */
+.segmentation-badge {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 30;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.popover-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.popover-check:has(.popover-check__input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.popover-check__input {
+  accent-color: var(--segmentation);
+  width: 14px;
+  height: 14px;
+  cursor: inherit;
+}
+/* Muestra de color: enseña qué overlay conmuta la casilla. */
+.popover-check__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 2px solid var(--segmentation);
+  background: var(--segmentation-soft);
+  flex: none;
+}

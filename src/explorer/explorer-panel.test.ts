@@ -54,30 +54,29 @@ beforeEach(() => {
   `);
 });
 
-test("initExplorerPanel marks the toggle button active on start", () => {
+test("initExplorerPanel starts with the panel collapsed", () => {
   initExplorerPanel();
-  assert.equal(
-    document
-      .getElementById("btn-toggle-explorer")!
-      .classList.contains("active"),
-    true,
-  );
+  const btn = document.getElementById("btn-toggle-explorer")!;
+  const panel = document.getElementById("explorer-panel")!;
+  assert.equal(panel.classList.contains("explorer-panel--collapsed"), true);
+  assert.equal(btn.classList.contains("active"), false);
+  assert.equal(btn.getAttribute("aria-expanded"), "false");
 });
 
-test("clicking the toggle button collapses and re-expands the panel", () => {
+test("clicking the toggle button expands and re-collapses the panel", () => {
   initExplorerPanel();
   const btn = document.getElementById("btn-toggle-explorer")!;
   const panel = document.getElementById("explorer-panel")!;
 
   btn.click();
-  assert.equal(panel.classList.contains("explorer-panel--collapsed"), true);
-  assert.equal(btn.getAttribute("aria-expanded"), "false");
-  assert.equal(btn.classList.contains("active"), false);
-
-  btn.click();
   assert.equal(panel.classList.contains("explorer-panel--collapsed"), false);
   assert.equal(btn.getAttribute("aria-expanded"), "true");
   assert.equal(btn.classList.contains("active"), true);
+
+  btn.click();
+  assert.equal(panel.classList.contains("explorer-panel--collapsed"), true);
+  assert.equal(btn.getAttribute("aria-expanded"), "false");
+  assert.equal(btn.classList.contains("active"), false);
 });
 
 test("clicking export does not throw with no study loaded", () => {
@@ -101,6 +100,8 @@ test("a saved width below the minimum is ignored", () => {
 
 test("dragging the resize handle updates the panel width and persists it", () => {
   initExplorerPanel();
+  // The handle ignores drags while collapsed, so open the panel first.
+  document.getElementById("btn-toggle-explorer")!.click();
   const handle = document.getElementById("explorer-resize-handle")!;
   const panel = document.getElementById("explorer-panel")!;
 
@@ -138,9 +139,7 @@ test("dragging the resize handle updates the panel width and persists it", () =>
 });
 
 test("mousedown on the resize handle while collapsed is a no-op", () => {
-  initExplorerPanel();
-  const btn = document.getElementById("btn-toggle-explorer")!;
-  btn.click(); // collapse
+  initExplorerPanel(); // starts collapsed
   const handle = document.getElementById("explorer-resize-handle")!;
 
   handle.dispatchEvent(
@@ -239,4 +238,25 @@ test("dropping nothing (no files) does not throw", async () => {
     panel.dispatchEvent(dragEvent("drop", { dataTransfer: dt })),
   );
   await Promise.resolve();
+});
+
+test("dropping a corrupt .zip expands it and reports the read error", async () => {
+  initExplorerPanel();
+  const panel = document.getElementById("explorer-panel")!;
+
+  // A .zip is accepted by collectServerUploadFiles, so the drop handler reaches
+  // the new zip-expansion branch; the bytes aren't a real archive, so fflate
+  // fails and it surfaces a zipReadError toast (no upload is attempted).
+  const dt = { files: [new File(["not a real zip"], "study.zip")] };
+  panel.dispatchEvent(dragEvent("drop", { dataTransfer: dt }));
+
+  // expandFiles dynamically imports fflate and unzips on a callback — give it
+  // enough time to settle even under test runner load.
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 25));
+    if (document.querySelector("#toast-container .toast--error")) break;
+  }
+
+  const toast = document.querySelector("#toast-container .toast--error");
+  assert.ok(toast, "expected an error toast for a corrupt zip");
 });

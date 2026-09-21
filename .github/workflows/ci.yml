@@ -2,13 +2,25 @@ name: CI
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, staging]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, dev, staging ]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
 
     steps:
       - name: Checkout repository

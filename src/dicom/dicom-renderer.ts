@@ -208,8 +208,7 @@ export function applyCanvasTransform(
   imageCanvas: HTMLCanvasElement,
   viewport: ViewportState,
 ): void {
-  // Apply zoom, pan, and vertical inversion (scaleY(-1)) so Anterior is at top and Posterior at bottom in 2D views
-  const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom}) scaleY(-1)`;
+  const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`;
   imageCanvas.style.transform = transform;
 }
 

@@ -1,5 +1,6 @@
 import type { ParsedDicom } from "../dicom/dicom-parser-util.js";
 import type { ViewportState } from "../dicom/dicom-renderer.js";
+import { updateApiOrigin } from "../auth/auth.js";
 export {
   WINDOW_PRESETS,
   type WindowPreset,
@@ -37,8 +38,6 @@ export interface AppState {
   measurementLineWidth: number;
   is3DMode: boolean;
   isMprMode?: boolean;
-  /** Configured base URL for the PACS / Orthanc server (TK-29). */
-  serverUrl: string;
   /** Validation record for the currently loaded server study, or null if none. */
   serverValidation: {
     validationId: number;
@@ -48,7 +47,6 @@ export interface AppState {
   } | null;
 }
 
-export const DEFAULT_SERVER_URL = "http://localhost:3000";
 export const SERVER_URL_STORAGE_KEY = "micd_server_url";
 
 function getStorage(): Storage | null {
@@ -63,29 +61,13 @@ function getStorage(): Storage | null {
   return null;
 }
 
-/** Reads the persisted server URL from localStorage or environment fallback. */
-export function getStoredServerUrl(): string {
-  const storage = getStorage();
-  if (storage) {
-    const stored =
-      storage.getItem(SERVER_URL_STORAGE_KEY) ||
-      storage.getItem("micd_api_origin");
-    if (stored && typeof stored === "string" && stored.trim().length > 0) {
-      return stored.trim().replace(/\/+$/, "");
-    }
-  }
-  const globalOrigin = (globalThis as { MICD_API_ORIGIN?: string })
-    .MICD_API_ORIGIN;
-  if (typeof globalOrigin === "string" && globalOrigin.trim().length > 0) {
-    return globalOrigin.trim().replace(/\/+$/, "");
-  }
-  return DEFAULT_SERVER_URL;
-}
-
-/** Persists the server URL to state and localStorage. */
+/**
+ * Sets the active server origin: updates the live resolved origin (auth.ts),
+ * persists it to localStorage, and mirrors it to MICD_API_ORIGIN so a reload
+ * re-resolves the same value. The one place the origin is written.
+ */
 export function persistServerUrl(url: string): void {
   const clean = url.trim().replace(/\/+$/, "");
-  state.serverUrl = clean;
   const storage = getStorage();
   if (storage) {
     try {
@@ -96,6 +78,7 @@ export function persistServerUrl(url: string): void {
     }
   }
   (globalThis as { MICD_API_ORIGIN?: string }).MICD_API_ORIGIN = clean;
+  updateApiOrigin(clean);
 }
 
 export const state: AppState = {
@@ -120,7 +103,6 @@ export const state: AppState = {
   isMprMode: false,
   annotations: {},
   areAnnotationsVisible: true,
-  serverUrl: getStoredServerUrl(),
   serverValidation: null,
 };
 

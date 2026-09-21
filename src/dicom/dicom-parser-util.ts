@@ -58,6 +58,21 @@ export interface DicomMetadata {
   imageOrientationPatient?: number[]; // [Rx, Ry, Rz, Cx, Cy, Cz] (0020,0037)
   sliceThickness?: number; // (0028,0050)
   spacingBetweenSlices?: number; // (0018,0088)
+
+  // Derivation — only set on images this app derives from another instance
+  // (e.g. the AI segmentation result). Never read from a parsed file.
+  /** ReferencedImageSequence (0008,1140). */
+  referencedImageSequence?: ReferencedImage[];
+  /** DerivationDescription (0008,2111). */
+  derivationDescription?: string;
+}
+
+/** One item of ReferencedImageSequence (0008,1140). */
+export interface ReferencedImage {
+  /** ReferencedSOPClassUID (0008,1150). */
+  referencedSopClassUid: string;
+  /** ReferencedSOPInstanceUID (0008,1155). */
+  referencedSopInstanceUid: string;
 }
 
 export interface ParsedDicom {

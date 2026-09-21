@@ -1,0 +1,357 @@
+<!-- Announced once when the session is nearly over. Separate from the
+         visible countdown, which updates every second and must not be live. -->
+<p id="session-announce" class="sr-only" role="status" aria-live="polite"></p>
+
+<!-- Activity history -->
+<div id="activity-dialog" class="dialog-overlay hidden">
+  <div
+    class="dialog dialog--wide"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="activity-title"
+  >
+    <h3
+      class="dialog__title"
+      id="activity-title"
+      data-i18n="dialog.activityTitle"
+    >
+      Historial de actividad
+    </h3>
+    <div id="activity-body" class="activity-body"></div>
+    <div class="dialog__actions">
+      <button
+        class="btn btn--secondary"
+        id="activity-close"
+        data-dialog-autofocus
+        data-i18n="common.close"
+      >
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Export dialog -->
+<div id="export-dialog" class="dialog-overlay hidden">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="export-dialog-title"
+  >
+    <h3
+      class="dialog__title"
+      id="export-dialog-title"
+      data-i18n="export.dialogTitle"
+    >
+      Opciones de Exportación
+    </h3>
+    <p class="dialog__msg" data-i18n="export.dialogPrompt">
+      Seleccioná el formato de exportación deseado:
+    </p>
+    <div
+      class="dialog__actions"
+      style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px"
+    >
+      <button class="btn btn--accent btn--full" id="btn-export-dialog-png">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+          style="margin-right: 6px"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+        <span data-i18n="export.currentViewPng"
+          >Exportar vista actual (PNG)</span
+        >
+      </button>
+      <button class="btn btn--outline btn--full" id="btn-export-dialog-zip">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+          style="margin-right: 6px"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span data-i18n="export.fullStudyZip"
+          >Exportar estudio completo (ZIP)</span
+        >
+      </button>
+      <button
+        class="btn btn--secondary btn--full"
+        id="export-dialog-cancel"
+        data-dialog-autofocus
+        style="margin-top: 4px"
+        data-i18n="common.cancel"
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate confirmation dialog -->
+<div id="duplicate-dialog" class="dialog-overlay hidden">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="duplicate-title"
+  >
+    <h3
+      class="dialog__title"
+      id="duplicate-title"
+      data-i18n="upload.duplicateTitle"
+    >
+      Estudio duplicado
+    </h3>
+    <p id="duplicate-msg" class="dialog__msg"></p>
+    <div class="dialog__actions">
+      <button
+        class="btn btn--danger"
+        id="duplicate-yes"
+        data-i18n="upload.replace"
+      >
+        Reemplazar
+      </button>
+      <!-- Focus lands on the safe option, not on "Reemplazar", which
+               overwrites an existing study. -->
+      <button
+        class="btn btn--secondary"
+        id="duplicate-no"
+        data-dialog-autofocus
+        data-i18n="common.cancel"
+      >
+        Cancelar
+      </button>
+      <button
+        class="btn btn--secondary"
+        id="duplicate-cancel-all"
+        data-i18n="upload.cancelAll"
+      >
+        Cancelar todo
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Activate an invited account by entering the emailed code (US-H04).
+         The URL-based accept-invite screen still works; this modal is the path
+         for the desktop app and for anyone who has the code but no live link. -->
+<div id="invite-dialog" class="dialog-overlay hidden">
+  <form
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="invite-dialog-title"
+    data-invite-dialog-form
+  >
+    <h3
+      class="dialog__title"
+      id="invite-dialog-title"
+      data-i18n="invite.dialog.title"
+    >
+      Activá tu cuenta
+    </h3>
+    <p class="dialog__msg" data-i18n="invite.dialog.msg">
+      Ingresá tu email y el código que recibiste por correo, y elegí una
+      contraseña.
+    </p>
+    <label class="login-field">
+      <span data-i18n="invite.dialog.emailLabel">Email</span>
+      <input
+        type="email"
+        data-invite-dialog-email
+        data-dialog-autofocus
+        required
+        autocomplete="username"
+      />
+    </label>
+    <label class="login-field">
+      <span data-i18n="invite.dialog.codeLabel">Código de invitación</span>
+      <input
+        type="text"
+        data-invite-dialog-code
+        required
+        autocomplete="one-time-code"
+        spellcheck="false"
+      />
+    </label>
+    <label class="login-field">
+      <span data-i18n="invite.password">Contraseña</span>
+      <input
+        type="password"
+        data-invite-dialog-password
+        required
+        autocomplete="new-password"
+      />
+    </label>
+    <p class="login-error hidden" data-invite-dialog-error role="alert"></p>
+    <div class="dialog__actions">
+      <button
+        class="btn btn--accent"
+        type="submit"
+        data-invite-dialog-submit
+        data-i18n="invite.submit"
+      >
+        Crear cuenta e ingresar
+      </button>
+      <button
+        class="btn btn--secondary"
+        type="button"
+        data-invite-dialog-cancel
+        data-i18n="common.cancel"
+      >
+        Cancelar
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Validation confirmation dialog (US-26) -->
+<div id="validation-dialog" class="dialog-overlay hidden">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="validation-dialog-title"
+  >
+    <h3
+      class="dialog__title"
+      id="validation-dialog-title"
+      data-i18n="validation.dialog.title"
+    >
+      Confirmar acción
+    </h3>
+    <p class="dialog__msg" id="validation-dialog-msg"></p>
+    <div class="dialog__field">
+      <label for="validation-comment" data-i18n="validation.dialog.commentLabel"
+        >Comentario</label
+      >
+      <textarea
+        id="validation-comment"
+        class="dialog__textarea"
+        rows="3"
+        data-dialog-autofocus
+      ></textarea>
+      <p
+        class="dialog__field-note hidden"
+        id="validation-comment-required"
+        data-i18n="validation.dialog.commentRequired"
+      >
+        El comentario es obligatorio para rechazar.
+      </p>
+    </div>
+    <div class="dialog__actions">
+      <button
+        class="btn btn--secondary"
+        id="validation-dialog-cancel"
+        data-i18n="common.cancel"
+      >
+        Cancelar
+      </button>
+      <button
+        class="btn btn--accent"
+        id="validation-dialog-confirm"
+        data-i18n="validation.dialog.confirm"
+      >
+        Confirmar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Server Configuration dialog (TK-29) -->
+<div id="server-config-dialog" class="dialog-overlay hidden">
+  <form
+    class="dialog server-config-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="server-config-dialog-title"
+    id="server-config-form"
+    novalidate
+  >
+    <div class="server-config-dialog__header">
+      <div class="server-config-dialog__icon" aria-hidden="true">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="2" y="2" width="20" height="8" rx="2" />
+          <rect x="2" y="14" width="20" height="8" rx="2" />
+          <line x1="6" y1="6" x2="6.01" y2="6" />
+          <line x1="6" y1="18" x2="6.01" y2="18" />
+        </svg>
+      </div>
+      <h3
+        class="dialog__title"
+        id="server-config-dialog-title"
+        data-i18n="serverConfig.title"
+      >
+        Configuración del Servidor
+      </h3>
+    </div>
+    <p class="dialog__msg" data-i18n="serverConfig.description">
+      Ingresá la URL base del servidor PACS/Orthanc para consultar estudios,
+      metadatos y volúmenes DICOM.
+    </p>
+    <label class="login-field">
+      <span data-i18n="serverConfig.urlLabel">URL del Servidor</span>
+      <input
+        type="url"
+        id="server-config-url-input"
+        class="server-config-input"
+        data-dialog-autofocus
+        placeholder="http://localhost:3000"
+        data-i18n-attr="placeholder:serverConfig.urlPlaceholder"
+        required
+        autocomplete="url"
+        spellcheck="false"
+      />
+    </label>
+    <p
+      id="server-config-error"
+      class="login-error server-config-error hidden"
+      role="alert"
+    ></p>
+    <div class="dialog__actions">
+      <button
+        class="btn btn--secondary"
+        type="button"
+        id="btn-server-config-cancel"
+        data-i18n="common.cancel"
+      >
+        Cancelar
+      </button>
+      <button
+        class="btn btn--accent"
+        type="submit"
+        id="btn-server-config-save"
+        data-i18n="serverConfig.saveAndConnect"
+      >
+        Guardar / Conectar
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Toast stack: transient, dismissible notifications (Zenodo errors, etc). -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>

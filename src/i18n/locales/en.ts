@@ -188,6 +188,20 @@ export const en: Record<string, string> = {
   "viewer.layers.opacity": "Opacity",
   "viewer.layers.ww": "Layer Width (WW)",
   "viewer.layers.wl": "Layer Center (WL)",
+
+  // ── viewer — AI segmentation (mock SAM3) ────────────────────────────────
+  "viewer.segmentation.buttonTitle": "AI segmentation (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "AI Seg.",
+  "viewer.segmentation.running": "Segmenting…",
+  "viewer.segmentation.simulatedBadge": "Simulated",
+  "viewer.segmentation.layerToggle": "AI segmentation",
+  "viewer.segmentation.showTitle": "Show AI segmentation",
+  "viewer.segmentation.showLabel": "AI Seg.",
+  "viewer.segmentation.none":
+    "No segmentation available. Generate one from Server → Validations.",
+  "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
+  "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
+  "viewer.segmentation.failed": "The segmentation could not be generated.",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",
@@ -255,6 +269,7 @@ export const en: Record<string, string> = {
 
   // ── upload ───────────────────────────────────────────────────────────────
   "upload.dropHint": "Drag .dcm, .zip files or a folder here",
+  "upload.selectFiles": "Select files or ZIP",
   "upload.selectFolder": "Select folder",
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",
@@ -675,7 +690,8 @@ export const en: Record<string, string> = {
   "validation.dialog.msg.correctionReview":
     "Record a correction flagging this study for review?",
   "validation.dialog.commentLabel": "Comment",
-  "validation.dialog.commentRequired": "A comment is required when rejecting.",
+  "validation.dialog.commentRequired":
+    "Leaving a comment when rejecting is recommended.",
   "validation.dialog.confirm": "Confirm",
   "validation.status.approved": "Approved",
   "validation.status.rejected": "Rejected",
@@ -686,13 +702,10 @@ export const en: Record<string, string> = {
   "validation.toast.success.review": "Study flagged for review.",
   "validation.toast.success.correction": "Correction recorded.",
   "validation.toast.error": "Could not record validation.",
-  "validation.analyzeWithAI": "Analyze with AI",
-  "validation.analyzing": "Analyzing...",
   "validation.analysisDone": "Analysis complete.",
   "validation.analysisFailed": "Analysis failed.",
   "validation.readonlyNotice":
     "Only an administrator can correct this validation.",
-  "validations.openNeedsML": "AI analysis required to open the study.",
 
   // ── Validations panel (US-26) ────────────────────────────────────────────────
   "validations.tab": "Validations",
@@ -708,17 +721,16 @@ export const en: Record<string, string> = {
   "validations.colStatus": "Status",
   "validations.colValidatedBy": "Validated by",
   "validations.colActions": "Actions",
-  "validations.openInViewer": "Open study",
+  "validations.segmentWithAI": "Segment with AI",
   "validations.empty": "No studies match the current filter.",
   "validations.loadError": "Could not load the study list.",
   "validations.actionSuccess.approved": "Study approved.",
   "validations.actionSuccess.rejected": "Study rejected.",
   "validations.actionSuccess.review": "Study flagged for review.",
   "validations.rejectDialog.title": "Reject study",
-  "validations.rejectDialog.commentLabel": "Comment (required)",
+  "validations.rejectDialog.commentLabel": "Comment (optional)",
   "validations.rejectDialog.confirm": "Reject",
   "validations.correctionBadge": "correction",
-  "validations.mlDone": "✓ AI analyzed",
 
   // ── Server Configuration (TK-29) ──────────────────────────────────────────
   "serverConfig.title": "Server Configuration",

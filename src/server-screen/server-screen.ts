@@ -20,6 +20,7 @@ import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
 import { mountValidationsPanel } from "./validations-panel.js";
 import { requestValidationMode } from "../viewer/validation-ui.js";
+import { runSegmentation } from "../viewer/segmentation/segmentation-ui.js";
 import {
   loadStudyExplorer,
   getSelectedStudyId,
@@ -196,10 +197,15 @@ export function initServerScreen(): void {
   systemPanel = mountSystemPanel($("system-panel-body"));
   validationsPanel = mountValidationsPanel(
     $("panel-validaciones"),
-    async (studyId: string) => {
+    async (studyId: string, options?: { segment?: boolean }) => {
       requestValidationMode();
       await openStudy(studyId);
       closeServerScreen();
+      // La segmentación corre recién con el estudio ya cargado en el visor:
+      // necesita los píxeles y el tamaño de la imagen abierta.
+      if (options?.segment) {
+        await runSegmentation();
+      }
     },
   );
 

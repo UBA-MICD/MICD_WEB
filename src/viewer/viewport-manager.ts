@@ -4,7 +4,10 @@
  * camera transforms (Pan, Zoom, Window/Level, slice scroll) across viewports.
  */
 
-import type { ParsedDicom } from "../dicom/dicom-parser-util.js";
+import {
+  type ParsedDicom,
+  calculateAutoWindowLevel,
+} from "../dicom/dicom-parser-util.js";
 import {
   type ViewportState,
   renderDicom,
@@ -17,6 +20,10 @@ import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
 import { state } from "./state.js";
 import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
+import {
+  renderSegmentationOverlay,
+  type SegmentationLayer,
+} from "./segmentation/segmentation-overlay.js";
 
 // ── Types and Contracts ───────────────────────────────────────────────────────
 
@@ -37,6 +44,13 @@ export interface ViewportData {
   parsed: ParsedDicom | null;
   viewport: ViewportState;
   overlay?: OverlayLayer | null;
+  /** Segmentación de IA dibujada sobre este viewport (US-SEG). */
+  segmentation?: SegmentationLayer | null;
+  /**
+   * Serie a la que pertenece el window/level actual. Cambia de serie ⇒ el W/L
+   * se reinicia; mismo valor ⇒ se conserva al navegar entre cortes.
+   */
+  wlSeriesKey?: string | null;
   mlLabel?: string | null;
 }
 
@@ -195,6 +209,14 @@ export class Viewport {
       0.1,
       Math.min(10, this.data.viewport.zoom * factor),
     );
+    if (this.data.segmentation?.visible) {
+      // El contorno vive en el canvas de la imagen, en píxeles de imagen: el
+      // CSS transform ya lo mueve y lo escala solo, pero el grosor del borde
+      // se compensa por zoom, así que hay que repintarlo para que no engorde.
+      // Guardado tras el `if` para no pagar un render completo sin segmentación.
+      this.render();
+      return;
+    }
     this.applyTransform();
     this.updateInfoOverlay();
     this.renderOverlay();
@@ -240,8 +262,28 @@ export class Viewport {
   }
 
   public resetCamera(): void {
-    if (!this.data.parsed?.metadata) return;
-    this.data.viewport = createDefaultViewport(this.data.parsed.metadata);
+    const parsed = this.data.parsed;
+    if (!parsed?.metadata) return;
+    // Prefer the DICOM's own window/level; when it carries none, derive one from
+    // the pixels — otherwise createDefaultViewport() yields W/L 0 and the image
+    // renders all black (the "reset shows a dark DICOM" bug in the comparison view).
+    if (parsed.metadata.windowWidth > 0) {
+      this.data.viewport = createDefaultViewport(parsed.metadata);
+    } else if (parsed.pixelData) {
+      const auto = calculateAutoWindowLevel(
+        parsed.pixelData,
+        parsed.metadata.rescaleSlope,
+        parsed.metadata.rescaleIntercept,
+        parsed.metadata.modality,
+      );
+      this.data.viewport = {
+        windowCenter: auto.windowCenter,
+        windowWidth: auto.windowWidth,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+      };
+    }
     this.fitImage();
     this.render();
   }
@@ -286,6 +328,15 @@ export class Viewport {
       overlayPixelData: this.data.overlay?.parsed?.pixelData,
       overlayMetadata: this.data.overlay?.parsed?.metadata,
       overlayViewport: this.data.overlay?.viewport,
+    });
+
+    // Sobre el canvas de la imagen, no sobre el de anotaciones: así el
+    // contorno acompaña al zoom y al paneo por el mismo CSS transform.
+    renderSegmentationOverlay({
+      canvas: this.canvasElement,
+      metadata: this.data.parsed.metadata,
+      layer: this.data.segmentation,
+      zoom: this.data.viewport.zoom,
     });
 
     this.applyTransform();

@@ -33,6 +33,7 @@ import {
 } from "./loading.js";
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
+import { dicomCache } from "./cache.js";
 import { t } from "../i18n/i18n.js";
 import {
   exportCurrentViewToPNG,
@@ -78,6 +79,44 @@ import type {
   Point2D,
 } from "./measurements/types.js";
 import { exportSegmentation } from "./measurements/export-annotation.js";
+
+// ── Slice navigation ──────────────────────────────────────────────────────────
+
+/**
+ * Advance the active viewport by `delta` slices, routing through the
+ * ViewportManager so synchronized viewports scroll in step. The active viewport
+ * takes the full path (global state, series nav, prefetch); synced viewports —
+ * which share the current stack — get their slice loaded straight into them and
+ * repainted (loadCurrent()/displayParsed() only ever target the active one).
+ */
+async function navigateSliceDelta(delta: number): Promise<void> {
+  const manager = getViewportManager();
+  const activeVp = manager?.activeViewport ?? null;
+
+  if (activeVp && manager) {
+    await manager.dispatchSliceDelta(activeVp.id, delta, async (vp) => {
+      if (vp.id === activeVp.id) {
+        state.currentIndex = vp.data.currentIndex;
+        await loadCurrent();
+      } else {
+        const parsed = await dicomCache.getOrFetch(vp.data.currentIndex);
+        if (parsed) {
+          vp.data.parsed = parsed;
+          vp.render();
+        }
+      }
+    });
+    return;
+  }
+
+  // Fallback: no manager (e.g. unit tests).
+  const total = itemCount();
+  const target = state.currentIndex + delta;
+  if (target >= 0 && target < total) {
+    state.currentIndex = target;
+    await loadCurrent();
+  }
+}
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -149,6 +188,26 @@ export function initToolbar(): void {
   });
 
   $("tool-reset").addEventListener("click", () => {
+    // Multi-viewport path: reset the active viewport (and synced ones), the same
+    // way every other tool routes through the manager. Without this the reset
+    // button only touched the legacy global state and left the on-screen
+    // viewport — e.g. the left panel of the comparison view — untouched.
+    const manager = getViewportManager();
+    const activeVp = manager?.activeViewport ?? null;
+    if (manager && activeVp?.data.parsed) {
+      activeVp.resetCamera();
+      if (manager.isSynchronized) {
+        for (const vp of manager.getAllViewports()) {
+          if (vp.id !== activeVp.id && vp.data.parsed) vp.resetCamera();
+        }
+      }
+      if (state.is3DMode) view3DViewer.resetCamera();
+      // Keep global state + the zoom slider aligned with the active viewport.
+      state.viewport = { ...activeVp.data.viewport };
+      updateZoomControlsUI();
+      return;
+    }
+
     if (!state.parsed) return;
     const container = $("viewport-container");
     if (state.parsed.metadata.windowWidth > 0) {
@@ -1969,23 +2028,8 @@ export function initViewportInteraction(): void {
       const total = itemCount();
 
       if (total > 1 && !e.ctrlKey && !e.metaKey) {
-        // Slice scroll
-        const delta = e.deltaY > 0 ? 1 : -1;
-
-        if (activeVp && manager) {
-          await manager.dispatchSliceDelta(activeVp.id, delta, async (vp) => {
-            // Keep global state in sync for series nav and loadCurrent().
-            state.currentIndex = vp.data.currentIndex;
-            await loadCurrent();
-          });
-        } else {
-          // Fallback: no manager (e.g. unit tests)
-          const targetIndex = state.currentIndex + delta;
-          if (targetIndex >= 0 && targetIndex < total) {
-            state.currentIndex = targetIndex;
-            await loadCurrent();
-          }
-        }
+        // Slice scroll — routes through the manager so synced viewports follow.
+        await navigateSliceDelta(e.deltaY > 0 ? 1 : -1);
       } else {
         // Ctrl+Wheel zoom
         const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
@@ -2314,18 +2358,12 @@ export function initKeyboardShortcuts(): void {
 
     if (e.key === "PageUp") {
       e.preventDefault();
-      if (state.currentIndex > 0) {
-        state.currentIndex--;
-        await loadCurrent();
-      }
+      await navigateSliceDelta(-1);
       return;
     }
     if (e.key === "PageDown") {
       e.preventDefault();
-      if (state.currentIndex < itemCount() - 1) {
-        state.currentIndex++;
-        await loadCurrent();
-      }
+      await navigateSliceDelta(1);
       return;
     }
 
@@ -2423,10 +2461,22 @@ export function initGridLayoutControls(): void {
 
   const syncBtn = document.getElementById("btn-sync-viewports");
   syncBtn?.addEventListener("click", () => {
-    const isNowActive = syncBtn.classList.toggle("active");
-    syncBtn.setAttribute("aria-pressed", String(isNowActive));
-    getViewportManager()?.setSync(isNowActive);
+    setViewportSync(!syncBtn.classList.contains("active"));
   });
+}
+
+/**
+ * Single place that flips viewport sync — updates the manager and the toolbar
+ * button together so they never drift. Called on the button click and whenever a
+ * new study/file loads (sync resets to off on every study change).
+ */
+export function setViewportSync(enabled: boolean): void {
+  getViewportManager()?.setSync(enabled);
+  const btn = document.getElementById("btn-sync-viewports");
+  if (btn) {
+    btn.classList.toggle("active", enabled);
+    btn.setAttribute("aria-pressed", String(enabled));
+  }
 }
 
 function updateGridLayoutUI(activeLayout: GridLayout): void {

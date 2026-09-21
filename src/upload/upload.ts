@@ -396,7 +396,9 @@ function uploadOne(
         showUploadStatus(t("upload.fileTooLarge"), "error");
       } else {
         showUploadStatus(
-          safeMessage(xhr.responseText) || t("upload.genericError"),
+          anonymizationErrorMessage(xhr.responseText) ||
+            safeMessage(xhr.responseText) ||
+            t("upload.genericError"),
           "error",
         );
       }
@@ -429,6 +431,27 @@ function safeMessage(responseText: string): string {
     return body?.message ?? body?.error ?? "";
   } catch {
     return "";
+  }
+}
+
+/**
+ * Localized message for an anonymization rejection (US-16). The backend uses
+ * stable `error` codes so the bilingual UI doesn't have to surface a raw
+ * server string. Returns null when the body is not an anonymization error.
+ */
+function anonymizationErrorMessage(responseText: string): string | null {
+  try {
+    const body = JSON.parse(responseText);
+    const code = body?.error;
+    if (code === "anonymizer_unavailable" || code === "anonymizer_disabled") {
+      return t("upload.anonymizerUnavailable");
+    }
+    if (code === "anonymization_failed") {
+      return t("upload.anonymizationFailed", { reason: body?.message ?? "" });
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -637,7 +660,9 @@ function uploadOneExplorer(
         showToast(t("upload.fileTooLarge"), "error");
       } else {
         showToast(
-          safeMessage(xhr.responseText) || t("upload.genericError"),
+          anonymizationErrorMessage(xhr.responseText) ||
+            safeMessage(xhr.responseText) ||
+            t("upload.genericError"),
           "error",
         );
       }

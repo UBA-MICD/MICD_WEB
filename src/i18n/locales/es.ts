@@ -303,6 +303,10 @@ export const es: Record<string, string> = {
   "upload.unauthorizedRetry": "No autorizado. Iniciá sesión de nuevo.",
   "upload.fileTooLarge": "El archivo supera el límite de 2 GB.",
   "upload.genericError": "Error al cargar el archivo.",
+  "upload.anonymizerUnavailable":
+    "El servicio de anonimización no está disponible. La carga fue rechazada y el estudio no se almacenó.",
+  "upload.anonymizationFailed":
+    "No se pudo anonimizar el estudio; la carga fue rechazada y no se almacenó. {{reason}}",
   "upload.rowLabel": "Progreso de {{name}}",
   "upload.stateDuplicate": "Duplicado",
   "upload.stateAborted": "Cancelado",
@@ -698,7 +702,8 @@ export const es: Record<string, string> = {
   "validation.dialog.msg.correctionReview":
     "¿Registrás una corrección marcando este estudio para revisión?",
   "validation.dialog.commentLabel": "Comentario",
-  "validation.dialog.commentRequired": "Se recomienda dejar un comentario al rechazar.",
+  "validation.dialog.commentRequired":
+    "Se recomienda dejar un comentario al rechazar.",
   "validation.dialog.confirm": "Confirmar",
   "validation.status.approved": "Aprobado",
   "validation.status.rejected": "Rechazado",

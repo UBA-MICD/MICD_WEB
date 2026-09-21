@@ -21,6 +21,8 @@ import {
   toggleMprMode,
   toggle3DMode,
   initMeasurementControlsInteraction,
+  initGridLayoutControls,
+  setViewportSync,
 } from "./interaction.ts";
 import { state, itemCount } from "./state.ts";
 import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
@@ -1850,4 +1852,418 @@ test("btn-save-annotations triggers saveToLocalStorage and visual feedback", () 
   } finally {
     (globalThis as any).localStorage = originalLocalStorage;
   }
+});
+
+// ── Polygon vertex drag (Layer 1) ────────────────────────────────────────────
+
+test("polygon vertex drag: mousedown on vertex and mousemove repositions that vertex", () => {
+  // Use 512×512 so world↔screen coords have enough resolution for 8 px hit radius
+  const largeMeta = { ...baseMeta, rows: 512, columns: 512 };
+  state.parsed = {
+    metadata: largeMeta,
+    pixelData: new Uint16Array(4),
+    rawDataSet: {},
+  } as any;
+
+  const uid = largeMeta.sopInstanceUid; // "1.2.3.4.5"
+  // With cols=512, rows=512, zoom=1, panX=0, panY=0, viewW=500, viewH=500:
+  //   world(200,200) → screen(194, 306)
+  //   world(300,200) → screen(294, 306)
+  //   world(250,300) → screen(244, 206)
+  addAnnotation({
+    id: "poly-drag-v",
+    type: "polygon",
+    sopInstanceUid: uid,
+    sliceIndex: 0,
+    isCalibrated: false,
+    unit: "px",
+    isClosed: true,
+    area: 2500,
+    perimeter: 200,
+    points: [
+      { x: 200, y: 200 },
+      { x: 300, y: 200 },
+      { x: 250, y: 300 },
+    ],
+  } as PolygonAnnotation);
+
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+  // getTargetMetrics reads annotation-overlay canvas size; set it to match
+  const overlay = document.getElementById(
+    "annotation-overlay",
+  ) as HTMLCanvasElement;
+  overlay.width = 500;
+  overlay.height = 500;
+
+  state.activeTool = "polygon";
+  setActiveDrawing(null);
+  initViewportInteraction();
+
+  // Click exactly on vertex 0 screen position (194, 306) to start vertex drag
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 194,
+      clientY: 306,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.equal(
+    state.isDragging,
+    true,
+    "should be dragging after vertex mousedown",
+  );
+  assert.equal(
+    container.style.cursor,
+    "crosshair",
+    "cursor should be crosshair during vertex drag",
+  );
+
+  // Move mouse to screen (200, 300) → world ≈ (206, 206)
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 200, clientY: 300, bubbles: true }),
+  );
+
+  const updatedPoly = getAnnotationsForSlice(uid).find(
+    (a) => a.id === "poly-drag-v",
+  ) as PolygonAnnotation;
+  assert.ok(updatedPoly, "polygon should still exist after drag");
+  assert.notEqual(
+    updatedPoly.points[0].x,
+    200,
+    "vertex x should have moved from original position",
+  );
+  assert.notEqual(
+    updatedPoly.points[0].y,
+    200,
+    "vertex y should have moved from original position",
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(state.isDragging, false, "drag should end after mouseup");
+});
+
+// ── Polygon shape drag (Layer 2) ─────────────────────────────────────────────
+
+test("polygon shape drag: mousedown on interior translates all vertices", () => {
+  const largeMeta = { ...baseMeta, rows: 512, columns: 512 };
+  state.parsed = {
+    metadata: largeMeta,
+    pixelData: new Uint16Array(4),
+    rawDataSet: {},
+  } as any;
+
+  const uid = largeMeta.sopInstanceUid;
+  // Interior world point (250, 250) → screen (244, 256) with same canvas/zoom params
+  addAnnotation({
+    id: "poly-drag-s",
+    type: "polygon",
+    sopInstanceUid: uid,
+    sliceIndex: 0,
+    isCalibrated: false,
+    unit: "px",
+    isClosed: true,
+    area: 2500,
+    perimeter: 200,
+    points: [
+      { x: 200, y: 200 },
+      { x: 300, y: 200 },
+      { x: 250, y: 300 },
+    ],
+  } as PolygonAnnotation);
+
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+  const overlay = document.getElementById(
+    "annotation-overlay",
+  ) as HTMLCanvasElement;
+  overlay.width = 500;
+  overlay.height = 500;
+
+  state.activeTool = "polygon";
+  setActiveDrawing(null);
+  initViewportInteraction();
+
+  const originalPoints = [
+    { x: 200, y: 200 },
+    { x: 300, y: 200 },
+    { x: 250, y: 300 },
+  ];
+
+  // Click interior point (244, 256) to start shape drag
+  container.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: 244,
+      clientY: 256,
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  assert.equal(
+    state.isDragging,
+    true,
+    "should be dragging after interior mousedown",
+  );
+  assert.equal(
+    container.style.cursor,
+    "move",
+    "cursor should be 'move' during shape drag",
+  );
+
+  // Move 20px right → all vertices should translate
+  document.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 264, clientY: 256, bubbles: true }),
+  );
+
+  const updatedPoly = getAnnotationsForSlice(uid).find(
+    (a) => a.id === "poly-drag-s",
+  ) as PolygonAnnotation;
+  assert.ok(updatedPoly, "polygon should still exist after shape drag");
+  // All vertices should have moved in the same direction
+  for (let i = 0; i < originalPoints.length; i++) {
+    assert.notEqual(
+      updatedPoly.points[i].x,
+      originalPoints[i].x,
+      `vertex ${i} x should have translated`,
+    );
+  }
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  assert.equal(state.isDragging, false);
+});
+
+// ── dblclick completes active polygon ────────────────────────────────────────
+
+test("dblclick on viewport-container completes the active polygon when 3+ points drawn", () => {
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "polygon";
+  initViewportInteraction();
+
+  // Draw 3 polygon points via clicks
+  for (const [cx, cy] of [
+    [50, 50],
+    [100, 50],
+    [100, 100],
+  ] as [number, number][]) {
+    container.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: cx,
+        clientY: cy,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  }
+
+  assert.ok(getActiveDrawing(), "active drawing should exist after 3 clicks");
+  assert.equal(getActiveDrawing()?.points?.length, 3);
+
+  // dblclick completes the polygon
+  container.dispatchEvent(
+    new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+  );
+
+  assert.equal(
+    getActiveDrawing(),
+    null,
+    "active drawing should be cleared after dblclick",
+  );
+  const annotations = getAnnotationsForSlice(baseMeta.sopInstanceUid);
+  assert.equal(
+    annotations.length,
+    1,
+    "completed polygon should be saved as annotation",
+  );
+  assert.equal(annotations[0].type, "polygon");
+  assert.equal((annotations[0] as PolygonAnnotation).isClosed, true);
+});
+
+test("dblclick is a no-op when active drawing has fewer than 3 points", () => {
+  state.parsed = mockParsed();
+  const container = document.getElementById("viewport-container")!;
+  Object.defineProperty(container, "clientWidth", {
+    value: 500,
+    configurable: true,
+  });
+  Object.defineProperty(container, "clientHeight", {
+    value: 500,
+    configurable: true,
+  });
+
+  state.activeTool = "polygon";
+  initViewportInteraction();
+
+  // Draw only 2 points
+  for (const [cx, cy] of [
+    [50, 50],
+    [100, 50],
+  ] as [number, number][]) {
+    container.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: cx,
+        clientY: cy,
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  }
+
+  container.dispatchEvent(
+    new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+  );
+
+  // Should not complete — active drawing remains
+  assert.ok(
+    getActiveDrawing(),
+    "active drawing should still exist with only 2 points",
+  );
+  assert.equal(
+    getAnnotationsForSlice(baseMeta.sopInstanceUid).length,
+    0,
+    "no annotation should be saved",
+  );
+});
+
+// ── Grid layout controls ──────────────────────────────────────────────────────
+
+test("initGridLayoutControls: layout buttons call setLayout and sync button toggles sync", () => {
+  // Add the layout control buttons that initGridLayoutControls expects
+  const extra = document.createElement("div");
+  extra.innerHTML = `
+    <button id="btn-layout-1x1" aria-pressed="false">1×1</button>
+    <button id="btn-layout-1x2" aria-pressed="false">1×2</button>
+    <button id="btn-layout-2x2" aria-pressed="false">2×2</button>
+    <button id="btn-sync-viewports" aria-pressed="false">Sync</button>
+  `;
+  document.body.appendChild(extra);
+
+  const vpContainer = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(vpContainer);
+
+  try {
+    initGridLayoutControls();
+
+    // Clicking 1x2 should switch layout
+    document
+      .getElementById("btn-layout-1x2")!
+      .dispatchEvent(new MouseEvent("click"));
+    assert.equal(
+      manager.getAllViewports().length,
+      2,
+      "1x2 layout should have 2 viewports",
+    );
+    assert.equal(
+      document.getElementById("btn-layout-1x2")!.getAttribute("aria-pressed"),
+      "true",
+    );
+    assert.equal(
+      document.getElementById("btn-layout-1x1")!.getAttribute("aria-pressed"),
+      "false",
+    );
+
+    // Clicking sync button enables sync
+    const syncBtn = document.getElementById("btn-sync-viewports")!;
+    assert.equal(
+      syncBtn.classList.contains("active"),
+      false,
+      "sync off initially",
+    );
+    syncBtn.dispatchEvent(new MouseEvent("click"));
+    assert.equal(
+      syncBtn.classList.contains("active"),
+      true,
+      "sync on after click",
+    );
+    assert.equal(syncBtn.getAttribute("aria-pressed"), "true");
+
+    // Clicking again disables sync
+    syncBtn.dispatchEvent(new MouseEvent("click"));
+    assert.equal(syncBtn.classList.contains("active"), false);
+    assert.equal(syncBtn.getAttribute("aria-pressed"), "false");
+  } finally {
+    manager.destroy();
+    extra.remove();
+  }
+});
+
+// ── setViewportSync ───────────────────────────────────────────────────────────
+
+test("setViewportSync toggles the btn-sync-viewports active state and aria-pressed", () => {
+  const btn = document.createElement("button");
+  btn.id = "btn-sync-viewports";
+  btn.setAttribute("aria-pressed", "false");
+  document.body.appendChild(btn);
+
+  const vpContainer = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(vpContainer);
+
+  try {
+    setViewportSync(true);
+    assert.equal(
+      btn.classList.contains("active"),
+      true,
+      "active class added when enabled",
+    );
+    assert.equal(btn.getAttribute("aria-pressed"), "true");
+
+    setViewportSync(false);
+    assert.equal(
+      btn.classList.contains("active"),
+      false,
+      "active class removed when disabled",
+    );
+    assert.equal(btn.getAttribute("aria-pressed"), "false");
+  } finally {
+    manager.destroy();
+    btn.remove();
+  }
+});
+
+// ── toggle3DMode error path ───────────────────────────────────────────────────
+
+test("toggle3DMode returns false and shows error when no files are loaded (count ≤ 1)", async () => {
+  initToolbar();
+  state.files = []; // count = 0 → loadVolumeIntoEngines returns false early
+  state.parsed = null;
+
+  const result = await toggle3DMode();
+
+  assert.equal(
+    result,
+    false,
+    "toggle3DMode should return false when nothing loaded",
+  );
+  // 3D mode should not have been activated
+  assert.equal(state.is3DMode, false);
 });

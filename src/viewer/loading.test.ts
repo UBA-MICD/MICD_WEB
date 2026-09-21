@@ -21,6 +21,8 @@ import {
   loadStudyFromServer,
   seriesKeyFor,
   initialViewportFor,
+  loadVolumeIntoEngines,
+  sortFilesByInstanceNumber,
 } from "./loading.ts";
 import { state } from "./state.ts";
 import { dicomCache } from "./cache.ts";
@@ -518,4 +520,42 @@ test("displayParsed keeps the user's window while scrolling the same series", ()
   const current = vp ? vp.data.viewport : state.viewport;
   assert.equal(current.windowCenter, -600, "el W/L manual no debe reiniciarse");
   assert.equal(current.windowWidth, 1500);
+});
+
+// ── loadVolumeIntoEngines ─────────────────────────────────────────────────────
+
+test("loadVolumeIntoEngines returns false immediately when fewer than 2 files are loaded", async () => {
+  // itemCount() reads state.files.length (source === "local")
+  state.source = "local";
+  state.files = [];
+  const result = await loadVolumeIntoEngines();
+  assert.equal(result, false, "should return false when no files loaded");
+
+  state.files = [new File(["a"], "single.dcm")];
+  const resultOne = await loadVolumeIntoEngines();
+  assert.equal(resultOne, false, "should return false with only one file");
+});
+
+// ── sortFilesByInstanceNumber ─────────────────────────────────────────────────
+
+test("sortFilesByInstanceNumber returns a single file unchanged", async () => {
+  const f = new File(["a"], "only.dcm");
+  const result = await sortFilesByInstanceNumber([f]);
+  assert.deepEqual(result, [f], "single file should not be reordered");
+});
+
+test("sortFilesByInstanceNumber falls back to alphanumeric sort when StudyBuilder fails", async () => {
+  // StudyBuilder.build will fail (no parseable DICOM bytes) → falls back to
+  // parseDicomFile-based sort, which will also fail per-file, then sorts by filename.
+  const files = [
+    new File(["x"], "img_003.dcm"),
+    new File(["x"], "img_001.dcm"),
+    new File(["x"], "img_002.dcm"),
+  ];
+  const sorted = await sortFilesByInstanceNumber(files);
+  assert.equal(sorted.length, 3, "all files should be returned");
+  // Alphabetic/numeric sort by filename: img_001 < img_002 < img_003
+  assert.equal(sorted[0].name, "img_001.dcm");
+  assert.equal(sorted[1].name, "img_002.dcm");
+  assert.equal(sorted[2].name, "img_003.dcm");
 });

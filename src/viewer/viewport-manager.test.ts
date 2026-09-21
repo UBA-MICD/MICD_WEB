@@ -203,3 +203,111 @@ test("ViewportCell resetCamera sets flipY for inverted IOP", () => {
 
   assert.equal(vp.data.viewport.flipY, true);
 });
+
+test("dispatchPan fans out to synced viewports only", () => {
+  manager.setLayout("1x2");
+  const [vp0, vp1] = manager.getAllViewports();
+  vp0!.data.parsed = fakeDicom(400);
+  vp1!.data.parsed = fakeDicom(400);
+  vp0!.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+  vp1!.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+
+  // Unsynced: only origin moves
+  manager.setSync(false);
+  manager.dispatchPan("vp-0", 20, 10);
+  assert.equal(vp0!.data.viewport.panX, 20);
+  assert.equal(vp1!.data.viewport.panX, 0, "vp-1 untouched while unsynced");
+
+  // Synced: both move
+  manager.setSync(true);
+  manager.dispatchPan("vp-0", 5, 0);
+  assert.equal(vp0!.data.viewport.panX, 25);
+  assert.equal(vp1!.data.viewport.panX, 5, "vp-1 follows when synced");
+});
+
+test("dispatchZoom fans out to synced viewports only", () => {
+  manager.setLayout("1x2");
+  const [vp0, vp1] = manager.getAllViewports();
+  vp0!.data.parsed = fakeDicom(400);
+  vp1!.data.parsed = fakeDicom(400);
+  vp0!.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+  vp1!.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+
+  // Unsynced: only origin zooms
+  manager.setSync(false);
+  manager.dispatchZoom("vp-0", 2);
+  assert.equal(vp0!.data.viewport.zoom, 2);
+  assert.equal(vp1!.data.viewport.zoom, 1, "vp-1 untouched while unsynced");
+
+  // Synced: both zoom
+  manager.setSync(true);
+  manager.dispatchZoom("vp-0", 0.5);
+  assert.equal(vp0!.data.viewport.zoom, 1);
+  assert.equal(vp1!.data.viewport.zoom, 0.5, "vp-1 follows when synced");
+});
+
+test("isTopRightViewport returns true for vp-1", () => {
+  manager.setLayout("1x2");
+  assert.equal(manager.isTopRightViewport("vp-1"), true);
+  assert.equal(manager.isTopRightViewport("vp-0"), false);
+  assert.equal(
+    manager.isTopRightViewport("vp-99"),
+    false,
+    "unknown id returns false",
+  );
+});
+
+test("applyZoomFactor with visible segmentation calls render and returns early", () => {
+  const vp = manager.activeViewport!;
+  vp.data.parsed = fakeDicom(400);
+  vp.data.viewport = {
+    windowCenter: 40,
+    windowWidth: 400,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  };
+  // contorno: [] makes renderSegmentationOverlay return early (length < 3)
+  (vp.data as any).segmentation = { visible: true, contorno: [] };
+
+  let renderCalled = false;
+  const originalRender = vp.render.bind(vp);
+  vp.render = () => {
+    renderCalled = true;
+    originalRender();
+  };
+
+  vp.applyZoomFactor(2);
+
+  assert.equal(
+    renderCalled,
+    true,
+    "render() should be called when segmentation is visible",
+  );
+  // Zoom is still applied before the early return
+  assert.equal(vp.data.viewport.zoom, 2);
+});

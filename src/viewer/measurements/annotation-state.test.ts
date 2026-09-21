@@ -163,6 +163,58 @@ test("clearAnnotations removes either a specific slice group or all annotations"
   assert.deepEqual(state.annotations, {});
 });
 
+test("deleteAnnotation without sopInstanceUid searches all annotation groups", () => {
+  const uid1 = "1.2.840.slice.g1";
+  const uid2 = "1.2.840.slice.g2";
+  addAnnotation(makeLengthAnnotation("ann-x", uid1));
+  addAnnotation(makeLengthAnnotation("ann-y", uid2));
+
+  const deleted = deleteAnnotation("ann-x"); // no UID → searches all groups
+  assert.equal(deleted, true);
+  assert.equal(getAnnotationsForSlice(uid1).length, 0);
+  assert.equal(
+    getAnnotationsForSlice(uid2).length,
+    1,
+    "sibling group untouched",
+  );
+
+  // Non-existent ID across all groups returns false
+  assert.equal(deleteAnnotation("non-existent-id"), false);
+});
+
+test("clearAnnotations initializes annotations object when state.annotations is falsy", () => {
+  (state as any).annotations = undefined;
+  assert.doesNotThrow(() => clearAnnotations());
+  assert.deepEqual(state.annotations, {});
+});
+
+test("loadFromLocalStorage handles legacy object format {[uid]: Annotation[]}", () => {
+  const mockStorage: Record<string, string> = {};
+  const originalLocalStorage = globalThis.localStorage;
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => mockStorage[k] ?? null,
+    setItem: (k: string, v: string) => {
+      mockStorage[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete mockStorage[k];
+    },
+  };
+
+  try {
+    const uid = "1.2.840.legacy.obj";
+    const ann = makeLengthAnnotation("legacy-ann-1", uid, 25);
+    // Simulate the old persisted format: a plain object keyed by UID
+    mockStorage[`micd_saves_${uid}`] = JSON.stringify({ [uid]: [ann] });
+
+    const restored = loadFromLocalStorage(uid);
+    assert.equal(restored.length, 1, "legacy format should be unwrapped");
+    assert.equal(restored[0].id, "legacy-ann-1");
+  } finally {
+    (globalThis as any).localStorage = originalLocalStorage;
+  }
+});
+
 test("saveToLocalStorage and loadFromLocalStorage persist and restore annotations", () => {
   const mockStorage: Record<string, string> = {};
   const originalLocalStorage = globalThis.localStorage;

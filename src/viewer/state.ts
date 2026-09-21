@@ -19,9 +19,12 @@ export interface AppState {
   currentIndex: number;
   parsed: ParsedDicom | null;
   viewport: ViewportState;
-  activeTool: "wl" | "zoom" | "pan" | "crosshair" | "length" | "ellipse";
+  activeTool:
+    "wl" | "zoom" | "pan" | "crosshair" | "length" | "ellipse" | "polygon";
   /** Measurement annotations indexed by SOPInstanceUID (TK-26). */
   annotations: Record<string, import("./measurements/types.js").Annotation[]>;
+  /** Visibility toggle for all measurement overlays on slices (US-48). */
+  areAnnotationsVisible: boolean;
   isDragging: boolean;
   lastMouseX: number;
   lastMouseY: number;
@@ -99,8 +102,13 @@ export const state: AppState = {
   is3DMode: false,
   isMprMode: false,
   annotations: {},
+  areAnnotationsVisible: true,
   serverValidation: null,
 };
+
+export function setAnnotationsVisible(visible: boolean): void {
+  state.areAnnotationsVisible = visible;
+}
 
 export function setMeasurementUnit(unit: "mm" | "cm"): void {
   state.measurementUnit = unit;

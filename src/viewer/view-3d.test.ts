@@ -363,3 +363,97 @@ test("View3DViewer.initGL attaches both vertex and fragment shaders before linki
     "Both VS and FS must be attached to the program",
   );
 });
+
+test("Matrix4.scale multiplies matrix by scaling factors", () => {
+  const m = Matrix4.identity();
+  const scaled = Matrix4.scale(m, [2, -1, 3]);
+  assert.equal(scaled[0], 2);
+  assert.equal(scaled[5], -1);
+  assert.equal(scaled[10], 3);
+  assert.equal(scaled[15], 1);
+});
+
+test("View3DViewer.buildVolume extracts imageOrientationPatient and computes canonical flip", () => {
+  const viewer = new View3DViewer();
+  const mockSlices: any[] = [
+    {
+      pixelData: new Int16Array(16),
+      columns: 4,
+      rows: 4,
+      metadata: {
+        rows: 4,
+        columns: 4,
+        imageOrientationPatient: [-1, 0, 0, 0, -1, 0],
+        pixelSpacing: [1, 1],
+        sliceThickness: 1,
+        rescaleSlope: 1,
+        rescaleIntercept: 0,
+        windowCenter: 40,
+        windowWidth: 400,
+      },
+    },
+  ];
+
+  const vol = viewer.buildVolume(mockSlices);
+  assert.equal(vol.flipX, true);
+  assert.equal(vol.flipY, true);
+  assert.deepEqual(vol.imageOrientationPatient, [-1, 0, 0, 0, -1, 0]);
+});
+
+test("View3DViewer.render passes u_flipY uniform and unscaled camera coordinates", () => {
+  const viewer = new View3DViewer();
+  let passedUniforms: Record<string, any> = {};
+
+  const mockGL = {
+    ...createMockWebGL2Context(),
+    uniformMatrix4fv: (loc: any, transpose: boolean, value: Float32Array) => {
+      passedUniforms.mvp = value;
+    },
+    uniform3f: (loc: any, x: number, y: number, z: number) => {
+      if (loc && loc.name === "u_cameraPos") {
+        passedUniforms.cameraPos = [x, y, z];
+      }
+    },
+    uniform1i: (loc: any, val: number) => {
+      if (loc && loc.name === "u_flipY") {
+        passedUniforms.flipY = val;
+      }
+    },
+    getUniformLocation: (_prog: any, name: string) => ({ name }),
+  };
+
+  (viewer as any).gl = mockGL;
+  (viewer as any).program = {};
+  (viewer as any).volumeTexture = {};
+  (viewer as any).vao = {};
+  viewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+    flipX: false,
+    flipY: true,
+  };
+
+  const canvas: any = {
+    width: 512,
+    height: 512,
+    clientWidth: 512,
+    clientHeight: 512,
+    getContext: () => mockGL,
+  };
+  mockGL.canvas = canvas;
+
+  viewer.render(canvas);
+
+  // u_flipY should be passed as 1 when flipY is true
+  assert.equal(passedUniforms.flipY, 1);
+  // cameraPos y must be strictly unscaled positive world coordinate
+  assert.ok(passedUniforms.cameraPos);
+  assert.ok(passedUniforms.cameraPos[1] > 0);
+  assert.ok(passedUniforms.mvp);
+});

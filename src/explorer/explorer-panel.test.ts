@@ -251,8 +251,11 @@ test("dropping a corrupt .zip expands it and reports the read error", async () =
   panel.dispatchEvent(dragEvent("drop", { dataTransfer: dt }));
 
   // expandFiles dynamically imports fflate and unzips on a callback — give it
-  // a couple of macrotasks to settle.
-  await new Promise((r) => setTimeout(r, 50));
+  // enough time to settle even under test runner load.
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 25));
+    if (document.querySelector("#toast-container .toast--error")) break;
+  }
 
   const toast = document.querySelector("#toast-container .toast--error");
   assert.ok(toast, "expected an error toast for a corrupt zip");

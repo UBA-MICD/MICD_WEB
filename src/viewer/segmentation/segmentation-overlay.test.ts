@@ -17,7 +17,10 @@ interface Recorded {
   fillStyles: unknown[];
 }
 
-function createMockCanvas(w = 256, h = 256): {
+function createMockCanvas(
+  w = 256,
+  h = 256,
+): {
   canvas: HTMLCanvasElement;
   rec: Recorded;
 } {
@@ -62,7 +65,9 @@ function createMockCanvas(w = 256, h = 256): {
 
 const METADATA = { rows: 256, columns: 256 } as DicomMetadata;
 
-function makeLayer(overrides: Partial<SegmentationLayer> = {}): SegmentationLayer {
+function makeLayer(
+  overrides: Partial<SegmentationLayer> = {},
+): SegmentationLayer {
   return {
     contorno: [
       { x: 10, y: 20 },
@@ -70,7 +75,12 @@ function makeLayer(overrides: Partial<SegmentationLayer> = {}): SegmentationLaye
       { x: 90, y: 80 },
       { x: 10, y: 80 },
     ],
-    mascara: { width: 256, height: 256, data: new Uint8Array(0), pixelCount: 4800 },
+    mascara: {
+      width: 256,
+      height: 256,
+      data: new Uint8Array(0),
+      pixelCount: 4800,
+    },
     visible: true,
     seed: 1,
     simulado: true,
@@ -160,7 +170,11 @@ test("draws nothing without a layer, metadata or canvas", () => {
   const { canvas, rec } = createMockCanvas();
   renderSegmentationOverlay({ canvas, metadata: METADATA, layer: null });
   renderSegmentationOverlay({ canvas, metadata: null, layer: makeLayer() });
-  renderSegmentationOverlay({ canvas: null, metadata: METADATA, layer: makeLayer() });
+  renderSegmentationOverlay({
+    canvas: null,
+    metadata: METADATA,
+    layer: makeLayer(),
+  });
   assert.deepEqual(rec.calls, []);
 });
 
@@ -169,7 +183,12 @@ test("draws nothing for a degenerate contour", () => {
   renderSegmentationOverlay({
     canvas,
     metadata: METADATA,
-    layer: makeLayer({ contorno: [{ x: 1, y: 1 }, { x: 2, y: 2 }] }),
+    layer: makeLayer({
+      contorno: [
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+      ],
+    }),
   });
   assert.deepEqual(rec.calls, []);
 });

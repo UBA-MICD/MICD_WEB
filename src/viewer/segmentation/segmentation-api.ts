@@ -51,8 +51,7 @@ export interface SegmentationRequest {
 }
 
 export type ApiResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; error: string };
+  { ok: true; data: T } | { ok: false; status: number; error: string };
 
 async function readError(res: Response): Promise<string> {
   try {

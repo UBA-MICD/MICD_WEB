@@ -191,10 +191,7 @@ test("segmentarConIA returns mask, contour and derived DICOM", async () => {
 
   assert.deepEqual(result.contorno, API_RESPONSE.contour);
   assert.equal(result.mascara.pixelCount, 3);
-  assert.deepEqual(
-    Array.from(result.mascara.data),
-    [0, 0, 1, 1, 1, 0, 0, 0],
-  );
+  assert.deepEqual(Array.from(result.mascara.data), [0, 0, 1, 1, 1, 0, 0, 0]);
   assert.equal(result.dicomDerivado.metadata.sopInstanceUid, "1.2.999.1");
   assert.equal(result.simulado, true);
   assert.equal(result.seed, 12345);

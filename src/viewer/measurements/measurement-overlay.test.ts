@@ -7,11 +7,17 @@ import {
   setSelectedAnnotationId,
   getSelectedAnnotationId,
   hitTestAnnotation,
+  hitTestPolygonVertex,
 } from "./measurement-overlay.js";
 import { addAnnotation, clearAnnotations } from "./annotation-state.js";
-import type { LengthAnnotation, EllipseAnnotation } from "./types.js";
+import type {
+  LengthAnnotation,
+  EllipseAnnotation,
+  PolygonAnnotation,
+} from "./types.js";
 import type { DicomMetadata } from "../../dicom/dicom-parser-util.js";
 import type { ViewportState } from "../../dicom/dicom-renderer.js";
+import { state } from "../state.js";
 
 function createMockCanvas(w = 500, h = 500): HTMLCanvasElement {
   const drawnCalls: string[] = [];
@@ -21,6 +27,7 @@ function createMockCanvas(w = 500, h = 500): HTMLCanvasElement {
     beginPath: () => drawnCalls.push("beginPath"),
     moveTo: () => drawnCalls.push("moveTo"),
     lineTo: () => drawnCalls.push("lineTo"),
+    closePath: () => drawnCalls.push("closePath"),
     stroke: () => drawnCalls.push("stroke"),
     fill: () => drawnCalls.push("fill"),
     arc: () => drawnCalls.push("arc"),
@@ -305,4 +312,195 @@ test("hitTestAnnotation detects length and ellipse selections correctly", () => 
     512,
   );
   assert.equal(missAll, null);
+});
+
+test("renderMeasurementOverlay: renders polygon annotation with handles, fill and badge", () => {
+  const canvas = createMockCanvas(512, 512);
+  const poly: PolygonAnnotation = {
+    id: "poly-render-1",
+    type: "polygon",
+    sopInstanceUid: "1.2.3.4.5",
+    sliceIndex: 0,
+    points: [
+      { x: 100, y: 100 },
+      { x: 200, y: 100 },
+      { x: 200, y: 200 },
+      { x: 100, y: 200 },
+    ],
+    isClosed: true,
+    area: 2500,
+    perimeter: 200,
+    isCalibrated: true,
+    unit: "mm²",
+    createdAt: Date.now(),
+  };
+  addAnnotation(poly);
+  setSelectedAnnotationId("poly-render-1");
+
+  renderMeasurementOverlay({
+    canvas,
+    viewport: mockViewport,
+    metadata: mockMetadata,
+    sopInstanceUid: "1.2.3.4.5",
+  });
+
+  const calls = (canvas as any)._drawnCalls;
+  assert.ok(calls.includes("beginPath"));
+  assert.ok(calls.includes("closePath"));
+  assert.ok(calls.includes("stroke"));
+  assert.ok(calls.includes("fill"));
+  assert.ok(calls.includes("fillText"));
+});
+
+test("hitTestAnnotation: detects polygon edge and interior", () => {
+  const poly: PolygonAnnotation = {
+    id: "poly-hit-1",
+    type: "polygon",
+    sopInstanceUid: "1.2.3.4.5",
+    sliceIndex: 0,
+    points: [
+      { x: 100, y: 100 },
+      { x: 200, y: 100 },
+      { x: 200, y: 200 },
+      { x: 100, y: 200 },
+    ],
+    isClosed: true,
+    area: 10000,
+    perimeter: 400,
+    isCalibrated: true,
+    unit: "mm²",
+    createdAt: Date.now(),
+  };
+
+  const hitEdge = hitTestAnnotation(
+    150,
+    412,
+    [poly],
+    mockViewport,
+    512,
+    512,
+    512,
+    512,
+  );
+  assert.equal(hitEdge?.id, "poly-hit-1");
+
+  const hitInterior = hitTestAnnotation(
+    150,
+    362,
+    [poly],
+    mockViewport,
+    512,
+    512,
+    512,
+    512,
+  );
+  assert.equal(hitInterior?.id, "poly-hit-1");
+
+  const miss = hitTestAnnotation(
+    50,
+    50,
+    [poly],
+    mockViewport,
+    512,
+    512,
+    512,
+    512,
+  );
+  assert.equal(miss, null);
+});
+
+test("hitTestPolygonVertex: detects polygon vertices accurately", () => {
+  const poly: PolygonAnnotation = {
+    id: "poly-vert-1",
+    type: "polygon",
+    sopInstanceUid: "1.2.3.4.5",
+    sliceIndex: 0,
+    points: [
+      { x: 100, y: 100 },
+      { x: 200, y: 100 },
+      { x: 150, y: 200 },
+    ],
+    isClosed: true,
+    area: 5000,
+    perimeter: 250,
+    isCalibrated: true,
+    unit: "mm²",
+    createdAt: Date.now(),
+  };
+
+  // Vertex 0: screen (100, 412)
+  const hitV0 = hitTestPolygonVertex(
+    102,
+    413,
+    [poly],
+    null,
+    mockViewport,
+    512,
+    512,
+    512,
+    512,
+    8,
+  );
+  assert.deepEqual(hitV0, { annotationId: "poly-vert-1", vertexIndex: 0 });
+
+  // Vertex 1: screen (200, 412)
+  const hitV1 = hitTestPolygonVertex(
+    200,
+    412,
+    [poly],
+    "poly-vert-1",
+    mockViewport,
+    512,
+    512,
+    512,
+    512,
+    8,
+  );
+  assert.deepEqual(hitV1, { annotationId: "poly-vert-1", vertexIndex: 1 });
+
+  // Miss
+  const miss = hitTestPolygonVertex(
+    150,
+    412,
+    [poly],
+    null,
+    mockViewport,
+    512,
+    512,
+    512,
+    512,
+    8,
+  );
+  assert.equal(miss, null);
+});
+
+test("renderMeasurementOverlay returns early when areAnnotationsVisible is false", () => {
+  const canvas = createMockCanvas();
+  clearAnnotations("1.2.3.4.5");
+  addAnnotation({
+    id: "ann-vis",
+    type: "length",
+    sopInstanceUid: "1.2.3.4.5",
+    sliceIndex: 0,
+    start: { x: 10, y: 10 },
+    end: { x: 50, y: 50 },
+    distance: 40,
+    isCalibrated: true,
+    unit: "mm",
+  });
+
+  state.areAnnotationsVisible = false;
+  renderMeasurementOverlay({
+    canvas,
+    viewport: mockViewport,
+    metadata: mockMetadata,
+    sopInstanceUid: "1.2.3.4.5",
+  });
+
+  const calls = (canvas as any)._drawnCalls;
+  // Should only have clearRect, nothing else drawn
+  assert.deepEqual(calls, ["clearRect"]);
+
+  // Reset
+  state.areAnnotationsVisible = true;
 });

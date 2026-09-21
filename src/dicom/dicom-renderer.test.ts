@@ -266,6 +266,14 @@ test("resetViewport is equivalent to createDefaultViewport", () => {
   assert.deepEqual(resetViewport(baseMeta), createDefaultViewport(baseMeta));
 });
 
+test("createDefaultViewport sets flipY when IOP indicates inverted acquisition", () => {
+  const vp = createDefaultViewport({
+    ...baseMeta,
+    imageOrientationPatient: [1, 0, 0, 0, -1, 0],
+  });
+  assert.equal(vp.flipY, true);
+});
+
 test("fitToContainer returns 1 when the image has zero width or height", () => {
   assert.equal(fitToContainer(800, 600, 0, 512), 1);
   assert.equal(fitToContainer(800, 600, 512, 0), 1);

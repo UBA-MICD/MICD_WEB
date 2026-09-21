@@ -11,11 +11,11 @@ test.after(() => uninstallDom());
  * test lo reimporta fresco con un query distinto para partir sin estado.
  */
 let counter = 0;
-async function freshUi(): Promise<
-  typeof import("./segmentation-ui.ts")
-> {
+async function freshUi(): Promise<typeof import("./segmentation-ui.ts")> {
   counter++;
-  return (await import(`./segmentation-ui.ts?u=${counter}`)) as typeof import("./segmentation-ui.ts");
+  return (await import(
+    `./segmentation-ui.ts?u=${counter}`
+  )) as typeof import("./segmentation-ui.ts");
 }
 
 function fixture(): void {

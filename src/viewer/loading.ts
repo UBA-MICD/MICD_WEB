@@ -8,6 +8,8 @@ import {
   fitToContainer,
   type ViewportState,
 } from "../dicom/dicom-renderer.js";
+import { StudyBuilder } from "../dicom/study-builder.js";
+import { getCanonicalFlip } from "../dicom/spatial-math.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { fetchStudyInstances } from "../services/api.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
@@ -31,6 +33,7 @@ import { getViewportManager } from "./viewport-registry.js";
 import { view3DViewer, buildVolumeFromCache } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
 import { itemCount } from "./state.js";
+import { loadFromLocalStorage } from "./measurements/annotation-state.js";
 
 /** Serie cuyo W/L tiene cargado el visor legacy (sin ViewportManager). */
 let legacyWlSeriesKey: string | null = null;
@@ -65,6 +68,17 @@ export async function sortFilesByInstanceNumber(
   files: File[],
 ): Promise<File[]> {
   if (files.length <= 1) return files;
+
+  try {
+    const study = await StudyBuilder.build(files);
+    if (study.primarySeries && study.primarySeries.slices.length > 0) {
+      return study.primarySeries.slices.map(
+        (s) => s.file ?? new File([s.buffer], s.name),
+      );
+    }
+  } catch (err) {
+    console.warn("StudyBuilder sorting failed, falling back:", err);
+  }
 
   const entries = await Promise.all(
     files.map(async (file) => {
@@ -181,7 +195,19 @@ async function loadLocalFiles(selected: File[]): Promise<void> {
   }
   dicomCache.clear();
 
-  const sortedFiles = await sortFilesByInstanceNumber(dcmFiles);
+  const study = await StudyBuilder.build(dcmFiles);
+  const primarySeries = study.primarySeries;
+  const sortedFiles: File[] =
+    primarySeries && primarySeries.slices.length > 0
+      ? primarySeries.slices.map((s) => s.file ?? new File([s.buffer], s.name))
+      : await sortFilesByInstanceNumber(dcmFiles);
+
+  if (primarySeries) {
+    primarySeries.slices.forEach((slice, idx) => {
+      dicomCache.set(idx, slice.parsed);
+    });
+  }
+
   const freshViewport = {
     windowCenter: 0,
     windowWidth: 0,
@@ -353,13 +379,19 @@ export function initialViewportFor(parsed: ParsedDicom): ViewportState {
     parsed.metadata.rescaleIntercept,
     parsed.metadata.modality,
   );
-  return {
+  const { flipX, flipY } = getCanonicalFlip(
+    parsed.metadata.imageOrientationPatient,
+  );
+  const vp: ViewportState = {
     windowCenter: auto.windowCenter,
     windowWidth: auto.windowWidth,
     zoom: 1,
     panX: 0,
     panY: 0,
   };
+  if (flipX) vp.flipX = true;
+  if (flipY) vp.flipY = true;
+  return vp;
 }
 
 export function displayParsed(parsed: ParsedDicom, name: string): void {
@@ -371,6 +403,10 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     showError(t("viewer.noPixelsFound"));
     return;
   }
+
+  const sopInstanceUid =
+    parsed.metadata.sopInstanceUid || `slice_${state.currentIndex}`;
+  loadFromLocalStorage(sopInstanceUid);
 
   const vp = getViewportManager()?.activeViewport ?? null;
 
@@ -388,8 +424,17 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     // it whenever a different series is opened: inheriting the previous
     // study's window is what rendered a freshly-opened image black.
     const seriesKey = seriesKeyFor(parsed);
-    if (vp.data.viewport.windowWidth <= 0 || vp.data.wlSeriesKey !== seriesKey) {
+    if (
+      vp.data.viewport.windowWidth <= 0 ||
+      vp.data.wlSeriesKey !== seriesKey
+    ) {
       vp.data.viewport = initialViewportFor(parsed);
+    } else {
+      const { flipX, flipY } = getCanonicalFlip(
+        parsed.metadata.imageOrientationPatient,
+      );
+      vp.data.viewport.flipX = flipX;
+      vp.data.viewport.flipY = flipY;
     }
     vp.data.wlSeriesKey = seriesKey;
 
@@ -403,6 +448,12 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
     const legacyKey = seriesKeyFor(parsed);
     if (state.viewport.windowWidth <= 0 || legacyWlSeriesKey !== legacyKey) {
       state.viewport = initialViewportFor(parsed);
+    } else {
+      const { flipX, flipY } = getCanonicalFlip(
+        parsed.metadata.imageOrientationPatient,
+      );
+      state.viewport.flipX = flipX;
+      state.viewport.flipY = flipY;
     }
     legacyWlSeriesKey = legacyKey;
 

@@ -25,6 +25,8 @@ export interface AppState {
   annotations: Record<string, import("./measurements/types.js").Annotation[]>;
   /** Visibility toggle for all measurement overlays on slices (US-48). */
   areAnnotationsVisible: boolean;
+  /** Visibility toggle for the value badges/labels (area, perimeter, "IA"…). */
+  areLabelsVisible: boolean;
   isDragging: boolean;
   lastMouseX: number;
   lastMouseY: number;
@@ -103,6 +105,7 @@ export const state: AppState = {
   isMprMode: false,
   annotations: {},
   areAnnotationsVisible: true,
+  areLabelsVisible: true,
   serverValidation: null,
 };
 

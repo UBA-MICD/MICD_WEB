@@ -49,6 +49,7 @@ import { initWalkthrough } from "./walkthrough/init.js";
 import { initValidation } from "./viewer/validation-ui.js";
 import { initMLView } from "./viewer/ml-view.js";
 import { initSegmentation } from "./viewer/segmentation/segmentation-ui.js";
+import { initSegmentationCorrection } from "./viewer/segmentation/segmentation-correction-ui.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
 import { initDesktopOnlyUI, initApiOriginSetting } from "./shared/desktop.js";
@@ -163,6 +164,7 @@ function startApp(): void {
   initValidation();
   initMLView();
   initSegmentation();
+  initSegmentationCorrection();
   // Last: the rail is one tab stop, with the arrow keys moving between tools,
   // so reaching the viewport does not mean tabbing through every tool. It
   // reads the tool buttons at init, so it runs after they are all wired.

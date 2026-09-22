@@ -168,65 +168,11 @@ function apiResponse() {
   };
 }
 
-// ── openSegmentationComparison ────────────────────────────────────────────────
-
-test("openSegmentationComparison lays out 1x2 with the derived DICOM on the right", async () => {
-  const ui = await freshUi();
-  ui.openSegmentationComparison(fakeResult());
-
-  assert.equal(manager.getLayout(), "1x2");
-  const [vp0, vp1] = manager.getAllViewports();
-  assert.equal(
-    vp0!.data.segmentation,
-    null,
-    "left panel keeps the original untouched",
-  );
-  assert.ok(
-    vp1!.data.segmentation,
-    "right panel carries the segmentation layer",
-  );
-  assert.equal(vp1!.data.segmentation!.visible, true);
-  assert.ok(vp1!.data.mlLabel, "right panel shows an AI HUD label");
-});
-
-test("openSegmentationComparison enables sync and makes the right panel active", async () => {
-  const ui = await freshUi();
-  ui.openSegmentationComparison(fakeResult());
-
-  assert.ok(manager.isSynchronized, "comparison shares framing between panels");
-  assert.equal(manager.activeViewport?.id, "vp-1");
-});
-
-// ── clearSegmentation ─────────────────────────────────────────────────────────
-
-test("clearSegmentation removes the layer and hides the badge", async () => {
-  const ui = await freshUi();
-  ui.openSegmentationComparison(fakeResult());
-  ui.clearSegmentation();
-
-  for (const vp of manager.getAllViewports()) {
-    assert.equal(vp.data.segmentation, null);
-  }
-  assert.ok(
-    document.getElementById("segmentation-badge")!.classList.contains("hidden"),
-  );
-});
-
-// ── setSegmentationVisible ────────────────────────────────────────────────────
-
-test("setSegmentationVisible toggles the layer's visible flag", async () => {
-  const ui = await freshUi();
-  ui.openSegmentationComparison(fakeResult());
-
-  ui.setSegmentationVisible(false);
-  const vp1 = manager.getAllViewports()[1]!;
-  assert.equal(vp1.data.segmentation!.visible, false);
-
-  ui.setSegmentationVisible(true);
-  assert.equal(vp1.data.segmentation!.visible, true);
-});
-
 // ── runSegmentation: guard + error paths (no network) ─────────────────────────
+//
+// US-45: the AI segmentation is now drawn as a polygon on the real image (no
+// derived 1x2 comparison), so these cover the guard/error/success of the entry
+// point without asserting a layout.
 
 test("runSegmentation warns and no-ops when there is no image open", async () => {
   state.parsed = null;
@@ -235,11 +181,7 @@ test("runSegmentation warns and no-ops when there is no image open", async () =>
 
   const banner = document.getElementById("app-banner")!;
   assert.ok(!banner.classList.contains("hidden"));
-  assert.equal(
-    manager.getLayout(),
-    "1x1",
-    "layout is untouched without an image",
-  );
+  assert.equal(ui.getLastSegmentation(), null, "no result without an image");
 });
 
 test("runSegmentation surfaces a SegmentationError as an error banner", async () => {
@@ -257,73 +199,12 @@ test("runSegmentation surfaces a SegmentationError as an error banner", async ()
   );
 });
 
-// ── runSegmentation: success path (stubbed API) ───────────────────────────────
-
-test("runSegmentation stores the result and opens the comparison on success", async () => {
+test("runSegmentation stores the result on success", async () => {
   await login();
   fetchImpl = async () => jsonResponse(200, apiResponse());
 
   const ui = await freshUi();
   await ui.runSegmentation();
 
-  assert.ok(ui.getLastSegmentation(), "the result is kept for the toggle");
-  assert.equal(manager.getLayout(), "1x2");
-  assert.ok(
-    !document
-      .getElementById("segmentation-badge")!
-      .classList.contains("hidden"),
-    "the simulated badge is shown",
-  );
-});
-
-// ── toggleLastSegmentation with a result in memory ────────────────────────────
-
-test("toggleLastSegmentation flips visibility once a result exists", async () => {
-  await login();
-  fetchImpl = async () => jsonResponse(200, apiResponse());
-  const ui = await freshUi();
-  await ui.runSegmentation();
-
-  // Currently shown; toggling hides it.
-  ui.toggleLastSegmentation();
-  const vp1 = manager.getAllViewports()[1]!;
-  assert.equal(vp1.data.segmentation!.visible, false);
-
-  // Toggling again shows it.
-  ui.toggleLastSegmentation();
-  assert.equal(vp1.data.segmentation!.visible, true);
-});
-
-test("toggleLastSegmentation rebuilds the comparison if the layer was lost", async () => {
-  await login();
-  fetchImpl = async () => jsonResponse(200, apiResponse());
-  const ui = await freshUi();
-  await ui.runSegmentation();
-
-  // Simulate a grid/study change that dropped the layers from the viewports
-  // but left lastResult in memory (clearSegmentation() would also null it).
-  for (const vp of manager.getAllViewports()) vp.data.segmentation = null;
-  assert.ok(manager.getAllViewports().every((vp) => !vp.data.segmentation));
-
-  ui.toggleLastSegmentation();
-  assert.ok(
-    manager.getAllViewports().some((vp) => vp.data.segmentation),
-    "the same result is re-applied without a new inference",
-  );
-});
-
-// ── checkbox change handler ───────────────────────────────────────────────────
-
-test("the layers checkbox drives setSegmentationVisible", async () => {
-  const ui = await freshUi();
-  ui.initSegmentation();
-  ui.openSegmentationComparison(fakeResult());
-
-  const toggle = document.getElementById(
-    "chk-segmentation-visible",
-  ) as HTMLInputElement;
-  toggle.checked = false;
-  toggle.dispatchEvent(new Event("change"));
-
-  assert.equal(manager.getAllViewports()[1]!.data.segmentation!.visible, false);
+  assert.ok(ui.getLastSegmentation(), "the result is kept in memory");
 });

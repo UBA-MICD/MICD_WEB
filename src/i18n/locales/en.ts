@@ -202,6 +202,18 @@ export const en: Record<string, string> = {
   "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
   "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
   "viewer.segmentation.failed": "The segmentation could not be generated.",
+  "viewer.segmentation.tagAi": "AI",
+  "viewer.segmentation.loading": "Loading AI segmentation…",
+  "viewer.segmentation.correct": "Correct",
+  "viewer.segmentation.correctHint":
+    "Drag, add or remove vertices to adjust the outline; then Submit.",
+  "viewer.segmentation.submit": "Submit",
+  "viewer.segmentation.cancel": "Cancel",
+  "viewer.segmentation.correctionSaved": "Correction saved.",
+  "viewer.segmentation.notPersisted":
+    "This segmentation is not persisted; it cannot be corrected.",
+  "viewer.segmentation.bySystem": "Segmented by AI",
+  "viewer.segmentation.byPerson": "Corrected by {{who}} · {{when}}",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",
@@ -764,6 +776,8 @@ export const en: Record<string, string> = {
   "viewer.measure.toggleVisibility": "Hide/Show",
   "viewer.measure.hideAnnotations": "Hide annotations",
   "viewer.measure.showAnnotations": "Show annotations",
+  "viewer.info.hide": "Hide info",
+  "viewer.info.show": "Show info",
   "viewer.measure.saveAnnotations": "Save",
   "viewer.measure.savedSuccess": "Saved!",
 };

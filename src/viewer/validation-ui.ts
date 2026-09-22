@@ -97,12 +97,12 @@ function refreshBar(): void {
 
   bar.classList.toggle("hidden", !shouldShow);
 
-  if (shouldShow) {
-    renderBadge();
-    renderCorrectionNotice();
-    renderReadonlyNotice();
-    renderActionButtons();
-  }
+  if (!shouldShow) return;
+
+  renderBadge();
+  renderCorrectionNotice();
+  renderReadonlyNotice();
+  renderActionButtons();
 }
 
 function renderBadge(): void {
@@ -110,7 +110,8 @@ function renderBadge(): void {
   if (!badge) return;
 
   const v = state.serverValidation;
-  if (!v) {
+  const known = ["approved", "rejected", "review"];
+  if (!v || !known.includes(v.status)) {
     badge.textContent = t("validation.status.none");
     badge.className = "validation-bar__status validation-bar__status--none";
     return;

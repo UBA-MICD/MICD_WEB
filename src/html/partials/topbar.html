@@ -60,6 +60,30 @@
   </div>
 
   <div class="topbar__actions">
+    <!-- Toggle the on-image info (measurement badges, HU, "IA" tag, AI label)
+         without hiding the contours themselves (US-45). -->
+    <button
+      class="nav-btn"
+      id="btn-toggle-info"
+      type="button"
+      aria-pressed="true"
+      data-i18n-attr="aria-label:viewer.info.hide; title:viewer.info.hide"
+      aria-label="Ocultar info"
+      title="Ocultar info"
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    </button>
     <div class="locale-switch">
       <label class="sr-only" for="locale-select" data-i18n="app.locale.label"
         >Idioma</label

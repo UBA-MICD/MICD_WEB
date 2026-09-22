@@ -712,6 +712,25 @@ export function initMeasurementControlsInteraction(): void {
     renderActiveMeasurementOverlays();
   });
 
+  // Top-bar "info" toggle (US-45): hides the on-image info — measurement
+  // badges (area/perimeter/HU), the "IA" tag and the AI label ("IA: …") —
+  // WITHOUT hiding the contours, which stay visible and editable. The state is
+  // global (state.areLabelsVisible), so it holds across slice and layout changes.
+  const btnInfo = $("btn-toggle-info");
+  btnInfo?.addEventListener("click", () => {
+    state.areLabelsVisible = !state.areLabelsVisible;
+    btnInfo.setAttribute("aria-pressed", String(state.areLabelsVisible));
+    const label = state.areLabelsVisible
+      ? t("viewer.info.hide") || "Ocultar info"
+      : t("viewer.info.show") || "Mostrar info";
+    btnInfo.setAttribute("aria-label", label);
+    btnInfo.setAttribute("title", label);
+    // Re-render every viewport so the AI label overlay updates too, not just the
+    // measurement badges.
+    for (const vp of getViewportManager()?.getAllViewports() ?? []) vp.render();
+    renderActiveMeasurementOverlays();
+  });
+
   const btnSave = $("btn-save-annotations");
   btnSave?.addEventListener("click", () => {
     const manager = getViewportManager();
@@ -1253,11 +1272,7 @@ export function initViewportInteraction(): void {
           viewH,
           metadata.columns,
           metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          1,
-          true,
+          vpState,
         );
         const distToStart = Math.hypot(
           clickX - p0Screen.x,
@@ -1283,11 +1298,7 @@ export function initViewportInteraction(): void {
           viewH,
           metadata.columns,
           metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          1,
-          true,
+          vpState,
         );
         activeD.points.push(worldPt);
         activeD.end = worldPt;
@@ -1347,11 +1358,7 @@ export function initViewportInteraction(): void {
             viewH,
             metadata.columns,
             metadata.rows,
-            vpState.zoom,
-            vpState.panX,
-            vpState.panY,
-            1,
-            true,
+            vpState,
           );
           draggingShape = {
             annotationId: hit.id,
@@ -1375,11 +1382,7 @@ export function initViewportInteraction(): void {
         viewH,
         metadata.columns,
         metadata.rows,
-        vpState.zoom,
-        vpState.panX,
-        vpState.panY,
-        1,
-        true,
+        vpState,
       );
 
       if (state.activeTool === "length") {
@@ -1448,11 +1451,7 @@ export function initViewportInteraction(): void {
           viewH,
           metadata.columns,
           metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          1,
-          true,
+          vpState,
         );
         drawing.end = currentWorld;
         if (activeVp) activeVp.renderOverlay();
@@ -1496,11 +1495,7 @@ export function initViewportInteraction(): void {
           viewH,
           metadata.columns,
           metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          1,
-          true,
+          vpState,
         );
         const ann = getAnnotationsForSlice(sopInstanceUid).find(
           (a) => a.id === draggingNode!.annotationId,
@@ -1558,11 +1553,7 @@ export function initViewportInteraction(): void {
           viewH,
           metadata.columns,
           metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          1,
-          true,
+          vpState,
         );
         const ann = getAnnotationsForSlice(sopInstanceUid).find(
           (a) => a.id === draggingShape!.annotationId,
@@ -1612,12 +1603,7 @@ export function initViewportInteraction(): void {
           viewH,
           metadata.columns,
           metadata.rows,
-          vpState.zoom,
-          vpState.panX,
-          vpState.panY,
-          // NOTA: baseScale se mantiene en 1 asumiendo que el renderer DICOM mapea 1:1 con los píxeles CSS antes de aplicar viewport.zoom
-          1,
-          true,
+          vpState,
         );
 
         if (drawing.type === "length") {

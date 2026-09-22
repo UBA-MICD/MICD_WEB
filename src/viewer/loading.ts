@@ -478,6 +478,13 @@ export function displayParsed(parsed: ParsedDicom, name: string): void {
 
   $("topbar-title").textContent = name;
   $("topbar-title").title = name;
+
+  // US-45: the AI segmentation lives only on the derived (right) viewport of the
+  // comparison, seeded by segmentation-ui. We deliberately do NOT reload it onto
+  // the original (left) image here — keying it to the real SOP UID made it show
+  // on both panels (and, since the mock reshapes each run, as two different
+  // blobs that looked mirrored). Persisting across slices belongs to the
+  // single-viewport unification (see reloadSegmentationForInstance, kept unused).
 }
 
 // ── Drop Zone ────────────────────────────────────────────────────────────────

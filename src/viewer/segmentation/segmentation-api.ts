@@ -24,6 +24,11 @@ export interface SegmentationMask {
 
 /** Respuesta cruda del endpoint, antes de decodificar la máscara. */
 export interface SegmentationApiResponse {
+  /**
+   * Id del candidato persistido (US-45), o null si no se persistió (imagen
+   * abierta de disco local sin UID de origen). Necesario para corregirlo.
+   */
+  segmentationId: number | null;
   seed: number;
   model: string;
   simulated: boolean;
@@ -86,6 +91,29 @@ export function decodeMaskRle(
   return data;
 }
 
+/**
+ * Inversa de {@link decodeMaskRle}: codifica una máscara binaria row-major como
+ * longitudes de tramo alternadas empezando por un tramo de ceros (mismo formato
+ * que produce y consume el backend). Un `decodeMaskRle(encodeMaskRle(m)) === m`.
+ */
+export function encodeMaskRle(mask: Uint8Array | number[]): number[] {
+  const rle: number[] = [];
+  let expected = 0; // el primer tramo es de ceros (puede ser de longitud 0)
+  let run = 0;
+  for (let i = 0; i < mask.length; i++) {
+    const v = mask[i] ? 1 : 0;
+    if (v === expected) {
+      run++;
+    } else {
+      rle.push(run);
+      expected = expected ? 0 : 1;
+      run = 1;
+    }
+  }
+  rle.push(run);
+  return rle;
+}
+
 /** Pide una segmentación para una imagen. */
 export async function requestSegmentation(
   body: SegmentationRequest,
@@ -97,6 +125,140 @@ export async function requestSegmentation(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+  } catch {
+    return { ok: false, status: 0, error: t("viewer.segmentation.failed") };
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: await readError(res) };
+  }
+  return { ok: true, data: await res.json() };
+}
+
+// ── Correcciones (US-45) ─────────────────────────────────────────────────────
+
+/** Cuerpo de una corrección: la máscara editada por la persona, en RLE. */
+export interface CorrectionRequest {
+  correctedRle: number[];
+  /** [height, width] del espacio de la máscara. */
+  maskShape: [number, number];
+  /** Resumen estructurado de la edición (movió/agregó/quitó). Opcional. */
+  editSummary?: Record<string, unknown>;
+}
+
+export interface CorrectionResponse {
+  correctionId: number;
+  segmentationId: number;
+  correctedBy: string;
+  correctedAt: string;
+  editSummary: Record<string, unknown> | null;
+}
+
+export interface SegmentationHistory {
+  segmentation: {
+    segmentationId: number;
+    status: string;
+    model: string | null;
+    maskRle: number[] | null;
+    maskShape: [number, number] | null;
+    createdBy: string;
+    createdAt: string;
+    reviewedBy: string | null;
+    reviewedAt: string | null;
+  };
+  corrections: CorrectionResponse[];
+}
+
+async function postJson<T>(
+  path: string,
+  body?: unknown,
+): Promise<ApiResult<T>> {
+  let res: Response;
+  try {
+    res = await authFetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch {
+    return { ok: false, status: 0, error: t("viewer.segmentation.failed") };
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: await readError(res) };
+  }
+  return { ok: true, data: await res.json() };
+}
+
+/** Guarda una corrección humana sobre el candidato `segmentationId`. */
+export async function saveCorrection(
+  segmentationId: number,
+  body: CorrectionRequest,
+): Promise<ApiResult<CorrectionResponse>> {
+  return postJson<CorrectionResponse>(
+    `/v1/ml/segmentation/${segmentationId}/corrections`,
+    body,
+  );
+}
+
+/** Aprueba el candidato tal cual (sin ediciones). */
+export async function acceptSegmentation(
+  segmentationId: number,
+): Promise<ApiResult<SegmentationHistory>> {
+  return postJson<SegmentationHistory>(
+    `/v1/ml/segmentation/${segmentationId}/accept`,
+  );
+}
+
+/** Descarta la segmentación entera. */
+export async function discardSegmentation(
+  segmentationId: number,
+): Promise<ApiResult<SegmentationHistory>> {
+  return postJson<SegmentationHistory>(
+    `/v1/ml/segmentation/${segmentationId}/discard`,
+  );
+}
+
+/** Segmentación actual de una imagen (original + última corrección), o null. */
+export interface InstanceSegmentation {
+  segmentationId: number;
+  status: string;
+  maskRle: number[] | null;
+  maskShape: [number, number] | null;
+  correctedRle: number[] | null;
+  correctedMaskShape: [number, number] | null;
+  correctedBy: string | null;
+  correctedAt: string | null;
+}
+
+/**
+ * Trae la segmentación persistida para (estudio, instancia) — para redibujar el
+ * polígono al abrir/scrollear/recargar (bug 3). `data` es null si no hay ninguna.
+ */
+export async function getSegmentationForInstance(
+  studyId: string,
+  instanceId: string,
+): Promise<ApiResult<InstanceSegmentation | null>> {
+  const qs = `studyId=${encodeURIComponent(studyId)}&instanceId=${encodeURIComponent(instanceId)}`;
+  let res: Response;
+  try {
+    res = await authFetch(`${API_BASE}/v1/ml/segmentation?${qs}`);
+  } catch {
+    return { ok: false, status: 0, error: t("viewer.segmentation.failed") };
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: await readError(res) };
+  }
+  return { ok: true, data: await res.json() };
+}
+
+/** Candidato + cadena completa de correcciones (más nueva primero). */
+export async function getSegmentationHistory(
+  segmentationId: number,
+): Promise<ApiResult<SegmentationHistory>> {
+  let res: Response;
+  try {
+    res = await authFetch(
+      `${API_BASE}/v1/ml/segmentation/${segmentationId}/corrections`,
+    );
   } catch {
     return { ok: false, status: 0, error: t("viewer.segmentation.failed") };
   }

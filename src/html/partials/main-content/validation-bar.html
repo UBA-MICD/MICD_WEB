@@ -1,4 +1,7 @@
-<!-- Validation action bar (US-26) — staff-only, server studies -->
+<!-- Validation action bar (US-26 + US-45) — staff-only, server studies.
+     One bar: study validation (Aprobar/Rechazar/Marcar) plus the AI segmentation
+     "Corregir" flow. "Corregir" stays visible while editing (so you can keep
+     adjusting); Enviar/Cancelar appear only in edit mode. -->
 <div
   class="validation-bar hidden"
   id="validation-bar"
@@ -6,6 +9,16 @@
   data-i18n-attr="aria-label:validation.barAriaLabel"
   aria-label="Validación de diagnóstico"
 >
+  <span
+    class="validation-bar__chip hidden"
+    id="seg-ia-chip"
+    data-i18n="viewer.segmentation.tagAi"
+    >IA</span
+  >
+  <span
+    class="validation-bar__seg-attr hidden"
+    id="seg-correction-attribution"
+  ></span>
   <span class="validation-bar__status" id="validation-status-badge"></span>
   <p
     class="validation-bar__correction-notice hidden"
@@ -21,6 +34,35 @@
   >
     Solo el administrador puede corregir esta validación.
   </p>
+
+  <div class="validation-bar__spacer"></div>
+
+  <!-- AI segmentation correction (US-45). Shown by segmentation-correction-ui.ts
+       only while a segmentation is on screen. "Corregir" never disappears. -->
+  <button
+    class="btn btn--secondary btn--sm hidden"
+    id="btn-seg-correct"
+    data-i18n="viewer.segmentation.correct"
+    aria-pressed="false"
+  >
+    Corregir
+  </button>
+  <button
+    class="btn btn--secondary btn--sm hidden"
+    id="btn-seg-submit"
+    data-i18n="viewer.segmentation.submit"
+  >
+    Enviar
+  </button>
+  <button
+    class="btn btn--secondary btn--sm hidden"
+    id="btn-seg-cancel"
+    data-i18n="viewer.segmentation.cancel"
+  >
+    Cancelar
+  </button>
+
+  <!-- Study validation (US-26). -->
   <button
     class="btn btn--accent btn--sm"
     id="btn-validate-approve"

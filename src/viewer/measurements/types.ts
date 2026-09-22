@@ -49,6 +49,12 @@ export interface PolygonAnnotation extends BaseAnnotation {
   stdDevHu?: number;
   minHu?: number;
   maxHu?: number;
+  /**
+   * Provenance (US-45). Absent/"manual" = drawn by a person with the polygon
+   * tool (rendered as usual). "ai" = seeded from the AI segmentation contour —
+   * rendered turquoise with an "IA" tag so it stands apart from manual polygons.
+   */
+  origin?: "ai" | "manual";
 }
 
 export type Annotation =

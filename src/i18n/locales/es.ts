@@ -205,6 +205,18 @@ export const es: Record<string, string> = {
   "viewer.segmentation.hudLabel": "Segmentación IA (simulada)",
   "viewer.segmentation.noImage": "Abrí una imagen DICOM antes de segmentar.",
   "viewer.segmentation.failed": "No se pudo generar la segmentación.",
+  "viewer.segmentation.tagAi": "IA",
+  "viewer.segmentation.loading": "Cargando segmentación IA…",
+  "viewer.segmentation.correct": "Corregir",
+  "viewer.segmentation.correctHint":
+    "Arrastrá, agregá o quitá vértices para ajustar el contorno; luego Enviar.",
+  "viewer.segmentation.submit": "Enviar",
+  "viewer.segmentation.cancel": "Cancelar",
+  "viewer.segmentation.correctionSaved": "Corrección guardada.",
+  "viewer.segmentation.notPersisted":
+    "Esta segmentación no está persistida; no se puede corregir.",
+  "viewer.segmentation.bySystem": "Segmentado por IA",
+  "viewer.segmentation.byPerson": "Corregido por {{who}} · {{when}}",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",
@@ -773,6 +785,8 @@ export const es: Record<string, string> = {
   "viewer.measure.toggleVisibility": "Esconder/Mostrar",
   "viewer.measure.hideAnnotations": "Ocultar anotaciones",
   "viewer.measure.showAnnotations": "Mostrar anotaciones",
+  "viewer.info.hide": "Ocultar info",
+  "viewer.info.show": "Mostrar info",
   "viewer.measure.saveAnnotations": "Guardar",
   "viewer.measure.savedSuccess": "¡Guardado!",
 };

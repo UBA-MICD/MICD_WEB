@@ -298,10 +298,6 @@ export const en: Record<string, string> = {
   "upload.unauthorizedRetry": "Not authorized. Log in again.",
   "upload.fileTooLarge": "The file exceeds the 2 GB limit.",
   "upload.genericError": "Error uploading the file.",
-  "upload.anonymizerUnavailable":
-    "The anonymization service is unavailable. The upload was rejected and the study was not stored.",
-  "upload.anonymizationFailed":
-    "The study could not be anonymized; the upload was rejected and nothing was stored. {{reason}}",
   "upload.rowLabel": "Progress for {{name}}",
   "upload.stateDuplicate": "Duplicate",
   "upload.stateAborted": "Cancelled",

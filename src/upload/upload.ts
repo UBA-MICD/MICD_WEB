@@ -13,6 +13,7 @@ import { openDialog, closeDialog } from "../shared/dialog.js";
 import { loadStudyExplorer, markStudyAsNew } from "../explorer/explorer.js";
 import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
+import { anonymizeDicomBuffer } from "../utils/dicom-anonymizer.js";
 
 // ── Upload (Cargar tab) ──────────────────────────────────────────────────────
 //
@@ -298,15 +299,32 @@ export function isUploading(): boolean {
 
 // ── One file ─────────────────────────────────────────────────────────────────
 
-function uploadOne(
+/**
+ * Anonymize a DICOM before it leaves the client, so PHI never touches the
+ * network. On the desktop build the real Python anonymizer runs in the main
+ * process (window.api.anonymizeDicom); the browser has no Python, so it falls
+ * back to the in-browser JS scrubber. Either way the backend stores what it
+ * receives and does not anonymize.
+ */
+async function anonymizeForUpload(file: File): Promise<File> {
+  const rawBuffer = await file.arrayBuffer();
+  const anonBuffer = window.api?.anonymizeDicom
+    ? await window.api.anonymizeDicom(rawBuffer)
+    : anonymizeDicomBuffer(rawBuffer);
+  return new File([anonBuffer], file.name, { type: file.type });
+}
+
+async function uploadOne(
   file: File,
   row: UploadRow,
   force = false,
   isRetry = false,
 ): Promise<UploadOutcome> {
+  const fileToSend = await anonymizeForUpload(file);
+
   return new Promise((resolve) => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", fileToSend);
 
     const xhr = new XMLHttpRequest();
     activeXhr = xhr;
@@ -396,9 +414,7 @@ function uploadOne(
         showUploadStatus(t("upload.fileTooLarge"), "error");
       } else {
         showUploadStatus(
-          anonymizationErrorMessage(xhr.responseText) ||
-            safeMessage(xhr.responseText) ||
-            t("upload.genericError"),
+          safeMessage(xhr.responseText) || t("upload.genericError"),
           "error",
         );
       }
@@ -431,27 +447,6 @@ function safeMessage(responseText: string): string {
     return body?.message ?? body?.error ?? "";
   } catch {
     return "";
-  }
-}
-
-/**
- * Localized message for an anonymization rejection (US-16). The backend uses
- * stable `error` codes so the bilingual UI doesn't have to surface a raw
- * server string. Returns null when the body is not an anonymization error.
- */
-function anonymizationErrorMessage(responseText: string): string | null {
-  try {
-    const body = JSON.parse(responseText);
-    const code = body?.error;
-    if (code === "anonymizer_unavailable" || code === "anonymizer_disabled") {
-      return t("upload.anonymizerUnavailable");
-    }
-    if (code === "anonymization_failed") {
-      return t("upload.anonymizationFailed", { reason: body?.message ?? "" });
-    }
-    return null;
-  } catch {
-    return null;
   }
 }
 
@@ -600,13 +595,15 @@ export async function startExplorerUpload(
   await loadStudyExplorer();
 }
 
-function uploadOneExplorer(
+async function uploadOneExplorer(
   file: File,
   isRetry = false,
 ): Promise<UploadOutcome> {
+  const fileToSend = await anonymizeForUpload(file);
+
   return new Promise((resolve) => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", fileToSend);
 
     const xhr = new XMLHttpRequest();
     activeXhr = xhr;
@@ -660,9 +657,7 @@ function uploadOneExplorer(
         showToast(t("upload.fileTooLarge"), "error");
       } else {
         showToast(
-          anonymizationErrorMessage(xhr.responseText) ||
-            safeMessage(xhr.responseText) ||
-            t("upload.genericError"),
+          safeMessage(xhr.responseText) || t("upload.genericError"),
           "error",
         );
       }

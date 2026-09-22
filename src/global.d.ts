@@ -33,6 +33,15 @@ declare global {
       };
       /** Native save dialog + disk write, in place of the browser's `<a download>`. */
       saveFile: (filename: string, data: ArrayBuffer) => Promise<boolean>;
+      /**
+       * Anonymize a DICOM buffer with the desktop app's Python anonymizer
+       * (pydicom, run via PythonShell) before it is uploaded. Present only under
+       * Electron; the browser build has no Python and falls back to the
+       * in-browser JS scrubber (utils/dicom-anonymizer.ts). See upload.ts.
+       * Optional so an older desktop preload without it still typechecks and
+       * takes the JS fallback.
+       */
+      anonymizeDicom?: (data: ArrayBuffer) => Promise<ArrayBuffer>;
       getApiOrigin: () => Promise<string>;
       setApiOrigin: (origin: string) => Promise<void>;
     };

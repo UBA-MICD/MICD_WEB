@@ -4223,6 +4223,24 @@ body {
   background: var(--amber-soft);
   color: var(--amber);
 }
+.study-item__classification-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+.study-item__classification-badge--none {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
 
 .validations-row-actions {
   display: flex;

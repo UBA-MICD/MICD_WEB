@@ -10,6 +10,13 @@
     <input type="file" id="upload-input" accept=".dcm,.zip" class="hidden" />
     <input type="file" id="upload-folder-input" class="hidden" />
 
+    <label class="upload-classification">
+      <span data-i18n="classification.label">Clasificación</span>
+      <select id="upload-classification">
+        <option value="" data-i18n="classification.none">Sin clasificar</option>
+      </select>
+    </label>
+
     <div class="upload-drop" id="upload-drop">
       <p data-i18n="upload.dropHint">
         Arrastrá archivos .dcm, .zip o una carpeta aquí

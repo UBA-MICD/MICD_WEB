@@ -4,6 +4,8 @@ import {
   getAccessToken,
   refreshAccessToken,
   getCurrentUser,
+  authFetch,
+  isAuthenticated,
   API_BASE,
 } from "../auth/auth.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
@@ -70,6 +72,59 @@ export function onUploadComplete(cb: (summary: UploadSummary) => void): void {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
+// ── Classification catalog (Cargar tab dropdown) ─────────────────────────────
+//
+// Categories are owned by the backend (GET /v1/pathologies). We fetch them once,
+// lazily, the first time the Cargar tab is opened by an authenticated user, and
+// build one <option value=id> per category — labels come from i18n, keyed by the
+// backend `key`, so they translate on the client and no descriptions live server-side.
+
+let classificationOptionsLoaded = false;
+
+function classificationSelect(): HTMLSelectElement | null {
+  return document.getElementById(
+    "upload-classification",
+  ) as HTMLSelectElement | null;
+}
+
+/** The selected category id, or "" when unclassified. */
+function selectedClassificationId(): string {
+  return classificationSelect()?.value.trim() ?? "";
+}
+
+/** Fetch the catalog once and populate the select. Silently no-ops for a guest
+ *  or on error — the blank "Sin clasificar" default stays, so upload still works. */
+async function ensureClassificationOptions(): Promise<void> {
+  if (classificationOptionsLoaded || !isAuthenticated()) return;
+  const sel = classificationSelect();
+  if (!sel) return;
+  try {
+    const res = await authFetch(`${API_BASE}/v1/pathologies`);
+    if (!res.ok) return;
+    const cats = (await res.json()) as { id: number; key: string }[];
+    sel.querySelectorAll("option[data-key]").forEach((o) => o.remove());
+    for (const c of cats) {
+      const opt = document.createElement("option");
+      opt.value = String(c.id);
+      opt.dataset.key = c.key;
+      opt.textContent = t(`classification.${c.key}`);
+      sel.appendChild(opt);
+    }
+    classificationOptionsLoaded = true;
+  } catch {
+    // leave the blank default in place
+  }
+}
+
+/** Re-translate the built options on a locale change (no refetch). */
+function relabelClassificationOptions(): void {
+  classificationSelect()
+    ?.querySelectorAll<HTMLOptionElement>("option[data-key]")
+    .forEach((o) => {
+      if (o.dataset.key) o.textContent = t(`classification.${o.dataset.key}`);
+    });
+}
+
 export function initUploadPanel(): void {
   const input = $("upload-input") as HTMLInputElement;
   input.setAttribute("multiple", "");
@@ -135,6 +190,14 @@ export function initUploadPanel(): void {
   $("btn-refresh-studies")?.addEventListener("click", loadStudyExplorer);
   renderTransportNote();
   onLocaleChange(renderTransportNote);
+
+  // Load the classification catalog when the Cargar tab opens; relabel on locale
+  // change. Try once now in case the session is already active.
+  $("tab-cargar")?.addEventListener("click", () => {
+    void ensureClassificationOptions();
+  });
+  onLocaleChange(relabelClassificationOptions);
+  void ensureClassificationOptions();
 }
 
 /** Drag-and-drop onto the Cargar tab's drop area. */
@@ -306,6 +369,9 @@ function uploadOne(
 ): Promise<UploadOutcome> {
   return new Promise((resolve) => {
     const formData = new FormData();
+    const classificationId = selectedClassificationId();
+    if (classificationId)
+      formData.append("classification_id", classificationId);
     formData.append("file", file);
 
     const xhr = new XMLHttpRequest();

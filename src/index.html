@@ -1189,6 +1189,22 @@
       </select>
     </div>
 
+    <!-- Pathology of the selected polygon (US-45). Same catalog as upload
+         (GET /v1/pathologies); applies to the currently selected polygon. -->
+    <div class="wl-section">
+      <label
+        class="wl-section-title"
+        for="measure-pathology"
+        data-i18n="viewer.measure.pathologyLabel"
+        >Patología</label
+      >
+      <select id="measure-pathology" class="measure-select">
+        <option value="" data-key="none" data-i18n="classification.none">
+          Sin clasificar
+        </option>
+      </select>
+    </div>
+
     <!-- Line Width Slider Section -->
     <div class="wl-section">
       <div class="slider-control">
@@ -1366,6 +1382,18 @@
   </p>
 
   <div class="validation-bar__spacer"></div>
+
+  <!-- Pathology type for the AI segmentation (US-45), same catalog as upload.
+       Optional. Shown only while an AI candidate is on screen. -->
+  <select
+    class="validation-bar__seg-select hidden"
+    id="seg-pathology"
+    data-i18n-attr="aria-label:viewer.segmentation.pathologyAria;title:viewer.segmentation.pathologyAria"
+  >
+    <option value="" data-key="none" data-i18n="classification.none">
+      Sin clasificar
+    </option>
+  </select>
 
   <!-- AI segmentation group (US-45), whole group in the turquoise "IA" family.
        Shown by segmentation-correction-ui.ts only while a segmentation is on

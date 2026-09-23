@@ -250,6 +250,21 @@ export async function getSegmentationForInstance(
   return { ok: true, data: await res.json() };
 }
 
+/**
+ * Catálogo de patologías (mismo que usa la carga de estudios: `GET
+ * /v1/pathologies`). Las etiquetas se traducen en el cliente por `key`
+ * (`classification.<key>`). Devuelve [] para invitado o ante un error.
+ */
+export async function getPathologies(): Promise<{ id: number; key: string }[]> {
+  try {
+    const res = await authFetch(`${API_BASE}/v1/pathologies`);
+    if (!res.ok) return [];
+    return (await res.json()) as { id: number; key: string }[];
+  } catch {
+    return [];
+  }
+}
+
 /** Candidato + cadena completa de correcciones (más nueva primero). */
 export async function getSegmentationHistory(
   segmentationId: number,

@@ -1888,6 +1888,20 @@ body {
   background: rgba(26, 188, 156, 0.24);
   border-color: #1abc9c;
 }
+.validation-bar__seg-select {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(26, 188, 156, 0.55);
+  background: rgba(26, 188, 156, 0.12);
+  color: #5fe0c8;
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+}
+.validation-bar__seg-select:hover {
+  border-color: #1abc9c;
+}
 
 .upload-status {
   font-size: 11px;

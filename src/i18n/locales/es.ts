@@ -223,6 +223,7 @@ export const es: Record<string, string> = {
   "viewer.segmentation.discarded": "Segmentación descartada.",
   "viewer.segmentation.discardRestore": "Restaurar",
   "viewer.segmentation.restored": "Segmentación restaurada.",
+  "viewer.segmentation.pathologyAria": "Tipo de patología de la segmentación",
   "viewer.segmentation.reset": "Descartar corrección",
   "viewer.segmentation.resetHint":
     "Volver al contorno original que propuso la IA.",

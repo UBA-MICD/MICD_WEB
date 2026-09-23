@@ -221,6 +221,7 @@ export const en: Record<string, string> = {
   "viewer.segmentation.discarded": "Segmentation discarded.",
   "viewer.segmentation.discardRestore": "Restore",
   "viewer.segmentation.restored": "Segmentation restored.",
+  "viewer.segmentation.pathologyAria": "Segmentation pathology type",
   "viewer.segmentation.reset": "Discard correction",
   "viewer.segmentation.resetHint":
     "Go back to the outline the AI originally proposed.",

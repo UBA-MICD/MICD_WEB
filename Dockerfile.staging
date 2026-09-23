@@ -13,6 +13,7 @@ COPY package.json ./
 RUN npm install
 
 COPY tsconfig.json ./
+COPY scripts/ ./scripts/
 COPY src/ ./src/
 
 RUN npm run build
@@ -32,7 +33,7 @@ RUN rm -rf /usr/share/nginx/html/*
 # Compiled JS
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY src/index.html /usr/share/nginx/html/index.html
+COPY --from=builder /app/src/index.html /usr/share/nginx/html/index.html
 COPY src/styles.css /usr/share/nginx/html/styles.css
 COPY src/favicon.svg /usr/share/nginx/html/favicon.svg
 

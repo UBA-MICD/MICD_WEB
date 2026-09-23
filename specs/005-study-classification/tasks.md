@@ -36,7 +36,7 @@
 - [x] T055 `upload.ts` — `droppedFiles`/`walkEntry`: dropped folders walked via entries API, plain files via `getAsFile()`.
 - [x] T056 Unit tests in `upload.test.ts` (confirm, cancel, folder drop).
 - [x] T057 E2E SC-7 … SC-9 in `testing/cypress/e2e/study-classification.cy.js` — 9/9 green against the local stack.
-- [ ] T058 Re-sync `desktop` (`make sync-web` → `make parity`) and check the folder button shows there.
+- [x] T058 Re-sync `desktop` (`make sync-web` → `make parity`) and check the folder button shows there — desktop `8d3aec7`, parity match, 901/901 tests.
 
 ## Phase 4 — Verify & deliver
 

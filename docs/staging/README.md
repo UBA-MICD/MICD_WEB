@@ -13,7 +13,6 @@ Full design, the cross-repo picture, and the resume routemap live in the **`MICD
 `docs/staging-deployment/{spec,plan,tasks,routemap}.md`.
 
 Quick facts:
-
 - Domain: `dicomviewermed.online` (its DNS A record must point at the VPS before first deploy — ACME).
 - The backend stack (postgres/orthanc/backend) is deployed from the `backend` repo, internal only.
 - Deploy trigger: CI success on the `staging` branch. The VPS never builds — it only pulls from GHCR.

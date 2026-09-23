@@ -308,6 +308,63 @@ test("cancelUpload is a no-op when nothing is uploading", () => {
   assert.doesNotThrow(() => cancelUpload());
 });
 
+test("startExplorerUpload anonymizes the file bytes before sending them", async () => {
+  (globalThis as any).dicomParser = {
+    parseDicom: () => ({
+      elements: { x00100010: { dataOffset: 0, length: 2 } },
+    }),
+  };
+
+  setBody(`<div id="toast-container"></div>`);
+  await signIn();
+  const statusEl = document.createElement("div");
+  document.body.appendChild(statusEl);
+
+  const file = new File([new Uint8Array([0xff, 0xff, 0x42])], "phi.dcm");
+  const done = startExplorerUpload([file], statusEl);
+  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  const sentFile = FakeXHR.latest().sentBody?.get("file") as File;
+  const sentBytes = new Uint8Array(await sentFile.arrayBuffer());
+  assert.equal(sentBytes[0], 0x20, "PatientName bytes must be scrubbed");
+  assert.equal(sentBytes[1], 0x20);
+  assert.equal(sentBytes[2], 0x42, "non-PII bytes must be untouched");
+
+  delete (globalThis as any).dicomParser;
+  FakeXHR.latest().respond(201, "{}");
+  await done;
+});
+
+test("startExplorerUpload uses window.api.anonymizeDicom (desktop) when present", async () => {
+  // Desktop seam: the Electron main process anonymizes via Python. Here we stub
+  // it to return sentinel bytes and assert THOSE, not the JS-scrubbed original,
+  // are what gets sent — i.e. the browser JS fallback was bypassed.
+  (window as any).api = {
+    anonymizeDicom: async () => new Uint8Array([0xde, 0xad]).buffer,
+  };
+
+  setBody(`<div id="toast-container"></div>`);
+  await signIn();
+  const statusEl = document.createElement("div");
+  document.body.appendChild(statusEl);
+
+  const file = new File([new Uint8Array([0x11, 0x22, 0x33])], "phi.dcm");
+  const done = startExplorerUpload([file], statusEl);
+  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  const sentFile = FakeXHR.latest().sentBody?.get("file") as File;
+  const sentBytes = new Uint8Array(await sentFile.arrayBuffer());
+  assert.deepEqual(Array.from(sentBytes), [0xde, 0xad], "desktop seam output");
+
+  delete (window as any).api;
+  FakeXHR.latest().respond(201, "{}");
+  await done;
+});
+
 test("onUploadComplete is not fired by startExplorerUpload (row-based summaries only)", async () => {
   setBody(`<div id="toast-container"></div>`);
   await signIn();

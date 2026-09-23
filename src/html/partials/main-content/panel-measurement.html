@@ -48,6 +48,22 @@
       </select>
     </div>
 
+    <!-- Pathology of the selected polygon (US-45). Same catalog as upload
+         (GET /v1/pathologies); applies to the currently selected polygon. -->
+    <div class="wl-section">
+      <label
+        class="wl-section-title"
+        for="measure-pathology"
+        data-i18n="viewer.measure.pathologyLabel"
+        >Patología</label
+      >
+      <select id="measure-pathology" class="measure-select">
+        <option value="" data-key="none" data-i18n="classification.none">
+          Sin clasificar
+        </option>
+      </select>
+    </div>
+
     <!-- Line Width Slider Section -->
     <div class="wl-section">
       <div class="slider-control">

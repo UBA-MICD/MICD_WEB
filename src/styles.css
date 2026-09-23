@@ -1803,6 +1803,22 @@ body {
   color: #2ee6a8;
 }
 
+.measure-select {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.measure-select:hover,
+.measure-select:focus {
+  border-color: var(--accent);
+}
+
 .measure-clear-btn {
   width: 100%;
   display: flex;

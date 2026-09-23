@@ -64,6 +64,13 @@ export function getSelectedAnnotationId(): string | null {
 
 export function setSelectedAnnotationId(id: string | null): void {
   selectedAnnotationId = id;
+  // Let the measurement panel sync its pathology select to the new selection.
+  // Guarded: this module is also imported under the Node test runner.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("annotation-selection-changed", { detail: { id } }),
+    );
+  }
 }
 
 // ── Color Tokens & Styling ───────────────────────────────────────────────────
@@ -461,6 +468,13 @@ function drawPolygonAnnotation(
       badgeLines.push({
         text: label,
         color: COLORS.aiSegmentation,
+        bold: true,
+      });
+    } else if (ann.pathologyKey) {
+      // Manual polygon tagged with a pathology (US-45): show it on its badge.
+      badgeLines.push({
+        text: t(`classification.${ann.pathologyKey}`),
+        color: COLORS.calibrated,
         bold: true,
       });
     }

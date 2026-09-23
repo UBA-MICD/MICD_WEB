@@ -795,6 +795,9 @@ export const en: Record<string, string> = {
   "annotations.perimeter": "Perimeter",
   "viewer.measure.panelTitle": "Measurement Settings",
   "viewer.measure.unitLabel": "Units",
+  "viewer.measure.pathologyLabel": "Pathology",
+  "viewer.measure.pathologyNeedPolygon":
+    "Select a polygon to assign it a pathology.",
   "viewer.measure.unitMm": "Millimeters (mm)",
   "viewer.measure.unitCm": "Centimeters (cm)",
   "viewer.measure.lineWidthLabel": "Line Width",

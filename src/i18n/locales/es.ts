@@ -803,6 +803,9 @@ export const es: Record<string, string> = {
   "annotations.perimeter": "Perímetro",
   "viewer.measure.panelTitle": "Ajuste de Mediciones",
   "viewer.measure.unitLabel": "Unidades",
+  "viewer.measure.pathologyLabel": "Patología",
+  "viewer.measure.pathologyNeedPolygon":
+    "Seleccioná un polígono para asignarle una patología.",
   "viewer.measure.unitMm": "Milímetros (mm)",
   "viewer.measure.unitCm": "Centímetros (cm)",
   "viewer.measure.lineWidthLabel": "Grosor de línea",

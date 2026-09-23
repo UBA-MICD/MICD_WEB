@@ -71,6 +71,7 @@ const baseMeta = {
   rescaleSlope: 1,
   windowCenter: 40,
   windowWidth: 400,
+  imageOrientationPatient: [1, 0, 0, 0, 1, 0],
   transferSyntaxUid: "1.2.840.10008.1.2.1",
 };
 
@@ -413,6 +414,42 @@ test("updateOrientationLabels shows A/P/R/L in 2D mode with pixel data", () => {
   assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "P");
   assert.equal(document.getElementById("mpr-orient-left")!.textContent, "R");
   assert.equal(document.getElementById("mpr-orient-right")!.textContent, "L");
+});
+
+test("updateOrientationLabels shows S/I/R/L for coronal orientation", () => {
+  state.parsed = {
+    metadata: {
+      ...baseMeta,
+      imageOrientationPatient: [1, 0, 0, 0, 0, -1],
+    },
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
+  state.is3DMode = false;
+
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "S");
+  assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "I");
+  assert.equal(document.getElementById("mpr-orient-left")!.textContent, "R");
+  assert.equal(document.getElementById("mpr-orient-right")!.textContent, "L");
+});
+
+test("updateOrientationLabels clears labels when IOP is missing or degenerate (AC-5)", () => {
+  state.parsed = {
+    metadata: {
+      ...baseMeta,
+      imageOrientationPatient: undefined,
+    },
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
+  state.is3DMode = false;
+
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-left")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-right")!.textContent, "");
 });
 
 test("a locale change re-renders the metadata panel, series nav, and info overlay", async () => {

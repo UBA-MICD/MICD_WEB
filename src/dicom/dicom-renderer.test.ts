@@ -244,10 +244,7 @@ test("applyCanvasTransform sets a translate+scale CSS transform", () => {
     panX: 10,
     panY: -5,
   });
-  assert.equal(
-    imageCanvas.style.transform,
-    "translate(10px, -5px) scale(2.5) scaleY(-1)",
-  );
+  assert.equal(imageCanvas.style.transform, "translate(10px, -5px) scale(2.5)");
 });
 
 test("createDefaultViewport reads window center/width from metadata with zoom 1 and no pan", () => {
@@ -267,6 +264,14 @@ test("createDefaultViewport reads window center/width from metadata with zoom 1 
 
 test("resetViewport is equivalent to createDefaultViewport", () => {
   assert.deepEqual(resetViewport(baseMeta), createDefaultViewport(baseMeta));
+});
+
+test("createDefaultViewport sets flipY when IOP indicates inverted acquisition", () => {
+  const vp = createDefaultViewport({
+    ...baseMeta,
+    imageOrientationPatient: [1, 0, 0, 0, -1, 0],
+  });
+  assert.equal(vp.flipY, true);
 });
 
 test("fitToContainer returns 1 when the image has zero width or height", () => {

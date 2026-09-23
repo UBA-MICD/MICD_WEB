@@ -4,7 +4,10 @@
  * camera transforms (Pan, Zoom, Window/Level, slice scroll) across viewports.
  */
 
-import type { ParsedDicom } from "../dicom/dicom-parser-util.js";
+import {
+  type ParsedDicom,
+  calculateAutoWindowLevel,
+} from "../dicom/dicom-parser-util.js";
 import {
   type ViewportState,
   renderDicom,
@@ -12,11 +15,19 @@ import {
   createDefaultViewport,
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
+import {
+  getCanonicalFlip,
+  getOrientationLabels,
+} from "../dicom/spatial-math.js";
 import { escapeHtml } from "../shared/dom.js";
 import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
 import { state } from "./state.js";
 import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
+import {
+  renderSegmentationOverlay,
+  type SegmentationLayer,
+} from "./segmentation/segmentation-overlay.js";
 
 // ── Types and Contracts ───────────────────────────────────────────────────────
 
@@ -37,7 +48,20 @@ export interface ViewportData {
   parsed: ParsedDicom | null;
   viewport: ViewportState;
   overlay?: OverlayLayer | null;
+  /** Segmentación de IA dibujada sobre este viewport (US-SEG). */
+  segmentation?: SegmentationLayer | null;
+  /**
+   * Serie a la que pertenece el window/level actual. Cambia de serie ⇒ el W/L
+   * se reinicia; mismo valor ⇒ se conserva al navegar entre cortes.
+   */
+  wlSeriesKey?: string | null;
   mlLabel?: string | null;
+  /**
+   * US-45 comparison view: when true this viewport is the clean "original"
+   * panel — the AI segmentation candidate is hidden here until it's transferred
+   * (accepted). The panel showing the candidate leaves this false/undefined.
+   */
+  suppressAiCandidate?: boolean;
 }
 
 // ── Viewport Class ────────────────────────────────────────────────────────────
@@ -187,6 +211,7 @@ export class Viewport {
     this.data.viewport.panX += dx;
     this.data.viewport.panY += dy;
     this.applyTransform();
+    this.renderOverlay();
   }
 
   public applyZoomFactor(factor: number): void {
@@ -194,8 +219,17 @@ export class Viewport {
       0.1,
       Math.min(10, this.data.viewport.zoom * factor),
     );
+    if (this.data.segmentation?.visible) {
+      // El contorno vive en el canvas de la imagen, en píxeles de imagen: el
+      // CSS transform ya lo mueve y lo escala solo, pero el grosor del borde
+      // se compensa por zoom, así que hay que repintarlo para que no engorde.
+      // Guardado tras el `if` para no pagar un render completo sin segmentación.
+      this.render();
+      return;
+    }
     this.applyTransform();
     this.updateInfoOverlay();
+    this.renderOverlay();
   }
 
   public applyWindowLevelDelta(dWidth: number, dCenter: number): void {
@@ -222,22 +256,56 @@ export class Viewport {
     return false;
   }
 
-  public fitImage(): void {
+  public fitImage(attempts = 0): void {
     if (!this.data.parsed?.metadata) return;
+    const cw = this.cellElement.clientWidth;
+    const ch = this.cellElement.clientHeight;
+    // Right after a layout change the browser hasn't sized the cells yet, so
+    // clientWidth/Height are 0 → fitToContainer would yield zoom 0 (black image
+    // until "Reset"). Retry on the next frame until the cell has real size.
+    if ((cw <= 0 || ch <= 0) && attempts < 20) {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => this.fitImage(attempts + 1));
+      }
+      return;
+    }
     const { columns, rows } = this.data.parsed.metadata;
-    this.data.viewport.zoom = fitToContainer(
-      this.cellElement.clientWidth,
-      this.cellElement.clientHeight,
-      columns,
-      rows,
-    );
+    this.data.viewport.zoom = fitToContainer(cw, ch, columns, rows);
     this.data.viewport.panX = 0;
     this.data.viewport.panY = 0;
+    this.applyTransform();
+    this.renderOverlay();
   }
 
   public resetCamera(): void {
-    if (!this.data.parsed?.metadata) return;
-    this.data.viewport = createDefaultViewport(this.data.parsed.metadata);
+    const parsed = this.data.parsed;
+    if (!parsed?.metadata) return;
+    // Prefer the DICOM's own window/level; when it carries none, derive one from
+    // the pixels — otherwise createDefaultViewport() yields W/L 0 and the image
+    // renders all black (the "reset shows a dark DICOM" bug in the comparison view).
+    if (parsed.metadata.windowWidth > 0) {
+      this.data.viewport = createDefaultViewport(parsed.metadata);
+    } else if (parsed.pixelData) {
+      const auto = calculateAutoWindowLevel(
+        parsed.pixelData,
+        parsed.metadata.rescaleSlope,
+        parsed.metadata.rescaleIntercept,
+        parsed.metadata.modality,
+      );
+      const { flipX, flipY } = getCanonicalFlip(
+        parsed.metadata.imageOrientationPatient,
+      );
+      const vp: ViewportState = {
+        windowCenter: auto.windowCenter,
+        windowWidth: auto.windowWidth,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+      };
+      if (flipX) vp.flipX = true;
+      if (flipY) vp.flipY = true;
+      this.data.viewport = vp;
+    }
     this.fitImage();
     this.render();
   }
@@ -284,6 +352,15 @@ export class Viewport {
       overlayViewport: this.data.overlay?.viewport,
     });
 
+    // Sobre el canvas de la imagen, no sobre el de anotaciones: así el
+    // contorno acompaña al zoom y al paneo por el mismo CSS transform.
+    renderSegmentationOverlay({
+      canvas: this.canvasElement,
+      metadata: this.data.parsed.metadata,
+      layer: this.data.segmentation,
+      zoom: this.data.viewport.zoom,
+    });
+
     this.applyTransform();
     this.updateInfoOverlay();
     this.updateOrientationLabels();
@@ -318,6 +395,7 @@ export class Viewport {
         this.data.parsed.metadata.sopInstanceUid ||
         `slice_${this.data.currentIndex}`,
       cellId: this.id,
+      suppressAiCandidate: this.data.suppressAiCandidate,
     });
   }
 
@@ -350,21 +428,38 @@ export class Viewport {
       return;
     }
 
-    if (this.plane === "coronal") {
-      this.orientTop.textContent = "S";
-      this.orientBottom.textContent = "I";
-      this.orientLeft.textContent = "R";
-      this.orientRight.textContent = "L";
-    } else if (this.plane === "sagittal") {
-      this.orientTop.textContent = "S";
-      this.orientBottom.textContent = "I";
-      this.orientLeft.textContent = "A";
-      this.orientRight.textContent = "P";
+    if (state.isMprMode) {
+      if (this.plane === "coronal") {
+        this.orientTop.textContent = "S";
+        this.orientBottom.textContent = "I";
+        this.orientLeft.textContent = "R";
+        this.orientRight.textContent = "L";
+      } else if (this.plane === "sagittal") {
+        this.orientTop.textContent = "S";
+        this.orientBottom.textContent = "I";
+        this.orientLeft.textContent = "A";
+        this.orientRight.textContent = "P";
+      } else {
+        this.orientTop.textContent = "A";
+        this.orientBottom.textContent = "P";
+        this.orientLeft.textContent = "R";
+        this.orientRight.textContent = "L";
+      }
+      return;
+    }
+
+    const iop = this.data.parsed?.metadata?.imageOrientationPatient;
+    const labels = getOrientationLabels(iop);
+    if (labels) {
+      this.orientTop.textContent = labels.top;
+      this.orientBottom.textContent = labels.bottom;
+      this.orientLeft.textContent = labels.left;
+      this.orientRight.textContent = labels.right;
     } else {
-      this.orientTop.textContent = "A";
-      this.orientBottom.textContent = "P";
-      this.orientLeft.textContent = "R";
-      this.orientRight.textContent = "L";
+      this.orientTop.textContent = "";
+      this.orientBottom.textContent = "";
+      this.orientLeft.textContent = "";
+      this.orientRight.textContent = "";
     }
   }
 
@@ -388,7 +483,9 @@ export class Viewport {
     this.overlayTL.innerHTML = `<div>${patientName}</div><div>${modality} ${seriesDesc}</div>`;
     this.overlayTR.innerHTML = `<div>${escapeHtml(metadata.studyDate || "")}</div>`;
     this.overlayBL.innerHTML = `<div>W: ${Math.round(windowWidth)} L: ${Math.round(windowCenter)}</div>`;
-    this.overlayBR.innerHTML = `<div>Zoom: ${(zoom * 100).toFixed(0)}%</div><div>Slice: ${this.data.currentIndex + 1}/${totalItems}</div>${this.data.mlLabel ? `<div class="vp-overlay__ai">${escapeHtml(this.data.mlLabel)}</div>` : ""}`;
+    // The AI label ("IA: …") is info, so the top-bar info toggle hides it too.
+    const showAi = this.data.mlLabel && state.areLabelsVisible !== false;
+    this.overlayBR.innerHTML = `<div>Zoom: ${(zoom * 100).toFixed(0)}%</div><div>Slice: ${this.data.currentIndex + 1}/${totalItems}</div>${showAi ? `<div class="vp-overlay__ai">${escapeHtml(this.data.mlLabel as string)}</div>` : ""}`;
   }
 
   public destroy(): void {

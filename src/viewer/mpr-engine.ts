@@ -12,6 +12,8 @@
  *    the 3D texture along the arbitrary cutting plane with trilinear interpolation (60+ FPS).
  */
 
+import { getCanonicalFlip } from "../dicom/spatial-math.js";
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type MPRPlane = "axial" | "coronal" | "sagittal";
@@ -27,6 +29,9 @@ export interface MPRVolumeData {
   rescaleIntercept: number;
   windowCenter: number;
   windowWidth: number;
+  imageOrientationPatient?: [number, number, number, number, number, number];
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 export interface MPRTransform {
@@ -318,6 +323,8 @@ export class MPRVolume {
   public readonly data: MPRVolumeData;
   public readonly physicalSize: [number, number, number]; // [Sx, Sy, Sz] in mm
   public readonly transform: MPRTransform;
+  public readonly flipX: boolean;
+  public readonly flipY: boolean;
 
   private texToWorldMatrix: Float32Array = Matrix4.identity();
   private worldToTexMatrix: Float32Array = Matrix4.identity();
@@ -328,6 +335,18 @@ export class MPRVolume {
     const sy = data.rows * (data.pixelSpacing[0] || 1);
     const sz = data.depth * (data.sliceSpacing || 1);
     this.physicalSize = [sx, sy, sz];
+
+    if (data.flipX !== undefined && data.flipY !== undefined) {
+      this.flipX = data.flipX;
+      this.flipY = data.flipY;
+    } else if (data.imageOrientationPatient) {
+      const canonical = getCanonicalFlip(data.imageOrientationPatient);
+      this.flipX = canonical.flipX;
+      this.flipY = canonical.flipY;
+    } else {
+      this.flipX = false;
+      this.flipY = false;
+    }
 
     this.transform = {
       translation: [0, 0, 0],
@@ -379,7 +398,13 @@ export class MPRVolume {
     volTransform = Matrix4.rotateZ(volTransform, rz);
     volTransform = Matrix4.rotateY(volTransform, ry);
     volTransform = Matrix4.rotateX(volTransform, rx);
-    volTransform = Matrix4.scale(volTransform, [s, s, s]);
+    const flipXScale = this.flipX ? -1 : 1;
+    const flipYScale = this.flipY ? -1 : 1;
+    volTransform = Matrix4.scale(volTransform, [
+      s * flipXScale,
+      s * flipYScale,
+      s,
+    ]);
 
     // M_texToWorld = volTransform * texToVol
     this.texToWorldMatrix = Matrix4.multiply(volTransform, texToVol);
@@ -466,30 +491,30 @@ export class MPRCamera {
       case "axial":
         // Radiological standard (RPLA/LPS): Looking from feet towards head (+Z)
         // Screen Right: Patient Left (+X)
-        // Screen Up: Patient Anterior (-Y in DICOM space, inverted V for screen-to-tex)
+        // Screen Up: Patient Anterior (-Y in DICOM space)
         // Normal: Superior (+Z)
         this.uAxis = [1, 0, 0];
-        this.vAxis = [0, 1, 0];
+        this.vAxis = [0, -1, 0];
         this.normal = [0, 0, 1];
         break;
 
       case "coronal":
         // Radiological standard: Looking from Anterior towards Posterior (+Y)
         // Screen Right: Patient Left (+X)
-        // Screen Up: Patient Superior (+Z in DICOM space, inverted V for screen-to-tex)
+        // Screen Up: Patient Superior (+Z in DICOM space, Head pointing to top)
         // Normal: Posterior (+Y)
         this.uAxis = [1, 0, 0];
-        this.vAxis = [0, 0, -1];
+        this.vAxis = [0, 0, 1];
         this.normal = [0, 1, 0];
         break;
 
       case "sagittal":
         // Radiological standard: Looking from Patient Right towards Left (+X)
         // Screen Right: Patient Posterior (+Y)
-        // Screen Up: Patient Superior (+Z in DICOM space, inverted V for screen-to-tex)
+        // Screen Up: Patient Superior (+Z in DICOM space, Head pointing to top)
         // Normal: Left (+X)
         this.uAxis = [0, 1, 0];
-        this.vAxis = [0, 0, -1];
+        this.vAxis = [0, 0, 1];
         this.normal = [1, 0, 0];
         break;
     }

@@ -1,0 +1,99 @@
+<!-- Screen 02: the only thing a guest sees here. -->
+<div class="server-auth" id="server-auth">
+  <form class="auth-card" id="server-login-form">
+    <div class="auth-card__icon" aria-hidden="true">
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+    </div>
+    <h3 class="auth-card__title" data-i18n="auth.login">Iniciar sesión</h3>
+    <p class="auth-card__msg" data-i18n="auth.loginRequiredMsg">
+      Se requiere sesión para buscar o subir estudios en el servidor. La
+      visualización local no la necesita.
+    </p>
+    <div class="auth-card__fields">
+      <label class="login-field">
+        <span data-i18n="auth.emailLabel">Email</span>
+        <input
+          type="email"
+          id="server-login-email"
+          data-login-email
+          required
+          autocomplete="username"
+          data-i18n-attr="placeholder:auth.emailPlaceholder"
+          placeholder="tu@email.com"
+        />
+      </label>
+      <label class="login-field">
+        <span data-i18n="auth.passwordLabel">Contraseña</span>
+        <div class="input-wrap">
+          <input
+            type="password"
+            id="server-login-password"
+            data-login-password
+            required
+            autocomplete="current-password"
+            placeholder="••••••••"
+          />
+          <button
+            type="button"
+            class="input-wrap__toggle"
+            data-login-toggle
+            data-i18n-attr="aria-label:auth.showPassword"
+            aria-label="Mostrar contraseña"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
+      </label>
+    </div>
+    <p
+      id="server-login-error"
+      class="login-error hidden"
+      data-login-error
+      role="alert"
+    ></p>
+    <button
+      type="submit"
+      class="btn btn--accent btn--full"
+      id="server-login-submit"
+      data-login-submit
+      data-i18n="auth.submitLogin"
+    >
+      Ingresar
+    </button>
+    <!-- Invited users activate here: no working email link is needed on
+               desktop (Electron loads from file://), so the code is entered by
+               hand in a modal. -->
+    <button
+      type="button"
+      class="auth-card__invite-link"
+      data-invite-open
+      data-i18n="auth.wereYouInvited"
+    >
+      ¿Te invitaron? Activá tu cuenta
+    </button>
+  </form>
+</div>

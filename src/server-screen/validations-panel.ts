@@ -1,10 +1,8 @@
 // ── Validations panel (US-26) ─────────────────────────────────────────────────
 // cspell:ignore Validaciones estudio Solicitar análisis
 
-import { authFetch, API_BASE, isAdmin } from "../auth/auth.js";
-import { triggerAnalysis } from "../viewer/prediction-api.js";
+import { authFetch, API_BASE } from "../auth/auth.js";
 import { escapeHtml } from "../shared/dom.js";
-import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -24,6 +22,11 @@ interface StudyRow {
 
 export interface ValidationsPanelHandle {
   reload(): Promise<void>;
+}
+
+export interface OpenStudyOptions {
+  /** Abre el estudio y dispara la segmentación de IA apenas termina de cargar. */
+  segment?: boolean;
 }
 
 // ── Pure helpers (exported for unit tests) ────────────────────────────────────
@@ -93,7 +96,7 @@ export function mountValidationsPanel(
    * is responsible for opening the study in the viewer and closing the server
    * screen — keeps this module free of circular imports.
    */
-  onOpenStudy: (studyId: string) => void,
+  onOpenStudy: (studyId: string, options?: OpenStudyOptions) => void,
 ): ValidationsPanelHandle {
   const filtersEl = root.querySelector<HTMLElement>(
     "[data-validations-filters]",
@@ -202,7 +205,6 @@ export function mountValidationsPanel(
   }
 
   function rowHtml(s: StudyRow): string {
-    const admin = isAdmin();
     return `<tr data-study-id="${escapeHtml(s.orthanc_study_id)}">
       <td>${escapeHtml(s.patient_name ?? "—")}</td>
       <td>${escapeHtml(s.modality ?? "—")}</td>
@@ -211,40 +213,25 @@ export function mountValidationsPanel(
       <td>${escapeHtml(s.validated_by ?? "—")}</td>
       <td>
         <div class="validations-row-actions">
-          ${mlAnalysisHtml(s.orthanc_study_id, s.has_ml_prediction, admin)}
-          ${openButtonHtml(s.orthanc_study_id, s.has_ml_prediction)}
+          ${segmentButtonHtml(s.orthanc_study_id)}
         </div>
       </td>
     </tr>`;
   }
 
   /**
-   * Shows a done badge for all staff when the study already has an ML prediction,
-   * or a "Solicitar análisis" button (admin only) when it doesn't.
+   * Única acción de la fila: abre el estudio en el visor y corre la
+   * segmentación con IA (mock SAM3). Vive sólo acá, en Validaciones — es una
+   * ayuda de lectura para quien valida, no una herramienta del visor general.
+   *
+   * No depende del clasificador ni guarda estado: cada click produce una forma
+   * nueva, y al abrir el visor llega con la barra de validación activa, así que
+   * este botón es también el camino para aprobar o rechazar el estudio.
    */
-  function mlAnalysisHtml(
-    studyId: string,
-    hasPrediction: boolean,
-    admin: boolean,
-  ): string {
-    if (hasPrediction) {
-      return `<span class="validation-ml-badge validation-ml-badge--done">${escapeHtml(t("validations.mlDone"))}</span>`;
-    }
-    if (!admin) return "";
-    return `<button class="btn btn--secondary btn--sm" data-action="analyze"
+  function segmentButtonHtml(studyId: string): string {
+    return `<button class="btn btn--secondary btn--sm btn--ai" data-action="segment"
       data-study="${escapeHtml(studyId)}" type="button">
-      ${escapeHtml(t("validation.analyzeWithAI"))}
-    </button>`;
-  }
-
-  function openButtonHtml(studyId: string, hasPrediction: boolean): string {
-    // data-needs-ml signals the click handler to show a toast instead of opening.
-    const needsAttr = hasPrediction ? "" : ` data-needs-ml="true"`;
-    const dimClass = hasPrediction ? "" : " btn--dim";
-    return `<button class="btn btn--secondary btn--sm${dimClass}" data-action="open"
-      data-study="${escapeHtml(studyId)}"
-      type="button"${needsAttr}>
-      ${escapeHtml(t("validations.openInViewer"))}
+      ${escapeHtml(t("validations.segmentWithAI"))}
     </button>`;
   }
 
@@ -256,65 +243,10 @@ export function mountValidationsPanel(
     const action = btn.dataset.action!;
     const studyId = btn.dataset.study!;
 
-    if (action === "open") {
-      if (btn.dataset.needsMl === "true") {
-        showToast(t("validations.openNeedsML"), "error");
-        return;
-      }
-      onOpenStudy(studyId);
-      return;
-    }
-
-    if (action === "analyze") {
-      void analyzeStudy(studyId, btn as HTMLButtonElement);
-      return;
+    if (action === "segment") {
+      onOpenStudy(studyId, { segment: true });
     }
   });
-
-  async function analyzeStudy(
-    studyId: string,
-    btn: HTMLButtonElement,
-  ): Promise<void> {
-    btn.disabled = true;
-    btn.textContent = t("validation.analyzing");
-
-    try {
-      const result = await triggerAnalysis(studyId);
-      if (!result.ok) {
-        showToast(result.error, "error");
-        return;
-      }
-      showToast(t("validation.analysisDone"), "success");
-
-      const rec = studies.find((s) => s.orthanc_study_id === studyId);
-      if (rec) rec.has_ml_prediction = true;
-
-      // Swap the button for the done badge in-place.
-      const row = tbodyEl.querySelector<HTMLElement>(
-        `[data-study-id="${CSS.escape(studyId)}"]`,
-      );
-      if (row) {
-        const badge = document.createElement("span");
-        badge.className = "validation-ml-badge validation-ml-badge--done";
-        badge.textContent = t("validations.mlDone");
-        btn.replaceWith(badge);
-
-        const openBtn = row.querySelector<HTMLButtonElement>(
-          '[data-action="open"]',
-        );
-        if (openBtn) {
-          openBtn.classList.remove("btn--dim");
-          openBtn.removeAttribute("data-needs-ml");
-        }
-      }
-    } finally {
-      // Re-enable only if the button is still in the DOM (error path).
-      if (btn.isConnected) {
-        btn.disabled = false;
-        btn.textContent = t("validation.analyzeWithAI");
-      }
-    }
-  }
 
   // ── Locale change ───────────────────────────────────────────────────────────
 

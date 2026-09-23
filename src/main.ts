@@ -48,6 +48,8 @@ import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { initWalkthrough } from "./walkthrough/init.js";
 import { initValidation } from "./viewer/validation-ui.js";
 import { initMLView } from "./viewer/ml-view.js";
+import { initSegmentation } from "./viewer/segmentation/segmentation-ui.js";
+import { initSegmentationCorrection } from "./viewer/segmentation/segmentation-correction-ui.js";
 import { $ } from "./shared/dom.js";
 import { initRovingTabindex } from "./shared/roving.js";
 import { initDesktopOnlyUI, initApiOriginSetting } from "./shared/desktop.js";
@@ -97,7 +99,6 @@ async function initApp(): Promise<void> {
   setLoginPrompt(promptLoginOnServerScreen);
   onAuthChange(() => updateAuthUI());
   $("btn-logout").addEventListener("click", () => void onLogout());
-  // cspell:disable
   $("btn-login").addEventListener("click", (e) =>
     openServerScreen("buscar", e.currentTarget as HTMLElement),
   );
@@ -112,7 +113,6 @@ async function initApp(): Promise<void> {
   $("btn-server-settings").addEventListener("click", (e) =>
     openServerConfigModal(e.currentTarget as HTMLElement),
   );
-  // cspell:enable
 
   // Local viewing works without a session — always start the app.
   startApp();
@@ -163,6 +163,8 @@ function startApp(): void {
   initWalkthrough();
   initValidation();
   initMLView();
+  initSegmentation();
+  initSegmentationCorrection();
   // Last: the rail is one tab stop, with the arrow keys moving between tools,
   // so reaching the viewport does not mean tabbing through every tool. It
   // reads the tool buttons at init, so it runs after they are all wired.

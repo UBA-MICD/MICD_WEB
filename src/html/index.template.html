@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Tighten CSP: no inline scripts, only local resources.
+         blob: is required for study thumbnails, which are fetched with an
+         Authorization header and shown via URL.createObjectURL. Vendored
+         assets (fflate, fonts) keep everything same-origin, which is also
+         what Electron's file:// CSP requires.
+         worker-src blob: is required for fflate's off-thread ZIP decompression;
+         without an explicit worker-src it falls back to script-src which doesn't
+         allow blob:, causing the worker creation to be blocked. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
+    />
+    <script type="importmap">
+      {
+        "imports": {
+          "fflate": "./vendor/fflate.js"
+        }
+      }
+    </script>
+    <title data-i18n="app.title">MICD — Visualizador DICOM</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content" data-i18n="app.skipLink"
+      >Saltar al visualizador</a
+    >
+
+    <!-- Action-confirmation strip; also a live region so it is announced. -->
+    <div
+      id="app-banner"
+      class="app-banner hidden"
+      role="status"
+      aria-live="polite"
+    ></div>
+
+    <!-- Live region for announcing measurement values to assistive tech -->
+    <div
+      id="measure-announce"
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
+    <!-- The viewer screen. Hidden (and inert) while the server screen is up,
+         but never torn down, so viewport state survives the round trip. -->
+    <div id="viewer-screen" class="screen">
+      <!-- @include html/partials/topbar.html -->
+
+      <div class="app-shell">
+        <!-- @include html/partials/sidebar.html -->
+
+        <!-- @include html/partials/main-content.html -->
+
+        <!-- @include html/partials/explorer-panel.html -->
+      </div>
+
+      <!-- @include html/partials/zenodo-panel.html -->
+    </div>
+
+    <!-- @include html/partials/server-screen.html -->
+
+    <!-- @include html/partials/invite-screen.html -->
+
+    <!-- @include html/partials/dialogs.html -->
+
+    <!-- Same-origin deployment (nginx proxies /api and /auth to the backend) —
+         must run before auth.ts's module-load-time resolveApiOrigin() call.
+         `??=` rather than `=`: Electron's preload sets this synchronously
+         before any page script runs, and must win here.
+         Browser users may store a custom origin in localStorage (TK-29);
+         that is loaded first so the `??=` fallback does not overwrite it. -->
+    <script>
+      if (typeof window.api === "undefined") {
+        var _s =
+          localStorage.getItem("micd_server_url") ||
+          localStorage.getItem("micd_api_origin");
+        if (_s) window.MICD_API_ORIGIN = _s;
+      }
+      window.MICD_API_ORIGIN ??= "";
+    </script>
+    <!-- dicom-parser UMD bundle (loaded before our modules) -->
+    <script src="./dicomParser.min.js"></script>
+    <!-- Compiled renderer script (output of tsc) -->
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>

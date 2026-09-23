@@ -1,0 +1,122 @@
+<!-- Validation action bar (US-26 + US-45) — staff-only, server studies.
+     One bar: study validation (Aprobar/Rechazar/Marcar) plus the AI segmentation
+     "Corregir" flow. "Corregir" stays visible while editing (so you can keep
+     adjusting); Enviar/Cancelar appear only in edit mode. -->
+<div
+  class="validation-bar hidden"
+  id="validation-bar"
+  role="toolbar"
+  data-i18n-attr="aria-label:validation.barAriaLabel"
+  aria-label="Validación de diagnóstico"
+>
+  <span
+    class="validation-bar__chip hidden"
+    id="seg-ia-chip"
+    data-i18n="viewer.segmentation.tagAi"
+    >IA</span
+  >
+  <span
+    class="validation-bar__seg-attr hidden"
+    id="seg-correction-attribution"
+  ></span>
+  <span class="validation-bar__status" id="validation-status-badge"></span>
+  <p
+    class="validation-bar__correction-notice hidden"
+    id="validation-correction-notice"
+    data-i18n="validation.correctionNotice"
+  >
+    Se registrará una corrección sobre la validación previa.
+  </p>
+  <p
+    class="validation-bar__readonly-notice hidden"
+    id="validation-readonly-notice"
+    data-i18n="validation.readonlyNotice"
+  >
+    Solo el administrador puede corregir esta validación.
+  </p>
+
+  <div class="validation-bar__spacer"></div>
+
+  <!-- AI segmentation group (US-45), whole group in the turquoise "IA" family.
+       Shown by segmentation-correction-ui.ts only while a segmentation is on
+       screen. "Corregir" never disappears; Transferir/Descartar stay visible
+       after use and toggle to their revert (Revertir/Restaurar). -->
+  <button
+    class="btn btn--seg btn--sm hidden"
+    id="btn-seg-correct"
+    data-i18n="viewer.segmentation.correct"
+    aria-pressed="false"
+  >
+    Corregir
+  </button>
+  <button
+    class="btn btn--seg btn--sm hidden"
+    id="btn-seg-submit"
+    data-i18n="viewer.segmentation.submit"
+  >
+    Enviar
+  </button>
+  <button
+    class="btn btn--seg-soft btn--sm hidden"
+    id="btn-seg-cancel"
+    data-i18n="viewer.segmentation.cancel"
+  >
+    Cancelar
+  </button>
+  <!-- Discard just the correction: revert the polygon to the AI's original
+       contour. Only shown while editing. -->
+  <button
+    class="btn btn--seg-soft btn--sm hidden"
+    id="btn-seg-reset"
+    data-i18n="viewer.segmentation.reset"
+    data-i18n-attr="title:viewer.segmentation.resetHint"
+  >
+    Descartar corrección
+  </button>
+  <!-- Transfer the (reviewed) AI segmentation onto the original DICOM, so it's
+       seen in the common view. Stays visible after use and toggles to
+       "Revertir transferencia". -->
+  <button
+    class="btn btn--seg btn--sm hidden"
+    id="btn-seg-transfer"
+    data-i18n="viewer.segmentation.transfer"
+    data-i18n-attr="title:viewer.segmentation.transferHint"
+    aria-pressed="false"
+  >
+    → Transferir al original
+  </button>
+  <!-- Discard the AI candidate (soft-hide) and return to the common view without
+       touching the original. Stays visible and toggles to "Restaurar". -->
+  <button
+    class="btn btn--seg-soft btn--sm hidden"
+    id="btn-seg-discard"
+    data-i18n="viewer.segmentation.discard"
+    data-i18n-attr="title:viewer.segmentation.discardHint"
+    aria-pressed="false"
+  >
+    Descartar
+  </button>
+
+  <!-- Study validation (US-26). -->
+  <button
+    class="btn btn--accent btn--sm"
+    id="btn-validate-approve"
+    data-i18n="validation.approve"
+  >
+    Aprobar
+  </button>
+  <button
+    class="btn btn--danger btn--sm"
+    id="btn-validate-reject"
+    data-i18n="validation.reject"
+  >
+    Rechazar
+  </button>
+  <button
+    class="btn btn--secondary btn--sm"
+    id="btn-validate-review"
+    data-i18n="validation.review"
+  >
+    Marcar para revisión
+  </button>
+</div>

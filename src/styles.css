@@ -1205,7 +1205,8 @@ body {
   cursor: grabbing;
 }
 .viewport-container.cursor-length,
-.viewport-container.cursor-ellipse {
+.viewport-container.cursor-ellipse,
+.viewport-container.cursor-polygon {
   cursor: crosshair;
 }
 
@@ -1770,6 +1771,38 @@ body {
   font-weight: 600;
 }
 
+.measure-toggle-btn,
+.measure-save-btn,
+.measure-export-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.measure-toggle-btn:hover,
+.measure-save-btn:hover,
+.measure-export-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.measure-save-btn.saved {
+  border-color: #2ee6a8;
+  color: #2ee6a8;
+}
+
 .measure-clear-btn {
   width: 100%;
   display: flex;
@@ -1830,6 +1863,30 @@ body {
 .btn--danger:hover {
   background: #e05555;
   border-color: #e05555;
+}
+
+/* AI segmentation action group (US-45): the whole group lives in the turquoise
+   "IA" family so it reads as one unit, set apart from the study Aprobar/Rechazar.
+   Solid = primary actions (Corregir/Enviar/Transferir); soft = quieter/undo
+   actions (Cancelar/Descartar corrección/Descartar/Restaurar). */
+.btn--seg {
+  background: #1abc9c;
+  color: #06110d;
+  border-color: #1abc9c;
+  font-weight: 600;
+}
+.btn--seg:hover {
+  background: #16a085;
+  border-color: #16a085;
+}
+.btn--seg-soft {
+  background: rgba(26, 188, 156, 0.14);
+  color: #5fe0c8;
+  border-color: rgba(26, 188, 156, 0.55);
+}
+.btn--seg-soft:hover {
+  background: rgba(26, 188, 156, 0.24);
+  border-color: #1abc9c;
 }
 
 .upload-status {
@@ -4288,6 +4345,35 @@ body {
   margin: 0;
 }
 
+/* ── Segmentation group (US-45) ───────────────────────────────────────────── */
+/* Small turquoise "IA" chip that tags the segmentation as machine-made. */
+.validation-bar__chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #1abc9c;
+  border: 1px solid rgba(26, 188, 156, 0.5);
+  background: rgba(26, 188, 156, 0.12);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* Attribution text ("Segmentado por IA" / "Corregido por…"). Without this rule
+   the span inherited 13px and dwarfed the rest of the bar. */
+.validation-bar__seg-attr {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 42ch;
+}
+/* Pushes the action buttons to the right so the bar reads: chip · text … actions. */
+.validation-bar__spacer {
+  flex: 1 1 auto;
+}
+
 /* ── Dialog fields (textarea, label, notes) ───────────────────────────────── */
 .dialog__field {
   display: flex;
@@ -4336,4 +4422,124 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* ── Segmentación con IA (mock SAM3) ──────────────────────────────────────── */
+/* Turquesa propio de la capa de segmentación: el esmeralda --accent ya
+   identifica las mediciones calibradas, y ambas capas pueden convivir en el
+   mismo viewport. Contraste del turquesa sobre #09090b: 8.4:1. */
+:root {
+  --segmentation: #1abc9c;
+  --segmentation-soft: rgba(26, 188, 156, 0.14);
+  --segmentation-border: rgba(26, 188, 156, 0.4);
+}
+
+/* Botón del visor que muestra u oculta la segmentación ya calculada. */
+.toolbar__tool--ai.active,
+.toolbar__tool--ai:hover:not(:disabled) {
+  color: var(--segmentation);
+  background: var(--segmentation-soft);
+  border-color: var(--segmentation-border);
+}
+.toolbar__tool--ai.active svg {
+  filter: drop-shadow(0 0 4px var(--segmentation-border));
+}
+
+/* Acción de segmentación en la fila de Validaciones. Turquesa apagado: es una
+   acción secundaria dentro de la tabla, no la principal. */
+.btn--ai {
+  border-color: var(--segmentation-border);
+  color: var(--segmentation);
+}
+.btn--ai:hover:not(:disabled) {
+  background: var(--segmentation-soft);
+  border-color: var(--segmentation);
+}
+
+@keyframes segmentation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.segmentation-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(18, 18, 24, 0.92);
+  border: 1px solid var(--segmentation-border);
+  color: var(--segmentation);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+.segmentation-status::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--segmentation-border);
+  border-top-color: var(--segmentation);
+  border-radius: 50%;
+  animation: segmentation-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmentation-status::before {
+    animation: none;
+  }
+}
+
+/* El resultado no viene de un modelo real: el aviso queda permanentemente a la
+   vista mientras la capa esté encendida, no como un toast que se desvanece. */
+.segmentation-badge {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 30;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.popover-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.popover-check:has(.popover-check__input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.popover-check__input {
+  accent-color: var(--segmentation);
+  width: 14px;
+  height: 14px;
+  cursor: inherit;
+}
+/* Muestra de color: enseña qué overlay conmuta la casilla. */
+.popover-check__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 2px solid var(--segmentation);
+  background: var(--segmentation-soft);
+  flex: none;
 }

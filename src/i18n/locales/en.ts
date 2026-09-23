@@ -116,6 +116,7 @@ export const en: Record<string, string> = {
   "viewer.tool.crosshairTitle": "3D crosshair navigation (C)",
   "viewer.tool.lengthTitle": "Ruler measurement (L)",
   "viewer.tool.ellipseTitle": "Area and HU measurement (E)",
+  "viewer.tool.polygonTitle": "Manual region marking (Polygon)",
   "viewer.tool.resetTitle": "Reset (R)",
   "viewer.tool.metadataTitle": "DICOM tags (M)",
   "viewer.tool.zenodoTitle": "Zenodo — open science repository",
@@ -187,6 +188,49 @@ export const en: Record<string, string> = {
   "viewer.layers.opacity": "Opacity",
   "viewer.layers.ww": "Layer Width (WW)",
   "viewer.layers.wl": "Layer Center (WL)",
+
+  // ── viewer — AI segmentation (mock SAM3) ────────────────────────────────
+  "viewer.segmentation.buttonTitle": "AI segmentation (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "AI Seg.",
+  "viewer.segmentation.running": "Segmenting…",
+  "viewer.segmentation.simulatedBadge": "Simulated",
+  "viewer.segmentation.layerToggle": "AI segmentation",
+  "viewer.segmentation.showTitle": "Show AI segmentation",
+  "viewer.segmentation.showLabel": "AI Seg.",
+  "viewer.segmentation.none":
+    "No segmentation available. Generate one from Server → Validations.",
+  "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
+  "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
+  "viewer.segmentation.failed": "The segmentation could not be generated.",
+  "viewer.segmentation.tagAi": "AI",
+  "viewer.segmentation.loading": "Loading AI segmentation…",
+  "viewer.segmentation.correct": "Correct",
+  "viewer.segmentation.correctHint":
+    "Drag, add or remove vertices to adjust the outline; then Submit.",
+  "viewer.segmentation.submit": "Submit",
+  "viewer.segmentation.cancel": "Cancel",
+  "viewer.segmentation.transfer": "→ Transfer to original",
+  "viewer.segmentation.transferHint":
+    "Bring this segmentation onto the original DICOM and see it in the common view.",
+  "viewer.segmentation.transferred":
+    "Segmentation transferred to the original.",
+  "viewer.segmentation.transferRevert": "Revert transfer",
+  "viewer.segmentation.discard": "Discard",
+  "viewer.segmentation.discardHint":
+    "Discard the AI segmentation without touching the original.",
+  "viewer.segmentation.discarded": "Segmentation discarded.",
+  "viewer.segmentation.discardRestore": "Restore",
+  "viewer.segmentation.restored": "Segmentation restored.",
+  "viewer.segmentation.reset": "Discard correction",
+  "viewer.segmentation.resetHint":
+    "Go back to the outline the AI originally proposed.",
+  "viewer.segmentation.resetDone":
+    "Correction discarded; back to the AI outline.",
+  "viewer.segmentation.correctionSaved": "Correction saved.",
+  "viewer.segmentation.notPersisted":
+    "This segmentation is not persisted; it cannot be corrected.",
+  "viewer.segmentation.bySystem": "Segmented by AI",
+  "viewer.segmentation.byPerson": "Corrected by {{who}} · {{when}}",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",
@@ -254,6 +298,7 @@ export const en: Record<string, string> = {
 
   // ── upload ───────────────────────────────────────────────────────────────
   "upload.dropHint": "Drag .dcm, .zip files or a folder here",
+  "upload.selectFiles": "Select files or ZIP",
   "upload.selectFolder": "Select folder",
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",
@@ -674,7 +719,8 @@ export const en: Record<string, string> = {
   "validation.dialog.msg.correctionReview":
     "Record a correction flagging this study for review?",
   "validation.dialog.commentLabel": "Comment",
-  "validation.dialog.commentRequired": "A comment is required when rejecting.",
+  "validation.dialog.commentRequired":
+    "Leaving a comment when rejecting is recommended.",
   "validation.dialog.confirm": "Confirm",
   "validation.status.approved": "Approved",
   "validation.status.rejected": "Rejected",
@@ -685,13 +731,10 @@ export const en: Record<string, string> = {
   "validation.toast.success.review": "Study flagged for review.",
   "validation.toast.success.correction": "Correction recorded.",
   "validation.toast.error": "Could not record validation.",
-  "validation.analyzeWithAI": "Analyze with AI",
-  "validation.analyzing": "Analyzing...",
   "validation.analysisDone": "Analysis complete.",
   "validation.analysisFailed": "Analysis failed.",
   "validation.readonlyNotice":
     "Only an administrator can correct this validation.",
-  "validations.openNeedsML": "AI analysis required to open the study.",
 
   // ── Validations panel (US-26) ────────────────────────────────────────────────
   "validations.tab": "Validations",
@@ -707,17 +750,16 @@ export const en: Record<string, string> = {
   "validations.colStatus": "Status",
   "validations.colValidatedBy": "Validated by",
   "validations.colActions": "Actions",
-  "validations.openInViewer": "Open study",
+  "validations.segmentWithAI": "Segment with AI",
   "validations.empty": "No studies match the current filter.",
   "validations.loadError": "Could not load the study list.",
   "validations.actionSuccess.approved": "Study approved.",
   "validations.actionSuccess.rejected": "Study rejected.",
   "validations.actionSuccess.review": "Study flagged for review.",
   "validations.rejectDialog.title": "Reject study",
-  "validations.rejectDialog.commentLabel": "Comment (required)",
+  "validations.rejectDialog.commentLabel": "Comment (optional)",
   "validations.rejectDialog.confirm": "Reject",
   "validations.correctionBadge": "correction",
-  "validations.mlDone": "✓ AI analyzed",
 
   // ── Server Configuration (TK-29) ──────────────────────────────────────────
   "serverConfig.title": "Server Configuration",
@@ -736,10 +778,23 @@ export const en: Record<string, string> = {
   "annotations.mean": "Mean",
   "annotations.stdDev": "Std Dev",
   "annotations.uncalibrated": "No spatial calibration",
+  "annotations.polygon": "Polygon",
+  "annotations.perimeter": "Perimeter",
   "viewer.measure.panelTitle": "Measurement Settings",
   "viewer.measure.unitLabel": "Units",
   "viewer.measure.unitMm": "Millimeters (mm)",
   "viewer.measure.unitCm": "Centimeters (cm)",
   "viewer.measure.lineWidthLabel": "Line Width",
   "viewer.measure.clearAnnotations": "Clear Annotations",
+  "viewer.measure.exportSegmentation": "Export Segmentation",
+  "viewer.measure.noSegmentationToExport":
+    "No polygon segmentations to export on this slice.",
+  "viewer.measure.exportSuccess": "Segmentation exported successfully.",
+  "viewer.measure.toggleVisibility": "Hide/Show",
+  "viewer.measure.hideAnnotations": "Hide annotations",
+  "viewer.measure.showAnnotations": "Show annotations",
+  "viewer.info.hide": "Hide info",
+  "viewer.info.show": "Show info",
+  "viewer.measure.saveAnnotations": "Save",
+  "viewer.measure.savedSuccess": "Saved!",
 };

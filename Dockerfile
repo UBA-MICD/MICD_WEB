@@ -7,6 +7,7 @@ COPY package.json ./
 RUN npm install
 
 COPY tsconfig.json ./
+COPY scripts/ ./scripts/
 COPY src/ ./src/
 
 RUN npm run build
@@ -25,7 +26,9 @@ RUN rm -rf /usr/share/nginx/html/*
 # JS compilado
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY src/index.html /usr/share/nginx/html/index.html
+# index.html is assembled from src/html/ partials by `prebuild` (build-html.mjs),
+# so take the builder's freshly-generated copy rather than the host's.
+COPY --from=builder /app/src/index.html /usr/share/nginx/html/index.html
 COPY src/styles.css /usr/share/nginx/html/styles.css
 COPY src/favicon.svg /usr/share/nginx/html/favicon.svg
 

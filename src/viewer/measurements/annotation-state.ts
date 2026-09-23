@@ -125,3 +125,61 @@ export function clearAnnotations(
     appState.annotations = {};
   }
 }
+
+/**
+ * Persists annotations to localStorage using key `micd_saves_${uid}`.
+ * If sopInstanceUid is omitted, uses the active slice UID.
+ */
+export function saveToLocalStorage(
+  sopInstanceUid?: string,
+  appState: AppState = state,
+): boolean {
+  try {
+    if (typeof localStorage === "undefined") return false;
+    const uid = sopInstanceUid || getActiveSopInstanceUid(appState);
+    if (!uid) return false;
+    const annotationsForUid = appState.annotations?.[uid] || [];
+    localStorage.setItem(
+      `micd_saves_${uid}`,
+      JSON.stringify(annotationsForUid),
+    );
+    return true;
+  } catch (err) {
+    console.warn("Failed to save annotations to localStorage:", err);
+    return false;
+  }
+}
+
+/**
+ * Loads and restores annotations from localStorage for a specific SOPInstanceUID.
+ * Automatically restores segmentations into appState.annotations.
+ */
+export function loadFromLocalStorage(
+  sopInstanceUid?: string,
+  appState: AppState = state,
+): Annotation[] {
+  try {
+    if (typeof localStorage === "undefined") return [];
+    const uid = sopInstanceUid || getActiveSopInstanceUid(appState);
+    if (!uid) return [];
+    const raw = localStorage.getItem(`micd_saves_${uid}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const list: Annotation[] = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === "object" && Array.isArray(parsed[uid])
+        ? parsed[uid]
+        : [];
+
+    if (!appState.annotations) {
+      appState.annotations = {};
+    }
+    if (list.length > 0) {
+      appState.annotations[uid] = list;
+    }
+    return list;
+  } catch (err) {
+    console.warn("Failed to load annotations from localStorage:", err);
+    return [];
+  }
+}

@@ -1,4 +1,5 @@
 import { renderDicom, applyCanvasTransform } from "../dicom/dicom-renderer.js";
+import { getOrientationLabels } from "../dicom/spatial-math.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 import { view3DViewer, mpr3DViewer } from "./view-3d.js";
@@ -104,10 +105,19 @@ export function updateOrientationLabels(): void {
     return;
   }
 
-  if (top) top.textContent = "A";
-  if (bottom) bottom.textContent = "P";
-  if (left) left.textContent = "R";
-  if (right) right.textContent = "L";
+  const iop = state.parsed.metadata.imageOrientationPatient;
+  const labels = getOrientationLabels(iop);
+  if (labels) {
+    if (top) top.textContent = labels.top;
+    if (bottom) bottom.textContent = labels.bottom;
+    if (left) left.textContent = labels.left;
+    if (right) right.textContent = labels.right;
+  } else {
+    if (top) top.textContent = "";
+    if (bottom) bottom.textContent = "";
+    if (left) left.textContent = "";
+    if (right) right.textContent = "";
+  }
 }
 
 // ── 3D Controls Update ───────────────────────────────────────────────────────

@@ -163,14 +163,16 @@ test("validation bar is visible when medico opens a server study", async () => {
   state.source = "server";
   state.serverValidation = null;
 
-  const { initValidation, notifyStudyLoaded } = await freshUi();
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
   initValidation();
+  requestValidationMode();
   notifyStudyLoaded("study-001");
 
   const bar = document.getElementById("validation-bar")!;
   assert.ok(
     !bar.classList.contains("hidden"),
-    "bar should be visible for medico + server study",
+    "bar should be visible for medico + server study opened in validation mode",
   );
 });
 
@@ -199,8 +201,10 @@ test("status badge shows 'Sin validación' when serverValidation is null", async
   state.source = "server";
   state.serverValidation = null;
 
-  const { initValidation, notifyStudyLoaded } = await freshUi();
+  const { initValidation, notifyStudyLoaded, requestValidationMode } =
+    await freshUi();
   initValidation();
+  requestValidationMode();
   notifyStudyLoaded("study-001");
 
   const badge = document.getElementById("validation-status-badge")!;
@@ -242,17 +246,17 @@ test("clicking Aprobar and confirming calls submitValidation with approved actio
   );
 });
 
-// ── Tests: reject requires comment ───────────────────────────────────────────
+// ── Tests: the comment is optional, rejection included ───────────────────────
 
-test("clicking Rechazar without comment keeps dialog open and shows required note", async () => {
+test("clicking Rechazar without comment submits anyway", async () => {
   setupFixture();
   await loginAs("medico");
   state.source = "server";
   state.serverValidation = null;
 
-  let fetchCalled = false;
-  fetchImpl = async () => {
-    fetchCalled = true;
+  let capturedBody: unknown;
+  fetchImpl = async (_url, init) => {
+    capturedBody = JSON.parse(String(init?.body));
     return jsonResponse(201, MOCK_RECORD);
   };
 
@@ -263,20 +267,21 @@ test("clicking Rechazar without comment keeps dialog open and shows required not
   document.getElementById("btn-validate-reject")!.click();
   await new Promise((r) => setTimeout(r, 0));
 
-  // Clear comment and confirm
+  // Confirm with an empty comment box.
   (document.getElementById("validation-comment") as HTMLTextAreaElement).value =
     "";
   document.getElementById("validation-dialog-confirm")!.click();
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.ok(
-    !fetchCalled,
-    "API must not be called without a comment for rejection",
+  assert.deepEqual(
+    capturedBody,
+    { action: "rejected" },
+    "rejection must be sent with no comment field",
   );
-  const requiredNote = document.getElementById("validation-comment-required")!;
+  const dialog = document.getElementById("validation-dialog")!;
   assert.ok(
-    !requiredNote.classList.contains("hidden"),
-    "required note should be visible",
+    dialog.classList.contains("hidden"),
+    "the dialog must close instead of blocking on the comment",
   );
 });
 
@@ -562,7 +567,7 @@ test("error toast has role=alert for screen reader interruption", async () => {
 
 // ── Tests: requestValidationMode / pendingValidationBar one-shot ──────────────
 
-test("bar is visible when notifyStudyLoaded is called without requestValidationMode (free path)", async () => {
+test("bar is hidden when notifyStudyLoaded is called without requestValidationMode (normal browsing)", async () => {
   setupFixture();
   await loginAs("medico");
   state.source = "server";
@@ -574,8 +579,8 @@ test("bar is visible when notifyStudyLoaded is called without requestValidationM
 
   const bar = document.getElementById("validation-bar")!;
   assert.ok(
-    !bar.classList.contains("hidden"),
-    "bar must be visible for staff + server study without requestValidationMode",
+    bar.classList.contains("hidden"),
+    "bar must stay hidden for a study opened outside validation mode",
   );
 });
 

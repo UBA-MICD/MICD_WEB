@@ -209,6 +209,23 @@ export const en: Record<string, string> = {
     "Drag, add or remove vertices to adjust the outline; then Submit.",
   "viewer.segmentation.submit": "Submit",
   "viewer.segmentation.cancel": "Cancel",
+  "viewer.segmentation.transfer": "→ Transfer to original",
+  "viewer.segmentation.transferHint":
+    "Bring this segmentation onto the original DICOM and see it in the common view.",
+  "viewer.segmentation.transferred":
+    "Segmentation transferred to the original.",
+  "viewer.segmentation.transferRevert": "Revert transfer",
+  "viewer.segmentation.discard": "Discard",
+  "viewer.segmentation.discardHint":
+    "Discard the AI segmentation without touching the original.",
+  "viewer.segmentation.discarded": "Segmentation discarded.",
+  "viewer.segmentation.discardRestore": "Restore",
+  "viewer.segmentation.restored": "Segmentation restored.",
+  "viewer.segmentation.reset": "Discard correction",
+  "viewer.segmentation.resetHint":
+    "Go back to the outline the AI originally proposed.",
+  "viewer.segmentation.resetDone":
+    "Correction discarded; back to the AI outline.",
   "viewer.segmentation.correctionSaved": "Correction saved.",
   "viewer.segmentation.notPersisted":
     "This segmentation is not persisted; it cannot be corrected.",

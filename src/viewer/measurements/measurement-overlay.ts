@@ -88,6 +88,12 @@ export interface RenderOverlayOptions {
   pixelData?: ArrayLike<number> | null;
   sopInstanceUid?: string;
   cellId?: string | null;
+  /**
+   * US-45: hide the AI segmentation CANDIDATE on this viewport (the clean
+   * "original" panel of the comparison view). Only unaccepted AI polygons are
+   * suppressed — once transferred (`accepted`) they show here like any mark.
+   */
+  suppressAiCandidate?: boolean;
 }
 
 /**
@@ -95,8 +101,15 @@ export interface RenderOverlayOptions {
  * on the 2D overlay canvas.
  */
 export function renderMeasurementOverlay(options: RenderOverlayOptions): void {
-  const { canvas, viewport, metadata, pixelData, sopInstanceUid, cellId } =
-    options;
+  const {
+    canvas,
+    viewport,
+    metadata,
+    pixelData,
+    sopInstanceUid,
+    cellId,
+    suppressAiCandidate,
+  } = options;
   if (!canvas || !metadata) return;
 
   const ctx = canvas.getContext("2d");
@@ -119,6 +132,17 @@ export function renderMeasurementOverlay(options: RenderOverlayOptions): void {
   // 1. Render persisted annotations for this slice
   const annotations = getAnnotationsForSlice(sopInstanceUid);
   for (const ann of annotations) {
+    // A discarded (soft-hidden) candidate renders nowhere until restored.
+    if (ann.type === "polygon" && ann.hidden) continue;
+    // On the clean "original" panel, skip the AI candidate until it's accepted.
+    if (
+      suppressAiCandidate &&
+      ann.type === "polygon" &&
+      ann.origin === "ai" &&
+      !ann.accepted
+    ) {
+      continue;
+    }
     const isSelected = ann.id === selectedAnnotationId;
     if (ann.type === "length") {
       drawLengthAnnotation(
@@ -427,9 +451,11 @@ function drawPolygonAnnotation(
     ctx.fill();
   }
 
-  // Draw handles (circles) on vertices if selected. AI polygons keep a turquoise
+  // Draw handles (circles) on vertices only when selected AND editable. A locked
+  // polygon (the AI candidate before "Corregir") shows just its contour — no
+  // handles — so it reads as a read-only proposal. AI polygons keep a turquoise
   // body, so their handles are white for contrast while dragging.
-  if (isSelected) {
+  if (isSelected && !ann.locked) {
     const handleColor = ann.origin === "ai" ? "#ffffff" : color;
     for (const pt of screenPts) {
       drawHandle(ctx, pt.x, pt.y, handleColor, 4);
@@ -878,6 +904,10 @@ export function hitTestAnnotation(
         if (norm <= 1.25) return ann;
       }
     } else if (ann.type === "polygon") {
+      // A locked polygon (AI candidate before "Corregir") isn't hit-testable:
+      // it can't be selected, moved or vertex-edited — only its contour shows.
+      // A hidden (discarded) one isn't hit-testable either.
+      if (ann.locked || ann.hidden) continue;
       if (ann.points && ann.points.length >= 2) {
         const screenPts = ann.points.map((p) =>
           worldToScreen(
@@ -976,7 +1006,12 @@ export function hitTestPolygonVertex(
 ): VertexHit | null {
   if (selectedId) {
     const selectedAnn = annotations.find((a) => a.id === selectedId);
-    if (selectedAnn && selectedAnn.type === "polygon" && selectedAnn.points) {
+    if (
+      selectedAnn &&
+      selectedAnn.type === "polygon" &&
+      selectedAnn.points &&
+      !selectedAnn.locked
+    ) {
       for (let i = 0; i < selectedAnn.points.length; i++) {
         const pt = selectedAnn.points[i];
         // Object overload so hit-testing honours viewport.flipX/flipY exactly
@@ -993,7 +1028,7 @@ export function hitTestPolygonVertex(
   for (let a = annotations.length - 1; a >= 0; a--) {
     const ann = annotations[a];
     if (ann.id === selectedId) continue;
-    if (ann.type === "polygon" && ann.points) {
+    if (ann.type === "polygon" && ann.points && !ann.locked && !ann.hidden) {
       for (let i = 0; i < ann.points.length; i++) {
         const pt = ann.points[i];
         const s = worldToScreen(pt, viewport, viewW, viewH, cols, rows);

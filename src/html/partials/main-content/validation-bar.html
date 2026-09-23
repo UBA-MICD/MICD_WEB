@@ -37,10 +37,12 @@
 
   <div class="validation-bar__spacer"></div>
 
-  <!-- AI segmentation correction (US-45). Shown by segmentation-correction-ui.ts
-       only while a segmentation is on screen. "Corregir" never disappears. -->
+  <!-- AI segmentation group (US-45), whole group in the turquoise "IA" family.
+       Shown by segmentation-correction-ui.ts only while a segmentation is on
+       screen. "Corregir" never disappears; Transferir/Descartar stay visible
+       after use and toggle to their revert (Revertir/Restaurar). -->
   <button
-    class="btn btn--secondary btn--sm hidden"
+    class="btn btn--seg btn--sm hidden"
     id="btn-seg-correct"
     data-i18n="viewer.segmentation.correct"
     aria-pressed="false"
@@ -48,18 +50,51 @@
     Corregir
   </button>
   <button
-    class="btn btn--secondary btn--sm hidden"
+    class="btn btn--seg btn--sm hidden"
     id="btn-seg-submit"
     data-i18n="viewer.segmentation.submit"
   >
     Enviar
   </button>
   <button
-    class="btn btn--secondary btn--sm hidden"
+    class="btn btn--seg-soft btn--sm hidden"
     id="btn-seg-cancel"
     data-i18n="viewer.segmentation.cancel"
   >
     Cancelar
+  </button>
+  <!-- Discard just the correction: revert the polygon to the AI's original
+       contour. Only shown while editing. -->
+  <button
+    class="btn btn--seg-soft btn--sm hidden"
+    id="btn-seg-reset"
+    data-i18n="viewer.segmentation.reset"
+    data-i18n-attr="title:viewer.segmentation.resetHint"
+  >
+    Descartar corrección
+  </button>
+  <!-- Transfer the (reviewed) AI segmentation onto the original DICOM, so it's
+       seen in the common view. Stays visible after use and toggles to
+       "Revertir transferencia". -->
+  <button
+    class="btn btn--seg btn--sm hidden"
+    id="btn-seg-transfer"
+    data-i18n="viewer.segmentation.transfer"
+    data-i18n-attr="title:viewer.segmentation.transferHint"
+    aria-pressed="false"
+  >
+    → Transferir al original
+  </button>
+  <!-- Discard the AI candidate (soft-hide) and return to the common view without
+       touching the original. Stays visible and toggles to "Restaurar". -->
+  <button
+    class="btn btn--seg-soft btn--sm hidden"
+    id="btn-seg-discard"
+    data-i18n="viewer.segmentation.discard"
+    data-i18n-attr="title:viewer.segmentation.discardHint"
+    aria-pressed="false"
+  >
+    Descartar
   </button>
 
   <!-- Study validation (US-26). -->

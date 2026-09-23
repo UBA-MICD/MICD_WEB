@@ -56,6 +56,12 @@ export interface ViewportData {
    */
   wlSeriesKey?: string | null;
   mlLabel?: string | null;
+  /**
+   * US-45 comparison view: when true this viewport is the clean "original"
+   * panel — the AI segmentation candidate is hidden here until it's transferred
+   * (accepted). The panel showing the candidate leaves this false/undefined.
+   */
+  suppressAiCandidate?: boolean;
 }
 
 // ── Viewport Class ────────────────────────────────────────────────────────────
@@ -389,6 +395,7 @@ export class Viewport {
         this.data.parsed.metadata.sopInstanceUid ||
         `slice_${this.data.currentIndex}`,
       cellId: this.id,
+      suppressAiCandidate: this.data.suppressAiCandidate,
     });
   }
 

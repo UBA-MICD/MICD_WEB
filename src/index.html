@@ -1473,6 +1473,26 @@
               >
                 Cancelar
               </button>
+              <!-- Transfer the (reviewed) AI segmentation onto the original DICOM, so it's
+       seen in the common view. Only shown while an AI candidate is on screen. -->
+              <button
+                class="btn btn--accent btn--sm hidden"
+                id="btn-seg-transfer"
+                data-i18n="viewer.segmentation.transfer"
+                data-i18n-attr="title:viewer.segmentation.transferHint"
+              >
+                → Transferir al original
+              </button>
+              <!-- Discard the AI candidate and return to the common view without touching
+       the original. Only shown while an AI candidate is on screen. -->
+              <button
+                class="btn btn--danger btn--sm hidden"
+                id="btn-seg-discard"
+                data-i18n="viewer.segmentation.discard"
+                data-i18n-attr="title:viewer.segmentation.discardHint"
+              >
+                Descartar
+              </button>
 
               <!-- Study validation (US-26). -->
               <button

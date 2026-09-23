@@ -32,6 +32,8 @@ export interface DerivedDicom extends ParsedDicom {
 }
 
 export interface SegmentationResult {
+  /** Id del candidato persistido (US-45), o null si no se persistió. */
+  segmentationId: number | null;
   mascara: SegmentationMask;
   contorno: Point2D[];
   dicomDerivado: DerivedDicom;
@@ -146,6 +148,7 @@ export async function segmentarConIA(
   };
 
   return {
+    segmentationId: data.segmentationId ?? null,
     mascara,
     contorno: data.contour,
     dicomDerivado: buildDerivedDicom(dicom, data.derived),

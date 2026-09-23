@@ -71,6 +71,7 @@ export function setSelectedAnnotationId(id: string | null): void {
 export const COLORS = {
   calibrated: "#2ee6a8", // Clinical emerald
   uncalibrated: "#facc15", // PACS warning amber
+  aiSegmentation: "#1ABC9C", // Turquoise — AI-seeded segmentation (US-45)
   active: "#38bdf8", // Sky blue for in-progress drawing
   selected: "#ffffff",
   badgeBg: "rgba(18, 18, 24, 0.85)",
@@ -87,6 +88,12 @@ export interface RenderOverlayOptions {
   pixelData?: ArrayLike<number> | null;
   sopInstanceUid?: string;
   cellId?: string | null;
+  /**
+   * US-45: hide the AI segmentation CANDIDATE on this viewport (the clean
+   * "original" panel of the comparison view). Only unaccepted AI polygons are
+   * suppressed — once transferred (`accepted`) they show here like any mark.
+   */
+  suppressAiCandidate?: boolean;
 }
 
 /**
@@ -94,8 +101,15 @@ export interface RenderOverlayOptions {
  * on the 2D overlay canvas.
  */
 export function renderMeasurementOverlay(options: RenderOverlayOptions): void {
-  const { canvas, viewport, metadata, pixelData, sopInstanceUid, cellId } =
-    options;
+  const {
+    canvas,
+    viewport,
+    metadata,
+    pixelData,
+    sopInstanceUid,
+    cellId,
+    suppressAiCandidate,
+  } = options;
   if (!canvas || !metadata) return;
 
   const ctx = canvas.getContext("2d");
@@ -118,6 +132,17 @@ export function renderMeasurementOverlay(options: RenderOverlayOptions): void {
   // 1. Render persisted annotations for this slice
   const annotations = getAnnotationsForSlice(sopInstanceUid);
   for (const ann of annotations) {
+    // A discarded (soft-hidden) candidate renders nowhere until restored.
+    if (ann.type === "polygon" && ann.hidden) continue;
+    // On the clean "original" panel, skip the AI candidate until it's accepted.
+    if (
+      suppressAiCandidate &&
+      ann.type === "polygon" &&
+      ann.origin === "ai" &&
+      !ann.accepted
+    ) {
+      continue;
+    }
     const isSelected = ann.id === selectedAnnotationId;
     if (ann.type === "length") {
       drawLengthAnnotation(
@@ -255,7 +280,8 @@ function drawLengthAnnotation(
     });
   }
 
-  drawBadge(ctx, midX, midY - 14, badgeLines);
+  if (state.areLabelsVisible !== false)
+    drawBadge(ctx, midX, midY - 14, badgeLines);
   ctx.restore();
 }
 
@@ -347,7 +373,9 @@ function drawEllipseAnnotation(
     });
   }
 
-  drawBadge(ctx, center.x, center.y + ryScreen + 16, badgeLines);
+  if (state.areLabelsVisible !== false) {
+    drawBadge(ctx, center.x, center.y + ryScreen + 16, badgeLines);
+  }
   ctx.restore();
 }
 
@@ -363,27 +391,26 @@ function drawPolygonAnnotation(
 ): void {
   if (!ann.points || ann.points.length === 0) return;
 
+  // Use the viewport-object overload so handles/bbox honour viewport.flipX/flipY
+  // exactly like the polygon path below. The explicit overload hard-coded
+  // flipX=false/flipY=true, so on a flipped viewport (e.g. the left panel of the
+  // comparison) the handles rendered mirrored relative to the filled contour.
   const screenPts = ann.points.map((p) =>
-    worldToScreen(
-      p.x,
-      p.y,
-      viewW,
-      viewH,
-      cols,
-      rows,
-      viewport.zoom,
-      viewport.panX,
-      viewport.panY,
-      1,
-      true,
-    ),
+    worldToScreen(p, viewport, viewW, viewH, cols, rows),
   );
 
-  const color = isSelected
-    ? COLORS.selected
-    : ann.isCalibrated
-      ? COLORS.calibrated
-      : COLORS.uncalibrated;
+  // US-45: an AI-seeded polygon ALWAYS keeps its turquoise colour — even while
+  // selected/being edited — so it stays visible over bright CT tissue (the white
+  // "selected" style made it look like it disappeared on Corregir). Manual
+  // polygons are unchanged: a polygon with no `origin` renders exactly as before.
+  const color =
+    ann.origin === "ai"
+      ? COLORS.aiSegmentation
+      : isSelected
+        ? COLORS.selected
+        : ann.isCalibrated
+          ? COLORS.calibrated
+          : COLORS.uncalibrated;
 
   ctx.save();
   ctx.strokeStyle = color;
@@ -413,18 +440,25 @@ function drawPolygonAnnotation(
 
   // Semitransparent fill if closed
   if (ann.isClosed && screenPts.length >= 3) {
-    ctx.fillStyle = isSelected
-      ? "rgba(255, 255, 255, 0.15)"
-      : ann.isCalibrated
-        ? "rgba(46, 230, 168, 0.20)"
-        : "rgba(250, 204, 21, 0.18)";
+    ctx.fillStyle =
+      ann.origin === "ai"
+        ? "rgba(26, 188, 156, 0.20)"
+        : isSelected
+          ? "rgba(255, 255, 255, 0.15)"
+          : ann.isCalibrated
+            ? "rgba(46, 230, 168, 0.20)"
+            : "rgba(250, 204, 21, 0.18)";
     ctx.fill();
   }
 
-  // Draw handles (circles) on vertices if selected
-  if (isSelected) {
+  // Draw handles (circles) on vertices only when selected AND editable. A locked
+  // polygon (the AI candidate before "Corregir") shows just its contour — no
+  // handles — so it reads as a read-only proposal. AI polygons keep a turquoise
+  // body, so their handles are white for contrast while dragging.
+  if (isSelected && !ann.locked) {
+    const handleColor = ann.origin === "ai" ? "#ffffff" : color;
     for (const pt of screenPts) {
-      drawHandle(ctx, pt.x, pt.y, color, 4);
+      drawHandle(ctx, pt.x, pt.y, handleColor, 4);
     }
   }
 
@@ -446,18 +480,29 @@ function drawPolygonAnnotation(
     );
 
     const badgeLines: Array<{ text: string; color?: string; bold?: boolean }> =
-      [
-        {
-          text: `${t("annotations.area") || "Área"}: ${areaStr}`,
-          color: "#ffffff",
-          bold: true,
-        },
-        {
-          text: `${t("annotations.perimeter") || "Perímetro"}: ${perimeterStr}`,
-          color: COLORS.subText,
-          bold: false,
-        },
-      ];
+      [];
+
+    // US-45: tag the AI-seeded polygon so it's told apart from manual ones.
+    if (ann.origin === "ai") {
+      badgeLines.push({
+        text: t("viewer.segmentation.tagAi") || "IA",
+        color: COLORS.aiSegmentation,
+        bold: true,
+      });
+    }
+
+    badgeLines.push(
+      {
+        text: `${t("annotations.area") || "Área"}: ${areaStr}`,
+        color: "#ffffff",
+        bold: true,
+      },
+      {
+        text: `${t("annotations.perimeter") || "Perímetro"}: ${perimeterStr}`,
+        color: COLORS.subText,
+        bold: false,
+      },
+    );
 
     if (!ann.isCalibrated) {
       badgeLines.push({
@@ -467,7 +512,9 @@ function drawPolygonAnnotation(
       });
     }
 
-    drawBadge(ctx, badgeX, badgeY, badgeLines);
+    if (state.areLabelsVisible !== false) {
+      drawBadge(ctx, badgeX, badgeY, badgeLines);
+    }
   }
 
   ctx.restore();
@@ -857,6 +904,10 @@ export function hitTestAnnotation(
         if (norm <= 1.25) return ann;
       }
     } else if (ann.type === "polygon") {
+      // A locked polygon (AI candidate before "Corregir") isn't hit-testable:
+      // it can't be selected, moved or vertex-edited — only its contour shows.
+      // A hidden (discarded) one isn't hit-testable either.
+      if (ann.locked || ann.hidden) continue;
       if (ann.points && ann.points.length >= 2) {
         const screenPts = ann.points.map((p) =>
           worldToScreen(
@@ -955,22 +1006,18 @@ export function hitTestPolygonVertex(
 ): VertexHit | null {
   if (selectedId) {
     const selectedAnn = annotations.find((a) => a.id === selectedId);
-    if (selectedAnn && selectedAnn.type === "polygon" && selectedAnn.points) {
+    if (
+      selectedAnn &&
+      selectedAnn.type === "polygon" &&
+      selectedAnn.points &&
+      !selectedAnn.locked
+    ) {
       for (let i = 0; i < selectedAnn.points.length; i++) {
         const pt = selectedAnn.points[i];
-        const s = worldToScreen(
-          pt.x,
-          pt.y,
-          viewW,
-          viewH,
-          cols,
-          rows,
-          viewport.zoom,
-          viewport.panX,
-          viewport.panY,
-          1,
-          true,
-        );
+        // Object overload so hit-testing honours viewport.flipX/flipY exactly
+        // like the rendered handles — otherwise dragging misses on a flipped
+        // viewport (the handle is drawn mirrored from where the test looks).
+        const s = worldToScreen(pt, viewport, viewW, viewH, cols, rows);
         if (Math.hypot(screenX - s.x, screenY - s.y) <= radius) {
           return { annotationId: selectedAnn.id, vertexIndex: i };
         }
@@ -981,22 +1028,10 @@ export function hitTestPolygonVertex(
   for (let a = annotations.length - 1; a >= 0; a--) {
     const ann = annotations[a];
     if (ann.id === selectedId) continue;
-    if (ann.type === "polygon" && ann.points) {
+    if (ann.type === "polygon" && ann.points && !ann.locked && !ann.hidden) {
       for (let i = 0; i < ann.points.length; i++) {
         const pt = ann.points[i];
-        const s = worldToScreen(
-          pt.x,
-          pt.y,
-          viewW,
-          viewH,
-          cols,
-          rows,
-          viewport.zoom,
-          viewport.panX,
-          viewport.panY,
-          1,
-          true,
-        );
+        const s = worldToScreen(pt, viewport, viewW, viewH, cols, rows);
         if (Math.hypot(screenX - s.x, screenY - s.y) <= radius) {
           return { annotationId: ann.id, vertexIndex: i };
         }

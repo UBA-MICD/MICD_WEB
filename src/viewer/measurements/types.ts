@@ -49,6 +49,33 @@ export interface PolygonAnnotation extends BaseAnnotation {
   stdDevHu?: number;
   minHu?: number;
   maxHu?: number;
+  /**
+   * Provenance (US-45). Absent/"manual" = drawn by a person with the polygon
+   * tool (rendered as usual). "ai" = seeded from the AI segmentation contour —
+   * rendered turquoise with an "IA" tag so it stands apart from manual polygons.
+   */
+  origin?: "ai" | "manual";
+  /**
+   * Read-only guard (US-45). When true the polygon shows its contour but NO
+   * vertex handles, and it can't be selected, vertex-dragged or moved. The AI
+   * candidate is seeded locked; pressing "Corregir" unlocks it for editing, and
+   * "Enviar"/"Cancelar" lock it again. Absent = editable (manual polygons).
+   */
+  locked?: boolean;
+  /**
+   * Transfer state (US-45). An AI candidate (`origin: "ai"`) is shown ONLY in
+   * the comparison panel and is filtered out of the clean original view. Once
+   * the validator "Transfiere" it to the original, `accepted` flips to true and
+   * it becomes a real annotation shown everywhere (still tagged "IA" for
+   * traceability). Absent/false on an AI polygon = candidate (proposal only).
+   */
+  accepted?: boolean;
+  /**
+   * Soft-hide (US-45). A discarded AI candidate is hidden — not deleted — so the
+   * validator can "Restaurar" it (revert the discard). It renders nowhere and
+   * isn't hit-testable while hidden.
+   */
+  hidden?: boolean;
 }
 
 export type Annotation =

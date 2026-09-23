@@ -205,6 +205,34 @@ export const es: Record<string, string> = {
   "viewer.segmentation.hudLabel": "Segmentación IA (simulada)",
   "viewer.segmentation.noImage": "Abrí una imagen DICOM antes de segmentar.",
   "viewer.segmentation.failed": "No se pudo generar la segmentación.",
+  "viewer.segmentation.tagAi": "IA",
+  "viewer.segmentation.loading": "Cargando segmentación IA…",
+  "viewer.segmentation.correct": "Corregir",
+  "viewer.segmentation.correctHint":
+    "Arrastrá, agregá o quitá vértices para ajustar el contorno; luego Enviar.",
+  "viewer.segmentation.submit": "Enviar",
+  "viewer.segmentation.cancel": "Cancelar",
+  "viewer.segmentation.transfer": "→ Transferir al original",
+  "viewer.segmentation.transferHint":
+    "Llevar esta segmentación al DICOM original y verla en la vista común.",
+  "viewer.segmentation.transferred": "Segmentación transferida al original.",
+  "viewer.segmentation.transferRevert": "Revertir transferencia",
+  "viewer.segmentation.discard": "Descartar",
+  "viewer.segmentation.discardHint":
+    "Descartar la segmentación de la IA sin tocar el original.",
+  "viewer.segmentation.discarded": "Segmentación descartada.",
+  "viewer.segmentation.discardRestore": "Restaurar",
+  "viewer.segmentation.restored": "Segmentación restaurada.",
+  "viewer.segmentation.reset": "Descartar corrección",
+  "viewer.segmentation.resetHint":
+    "Volver al contorno original que propuso la IA.",
+  "viewer.segmentation.resetDone":
+    "Corrección descartada; volviste al contorno de la IA.",
+  "viewer.segmentation.correctionSaved": "Corrección guardada.",
+  "viewer.segmentation.notPersisted":
+    "Esta segmentación no está persistida; no se puede corregir.",
+  "viewer.segmentation.bySystem": "Segmentado por IA",
+  "viewer.segmentation.byPerson": "Corregido por {{who}} · {{when}}",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",
@@ -785,6 +813,8 @@ export const es: Record<string, string> = {
   "viewer.measure.toggleVisibility": "Esconder/Mostrar",
   "viewer.measure.hideAnnotations": "Ocultar anotaciones",
   "viewer.measure.showAnnotations": "Mostrar anotaciones",
+  "viewer.info.hide": "Ocultar info",
+  "viewer.info.show": "Mostrar info",
   "viewer.measure.saveAnnotations": "Guardar",
   "viewer.measure.savedSuccess": "¡Guardado!",
 };

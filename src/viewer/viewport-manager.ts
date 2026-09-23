@@ -56,6 +56,12 @@ export interface ViewportData {
    */
   wlSeriesKey?: string | null;
   mlLabel?: string | null;
+  /**
+   * US-45 comparison view: when true this viewport is the clean "original"
+   * panel — the AI segmentation candidate is hidden here until it's transferred
+   * (accepted). The panel showing the candidate leaves this false/undefined.
+   */
+  suppressAiCandidate?: boolean;
 }
 
 // ── Viewport Class ────────────────────────────────────────────────────────────
@@ -250,15 +256,21 @@ export class Viewport {
     return false;
   }
 
-  public fitImage(): void {
+  public fitImage(attempts = 0): void {
     if (!this.data.parsed?.metadata) return;
+    const cw = this.cellElement.clientWidth;
+    const ch = this.cellElement.clientHeight;
+    // Right after a layout change the browser hasn't sized the cells yet, so
+    // clientWidth/Height are 0 → fitToContainer would yield zoom 0 (black image
+    // until "Reset"). Retry on the next frame until the cell has real size.
+    if ((cw <= 0 || ch <= 0) && attempts < 20) {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => this.fitImage(attempts + 1));
+      }
+      return;
+    }
     const { columns, rows } = this.data.parsed.metadata;
-    this.data.viewport.zoom = fitToContainer(
-      this.cellElement.clientWidth,
-      this.cellElement.clientHeight,
-      columns,
-      rows,
-    );
+    this.data.viewport.zoom = fitToContainer(cw, ch, columns, rows);
     this.data.viewport.panX = 0;
     this.data.viewport.panY = 0;
     this.applyTransform();
@@ -383,6 +395,7 @@ export class Viewport {
         this.data.parsed.metadata.sopInstanceUid ||
         `slice_${this.data.currentIndex}`,
       cellId: this.id,
+      suppressAiCandidate: this.data.suppressAiCandidate,
     });
   }
 
@@ -470,7 +483,9 @@ export class Viewport {
     this.overlayTL.innerHTML = `<div>${patientName}</div><div>${modality} ${seriesDesc}</div>`;
     this.overlayTR.innerHTML = `<div>${escapeHtml(metadata.studyDate || "")}</div>`;
     this.overlayBL.innerHTML = `<div>W: ${Math.round(windowWidth)} L: ${Math.round(windowCenter)}</div>`;
-    this.overlayBR.innerHTML = `<div>Zoom: ${(zoom * 100).toFixed(0)}%</div><div>Slice: ${this.data.currentIndex + 1}/${totalItems}</div>${this.data.mlLabel ? `<div class="vp-overlay__ai">${escapeHtml(this.data.mlLabel)}</div>` : ""}`;
+    // The AI label ("IA: …") is info, so the top-bar info toggle hides it too.
+    const showAi = this.data.mlLabel && state.areLabelsVisible !== false;
+    this.overlayBR.innerHTML = `<div>Zoom: ${(zoom * 100).toFixed(0)}%</div><div>Slice: ${this.data.currentIndex + 1}/${totalItems}</div>${showAi ? `<div class="vp-overlay__ai">${escapeHtml(this.data.mlLabel as string)}</div>` : ""}`;
   }
 
   public destroy(): void {

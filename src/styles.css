@@ -4508,3 +4508,30 @@ body {
   background: var(--segmentation-soft);
   flex: none;
 }
+
+/* Classify-before-upload dialog field. */
+.classify-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.classify-field select {
+  padding: 8px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.classify-field select:focus-visible {
+  border-color: var(--accent);
+}
+.classify-field select option {
+  background: var(--bg-elevated);
+}

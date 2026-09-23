@@ -38,8 +38,23 @@ text `t('classification.'+key)`; it stores each option's `key` (e.g. `data-key`)
 on `onLocaleChange` without refetching, preserving the current selection. If the fetch fails, the
 selector keeps just the blank default (upload proceeds unclassified) — no blocking.
 
-**Upload.** The Cargar tab uploads the instant files are picked/dropped, so the selector is set
-first and read at send time. In `uploadOne` (the Cargar path only), read `#upload-classification`;
+**Classify dialog (revision 2026-09-22).** The selector moved out of the tab into
+`#classify-dialog` (`partials/dialogs.html`, next to the duplicate dialog). `startUpload` — after the
+auth gate, before any row or XHR — awaits `confirmClassification(count)`: it ensures the catalog is
+loaded, resets the select to `""`, opens the dialog via `openDialog`, and resolves `true` only on
+`#classify-confirm`; Cancel, Escape and any other close resolve `false` and the queue never starts.
+When the dialog isn't in the page (unit fixtures, Buscar quick-drop shell) it resolves `true`, so
+FR-6 is unaffected. The select can't change mid-batch: it lives in the closed modal.
+
+**Folder picker / folder drop (FR-7).** `#btn-upload-folder` carries `class="hidden"
+data-desktop-only`, so `initDesktopOnlyUI()` reveals it only in Electron; the tour step
+`staff.uploadFolder` is `optional` and is skipped when hidden. The drop handler reads
+`dataTransfer.items` synchronously: directories go through `webkitGetAsEntry()` and are walked
+recursively (`readEntries` until empty, `webkitRelativePath` set from `fullPath` so
+`collectDicomFiles` groups series); plain files use `getAsFile()`, because a file _entry_ can be
+unreadable for synthetic/foreign drags. Unreadable folders are skipped, not fatal.
+
+**Upload.** The selector is read at send time. In `uploadOne` (the Cargar path only), read `#upload-classification`;
 if a non-empty id is selected, `formData.append("classification_id", id)` **before** the `file` part
 (busboy/multer field-order convention). `uploadOneExplorer` is left untouched (Buscar quick-drop is
 out of scope).
@@ -52,15 +67,18 @@ both; the explorer re-renders on locale change, so the badge label follows the l
 
 ## Affected files
 
-- `src/html/partials/server-screen/tab-cargar.html` — add a labeled `<select id="upload-classification">` containing only the blank default (`classification.none`); options are injected at runtime. Then **`npm run build:html`** to regenerate the git-ignored `src/index.html` (never hand-edit it).
-- `src/upload/upload.ts` — fetch + cache the catalog and populate the select on first Cargar-tab open; re-label options on `onLocaleChange`; in `uploadOne`, append `classification_id` when set. Leave `uploadOneExplorer` unchanged.
+- `src/html/partials/dialogs.html` — `#classify-dialog` holding the labeled `<select id="upload-classification">` (only the blank default; options injected at runtime), `#classify-confirm`, `#classify-cancel`. _(Originally in `tab-cargar.html`; moved 2026-09-22.)_
+- `src/html/partials/server-screen/tab-cargar.html` — `#btn-upload-folder` marked `hidden data-desktop-only`.
+- `src/walkthrough/tour-steps.ts` — `staff.uploadFolder` step `optional: true`. Then **`npm run build:html`** to regenerate the git-ignored `src/index.html` (never hand-edit it).
+- `src/upload/upload.ts` — fetch + cache the catalog and populate the select on first Cargar-tab open; re-label options on `onLocaleChange`; `confirmClassification` gates `startUpload`; `droppedFiles`/`walkEntry` read dropped folders; in `uploadOne`, append `classification_id` when set. Leave `uploadOneExplorer` unchanged.
 - `src/explorer/explorer.ts` — add `classification_id`/`classification_key` to `StudyRecord`; render the badge in `renderStudy`.
 - `styles.css` — add `.study-item__classification-badge` mirroring `.study-item__validation-badge`.
 - `src/i18n/locales/es.ts` **and** `en.ts` — add `classification.label`, `classification.none`, and `classification.{acv,hemorragia,tumor,desmielinizante,normales,otros}`.
 
 ## Testing strategy
 
-- **Unit (`tsx --test`):** no new pure logic; `i18n.test.ts` fails if a key is added to one locale and not the other (covers FR-5). If the catalog→option mapping is extracted as a pure helper, add a tiny test for it.
+- **Unit (`tsx --test`):** `i18n.test.ts` fails if a key is added to one locale and not the other (covers FR-5). `upload.test.ts` covers the dialog holding the upload until confirm (and sending the chosen `classification_id`), cancel sending nothing, and a dropped folder + sub-folder + loose file all being queued.
+- **E2E (`testing/`, Cypress):** `study-classification.cy.js` SC-7 (pick → dialog → confirm → duplicate/replace → persisted `tumor`), SC-8 (drop → cancel → no request), SC-9 (browser build hides the folder button). See `testing/docs/study-classification-use-cases.md`.
 - **DOM / integration:** none required — markup + network glue; covered by the manual `.feature` run.
 - **Manual / BDD:** the `005-study-classification.feature` scenarios (catalog loads; upload with/without a category; locale switch relabels options + badge; quick-drop shows no selector).
 

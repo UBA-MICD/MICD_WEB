@@ -26,6 +26,18 @@
 - [ ] T031 `make parity` prints match.
 - [ ] T032 `npm run build` && `npm test` (desktop).
 
+## Phase 3b — Revision 2026-09-22: classify dialog + no browser folder prompt
+
+- [x] T050 `dialogs.html` — `#classify-dialog` with the select, `#classify-confirm`, `#classify-cancel`; select removed from `tab-cargar.html`.
+- [x] T051 `upload.ts` — `confirmClassification()` gates `startUpload` after the auth check; select reset to blank on open.
+- [x] T052 i18n — `upload.classifyTitle`, `upload.classifyMessage`, `upload.classifyConfirm` in `es` + `en`.
+- [x] T053 `styles.css` — `.classify-field`.
+- [x] T054 `tab-cargar.html` — `#btn-upload-folder` → `hidden data-desktop-only`; `tour-steps.ts` `staff.uploadFolder` → `optional: true`.
+- [x] T055 `upload.ts` — `droppedFiles`/`walkEntry`: dropped folders walked via entries API, plain files via `getAsFile()`.
+- [x] T056 Unit tests in `upload.test.ts` (confirm, cancel, folder drop).
+- [x] T057 E2E SC-7 … SC-9 in `testing/cypress/e2e/study-classification.cy.js` — 9/9 green against the local stack.
+- [ ] T058 Re-sync `desktop` (`make sync-web` → `make parity`) and check the folder button shows there.
+
 ## Phase 4 — Verify & deliver
 
 - [ ] T040 `npm run build` && `npm test` (web) green.

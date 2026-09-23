@@ -30,11 +30,15 @@ the backend `key`.
 ## Functional requirements
 
 - **FR-1:** On opening the Cargar tab, the client MUST fetch the category catalog (`GET /api/v1/pathologies`) and populate a single-select control with one option per category (option value = id, label = `t('classification.'+key)`), plus a blank default ("Sin clasificar").
+- **FR-1a:** The selector MUST live in an in-app modal (not a browser `alert`/`confirm`) that opens after the user picks or drops files on the Cargar tab. It MUST open reset to the blank default, and nothing is sent until the user presses "Subir"; Cancel/Escape uploads nothing.
 - **FR-2:** When a category is selected, the client MUST send its `classification_id` with each file's upload request.
 - **FR-3:** When no category is selected, the client MUST send no `classification_id` — the field is **optional** (study stays unclassified).
 - **FR-4:** The studies listing MUST render the study's category as a badge using `t('classification.'+classification_key)`; an unclassified study MUST render a muted "Sin clasificar" badge.
 - **FR-5:** The client MUST hold a translation for each catalog `key` in **both** `es` and `en`; labels MUST update on locale switch (including the dynamically-built selector options). A key with no translation MUST fall back to the raw key (never blank/throw).
 - **FR-6:** The selector MUST NOT appear on the Buscar/explorer quick-drop path (out of scope this iteration).
+- **FR-7:** In the browser build the Cargar tab MUST NOT offer a folder picker (`<input webkitdirectory>` makes Chrome show its own "Upload N files to this site?" prompt, which the page cannot suppress). Folders MUST instead be accepted by drag-and-drop onto the drop zone, walking sub-folders without any browser prompt. The desktop (Electron) build keeps the folder button, where no such prompt exists.
+
+> **Revision 2026-09-22 (UX):** physicians missed that the category had to be set _before_ adding files. The flow is now files first, classification second (FR-1a), and the browser folder picker is dropped (FR-7).
 
 ## Acceptance criteria
 
@@ -43,6 +47,9 @@ the backend `key`.
 - **AC-3:** Given no category selected, when I upload, then the study appears with a "Sin clasificar" badge.
 - **AC-4:** Given a classified study shown, when I switch locale to English, then both the selector options and the badge switch to the English terms.
 - **AC-5:** Given the Buscar quick-drop upload, when I drop files, then no selector is shown and the study is unclassified.
+- **AC-6:** Given the Cargar tab, when I pick or drop files, then the classify dialog opens reset to "Sin clasificar" and no upload request is sent until I press "Subir".
+- **AC-7:** Given the classify dialog open, when I press Cancelar or Escape, then nothing is uploaded.
+- **AC-8:** Given the browser build, when I open the Cargar tab, then there is no "Seleccionar carpeta" button; when I drop a folder with sub-folders, then every DICOM inside is queued with no browser prompt.
 
 _(full matrix in `005-study-classification.feature`)_
 
@@ -55,7 +62,7 @@ validation-queue panel.
 ## Non-functional requirements (the constitution's gates)
 
 - **i18n:** new keys in **both** `es.ts`/`en.ts` (parity test), one per catalog key: `classification.label`, `classification.none`, `classification.{acv,hemorragia,tumor,desmielinizante,normales,otros}`. `t()` already falls back to the key if a translation is missing.
-- **Accessibility:** the selector is a labeled native `<select>` (keyboard-operable, screen-reader-named via its `<label>`); the badge is decorative text, not a live region.
+- **Accessibility:** the selector is a labeled native `<select>` (keyboard-operable, screen-reader-named via its `<label>`) inside a modal built on `shared/dialog.ts` (`role="dialog"`, `aria-modal`, focus trap, Escape = cancel, focus restored); focus lands on the selector. The badge is decorative text, not a live region.
 - **Security:** the selected value is a numeric id from a server-provided list; the badge renders through the existing `t()`/escaping path (no raw user data). No new direct data-store access — still via `/api/*` (`authFetch`).
 - **Desktop parity:** all changes land in `web/src/` and vendor into `desktop/src/renderer/` unchanged (`diff -r` must stay clean); the catalog fetch uses the existing `API_BASE`/`authFetch` seam.
 - **Performance / offline:** the catalog is fetched once and cached; if the fetch fails, the selector shows only the blank default (studies upload unclassified) — a graceful degradation, no blocking.

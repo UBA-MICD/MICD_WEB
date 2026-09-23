@@ -2438,13 +2438,6 @@
     <input type="file" id="upload-input" accept=".dcm,.zip" class="hidden" />
     <input type="file" id="upload-folder-input" class="hidden" />
 
-    <label class="upload-classification">
-      <span data-i18n="classification.label">Clasificación</span>
-      <select id="upload-classification">
-        <option value="" data-i18n="classification.none">Sin clasificar</option>
-      </select>
-    </label>
-
     <div class="upload-drop" id="upload-drop">
       <p data-i18n="upload.dropHint">
         Arrastrá archivos .dcm, .zip o una carpeta aquí
@@ -2457,9 +2450,13 @@
         >
           Seleccionar archivos o ZIP
         </button>
+        <!-- Desktop only: in a browser, <input webkitdirectory> triggers Chrome's
+             own "Upload N files to this site?" prompt, which no page can
+             suppress. Browsers drop a folder onto this zone instead. -->
         <button
-          class="btn btn--outline"
+          class="btn btn--outline hidden"
           id="btn-upload-folder"
+          data-desktop-only
           data-i18n="upload.selectFolder"
         >
           Seleccionar carpeta
@@ -2773,6 +2770,49 @@
         id="export-dialog-cancel"
         data-dialog-autofocus
         style="margin-top: 4px"
+        data-i18n="common.cancel"
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Classify-before-upload dialog: opens once files are chosen/dropped on the
+     Cargar tab; nothing is sent until "Subir" is pressed. -->
+<div id="classify-dialog" class="dialog-overlay hidden">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="classify-title"
+    aria-describedby="classify-msg"
+  >
+    <h3
+      class="dialog__title"
+      id="classify-title"
+      data-i18n="upload.classifyTitle"
+    >
+      Clasificar estudio
+    </h3>
+    <p id="classify-msg" class="dialog__msg"></p>
+    <label class="classify-field">
+      <span data-i18n="classification.label">Clasificación</span>
+      <select id="upload-classification" data-dialog-autofocus>
+        <option value="" data-i18n="classification.none">Sin clasificar</option>
+      </select>
+    </label>
+    <div class="dialog__actions">
+      <button
+        class="btn btn--accent"
+        id="classify-confirm"
+        data-i18n="upload.classifyConfirm"
+      >
+        Subir
+      </button>
+      <button
+        class="btn btn--secondary"
+        id="classify-cancel"
         data-i18n="common.cancel"
       >
         Cancelar

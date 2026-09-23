@@ -297,6 +297,8 @@ const staffSteps: TourStep[] = [
     bodyKey: "tour.staff.uploadFolder.body",
     placement: "bottom",
     advance: { on: "next" },
+    // Desktop only — the button is hidden in the browser build.
+    optional: true,
   },
   {
     id: "staff.uploadStatus",

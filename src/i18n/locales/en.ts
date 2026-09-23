@@ -271,6 +271,10 @@ export const en: Record<string, string> = {
   "upload.dropHint": "Drag .dcm, .zip files or a folder here",
   "upload.selectFiles": "Select files or ZIP",
   "upload.selectFolder": "Select folder",
+  "upload.classifyTitle": "Classify this study",
+  "upload.classifyMessage":
+    "{{count}} file(s) ready. Choose a classification for this study (optional), then confirm to upload.",
+  "upload.classifyConfirm": "Upload",
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",
   "upload.replace": "Replace",

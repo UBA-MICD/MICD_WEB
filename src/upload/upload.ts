@@ -220,7 +220,7 @@ function initUploadDropZone(): void {
   zone.addEventListener("drop", async (e: DragEvent) => {
     e.preventDefault();
     zone.classList.remove("drag-over");
-    const dropped = Array.from(e.dataTransfer?.files ?? []);
+    const dropped = await droppedFiles(e.dataTransfer);
     const hasZip = dropped.some((f) => f.name.toLowerCase().endsWith(".zip"));
     if (hasZip) showUploadStatus(t("upload.unzippingGeneric"), "");
     const {
@@ -248,6 +248,57 @@ function initUploadDropZone(): void {
     }
     if (await ensureAuthenticated()) void startUpload(files);
   });
+}
+
+/**
+ * Files from a drop, walking into dropped folders. `dataTransfer.files` lists a
+ * folder as one empty entry, so folders go through the entries API — which,
+ * unlike <input webkitdirectory>, shows no browser "Upload N files?" prompt.
+ * Plain files still come from getAsFile(): a file entry can be unreadable
+ * (synthetic drags, some source apps) where getAsFile() works.
+ * Items must be read synchronously, before the drop event returns.
+ */
+async function droppedFiles(dt: DataTransfer | null): Promise<File[]> {
+  if (!dt) return [];
+  if (!dt.items) return Array.from(dt.files ?? []);
+  const out: File[] = [];
+  const dirs: FileSystemEntry[] = [];
+  for (const item of Array.from(dt.items)) {
+    if (item.kind !== "file") continue;
+    const entry = item.webkitGetAsEntry?.();
+    if (entry?.isDirectory) dirs.push(entry);
+    else {
+      const file = item.getAsFile();
+      if (file) out.push(file);
+    }
+  }
+  // An unreadable folder (permissions, vanished) is skipped, not fatal.
+  for (const dir of dirs) await walkEntry(dir, out).catch(() => {});
+  return out;
+}
+
+async function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
+  if (entry.isFile) {
+    const file = await new Promise<File>((resolve, reject) =>
+      (entry as FileSystemFileEntry).file(resolve, reject),
+    );
+    // Keep the folder path so collectDicomFiles groups series as it does for
+    // a webkitdirectory selection.
+    Object.defineProperty(file, "webkitRelativePath", {
+      value: entry.fullPath.replace(/^\//, ""),
+    });
+    out.push(file);
+    return;
+  }
+  const reader = (entry as FileSystemDirectoryEntry).createReader();
+  // readEntries hands back at most ~100 entries per call; read until empty.
+  for (;;) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+      reader.readEntries(resolve, reject),
+    );
+    if (batch.length === 0) return;
+    for (const child of batch) await walkEntry(child, out);
+  }
 }
 
 /**
@@ -283,6 +334,10 @@ async function startUpload(files: File[]): Promise<void> {
   if (!(await ensureAuthenticated())) {
     uploading = false;
     showUploadStatus(t("upload.needLogin"), "error");
+    return;
+  }
+  if (!(await confirmClassification(files.length))) {
+    uploading = false;
     return;
   }
   queue = { done: 0, total: files.length };
@@ -711,6 +766,40 @@ function uploadOneExplorer(
     });
 
     xhr.send(formData);
+  });
+}
+
+// ── Classify-before-upload confirmation ─────────────────────────────────────
+
+/**
+ * Asks for the study's category once files are chosen, and resolves true only
+ * on "Subir". Cancel, Escape and closing all resolve false — nothing is sent.
+ * Without the dialog in the page (the Buscar quick-drop shell, tests) it
+ * resolves true straight away.
+ */
+async function confirmClassification(count: number): Promise<boolean> {
+  const dialog = document.getElementById("classify-dialog");
+  if (!dialog) return true;
+  await ensureClassificationOptions();
+  // Start blank per study so the last study's category never carries over unseen.
+  const sel = classificationSelect();
+  if (sel) sel.value = "";
+  $("classify-msg").textContent = t("upload.classifyMessage", { count });
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      closeDialog(dialog);
+      resolve(ok);
+    };
+    ($("classify-confirm") as HTMLButtonElement).onclick = () => finish(true);
+    ($("classify-cancel") as HTMLButtonElement).onclick = () => finish(false);
+    dialog.addEventListener("dialog:close", () => finish(false), {
+      once: true,
+    });
+    openDialog(dialog);
   });
 }
 

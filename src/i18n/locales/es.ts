@@ -276,6 +276,10 @@ export const es: Record<string, string> = {
   "upload.dropHint": "Arrastrá archivos .dcm, .zip o una carpeta aquí",
   "upload.selectFiles": "Seleccionar archivos o ZIP",
   "upload.selectFolder": "Seleccionar carpeta",
+  "upload.classifyTitle": "Clasificar estudio",
+  "upload.classifyMessage":
+    "{{count}} archivo(s) listos. Elegí una clasificación para este estudio (opcional) y confirmá para subir.",
+  "upload.classifyConfirm": "Subir",
   "upload.finish": "Finalizar",
   "upload.duplicateTitle": "Estudio duplicado",
   "upload.replace": "Reemplazar",

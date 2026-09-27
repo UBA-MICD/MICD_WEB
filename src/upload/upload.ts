@@ -4,6 +4,8 @@ import {
   getAccessToken,
   refreshAccessToken,
   getCurrentUser,
+  authFetch,
+  isAuthenticated,
   API_BASE,
 } from "../auth/auth.js";
 import { collectDicomFiles } from "../shared/folder-files.js";
@@ -71,6 +73,59 @@ export function onUploadComplete(cb: (summary: UploadSummary) => void): void {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
+// ── Classification catalog (Cargar tab dropdown) ─────────────────────────────
+//
+// Categories are owned by the backend (GET /v1/pathologies). We fetch them once,
+// lazily, the first time the Cargar tab is opened by an authenticated user, and
+// build one <option value=id> per category — labels come from i18n, keyed by the
+// backend `key`, so they translate on the client and no descriptions live server-side.
+
+let classificationOptionsLoaded = false;
+
+function classificationSelect(): HTMLSelectElement | null {
+  return document.getElementById(
+    "upload-classification",
+  ) as HTMLSelectElement | null;
+}
+
+/** The selected category id, or "" when unclassified. */
+function selectedClassificationId(): string {
+  return classificationSelect()?.value.trim() ?? "";
+}
+
+/** Fetch the catalog once and populate the select. Silently no-ops for a guest
+ *  or on error — the blank "Sin clasificar" default stays, so upload still works. */
+async function ensureClassificationOptions(): Promise<void> {
+  if (classificationOptionsLoaded || !isAuthenticated()) return;
+  const sel = classificationSelect();
+  if (!sel) return;
+  try {
+    const res = await authFetch(`${API_BASE}/v1/pathologies`);
+    if (!res.ok) return;
+    const cats = (await res.json()) as { id: number; key: string }[];
+    sel.querySelectorAll("option[data-key]").forEach((o) => o.remove());
+    for (const c of cats) {
+      const opt = document.createElement("option");
+      opt.value = String(c.id);
+      opt.dataset.key = c.key;
+      opt.textContent = t(`classification.${c.key}`);
+      sel.appendChild(opt);
+    }
+    classificationOptionsLoaded = true;
+  } catch {
+    // leave the blank default in place
+  }
+}
+
+/** Re-translate the built options on a locale change (no refetch). */
+function relabelClassificationOptions(): void {
+  classificationSelect()
+    ?.querySelectorAll<HTMLOptionElement>("option[data-key]")
+    .forEach((o) => {
+      if (o.dataset.key) o.textContent = t(`classification.${o.dataset.key}`);
+    });
+}
+
 export function initUploadPanel(): void {
   const input = $("upload-input") as HTMLInputElement;
   input.setAttribute("multiple", "");
@@ -136,6 +191,14 @@ export function initUploadPanel(): void {
   $("btn-refresh-studies")?.addEventListener("click", loadStudyExplorer);
   renderTransportNote();
   onLocaleChange(renderTransportNote);
+
+  // Load the classification catalog when the Cargar tab opens; relabel on locale
+  // change. Try once now in case the session is already active.
+  $("tab-cargar")?.addEventListener("click", () => {
+    void ensureClassificationOptions();
+  });
+  onLocaleChange(relabelClassificationOptions);
+  void ensureClassificationOptions();
 }
 
 /** Drag-and-drop onto the Cargar tab's drop area. */
@@ -158,7 +221,7 @@ function initUploadDropZone(): void {
   zone.addEventListener("drop", async (e: DragEvent) => {
     e.preventDefault();
     zone.classList.remove("drag-over");
-    const dropped = Array.from(e.dataTransfer?.files ?? []);
+    const dropped = await droppedFiles(e.dataTransfer);
     const hasZip = dropped.some((f) => f.name.toLowerCase().endsWith(".zip"));
     if (hasZip) showUploadStatus(t("upload.unzippingGeneric"), "");
     const {
@@ -186,6 +249,57 @@ function initUploadDropZone(): void {
     }
     if (await ensureAuthenticated()) void startUpload(files);
   });
+}
+
+/**
+ * Files from a drop, walking into dropped folders. `dataTransfer.files` lists a
+ * folder as one empty entry, so folders go through the entries API — which,
+ * unlike <input webkitdirectory>, shows no browser "Upload N files?" prompt.
+ * Plain files still come from getAsFile(): a file entry can be unreadable
+ * (synthetic drags, some source apps) where getAsFile() works.
+ * Items must be read synchronously, before the drop event returns.
+ */
+async function droppedFiles(dt: DataTransfer | null): Promise<File[]> {
+  if (!dt) return [];
+  if (!dt.items) return Array.from(dt.files ?? []);
+  const out: File[] = [];
+  const dirs: FileSystemEntry[] = [];
+  for (const item of Array.from(dt.items)) {
+    if (item.kind !== "file") continue;
+    const entry = item.webkitGetAsEntry?.();
+    if (entry?.isDirectory) dirs.push(entry);
+    else {
+      const file = item.getAsFile();
+      if (file) out.push(file);
+    }
+  }
+  // An unreadable folder (permissions, vanished) is skipped, not fatal.
+  for (const dir of dirs) await walkEntry(dir, out).catch(() => {});
+  return out;
+}
+
+async function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
+  if (entry.isFile) {
+    const file = await new Promise<File>((resolve, reject) =>
+      (entry as FileSystemFileEntry).file(resolve, reject),
+    );
+    // Keep the folder path so collectDicomFiles groups series as it does for
+    // a webkitdirectory selection.
+    Object.defineProperty(file, "webkitRelativePath", {
+      value: entry.fullPath.replace(/^\//, ""),
+    });
+    out.push(file);
+    return;
+  }
+  const reader = (entry as FileSystemDirectoryEntry).createReader();
+  // readEntries hands back at most ~100 entries per call; read until empty.
+  for (;;) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+      reader.readEntries(resolve, reject),
+    );
+    if (batch.length === 0) return;
+    for (const child of batch) await walkEntry(child, out);
+  }
 }
 
 /**
@@ -221,6 +335,10 @@ async function startUpload(files: File[]): Promise<void> {
   if (!(await ensureAuthenticated())) {
     uploading = false;
     showUploadStatus(t("upload.needLogin"), "error");
+    return;
+  }
+  if (!(await confirmClassification(files.length))) {
+    uploading = false;
     return;
   }
   queue = { done: 0, total: files.length };
@@ -324,6 +442,9 @@ async function uploadOne(
 
   return new Promise((resolve) => {
     const formData = new FormData();
+    const classificationId = selectedClassificationId();
+    if (classificationId)
+      formData.append("classification_id", classificationId);
     formData.append("file", fileToSend);
 
     const xhr = new XMLHttpRequest();
@@ -665,6 +786,40 @@ async function uploadOneExplorer(
     });
 
     xhr.send(formData);
+  });
+}
+
+// ── Classify-before-upload confirmation ─────────────────────────────────────
+
+/**
+ * Asks for the study's category once files are chosen, and resolves true only
+ * on "Subir". Cancel, Escape and closing all resolve false — nothing is sent.
+ * Without the dialog in the page (the Buscar quick-drop shell, tests) it
+ * resolves true straight away.
+ */
+async function confirmClassification(count: number): Promise<boolean> {
+  const dialog = document.getElementById("classify-dialog");
+  if (!dialog) return true;
+  await ensureClassificationOptions();
+  // Start blank per study so the last study's category never carries over unseen.
+  const sel = classificationSelect();
+  if (sel) sel.value = "";
+  $("classify-msg").textContent = t("upload.classifyMessage", { count });
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      closeDialog(dialog);
+      resolve(ok);
+    };
+    ($("classify-confirm") as HTMLButtonElement).onclick = () => finish(true);
+    ($("classify-cancel") as HTMLButtonElement).onclick = () => finish(false);
+    dialog.addEventListener("dialog:close", () => finish(false), {
+      once: true,
+    });
+    openDialog(dialog);
   });
 }
 

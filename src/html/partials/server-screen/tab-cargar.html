@@ -22,9 +22,13 @@
         >
           Seleccionar archivos o ZIP
         </button>
+        <!-- Desktop only: in a browser, <input webkitdirectory> triggers Chrome's
+             own "Upload N files to this site?" prompt, which no page can
+             suppress. Browsers drop a folder onto this zone instead. -->
         <button
-          class="btn btn--outline"
+          class="btn btn--outline hidden"
           id="btn-upload-folder"
+          data-desktop-only
           data-i18n="upload.selectFolder"
         >
           Seleccionar carpeta

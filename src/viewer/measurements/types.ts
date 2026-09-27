@@ -76,6 +76,13 @@ export interface PolygonAnnotation extends BaseAnnotation {
    * isn't hit-testable while hidden.
    */
   hidden?: boolean;
+  /**
+   * Pathology type chosen for an AI segmentation (US-45), from the same catalog
+   * used when uploading a study (`GET /v1/pathologies`). `pathologyKey` drives
+   * the i18n label (`classification.<key>`); `pathologyId` is what's persisted.
+   */
+  pathologyId?: number;
+  pathologyKey?: string;
 }
 
 export type Annotation =

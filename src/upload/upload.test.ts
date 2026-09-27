@@ -486,6 +486,75 @@ test("initUploadPanel: folder input change collects and uploads files", async ()
   await new Promise((r) => setTimeout(r, 0));
 });
 
+function addClassifyDialog(): void {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<div id="classify-dialog" class="hidden">
+      <div class="dialog" role="dialog" aria-modal="true">
+        <p id="classify-msg"></p>
+        <select id="upload-classification">
+          <option value="">Sin clasificar</option>
+          <option value="3">Tumor</option>
+        </select>
+        <button id="classify-confirm">Subir</button>
+        <button id="classify-cancel">Cancelar</button>
+      </div>
+    </div>`,
+  );
+}
+
+async function waitForDialog(): Promise<HTMLElement> {
+  const dialog = document.getElementById("classify-dialog")!;
+  for (let i = 0; i < 10 && dialog.classList.contains("hidden"); i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  return dialog;
+}
+
+test("initUploadPanel: classify dialog holds the upload until confirmed", async () => {
+  uploadPanelFixture();
+  addClassifyDialog();
+  await signIn();
+  initUploadPanel();
+
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  setInputFiles(input, [dcmFile()]);
+  input.dispatchEvent(new Event("change"));
+
+  const dialog = await waitForDialog();
+  assert.equal(dialog.classList.contains("hidden"), false);
+  assert.equal(FakeXHR.instances.length, 0);
+
+  (
+    document.getElementById("upload-classification") as HTMLSelectElement
+  ).value = "3";
+  document.getElementById("classify-confirm")!.click();
+  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  assert.equal(dialog.classList.contains("hidden"), true);
+  assert.equal(FakeXHR.latest().sentBody!.get("classification_id"), "3");
+  FakeXHR.latest().respond(201, "{}");
+  await new Promise((r) => setTimeout(r, 0));
+});
+
+test("initUploadPanel: cancelling the classify dialog uploads nothing", async () => {
+  uploadPanelFixture();
+  addClassifyDialog();
+  await signIn();
+  initUploadPanel();
+
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  setInputFiles(input, [dcmFile()]);
+  input.dispatchEvent(new Event("change"));
+
+  const dialog = await waitForDialog();
+  document.getElementById("classify-cancel")!.click();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(dialog.classList.contains("hidden"), true);
+  assert.equal(FakeXHR.instances.length, 0);
+});
+
 test("initUploadPanel: shows an error status when uploading twice concurrently", async () => {
   uploadPanelFixture();
   await signIn();
@@ -589,6 +658,59 @@ test("initUploadPanel: cancelling mid-upload marks the summary cancelled", async
   const status = document.getElementById("upload-status")!;
   assert.equal(status.classList.contains("upload-status--error"), true);
   assert.equal(summary?.cancelled, true);
+});
+
+test("initUploadPanel: dropping a folder uploads the files inside it", async () => {
+  uploadPanelFixture();
+  await signIn();
+  initUploadPanel();
+
+  const fileEntry = (name: string, path: string) => ({
+    isFile: true,
+    fullPath: path,
+    file: (ok: (f: File) => void) => ok(dcmFile(name)),
+  });
+  // readEntries returns children once, then an empty batch (end of folder).
+  const dirEntry = (children: unknown[]) => ({
+    isFile: false,
+    isDirectory: true,
+    createReader: () => {
+      let batches = [children, []];
+      return {
+        readEntries: (ok: (b: unknown[]) => void) => ok(batches.shift() ?? []),
+      };
+    },
+  });
+  const folder = dirEntry([
+    fileEntry("a.dcm", "/study/a.dcm"),
+    dirEntry([fileEntry("b.dcm", "/study/series/b.dcm")]),
+  ]);
+
+  const dropEvt = new Event("drop", { cancelable: true }) as DragEvent;
+  Object.defineProperty(dropEvt, "dataTransfer", {
+    value: {
+      files: [],
+      items: [
+        { kind: "file", webkitGetAsEntry: () => folder },
+        // A loose file beside the folder: read via getAsFile, not its entry.
+        {
+          kind: "file",
+          webkitGetAsEntry: () => ({ isDirectory: false }),
+          getAsFile: () => dcmFile("loose.dcm"),
+        },
+      ],
+    },
+  });
+  document.getElementById("upload-drop")!.dispatchEvent(dropEvt);
+
+  for (let i = 0; i < 10 && FakeXHR.instances.length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  assert.equal(document.querySelectorAll(".upload-row").length, 3);
+  for (let n = 0; n < 3; n++) {
+    FakeXHR.latest().respond(201, "{}");
+    await new Promise((r) => setTimeout(r, 0));
+  }
 });
 
 test("initUploadPanel: drop zone toggles drag-over and uploads dropped files", async () => {

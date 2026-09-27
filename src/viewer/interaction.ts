@@ -9,6 +9,8 @@ import {
   fitToContainer,
 } from "../dicom/dicom-renderer.js";
 import { $, showLoading, showError } from "../shared/dom.js";
+import { showToast } from "../shared/banner.js";
+import { getPathologies } from "./segmentation/segmentation-api.js";
 import { anyDialogOpen, openDialog, closeDialog } from "../shared/dialog.js";
 import { currentScreen } from "../shared/screen.js";
 import {
@@ -34,7 +36,7 @@ import {
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
 import { dicomCache } from "./cache.js";
-import { t } from "../i18n/i18n.js";
+import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
   exportCurrentViewToPNG,
   exportCurrentStudyAsZip,
@@ -768,6 +770,102 @@ export function initMeasurementControlsInteraction(): void {
       renderActiveMeasurementOverlays();
     }
   });
+
+  // Pathology selector (US-45): tag the selected polygon with a pathology type,
+  // from the same catalog as upload. Populated lazily (needs a session), synced
+  // to whatever polygon is selected, and re-labelled on a locale change.
+  measurePathologySelect()?.addEventListener("change", () =>
+    onMeasurePathologyChange(),
+  );
+  onLocaleChange(relabelMeasurePathologyOptions);
+  void ensureMeasurePathologyOptions();
+  if (typeof window !== "undefined") {
+    window.addEventListener("annotation-selection-changed", () => {
+      void ensureMeasurePathologyOptions();
+      syncMeasurePathologySelect();
+    });
+  }
+}
+
+// ── Pathology of the selected polygon (measurement panel) ────────────────────
+
+let measurePathologyLoaded = false;
+
+function measurePathologySelect(): HTMLSelectElement | null {
+  return $("measure-pathology") as HTMLSelectElement | null;
+}
+
+/** The currently selected annotation, if it is a polygon on the active slice. */
+function findSelectedPolygon(): PolygonAnnotation | null {
+  const id = getSelectedAnnotationId();
+  if (!id) return null;
+  const manager = getViewportManager();
+  const uid =
+    manager?.activeViewport?.data.parsed?.metadata?.sopInstanceUid ||
+    getActiveSopInstanceUid();
+  const ann = getAnnotationsForSlice(uid).find((a) => a.id === id);
+  return ann && ann.type === "polygon" ? (ann as PolygonAnnotation) : null;
+}
+
+/** Fetch the catalog once and build the options. No-op for a guest/on error —
+ *  the blank "Sin clasificar" default stays and retries on the next selection. */
+async function ensureMeasurePathologyOptions(): Promise<void> {
+  if (measurePathologyLoaded) return;
+  const sel = measurePathologySelect();
+  if (!sel) return;
+  const cats = await getPathologies();
+  if (cats.length === 0) return;
+  sel.querySelectorAll("option[data-id]").forEach((o) => o.remove());
+  for (const c of cats) {
+    const opt = document.createElement("option");
+    opt.value = String(c.id);
+    opt.dataset.id = String(c.id);
+    opt.dataset.key = c.key;
+    opt.textContent = t(`classification.${c.key}`);
+    sel.appendChild(opt);
+  }
+  measurePathologyLoaded = true;
+  syncMeasurePathologySelect();
+}
+
+/** Re-translate the options on a locale change (no refetch). */
+function relabelMeasurePathologyOptions(): void {
+  measurePathologySelect()
+    ?.querySelectorAll<HTMLOptionElement>("option[data-key]")
+    .forEach((o) => {
+      if (o.dataset.key) o.textContent = t(`classification.${o.dataset.key}`);
+    });
+}
+
+/** Reflect the selected polygon's pathology in the select (blank if none). */
+function syncMeasurePathologySelect(): void {
+  const sel = measurePathologySelect();
+  if (!sel) return;
+  const poly = findSelectedPolygon();
+  sel.value = poly?.pathologyId != null ? String(poly.pathologyId) : "";
+}
+
+/** Assign the chosen pathology to the selected polygon (or warn if none). */
+function onMeasurePathologyChange(): void {
+  const sel = measurePathologySelect();
+  if (!sel) return;
+  const poly = findSelectedPolygon();
+  if (!poly) {
+    showToast(t("viewer.measure.pathologyNeedPolygon"), "warning");
+    sel.value = "";
+    return;
+  }
+  const opt = sel.selectedOptions[0];
+  if (sel.value === "") {
+    delete poly.pathologyId;
+    delete poly.pathologyKey;
+  } else {
+    poly.pathologyId = Number(sel.value);
+    poly.pathologyKey = opt?.dataset.key;
+  }
+  updateAnnotation(poly);
+  saveToLocalStorage(poly.sopInstanceUid);
+  renderActiveMeasurementOverlays();
 }
 
 export async function toggle3DMode(): Promise<boolean> {

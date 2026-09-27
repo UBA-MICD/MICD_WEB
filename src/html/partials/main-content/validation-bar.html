@@ -37,6 +37,18 @@
 
   <div class="validation-bar__spacer"></div>
 
+  <!-- Pathology type for the AI segmentation (US-45), same catalog as upload.
+       Optional. Shown only while an AI candidate is on screen. -->
+  <select
+    class="validation-bar__seg-select hidden"
+    id="seg-pathology"
+    data-i18n-attr="aria-label:viewer.segmentation.pathologyAria;title:viewer.segmentation.pathologyAria"
+  >
+    <option value="" data-key="none" data-i18n="classification.none">
+      Sin clasificar
+    </option>
+  </select>
+
   <!-- AI segmentation group (US-45), whole group in the turquoise "IA" family.
        Shown by segmentation-correction-ui.ts only while a segmentation is on
        screen. "Corregir" never disappears; Transferir/Descartar stay visible

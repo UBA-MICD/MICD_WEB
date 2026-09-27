@@ -1803,6 +1803,22 @@ body {
   color: #2ee6a8;
 }
 
+.measure-select {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.measure-select:hover,
+.measure-select:focus {
+  border-color: var(--accent);
+}
+
 .measure-clear-btn {
   width: 100%;
   display: flex;
@@ -1886,6 +1902,20 @@ body {
 }
 .btn--seg-soft:hover {
   background: rgba(26, 188, 156, 0.24);
+  border-color: #1abc9c;
+}
+.validation-bar__seg-select {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(26, 188, 156, 0.55);
+  background: rgba(26, 188, 156, 0.12);
+  color: #5fe0c8;
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+}
+.validation-bar__seg-select:hover {
   border-color: #1abc9c;
 }
 
@@ -4247,6 +4277,24 @@ body {
   background: var(--amber-soft);
   color: var(--amber);
 }
+.study-item__classification-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+.study-item__classification-badge--none {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
 
 .validations-row-actions {
   display: flex;
@@ -4542,4 +4590,31 @@ body {
   border: 2px solid var(--segmentation);
   background: var(--segmentation-soft);
   flex: none;
+}
+
+/* Classify-before-upload dialog field. */
+.classify-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.classify-field select {
+  padding: 8px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.classify-field select:focus-visible {
+  border-color: var(--accent);
+}
+.classify-field select option {
+  background: var(--bg-elevated);
 }

@@ -64,6 +64,13 @@ export function getSelectedAnnotationId(): string | null {
 
 export function setSelectedAnnotationId(id: string | null): void {
   selectedAnnotationId = id;
+  // Let the measurement panel sync its pathology select to the new selection.
+  // Guarded: this module is also imported under the Node test runner.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("annotation-selection-changed", { detail: { id } }),
+    );
+  }
 }
 
 // ── Color Tokens & Styling ───────────────────────────────────────────────────
@@ -212,32 +219,11 @@ function drawLengthAnnotation(
   viewH: number,
   isSelected: boolean,
 ): void {
-  const p1 = worldToScreen(
-    ann.start.x,
-    ann.start.y,
-    viewW,
-    viewH,
-    cols,
-    rows,
-    viewport.zoom,
-    viewport.panX,
-    viewport.panY,
-    1,
-    true,
-  );
-  const p2 = worldToScreen(
-    ann.end.x,
-    ann.end.y,
-    viewW,
-    viewH,
-    cols,
-    rows,
-    viewport.zoom,
-    viewport.panX,
-    viewport.panY,
-    1,
-    true,
-  );
+  // Object overload throughout so measurements honour viewport.flipX/flipY
+  // (canonical flip renders identically; only genuinely-flipped viewports differ
+  // — and there this is the correct, non-mirrored placement).
+  const p1 = worldToScreen(ann.start, viewport, viewW, viewH, cols, rows);
+  const p2 = worldToScreen(ann.end, viewport, viewW, viewH, cols, rows);
 
   const color = isSelected
     ? COLORS.selected
@@ -295,19 +281,9 @@ function drawEllipseAnnotation(
   viewH: number,
   isSelected: boolean,
 ): void {
-  const center = worldToScreen(
-    ann.center.x,
-    ann.center.y,
-    viewW,
-    viewH,
-    cols,
-    rows,
-    viewport.zoom,
-    viewport.panX,
-    viewport.panY,
-    1,
-    true,
-  );
+  // Object overload so the ellipse honours viewport.flipX/flipY (canonical flip
+  // renders identically; only genuinely-flipped viewports differ, correctly).
+  const center = worldToScreen(ann.center, viewport, viewW, viewH, cols, rows);
   const rxScreen = Math.abs(ann.radiusX * viewport.zoom);
   const ryScreen = Math.abs(ann.radiusY * viewport.zoom);
 
@@ -482,11 +458,23 @@ function drawPolygonAnnotation(
     const badgeLines: Array<{ text: string; color?: string; bold?: boolean }> =
       [];
 
-    // US-45: tag the AI-seeded polygon so it's told apart from manual ones.
+    // US-45: tag the AI-seeded polygon so it's told apart from manual ones, and
+    // show its chosen pathology type (from the upload catalog) when set.
     if (ann.origin === "ai") {
+      const tag = t("viewer.segmentation.tagAi") || "IA";
+      const label = ann.pathologyKey
+        ? `${tag} · ${t(`classification.${ann.pathologyKey}`)}`
+        : tag;
       badgeLines.push({
-        text: t("viewer.segmentation.tagAi") || "IA",
+        text: label,
         color: COLORS.aiSegmentation,
+        bold: true,
+      });
+    } else if (ann.pathologyKey) {
+      // Manual polygon tagged with a pathology (US-45): show it on its badge.
+      badgeLines.push({
+        text: t(`classification.${ann.pathologyKey}`),
+        color: COLORS.calibrated,
         bold: true,
       });
     }
@@ -539,32 +527,11 @@ function drawActiveDrawing(
   ctx.setLineDash([4, 4]);
 
   if (drawing.type === "length" && drawing.start && drawing.end) {
-    const p1 = worldToScreen(
-      drawing.start.x,
-      drawing.start.y,
-      viewW,
-      viewH,
-      cols,
-      rows,
-      viewport.zoom,
-      viewport.panX,
-      viewport.panY,
-      1,
-      true,
-    );
-    const p2 = worldToScreen(
-      drawing.end.x,
-      drawing.end.y,
-      viewW,
-      viewH,
-      cols,
-      rows,
-      viewport.zoom,
-      viewport.panX,
-      viewport.panY,
-      1,
-      true,
-    );
+    // Object overload so the in-progress preview honours viewport.flipX/flipY,
+    // matching the click→world mapping and the finalized render — otherwise the
+    // preview appears mirrored on a flipped viewport.
+    const p1 = worldToScreen(drawing.start, viewport, viewW, viewH, cols, rows);
+    const p2 = worldToScreen(drawing.end, viewport, viewW, viewH, cols, rows);
 
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -598,17 +565,12 @@ function drawActiveDrawing(
     typeof drawing.radiusY === "number"
   ) {
     const center = worldToScreen(
-      drawing.center.x,
-      drawing.center.y,
+      drawing.center,
+      viewport,
       viewW,
       viewH,
       cols,
       rows,
-      viewport.zoom,
-      viewport.panX,
-      viewport.panY,
-      1,
-      true,
     );
     const rxScreen = Math.abs(drawing.radiusX * viewport.zoom);
     const ryScreen = Math.abs(drawing.radiusY * viewport.zoom);
@@ -666,20 +628,11 @@ function drawActiveDrawing(
     drawing.points &&
     drawing.points.length > 0
   ) {
+    // Object overload so the in-progress preview honours viewport.flipX/flipY,
+    // matching the click→world mapping and the finalized render — otherwise the
+    // polygon appears mirrored while drawing on a flipped viewport.
     const screenPts = drawing.points.map((p) =>
-      worldToScreen(
-        p.x,
-        p.y,
-        viewW,
-        viewH,
-        cols,
-        rows,
-        viewport.zoom,
-        viewport.panX,
-        viewport.panY,
-        1,
-        true,
-      ),
+      worldToScreen(p, viewport, viewW, viewH, cols, rows),
     );
 
     ctx.beginPath();
@@ -690,17 +643,12 @@ function drawActiveDrawing(
 
     if (drawing.end) {
       const endScreen = worldToScreen(
-        drawing.end.x,
-        drawing.end.y,
+        drawing.end,
+        viewport,
         viewW,
         viewH,
         cols,
         rows,
-        viewport.zoom,
-        viewport.panX,
-        viewport.panY,
-        1,
-        true,
       );
       ctx.lineTo(endScreen.x, endScreen.y);
     }
@@ -714,17 +662,12 @@ function drawActiveDrawing(
     // Highlight starting node when cursor is close enough to close (<= 10px)
     if (drawing.end && screenPts.length >= 3) {
       const endScreen = worldToScreen(
-        drawing.end.x,
-        drawing.end.y,
+        drawing.end,
+        viewport,
         viewW,
         viewH,
         cols,
         rows,
-        viewport.zoom,
-        viewport.panX,
-        viewport.panY,
-        1,
-        true,
       );
       const distToStart = Math.hypot(
         endScreen.x - screenPts[0].x,
@@ -853,47 +796,18 @@ export function hitTestAnnotation(
   for (let i = annotations.length - 1; i >= 0; i--) {
     const ann = annotations[i];
     if (ann.type === "length") {
-      const p1 = worldToScreen(
-        ann.start.x,
-        ann.start.y,
-        viewW,
-        viewH,
-        cols,
-        rows,
-        viewport.zoom,
-        viewport.panX,
-        viewport.panY,
-        1,
-        true,
-      );
-      const p2 = worldToScreen(
-        ann.end.x,
-        ann.end.y,
-        viewW,
-        viewH,
-        cols,
-        rows,
-        viewport.zoom,
-        viewport.panX,
-        viewport.panY,
-        1,
-        true,
-      );
+      const p1 = worldToScreen(ann.start, viewport, viewW, viewH, cols, rows);
+      const p2 = worldToScreen(ann.end, viewport, viewW, viewH, cols, rows);
       const dist = distToSegment(screenX, screenY, p1.x, p1.y, p2.x, p2.y);
       if (dist <= 8) return ann;
     } else if (ann.type === "ellipse") {
       const center = worldToScreen(
-        ann.center.x,
-        ann.center.y,
+        ann.center,
+        viewport,
         viewW,
         viewH,
         cols,
         rows,
-        viewport.zoom,
-        viewport.panX,
-        viewport.panY,
-        1,
-        true,
       );
       const rxScreen = Math.abs(ann.radiusX * viewport.zoom);
       const ryScreen = Math.abs(ann.radiusY * viewport.zoom);
@@ -910,19 +824,7 @@ export function hitTestAnnotation(
       if (ann.locked || ann.hidden) continue;
       if (ann.points && ann.points.length >= 2) {
         const screenPts = ann.points.map((p) =>
-          worldToScreen(
-            p.x,
-            p.y,
-            viewW,
-            viewH,
-            cols,
-            rows,
-            viewport.zoom,
-            viewport.panX,
-            viewport.panY,
-            1,
-            true,
-          ),
+          worldToScreen(p, viewport, viewW, viewH, cols, rows),
         );
 
         // 1. Proximity to any edge
@@ -949,11 +851,7 @@ export function hitTestAnnotation(
             viewH,
             cols,
             rows,
-            viewport.zoom,
-            viewport.panX,
-            viewport.panY,
-            1,
-            true,
+            viewport,
           );
           if (isPointInPolygon(worldPt, ann.points)) {
             return ann;

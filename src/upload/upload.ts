@@ -15,7 +15,12 @@ import { openDialog, closeDialog } from "../shared/dialog.js";
 import { loadStudyExplorer, markStudyAsNew } from "../explorer/explorer.js";
 import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
-import { anonymizeDicomBuffer } from "../utils/dicom-anonymizer.js";
+import {
+  anonymizeWithLocalService,
+  anonymizerUrl,
+  AnonymizerUnavailableError,
+  isAnonymizerAvailable,
+} from "./local-anonymizer.js";
 
 // ── Upload (Cargar tab) ──────────────────────────────────────────────────────
 //
@@ -337,6 +342,14 @@ async function startUpload(files: File[]): Promise<void> {
     showUploadStatus(t("upload.needLogin"), "error");
     return;
   }
+  if (!(await anonymizerReady())) {
+    uploading = false;
+    showUploadStatus(
+      t("upload.anonymizerUnavailable", { url: anonymizerUrl() }),
+      "error",
+    );
+    return;
+  }
   if (!(await confirmClassification(files.length))) {
     uploading = false;
     return;
@@ -418,18 +431,30 @@ export function isUploading(): boolean {
 // ── One file ─────────────────────────────────────────────────────────────────
 
 /**
- * Anonymize a DICOM before it leaves the client, so PHI never touches the
- * network. On the desktop build the real Python anonymizer runs in the main
- * process (window.api.anonymizeDicom); the browser has no Python, so it falls
- * back to the in-browser JS scrubber. Either way the backend stores what it
- * receives and does not anonymize.
+ * Anonymize a DICOM before it leaves the computer (US-16). The desktop build
+ * can provide its own seam (window.api.anonymizeDicom); otherwise the raw
+ * file goes only to the anonymization service on this machine
+ * (local-anonymizer.ts). The backend stores what it receives and does not
+ * anonymize, so this throws rather than ever handing back un-anonymized
+ * bytes, and callers must not send the file when it does.
  */
 async function anonymizeForUpload(file: File): Promise<File> {
-  const rawBuffer = await file.arrayBuffer();
   const anonBuffer = window.api?.anonymizeDicom
-    ? await window.api.anonymizeDicom(rawBuffer)
-    : anonymizeDicomBuffer(rawBuffer);
-  return new File([anonBuffer], file.name, { type: file.type });
+    ? await window.api.anonymizeDicom(await file.arrayBuffer())
+    : await anonymizeWithLocalService(file);
+  return new File([anonBuffer], file.name, { type: "application/dicom" });
+}
+
+/** Check the anonymizer before a queue starts, so a stopped service fails
+ *  the whole batch up front with one clear message. */
+async function anonymizerReady(): Promise<boolean> {
+  return Boolean(window.api?.anonymizeDicom) || (await isAnonymizerAvailable());
+}
+
+function anonymizationErrorMessage(err: unknown, file: File): string {
+  return err instanceof AnonymizerUnavailableError
+    ? t("upload.anonymizerUnavailable", { url: anonymizerUrl() })
+    : t("upload.anonymizationFailed", { name: file.name });
 }
 
 async function uploadOne(
@@ -438,7 +463,19 @@ async function uploadOne(
   force = false,
   isRetry = false,
 ): Promise<UploadOutcome> {
-  const fileToSend = await anonymizeForUpload(file);
+  let fileToSend: File;
+  try {
+    fileToSend = await anonymizeForUpload(file);
+  } catch (err) {
+    // Fail closed (US-16): a file we couldn't anonymize is never sent.
+    console.error("Anonymization failed, upload cancelled:", err);
+    setRowState(row, "error");
+    // The row keeps saying why after the end-of-queue summary replaces the
+    // status line.
+    row.pct.textContent = t("upload.stateNotAnonymized");
+    showUploadStatus(anonymizationErrorMessage(err, file), "error");
+    return "error";
+  }
 
   return new Promise((resolve) => {
     const formData = new FormData();
@@ -669,6 +706,14 @@ export async function startExplorerUpload(
     showToast(t("upload.needLoginExplorer"), "warning");
     return;
   }
+  if (!(await anonymizerReady())) {
+    uploading = false;
+    showToast(
+      t("upload.anonymizerUnavailable", { url: anonymizerUrl() }),
+      "error",
+    );
+    return;
+  }
 
   statusEl.textContent = t("upload.explorerUploadingProgress", {
     count: files.length,
@@ -720,7 +765,14 @@ async function uploadOneExplorer(
   file: File,
   isRetry = false,
 ): Promise<UploadOutcome> {
-  const fileToSend = await anonymizeForUpload(file);
+  let fileToSend: File;
+  try {
+    fileToSend = await anonymizeForUpload(file);
+  } catch (err) {
+    console.error("Anonymization failed, upload cancelled:", err);
+    showToast(anonymizationErrorMessage(err, file), "error");
+    return "error";
+  }
 
   return new Promise((resolve) => {
     const formData = new FormData();

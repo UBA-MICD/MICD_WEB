@@ -23,10 +23,12 @@ import {
   initMeasurementControlsInteraction,
   initGridLayoutControls,
   setViewportSync,
+  update3DSlidersUI,
 } from "./interaction.ts";
 import { state, itemCount } from "./state.ts";
 import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
 import { mprEngine } from "./mpr-engine.ts";
+import { mprCoordinator } from "./mpr-coordinator.ts";
 import { dicomCache } from "./cache.ts";
 import { ViewportManager } from "./viewport-manager.ts";
 import { initViewportManager } from "./viewport-registry.ts";
@@ -2371,4 +2373,89 @@ test("US-50 mouse: contextmenu is prevented on viewport-container to support rig
     true,
     "contextmenu should be prevented on container",
   );
+});
+
+test("3-axis panel wiring and bidirectional reactivity with MPRGridCoordinator", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  // Mock volume on view3DViewer
+  view3DViewer.volume = {
+    cols: 100,
+    rows: 80,
+    depth: 40,
+    data: new Int16Array(100 * 80 * 40),
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  } as any;
+  mprCoordinator.initFromVolume(100, 80, 40);
+
+  const axialSlider = document.getElementById(
+    "view-3d-scroll-axial",
+  ) as HTMLInputElement;
+  const coronalSlider = document.getElementById(
+    "view-3d-scroll-coronal",
+  ) as HTMLInputElement;
+  const sagittalSlider = document.getElementById(
+    "view-3d-scroll-sagittal",
+  ) as HTMLInputElement;
+
+  const valAxial = document.getElementById("view-3d-val-axial");
+  const valCoronal = document.getElementById("view-3d-val-coronal");
+  const valSagittal = document.getElementById("view-3d-val-sagittal");
+
+  update3DSlidersUI();
+
+  // Moving axial slider updates only Z coordinate and triggers reactivity
+  axialSlider.value = "12";
+  axialSlider.dispatchEvent(new Event("input"));
+  assert.equal(mprCoordinator.crosshair.z, 12);
+  assert.equal(mprCoordinator.crosshair.x, 50);
+  assert.equal(mprCoordinator.crosshair.y, 40);
+  assert.equal(valAxial?.textContent, "12");
+
+  // Moving coronal slider updates only Y coordinate
+  coronalSlider.value = "64";
+  coronalSlider.dispatchEvent(new Event("input"));
+  assert.equal(mprCoordinator.crosshair.y, 64);
+  assert.equal(mprCoordinator.crosshair.x, 50);
+  assert.equal(mprCoordinator.crosshair.z, 12);
+  assert.equal(valCoronal?.textContent, "64");
+
+  // Moving sagittal slider updates only X coordinate
+  sagittalSlider.value = "88";
+  sagittalSlider.dispatchEvent(new Event("input"));
+  assert.equal(mprCoordinator.crosshair.x, 88);
+  assert.equal(mprCoordinator.crosshair.y, 64);
+  assert.equal(mprCoordinator.crosshair.z, 12);
+  assert.equal(valSagittal?.textContent, "88");
+
+  // Focus guard: while sagittal slider has focus / active interaction, coordinator updates do not fight user .value
+  sagittalSlider.focus();
+  mprCoordinator.setCrosshair(15, 25, 35);
+  assert.equal(
+    sagittalSlider.value,
+    "88",
+    "Focused slider value must not be overwritten by coordinator",
+  );
+  assert.equal(
+    valSagittal?.textContent,
+    "15",
+    "Display text label still updates to reflect current crosshair",
+  );
+
+  // On blur / mouseup, releasing interaction allows reverse reactivity to update value
+  sagittalSlider.blur();
+  window.dispatchEvent(new Event("mouseup"));
+  mprCoordinator.setCrosshair(15, 25, 35);
+  assert.equal(axialSlider.value, "35");
+  assert.equal(coronalSlider.value, "25");
+  assert.equal(sagittalSlider.value, "15");
+  assert.equal(valAxial?.textContent, "35");
+  assert.equal(valCoronal?.textContent, "25");
+  assert.equal(valSagittal?.textContent, "15");
+
+  view3DViewer.volume = null;
 });

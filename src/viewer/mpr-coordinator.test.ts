@@ -69,6 +69,47 @@ test("MPRGridCoordinator: setSliceIndex updates individual orthogonal planes", (
   assert.equal(coordinator.getSliceIndex("sagittal"), 15);
 });
 
+test("MPRGridCoordinator: updateCrosshairAxis updates targeted axis independently and clamps to volume boundaries", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 80, 40); // cols=100, rows=80, depth=40 (center: 50, 40, 20)
+
+  // Axial (Z)
+  coordinator.updateCrosshairAxis("axial", 35);
+  assert.equal(coordinator.crosshair.z, 35);
+  assert.equal(coordinator.crosshair.x, 50);
+  assert.equal(coordinator.crosshair.y, 40);
+
+  // Coronal (Y)
+  coordinator.updateCrosshairAxis("coronal", 15);
+  assert.equal(coordinator.crosshair.y, 15);
+  assert.equal(coordinator.crosshair.x, 50);
+  assert.equal(coordinator.crosshair.z, 35);
+
+  // Sagittal (X)
+  coordinator.updateCrosshairAxis("sagittal", 85);
+  assert.equal(coordinator.crosshair.x, 85);
+  assert.equal(coordinator.crosshair.y, 15);
+  assert.equal(coordinator.crosshair.z, 35);
+
+  // Test aliases "x", "y", "z"
+  coordinator.updateCrosshairAxis("z", 10);
+  assert.equal(coordinator.crosshair.z, 10);
+  coordinator.updateCrosshairAxis("y", 20);
+  assert.equal(coordinator.crosshair.y, 20);
+  coordinator.updateCrosshairAxis("x", 30);
+  assert.equal(coordinator.crosshair.x, 30);
+
+  // Clamping lower bound
+  coordinator.updateCrosshairAxis("axial", -15);
+  assert.equal(coordinator.crosshair.z, 0);
+
+  // Clamping upper bound
+  coordinator.updateCrosshairAxis("coronal", 500);
+  assert.equal(coordinator.crosshair.y, 79);
+  coordinator.updateCrosshairAxis("sagittal", 500);
+  assert.equal(coordinator.crosshair.x, 99);
+});
+
 test("MPRGridCoordinator: toggleMaximize applies 1x1 fullscreen CSS classes and toggles back", () => {
   const coordinator = new MPRGridCoordinator();
   const container = document.getElementById("viewport-container")!;

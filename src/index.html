@@ -831,36 +831,6 @@
         <main class="main-content" id="main-content" tabindex="-1">
           <!-- Viewport -->
           <div class="viewport-wrapper">
-            <!-- 3D Unified Depth Slider (Bottom capsule) -->
-            <div
-              class="view-3d-depth-slider-wrap mpr-depth-slider-wrap hidden"
-              id="view-3d-depth-slider-wrap"
-              role="group"
-              aria-label="Control de profundidad"
-              data-i18n-attr="aria-label:viewer.view3d.depthControlAria"
-            >
-              <span
-                class="view-3d-depth-counter mpr-depth-counter"
-                id="view-3d-depth-counter"
-                >Corte: 1/1</span
-              >
-              <input
-                type="range"
-                id="view-3d-depth-slider"
-                class="view-3d-depth-slider mpr-depth-slider"
-                role="slider"
-                aria-label="Profundidad de corte"
-                aria-orientation="horizontal"
-                aria-valuemin="0"
-                aria-valuemax="0"
-                aria-valuenow="0"
-                data-i18n-attr="aria-label:viewer.view3d.depthSliderAria"
-                min="0"
-                max="0"
-                value="0"
-              />
-            </div>
-
             <div
               class="viewport-container mpr-grid-container cursor-wl"
               id="viewport-container"
@@ -937,11 +907,14 @@
                 data-i18n-attr="aria-label:viewer.view3d.triplanarSlidersAria"
               >
                 <div class="view-3d-slider-row mpr-slider-row">
-                  <label
-                    for="view-3d-scroll-axial"
-                    data-i18n="viewer.view3d.axial"
-                    >Axial</label
-                  >
+                  <div class="mpr-slider-label-group">
+                    <label
+                      for="view-3d-scroll-axial"
+                      data-i18n="viewer.view3d.axial"
+                      >Axial</label
+                    >
+                    <span class="mpr-slider-val" id="view-3d-val-axial">0</span>
+                  </div>
                   <input
                     type="range"
                     id="view-3d-scroll-axial"
@@ -953,11 +926,16 @@
                   />
                 </div>
                 <div class="view-3d-slider-row mpr-slider-row">
-                  <label
-                    for="view-3d-scroll-coronal"
-                    data-i18n="viewer.view3d.coronal"
-                    >Coronal</label
-                  >
+                  <div class="mpr-slider-label-group">
+                    <label
+                      for="view-3d-scroll-coronal"
+                      data-i18n="viewer.view3d.coronal"
+                      >Coronal</label
+                    >
+                    <span class="mpr-slider-val" id="view-3d-val-coronal"
+                      >0</span
+                    >
+                  </div>
                   <input
                     type="range"
                     id="view-3d-scroll-coronal"
@@ -969,11 +947,16 @@
                   />
                 </div>
                 <div class="view-3d-slider-row mpr-slider-row">
-                  <label
-                    for="view-3d-scroll-sagittal"
-                    data-i18n="viewer.view3d.sagittal"
-                    >Sagital</label
-                  >
+                  <div class="mpr-slider-label-group">
+                    <label
+                      for="view-3d-scroll-sagittal"
+                      data-i18n="viewer.view3d.sagittal"
+                      >Sagital</label
+                    >
+                    <span class="mpr-slider-val" id="view-3d-val-sagittal"
+                      >0</span
+                    >
+                  </div>
                   <input
                     type="range"
                     id="view-3d-scroll-sagittal"

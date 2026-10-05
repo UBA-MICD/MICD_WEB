@@ -3625,29 +3625,10 @@ body {
   touch-action: none;
 }
 
-/* Horizontal Non-Intrusive Depth Slider Capsule (US-50 Phase 1) */
+/* Obsolete Depth Slider Capsule — Hidden permanently in favor of 3-axis panel */
 .view-3d-depth-slider-wrap,
 .mpr-depth-slider-wrap {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  top: auto;
-  right: auto;
-  z-index: 70;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  background: rgba(18, 18, 24, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-strong, #3f3f46);
-  padding: 6px 16px;
-  border-radius: var(--radius-full, 9999px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
-  pointer-events: auto;
-  max-width: 380px;
-  width: calc(100% - 64px);
+  display: none !important;
 }
 
 .view-3d-depth-counter,
@@ -3806,7 +3787,11 @@ body {
 #viewport-container.mode-3d #view-3d-sliders-panel,
 #viewport-container.mode-3d .view-3d-sliders-panel,
 #viewport-container.mode-3d #mpr-sliders-panel,
-#viewport-container.mode-3d .mpr-sliders-panel {
+#viewport-container.mode-3d .mpr-sliders-panel,
+#viewport-container.mode-mpr #view-3d-sliders-panel,
+#viewport-container.mode-mpr .view-3d-sliders-panel,
+#viewport-container.mode-mpr #mpr-sliders-panel,
+#viewport-container.mode-mpr .mpr-sliders-panel {
   display: flex;
 }
 
@@ -3816,6 +3801,23 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.mpr-slider-label-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 90px;
+  gap: 8px;
+}
+
+.mpr-slider-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #d4d4d8);
+  min-width: 24px;
+  text-align: right;
 }
 
 .view-3d-slider-row label,

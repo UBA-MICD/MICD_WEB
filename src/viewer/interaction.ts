@@ -25,6 +25,10 @@ import {
   updateWlControlsUI,
   hide3DControls,
   update3DControls,
+  update3DSlidersUI,
+  updateMPRSlidersUI,
+  setActiveInteractingSlider,
+  getActiveInteractingSlider,
 } from "./rendering.js";
 import {
   loadCurrent,
@@ -911,6 +915,7 @@ export async function toggle3DMode(): Promise<boolean> {
 
   if (state.isMprMode) {
     state.isMprMode = false;
+    $("viewport-container")?.classList.remove("mode-mpr");
   }
 
   showLoading(true);
@@ -975,7 +980,9 @@ export async function toggleMprMode(): Promise<boolean> {
   const manager = getViewportManager();
   if (state.isMprMode) {
     state.isMprMode = false;
+    $("viewport-container")?.classList.remove("mode-mpr");
     manager?.setLayout("1x1");
+    hide3DControls();
     updateToolbarUI();
     render();
     return false;
@@ -992,11 +999,15 @@ export async function toggleMprMode(): Promise<boolean> {
 
     state.isMprMode = true;
     state.activeTool = "crosshair";
+    $("viewport-container")?.classList.add("mode-mpr");
 
     // Set 2x2 triplanar layout
     manager?.setLayout("2x2");
     manager?.getAllViewports().forEach((vp) => vp.render());
 
+    $("view-3d-sliders-panel")?.classList.remove("hidden");
+    $("mpr-sliders-panel")?.classList.remove("hidden");
+    update3DSlidersUI();
     updateToolbarUI();
     return true;
   } catch (err: any) {
@@ -1246,6 +1257,14 @@ export function initViewportInteraction(): void {
 
   if (container) {
     container.addEventListener("contextmenu", (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, select, textarea, button, .view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel",
+        )
+      ) {
+        return;
+      }
       e.preventDefault();
     });
   }
@@ -1338,6 +1357,11 @@ export function initViewportInteraction(): void {
 
     if (state.is3DMode && state.activeTool === "crosshair") {
       view3DViewer.updateCrosshairFromPointer(clickX, clickY, viewW, viewH);
+      mprCoordinator.setCrosshair(
+        view3DViewer.crosshair.x,
+        view3DViewer.crosshair.y,
+        view3DViewer.crosshair.z,
+      );
       render();
     }
   };
@@ -1345,6 +1369,17 @@ export function initViewportInteraction(): void {
   container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
     if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+
+    // Do NOT intercept clicks or block native events on interactive UI controls
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "input, select, textarea, button, label, .view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel, .view-3d-orientation-widget, .mpr-orientation-widget, #view-3d-reference-cube, #mpr-reference-cube",
+      )
+    ) {
+      return;
+    }
+
     activeMouseButton = e.button;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
@@ -2258,6 +2293,14 @@ export function initViewportInteraction(): void {
   });
 
   container.addEventListener("dblclick", (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "input, select, textarea, button, .view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel",
+      )
+    ) {
+      return;
+    }
     if (state.activeTool === "polygon") {
       completeActivePolygon();
       e.preventDefault();
@@ -2269,6 +2312,14 @@ export function initViewportInteraction(): void {
     "wheel",
     async (e: WheelEvent) => {
       if (!state.parsed) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          ".view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel, .view-3d-orientation-widget, .mpr-orientation-widget",
+        )
+      ) {
+        return;
+      }
       e.preventDefault();
 
       if (state.is3DMode) {
@@ -2319,7 +2370,27 @@ export function initViewportInteraction(): void {
 // ── 3D Controls & Orientation Interactions ───────────────────────────────────
 
 function init3DControlsInteraction(): void {
-  // Depth slider
+  const render3D = () => {
+    const canvas = (document.getElementById("view-3d-canvas") ||
+      document.getElementById("dicom-canvas")) as HTMLCanvasElement;
+    if (canvas && state.is3DMode) {
+      view3DViewer.render(canvas);
+    }
+  };
+
+  const syncAndRenderAfterSlider = () => {
+    render3D();
+    const manager = getViewportManager();
+    if (manager) {
+      for (const vp of manager.getAllViewports()) {
+        vp.render();
+      }
+    } else {
+      render();
+    }
+  };
+
+  // Depth slider (legacy fallback if present in test DOM)
   const depthSliders = [
     $("view-3d-depth-slider"),
     $("mpr-depth-slider"),
@@ -2329,40 +2400,46 @@ function init3DControlsInteraction(): void {
     depthSlider.addEventListener("input", () => {
       const idx = parseInt(depthSlider.value, 10);
       view3DViewer.setDepthIndex(idx);
-      update3DSlidersUI();
-      render();
+      mprCoordinator.updateCrosshairAxis("axial", idx);
+      syncAndRenderAfterSlider();
     });
   });
 
-  const render3D = () => {
-    const canvas = (document.getElementById("view-3d-canvas") ||
-      document.getElementById("dicom-canvas")) as HTMLCanvasElement;
-    if (canvas && state.is3DMode) {
-      view3DViewer.render(canvas);
-    }
-  };
+  // Stop propagation on floating slider panels to isolate from viewport navigation
+  const sliderPanels = [
+    $("view-3d-sliders-panel"),
+    $("mpr-sliders-panel"),
+  ].filter(Boolean) as HTMLElement[];
+
+  sliderPanels.forEach((panel) => {
+    panel.addEventListener("mousedown", (e) => e.stopPropagation());
+    panel.addEventListener("pointerdown", (e) => e.stopPropagation());
+  });
 
   const onAxialInput = (slider: HTMLInputElement) => {
+    setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      view3DViewer.setAxialIndex(idx);
-      render3D();
+      mprCoordinator.updateCrosshairAxis("axial", idx);
+      syncAndRenderAfterSlider();
     }
   };
 
   const onCoronalInput = (slider: HTMLInputElement) => {
+    setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      view3DViewer.setCoronalIndex(idx);
-      render3D();
+      mprCoordinator.updateCrosshairAxis("coronal", idx);
+      syncAndRenderAfterSlider();
     }
   };
 
   const onSagittalInput = (slider: HTMLInputElement) => {
+    setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      view3DViewer.setSagittalIndex(idx);
-      render3D();
+      mprCoordinator.updateCrosshairAxis("sagittal", idx);
+      syncAndRenderAfterSlider();
     }
   };
 
@@ -2379,6 +2456,46 @@ function init3DControlsInteraction(): void {
   ["view-3d-scroll-sagittal", "mpr-scroll-sagittal"].forEach((id) => {
     const el = $(id) as HTMLInputElement | null;
     el?.addEventListener("input", () => onSagittalInput(el));
+  });
+
+  // Track active interacting slider to break reactivity loops
+  const all3DSliders = [
+    "view-3d-scroll-axial",
+    "mpr-scroll-axial",
+    "view-3d-scroll-coronal",
+    "mpr-scroll-coronal",
+    "view-3d-scroll-sagittal",
+    "mpr-scroll-sagittal",
+  ]
+    .map((id) => $(id) as HTMLInputElement | null)
+    .filter(Boolean) as HTMLInputElement[];
+
+  all3DSliders.forEach((slider) => {
+    slider.addEventListener("pointerdown", () =>
+      setActiveInteractingSlider(slider),
+    );
+    slider.addEventListener("mousedown", () =>
+      setActiveInteractingSlider(slider),
+    );
+    slider.addEventListener("focus", () => setActiveInteractingSlider(slider));
+    slider.addEventListener("blur", () => {
+      if (getActiveInteractingSlider() === slider) {
+        setActiveInteractingSlider(null);
+      }
+    });
+    slider.addEventListener("change", () => setActiveInteractingSlider(null));
+  });
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("pointerup", () =>
+      setActiveInteractingSlider(null),
+    );
+    window.addEventListener("mouseup", () => setActiveInteractingSlider(null));
+  }
+
+  // Reverse reactivity: update 3-axis sliders & counters on any crosshair change
+  mprCoordinator.onCrosshairChange(() => {
+    update3DSlidersUI();
   });
 
   // Quick view orientation buttons
@@ -2455,58 +2572,12 @@ function updateOrientationButtonsUI(
   });
 }
 
-export function update3DSlidersUI(): void {
-  const dims = view3DViewer.getVolumeDimensions();
-  const indices = view3DViewer.getCurrentIndices();
-
-  const axialSliders = [
-    $("view-3d-scroll-axial") as HTMLInputElement | null,
-    $("mpr-scroll-axial") as HTMLInputElement | null,
-  ];
-  const coronalSliders = [
-    $("view-3d-scroll-coronal") as HTMLInputElement | null,
-    $("mpr-scroll-coronal") as HTMLInputElement | null,
-  ];
-  const sagittalSliders = [
-    $("view-3d-scroll-sagittal") as HTMLInputElement | null,
-    $("mpr-scroll-sagittal") as HTMLInputElement | null,
-  ];
-
-  if (dims) {
-    axialSliders.forEach((scrollAxial) => {
-      if (scrollAxial) {
-        scrollAxial.min = "0";
-        scrollAxial.max = String(Math.max(0, dims.depth - 1));
-        if (document.activeElement !== scrollAxial) {
-          scrollAxial.value = String(indices.z);
-        }
-      }
-    });
-
-    coronalSliders.forEach((scrollCoronal) => {
-      if (scrollCoronal) {
-        scrollCoronal.min = "0";
-        scrollCoronal.max = String(Math.max(0, dims.rows - 1));
-        if (document.activeElement !== scrollCoronal) {
-          scrollCoronal.value = String(indices.y);
-        }
-      }
-    });
-
-    sagittalSliders.forEach((scrollSagittal) => {
-      if (scrollSagittal) {
-        scrollSagittal.min = "0";
-        scrollSagittal.max = String(Math.max(0, dims.cols - 1));
-        if (document.activeElement !== scrollSagittal) {
-          scrollSagittal.value = String(indices.x);
-        }
-      }
-    });
-  }
-}
-
-// Backwards-compatible alias for existing tests and callers
-export const updateMPRSlidersUI = update3DSlidersUI;
+export {
+  update3DSlidersUI,
+  updateMPRSlidersUI,
+  setActiveInteractingSlider,
+  getActiveInteractingSlider,
+};
 
 // ── Series Navigation ────────────────────────────────────────────────────────
 

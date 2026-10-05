@@ -112,6 +112,29 @@ export class MPRGridCoordinator {
   }
 
   /**
+   * Updates a single crosshair axis coordinate without altering the other two.
+   *  - "x" or "sagittal" -> updates crosshair.x (cols)
+   *  - "y" or "coronal"  -> updates crosshair.y (rows)
+   *  - "z" or "axial"    -> updates crosshair.z (depth)
+   */
+  public updateCrosshairAxis(
+    axis: "x" | "y" | "z" | "sagittal" | "coronal" | "axial",
+    value: number,
+  ): void {
+    const dims = this.getDimensions();
+    const val = Math.round(value);
+    if (axis === "x" || axis === "sagittal") {
+      this.crosshair.x = Math.max(0, Math.min(dims.cols - 1, val));
+    } else if (axis === "y" || axis === "coronal") {
+      this.crosshair.y = Math.max(0, Math.min(dims.rows - 1, val));
+    } else if (axis === "z" || axis === "axial") {
+      this.crosshair.z = Math.max(0, Math.min(dims.depth - 1, val));
+    }
+    this.syncEngines();
+    this.notifyListeners();
+  }
+
+  /**
    * Sets the 3x3 rotation matrix for oblique slicing and synchronizes engines.
    */
   public setRotation(r: Float32Array): void {

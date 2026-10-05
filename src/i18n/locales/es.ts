@@ -29,6 +29,7 @@ export const es: Record<string, string> = {
   "auth.hidePassword": "Ocultar contraseña",
   "auth.submitLogin": "Ingresar",
   "auth.wereYouInvited": "¿Te invitaron? Activá tu cuenta",
+  "auth.forgotPassword": "¿Olvidaste tu contraseña?",
   "auth.loginRequiredMsg":
     "Se requiere sesión para buscar o subir estudios en el servidor. La visualización local no la necesita.",
   "auth.sessionActive": "Sesión activa",
@@ -593,6 +594,26 @@ export const es: Record<string, string> = {
   "invite.dialog.emailMismatch":
     "Ese código no corresponde a ese email. Revisá ambos.",
 
+  // ── Password recovery ───────────────────────────────────────────────────────
+  "reset.title": "Restablecer contraseña",
+  "reset.forEmail": "Elegí una contraseña nueva para {{email}}.",
+  "reset.newPassword": "Nueva contraseña",
+  "reset.submit": "Cambiar contraseña e ingresar",
+  "reset.invalid": "Este código de recuperación no es válido o ya venció.",
+  "reset.error.tooMany": "Demasiados intentos. Probá de nuevo en unos minutos.",
+  "reset.dialog.title": "Recuperar contraseña",
+  "reset.dialog.requestMsg":
+    "Ingresá el email de tu cuenta y te enviaremos un código para elegir una contraseña nueva.",
+  "reset.dialog.sendCode": "Enviar código",
+  "reset.dialog.haveCode": "Ya tengo un código",
+  "reset.dialog.haveCodeMsg":
+    "Ingresá el código que recibiste por correo y elegí una contraseña nueva.",
+  "reset.dialog.sent":
+    "Si existe una cuenta activa para {{email}}, te enviamos un código. Vence en 1 hora.",
+  "reset.dialog.codeLabel": "Código de recuperación",
+  "reset.dialog.back": "Pedir un código nuevo",
+  "reset.dialog.missingEmail": "Ingresá tu email.",
+  "reset.dialog.missingCode": "Ingresá el código que recibiste.",
   // ── System panel (admin) ────────────────────────────────────────────────────
   "system.tab": "Sistema",
   "system.orthancStorage": "Almacenamiento Orthanc",

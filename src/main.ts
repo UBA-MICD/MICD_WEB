@@ -10,6 +10,11 @@ import {
   initInviteDialog,
   enterInviteFlowIfPresent,
 } from "./auth/accept-invite.js";
+import {
+  initResetScreen,
+  initForgotPasswordDialog,
+  enterResetFlowIfPresent,
+} from "./auth/password-reset.js";
 import { showScreen } from "./shared/screen.js";
 import {
   initServerScreen,
@@ -120,6 +125,8 @@ async function initApp(): Promise<void> {
   // An invite link takes over the landing: it strips the code from the URL,
   // shows the accept-invite screen, and skips the normal signed-out flow.
   if (await enterInviteFlowIfPresent()) return;
+  // Same for a password reset link (?reset=<code>).
+  if (await enterResetFlowIfPresent()) return;
 
   // Silent session restore from the stored refresh token; never a popup here.
   const restored = await refreshAccessToken();
@@ -156,6 +163,8 @@ function startApp(): void {
   };
   initInviteScreen({ onAccepted: onInviteAccepted });
   initInviteDialog({ onAccepted: onInviteAccepted });
+  initResetScreen({ onReset: onInviteAccepted });
+  initForgotPasswordDialog({ onReset: onInviteAccepted });
   initActivityHistory();
   initZenodoPanel();
   initStudyDetailPanel();

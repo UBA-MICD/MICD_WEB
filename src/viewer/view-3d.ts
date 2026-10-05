@@ -226,6 +226,7 @@ export class View3DViewer {
   private vao: WebGLVertexArrayObject | null = null;
   private vbo: WebGLBuffer | null = null;
   private animationFrameId: number | null = null;
+  private uniformLocations: Record<string, WebGLUniformLocation | null> = {};
 
   public startRenderLoop(canvas?: HTMLCanvasElement): void {
     this.stopRenderLoop();
@@ -414,8 +415,13 @@ export class View3DViewer {
       windowWidth = 400;
     }
 
-    const iop = refMeta.imageOrientationPatient;
-    const { flipX, flipY } = getCanonicalFlip(iop);
+    const rawIop = refMeta.imageOrientationPatient;
+    const imageOrientationPatient:
+      [number, number, number, number, number, number] | undefined =
+      rawIop && rawIop.length >= 6
+        ? [rawIop[0], rawIop[1], rawIop[2], rawIop[3], rawIop[4], rawIop[5]]
+        : undefined;
+    const { flipX, flipY } = getCanonicalFlip(imageOrientationPatient);
 
     return {
       depth,
@@ -428,7 +434,7 @@ export class View3DViewer {
       rescaleIntercept: refMeta.rescaleIntercept,
       windowCenter,
       windowWidth,
-      imageOrientationPatient: iop as any,
+      imageOrientationPatient,
       flipX,
       flipY,
     };
@@ -779,6 +785,28 @@ void main() {
     if (!program) return false;
     this.program = program;
 
+    gl.useProgram(this.program);
+    const uniformNames = [
+      "u_mvp",
+      "u_volume",
+      "u_flipY",
+      "u_cameraPos",
+      "u_boxMin",
+      "u_boxMax",
+      "u_windowCenter",
+      "u_windowWidth",
+      "u_crosshair",
+      "u_activeView",
+      "u_clipPlane",
+      "u_debugAABB",
+      "u_voxelStep",
+      "u_presetMode",
+    ];
+    this.uniformLocations = {};
+    for (const name of uniformNames) {
+      this.uniformLocations[name] = gl.getUniformLocation(this.program, name);
+    }
+
     this.initCubeGeometry(gl);
     return true;
   }
@@ -1095,6 +1123,16 @@ void main() {
     if (!canvas) return;
 
     if (!this.gl || this.gl.canvas !== canvas) {
+      if (this.gl) {
+        const loseContext =
+          typeof this.gl.getExtension === "function"
+            ? this.gl.getExtension("WEBGL_lose_context")
+            : null;
+        if (loseContext) {
+          loseContext.loseContext();
+        }
+        this.volumeTexture = null;
+      }
       this.initGL(canvas);
       if (this.volume) {
         this.uploadVolumeTexture();
@@ -1204,34 +1242,25 @@ void main() {
     const mvp = Matrix4.multiply(proj, view);
 
     // Set Shader Uniforms
-    gl.uniformMatrix4fv(
-      gl.getUniformLocation(this.program, "u_mvp"),
-      false,
-      mvp,
-    );
+    gl.uniformMatrix4fv(this.uniformLocations["u_mvp"], false, mvp);
 
     // Texture Binding: Active unit 0 & volume texture bound every frame
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_3D, this.volumeTexture);
-    gl.uniform1i(gl.getUniformLocation(this.program, "u_volume"), 0);
+    gl.uniform1i(this.uniformLocations["u_volume"], 0);
 
     const flipY = this.volume.flipY ?? false;
-    gl.uniform1i(gl.getUniformLocation(this.program, "u_flipY"), flipY ? 1 : 0);
+    gl.uniform1i(this.uniformLocations["u_flipY"], flipY ? 1 : 0);
 
+    gl.uniform3f(this.uniformLocations["u_cameraPos"], eyeX, eyeY, eyeZ);
     gl.uniform3f(
-      gl.getUniformLocation(this.program, "u_cameraPos"),
-      eyeX,
-      eyeY,
-      eyeZ,
-    );
-    gl.uniform3f(
-      gl.getUniformLocation(this.program, "u_boxMin"),
+      this.uniformLocations["u_boxMin"],
       boxMin[0],
       boxMin[1],
       boxMin[2],
     );
     gl.uniform3f(
-      gl.getUniformLocation(this.program, "u_boxMax"),
+      this.uniformLocations["u_boxMax"],
       boxMax[0],
       boxMax[1],
       boxMax[2],
@@ -1260,14 +1289,8 @@ void main() {
     const normCenter = (wcHU + 1024) / 4095;
     const normWidth = Math.max(0.001, wwHU / 4095);
 
-    gl.uniform1f(
-      gl.getUniformLocation(this.program, "u_windowCenter"),
-      normCenter,
-    );
-    gl.uniform1f(
-      gl.getUniformLocation(this.program, "u_windowWidth"),
-      normWidth,
-    );
+    gl.uniform1f(this.uniformLocations["u_windowCenter"], normCenter);
+    gl.uniform1f(this.uniformLocations["u_windowWidth"], normWidth);
 
     // Normalized crosshair position [0..1]
     let normNormX = this.crosshair.x / Math.max(1, cols - 1);
@@ -1287,7 +1310,7 @@ void main() {
       }
     }
     gl.uniform3f(
-      gl.getUniformLocation(this.program, "u_crosshair"),
+      this.uniformLocations["u_crosshair"],
       normNormX,
       normNormY,
       normNormZ,
@@ -1301,38 +1324,26 @@ void main() {
           : this.activeView === "sagittal"
             ? 2
             : 3;
-    gl.uniform1i(
-      gl.getUniformLocation(this.program, "u_activeView"),
-      viewModeInt,
-    );
+    gl.uniform1i(this.uniformLocations["u_activeView"], viewModeInt);
 
     // Dynamic clipping plane position from depth slider [0..1]
     const depthInfo = this.getDepthInfo();
     const clipPlaneRatio = depthInfo.current / Math.max(1, depthInfo.total - 1);
-    gl.uniform1f(
-      gl.getUniformLocation(this.program, "u_clipPlane"),
-      clipPlaneRatio,
-    );
+    gl.uniform1f(this.uniformLocations["u_clipPlane"], clipPlaneRatio);
 
     // Flat color visual debug uniform
-    gl.uniform1i(
-      gl.getUniformLocation(this.program, "u_debugAABB"),
-      this.debugAABB ? 1 : 0,
-    );
+    gl.uniform1i(this.uniformLocations["u_debugAABB"], this.debugAABB ? 1 : 0);
 
     // Voxel step in normalized 3D texture space for finite differences gradient
     gl.uniform3f(
-      gl.getUniformLocation(this.program, "u_voxelStep"),
+      this.uniformLocations["u_voxelStep"],
       1.0 / Math.max(1, cols),
       1.0 / Math.max(1, rows),
       1.0 / Math.max(1, depth),
     );
 
     // Transfer function preset mode (0: W/L, 1: Bone, 2: Soft Tissue, 3: MIP)
-    gl.uniform1i(
-      gl.getUniformLocation(this.program, "u_presetMode"),
-      this.presetMode,
-    );
+    gl.uniform1i(this.uniformLocations["u_presetMode"], this.presetMode);
 
     // Diagnostic logging of uniforms and matrices before drawArrays
     console.log("[View3D] Render Frame Uniforms & Matrices:", {

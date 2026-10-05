@@ -426,6 +426,11 @@ test("View3DViewer.render passes u_flipY uniform and unscaled camera coordinates
   (viewer as any).program = {};
   (viewer as any).volumeTexture = {};
   (viewer as any).vao = {};
+  (viewer as any).uniformLocations = {
+    u_mvp: { name: "u_mvp" } as any,
+    u_cameraPos: { name: "u_cameraPos" } as any,
+    u_flipY: { name: "u_flipY" } as any,
+  };
   viewer.volume = {
     data: new Uint8Array(8),
     depth: 2,
@@ -524,4 +529,132 @@ test("View3DViewer: hitTestGizmoFace correctly identifies front-facing face clic
   // Far outside the cube should return null
   const miss = viewer.hitTestGizmoFace(5, 5, mockCanvas);
   assert.equal(miss, null);
+});
+
+test("View3DViewer.render releases old WebGL context with WEBGL_lose_context when canvas changes", () => {
+  const viewer = new View3DViewer();
+  let loseContextCalled = false;
+
+  const mockContext1: any = {
+    ...createMockWebGL2Context(),
+    getExtension: (name: string) => {
+      if (name === "WEBGL_lose_context") {
+        return {
+          loseContext: () => {
+            loseContextCalled = true;
+          },
+        };
+      }
+      return null;
+    },
+  };
+
+  const canvas1: any = {
+    width: 256,
+    height: 256,
+    clientWidth: 256,
+    clientHeight: 256,
+    getContext: () => mockContext1,
+  };
+  mockContext1.canvas = canvas1;
+
+  viewer.render(canvas1);
+  assert.equal(loseContextCalled, false);
+
+  const mockContext2: any = {
+    ...createMockWebGL2Context(),
+  };
+  const canvas2: any = {
+    width: 256,
+    height: 256,
+    clientWidth: 256,
+    clientHeight: 256,
+    getContext: () => mockContext2,
+  };
+  mockContext2.canvas = canvas2;
+
+  viewer.render(canvas2);
+  assert.equal(loseContextCalled, true);
+});
+
+test("View3DViewer.initGL caches uniform locations and render uses them without calling getUniformLocation", () => {
+  const viewer = new View3DViewer();
+  let getUniformCalls = 0;
+
+  const queriedLocations: string[] = [];
+  const mockGL: any = {
+    ...createMockWebGL2Context(),
+    getUniformLocation: (_prog: any, name: string) => {
+      getUniformCalls++;
+      queriedLocations.push(name);
+      return { name };
+    },
+  };
+
+  const canvas: any = {
+    width: 256,
+    height: 256,
+    clientWidth: 256,
+    clientHeight: 256,
+    getContext: () => mockGL,
+  };
+  mockGL.canvas = canvas;
+
+  viewer.initGL(canvas);
+
+  // During initGL, all 14 uniforms should be queried and cached
+  assert.ok(getUniformCalls >= 14);
+  assert.ok(queriedLocations.includes("u_mvp"));
+  assert.ok(queriedLocations.includes("u_volume"));
+  assert.ok(queriedLocations.includes("u_flipY"));
+  assert.ok(queriedLocations.includes("u_cameraPos"));
+  assert.ok(queriedLocations.includes("u_presetMode"));
+
+  const callsAfterInit = getUniformCalls;
+
+  // Set up volume so render proceeds past checks
+  viewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  viewer.render(canvas);
+
+  // During render, getUniformLocation should NOT be called again
+  assert.equal(getUniformCalls, callsAfterInit);
+});
+
+test("View3DViewer.buildVolume strictly types imageOrientationPatient as 6-tuple and handles malformed data", () => {
+  const viewer = new View3DViewer();
+  const validSlice: any = [
+    {
+      pixelData: new Int16Array(4),
+      metadata: {
+        rows: 2,
+        columns: 2,
+        imageOrientationPatient: [1, 0, 0, 0, 1, 0],
+      },
+    },
+  ];
+  const volValid = viewer.buildVolume(validSlice);
+  assert.deepEqual(volValid.imageOrientationPatient, [1, 0, 0, 0, 1, 0]);
+
+  const invalidSlice: any = [
+    {
+      pixelData: new Int16Array(4),
+      metadata: {
+        rows: 2,
+        columns: 2,
+        imageOrientationPatient: [1, 0],
+      },
+    },
+  ];
+  const volInvalid = viewer.buildVolume(invalidSlice);
+  assert.equal(volInvalid.imageOrientationPatient, undefined);
 });

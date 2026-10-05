@@ -1,7 +1,8 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-import { MPRGridCoordinator } from "./mpr-coordinator.js";
+import { MPRGridCoordinator, mprCoordinator } from "./mpr-coordinator.js";
+import { Matrix3, mprEngine } from "./mpr-engine.js";
 
 const dom = new JSDOM(
   `<!DOCTYPE html>
@@ -113,4 +114,116 @@ test("MPRGridCoordinator: onCrosshairChange notifies listeners and unsubscribes 
   unsubscribe();
   coordinator.setCrosshair(20, 20, 20);
   assert.equal(notified, 1); // Not called after unsubscribe
+});
+
+test("Matrix3: identity returns 3x3 identity matrix with det = 1 and isOrthonormal = true", () => {
+  const m = Matrix3.identity();
+  assert.equal(m.length, 9);
+  assert.equal(m[0], 1);
+  assert.equal(m[4], 1);
+  assert.equal(m[8], 1);
+  assert.equal(Matrix3.determinant(m), 1);
+  assert.equal(Matrix3.isOrthonormal(m), true);
+});
+
+test("Matrix3: fromRotationAxis generates orthonormal rotation matrices with det = 1 (no degeneration)", () => {
+  // Rotate 45 deg around Z axis
+  const rZ45 = Matrix3.fromRotationAxis([0, 0, 1], Math.PI / 4);
+  assert.ok(Math.abs(Matrix3.determinant(rZ45) - 1.0) < 1e-4, "det(R_z) = 1");
+  assert.equal(Matrix3.isOrthonormal(rZ45), true, "R_z is orthonormal");
+
+  // Rotate 37 deg around arbitrary normalized 3D diagonal vector [1, 2, 2] / 3
+  const axis: [number, number, number] = [1 / 3, 2 / 3, 2 / 3];
+  const rDiag = Matrix3.fromRotationAxis(axis, 0.645);
+  assert.ok(
+    Math.abs(Matrix3.determinant(rDiag) - 1.0) < 1e-4,
+    "det(R_diag) = 1",
+  );
+  assert.equal(Matrix3.isOrthonormal(rDiag), true, "R_diag is orthonormal");
+
+  // Verify vector length is preserved under rotation (isometry)
+  const v: [number, number, number] = [10, -5, 8];
+  const origLen = Math.hypot(...v);
+  const rotV = Matrix3.transformVector(rDiag, v);
+  const rotLen = Math.hypot(...rotV);
+  assert.ok(
+    Math.abs(rotLen - origLen) < 1e-4,
+    "Vector length strictly preserved",
+  );
+});
+
+test("MPRGridCoordinator: rotateAroundAxis and resetRotation synchronize cameras without mathematical degeneration", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  let rotationEvents = 0;
+  coordinator.onRotationChange((_r) => {
+    rotationEvents++;
+  });
+
+  // Apply 30 degree rotation around camera normal
+  coordinator.rotateAroundAxis([0, 0, 1], Math.PI / 6);
+  assert.equal(rotationEvents, 1);
+  assert.equal(Matrix3.isOrthonormal(coordinator.rotation), true);
+  assert.ok(Math.abs(Matrix3.determinant(coordinator.rotation) - 1.0) < 1e-4);
+
+  // Check that cameras in mprEngine are synchronized and retain orthonormal bases
+  const axCam = mprEngine.axialCamera;
+  const corCam = mprEngine.coronalCamera;
+  const sagCam = mprEngine.sagittalCamera;
+
+  const dot = (a: [number, number, number], b: [number, number, number]) =>
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const norm = (a: [number, number, number]) => Math.hypot(...a);
+
+  // Axial camera vectors must be unit length and mutually orthogonal
+  assert.ok(Math.abs(norm(axCam.uAxis) - 1.0) < 1e-4, "uAxis is unit length");
+  assert.ok(Math.abs(norm(axCam.vAxis) - 1.0) < 1e-4, "vAxis is unit length");
+  assert.ok(Math.abs(norm(axCam.normal) - 1.0) < 1e-4, "normal is unit length");
+  assert.ok(
+    Math.abs(dot(axCam.uAxis, axCam.vAxis)) < 1e-4,
+    "u and v are orthogonal",
+  );
+  assert.ok(
+    Math.abs(dot(axCam.uAxis, axCam.normal)) < 1e-4,
+    "u and n are orthogonal",
+  );
+  assert.ok(
+    Math.abs(dot(axCam.vAxis, axCam.normal)) < 1e-4,
+    "v and n are orthogonal",
+  );
+
+  // Reset rotation restores identity
+  coordinator.resetRotation();
+  assert.equal(rotationEvents, 2);
+  assert.equal(Matrix3.isOrthonormal(coordinator.rotation), true);
+  assert.deepEqual(coordinator.rotation, Matrix3.identity());
+});
+
+test("MPREngine: getCrosshairLineDirections calculates dynamic 2D oblique directions", () => {
+  // Test canonical orthogonal axes
+  mprEngine.resetRotation();
+  const dirs = mprEngine.getCrosshairLineDirections("axial");
+  assert.ok(dirs.line1.color.length > 0);
+  assert.ok(dirs.line2.color.length > 0);
+  assert.ok(
+    Math.abs(Math.hypot(dirs.line1.dirX, dirs.line1.dirY) - 1.0) < 1e-4,
+  );
+  assert.ok(
+    Math.abs(Math.hypot(dirs.line2.dirX, dirs.line2.dirY) - 1.0) < 1e-4,
+  );
+
+  // Apply oblique rotation: line directions adapt without division by zero
+  mprCoordinator.rotateAroundAxis([0, 1, 0], Math.PI / 4);
+  const obliqueDirs = mprEngine.getCrosshairLineDirections("axial");
+  assert.ok(
+    Math.abs(Math.hypot(obliqueDirs.line1.dirX, obliqueDirs.line1.dirY) - 1.0) <
+      1e-4,
+  );
+  assert.ok(
+    Math.abs(Math.hypot(obliqueDirs.line2.dirX, obliqueDirs.line2.dirY) - 1.0) <
+      1e-4,
+  );
+
+  mprCoordinator.resetRotation();
 });

@@ -457,3 +457,71 @@ test("View3DViewer.render passes u_flipY uniform and unscaled camera coordinates
   assert.ok(passedUniforms.cameraPos[1] > 0);
   assert.ok(passedUniforms.mvp);
 });
+
+test("View3DViewer: setPresetMode updates preset state and clamps bounds [0..3]", () => {
+  const viewer = new View3DViewer();
+  assert.equal(viewer.presetMode, 0);
+
+  viewer.setPresetMode(1); // Bone
+  assert.equal(viewer.presetMode, 1);
+
+  viewer.setPresetMode(2); // Soft tissue
+  assert.equal(viewer.presetMode, 2);
+
+  viewer.setPresetMode(3); // MIP
+  assert.equal(viewer.presetMode, 3);
+
+  viewer.setPresetMode(99); // Clamps to 3
+  assert.equal(viewer.presetMode, 3);
+
+  viewer.setPresetMode(-5); // Clamps to 0
+  assert.equal(viewer.presetMode, 0);
+});
+
+test("View3DViewer: getTargetAnglesForFace returns canonical clinical viewing angles", () => {
+  const viewer = new View3DViewer();
+
+  const anglesA = viewer.getTargetAnglesForFace("A");
+  assert.deepEqual(anglesA, { theta: 0, phi: 0 });
+
+  const anglesP = viewer.getTargetAnglesForFace("P");
+  assert.deepEqual(anglesP, { theta: 0, phi: Math.PI });
+
+  const anglesR = viewer.getTargetAnglesForFace("R");
+  assert.deepEqual(anglesR, { theta: 0, phi: Math.PI / 2 });
+
+  const anglesL = viewer.getTargetAnglesForFace("L");
+  assert.deepEqual(anglesL, { theta: 0, phi: -Math.PI / 2 });
+
+  const anglesS = viewer.getTargetAnglesForFace("S");
+  assert.ok(anglesS);
+  assert.ok(Math.abs(anglesS.theta - Math.PI / 2) < 0.01);
+  assert.equal(anglesS.phi, 0);
+
+  const anglesI = viewer.getTargetAnglesForFace("I");
+  assert.ok(anglesI);
+  assert.ok(Math.abs(anglesI.theta - -Math.PI / 2) < 0.01);
+  assert.equal(anglesI.phi, 0);
+
+  assert.equal(viewer.getTargetAnglesForFace("INVALID"), null);
+});
+
+test("View3DViewer: hitTestGizmoFace correctly identifies front-facing face clicked", () => {
+  const viewer = new View3DViewer();
+  // Camera facing Anterior (+Z): theta = 0, phi = 0
+  viewer.camera.theta = 0;
+  viewer.camera.phi = 0;
+
+  const mockCanvas: any = {
+    width: 200,
+    height: 200,
+  };
+
+  // Center of the canvas (100, 100) should hit Anterior face "A"
+  const hit = viewer.hitTestGizmoFace(100, 100, mockCanvas);
+  assert.equal(hit, "A");
+
+  // Far outside the cube should return null
+  const miss = viewer.hitTestGizmoFace(5, 5, mockCanvas);
+  assert.equal(miss, null);
+});

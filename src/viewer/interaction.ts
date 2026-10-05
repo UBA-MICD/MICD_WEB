@@ -35,6 +35,7 @@ import {
 } from "./loading.js";
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
+import { mprCoordinator } from "./mpr-coordinator.js";
 import { dicomCache } from "./cache.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
@@ -201,6 +202,8 @@ export function initToolbar(): void {
         }
       }
       if (state.is3DMode) view3DViewer.resetCamera();
+      mprCoordinator.resetRotation();
+      view3DViewer.setPresetMode(0);
       // Keep global state + the zoom slider aligned with the active viewport.
       state.viewport = { ...activeVp.data.viewport };
       updateZoomControlsUI();
@@ -466,11 +469,26 @@ function initWlControlsInteraction(): void {
         if (preset) {
           state.viewport.windowCenter = preset.windowCenter;
           state.viewport.windowWidth = preset.windowWidth;
+          if (key === "bone") {
+            view3DViewer.setPresetMode(1);
+          } else if (key === "soft") {
+            view3DViewer.setPresetMode(2);
+          } else {
+            view3DViewer.setPresetMode(0);
+          }
           render();
         }
       });
     }
   });
+
+  const btnMip = $("btn-preset-mip") || $("btn-view-3d-mip");
+  if (btnMip) {
+    btnMip.addEventListener("click", () => {
+      view3DViewer.setPresetMode(3);
+      render();
+    });
+  }
 }
 
 function initZoomControlsInteraction(): void {
@@ -1222,6 +1240,9 @@ export function initViewportInteraction(): void {
 
   let dragOriginViewportId: string | null = null;
   let activeMouseButton = 0;
+  let isRotatingMprCrosshair = false;
+  let mprRotationPlane: "axial" | "coronal" | "sagittal" = "axial";
+  let mprCrosshairScreenCenter: [number, number] = [0, 0];
 
   if (container) {
     container.addEventListener("contextmenu", (e: MouseEvent) => {
@@ -1281,7 +1302,30 @@ export function initViewportInteraction(): void {
         return;
       }
       const plane = activeVp?.plane || "axial";
+      const [cx, cy] = mprEngine.getCrosshairScreenCoords(plane, viewW, viewH);
+      const distToCenter = Math.hypot(clickX - cx, clickY - cy);
+
+      // Check if clicking on crosshair arm/handle to rotate oblique slice
+      if (distToCenter > 30) {
+        const { line1, line2 } = mprEngine.getCrosshairLineDirections(plane);
+        const distToLine1 = Math.abs(
+          (clickX - cx) * line1.dirY - (clickY - cy) * line1.dirX,
+        );
+        const distToLine2 = Math.abs(
+          (clickX - cx) * line2.dirY - (clickY - cy) * line2.dirX,
+        );
+        if (distToLine1 <= 18 || distToLine2 <= 18) {
+          isRotatingMprCrosshair = true;
+          mprRotationPlane = plane;
+          mprCrosshairScreenCenter = [cx, cy];
+          return;
+        }
+      }
+
+      isRotatingMprCrosshair = false;
       mprEngine.setCrosshairFromScreen(plane, clickX, clickY, viewW, viewH);
+      const [nx, ny, nz] = mprEngine.crosshairNormalized;
+      mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
       if (manager) {
         for (const vp of manager.getAllViewports()) {
           vp.render();
@@ -1910,6 +1954,35 @@ export function initViewportInteraction(): void {
             if (manager.isCombined3DViewport(crosshairOriginId)) {
               break;
             }
+
+            if (isRotatingMprCrosshair) {
+              const [cx, cy] = mprCrosshairScreenCenter;
+              const vpRect =
+                activeVp.canvasElement.getBoundingClientRect?.() ?? {
+                  left: 0,
+                  top: 0,
+                };
+              const prevRelX = state.lastMouseX - dx - vpRect.left - cx;
+              const prevRelY = state.lastMouseY - dy - vpRect.top - cy;
+              const currRelX = state.lastMouseX - vpRect.left - cx;
+              const currRelY = state.lastMouseY - vpRect.top - cy;
+
+              const anglePrev = Math.atan2(prevRelY, prevRelX);
+              const angleCurr = Math.atan2(currRelY, currRelX);
+              let dAngle = angleCurr - anglePrev;
+              if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+              if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+
+              if (Math.abs(dAngle) > 1e-4) {
+                const cam = mprEngine.getCamera(mprRotationPlane);
+                mprCoordinator.rotateAroundAxis(cam.normal, -dAngle);
+                for (const vp of manager.getAllViewports()) {
+                  vp.render();
+                }
+              }
+              break;
+            }
+
             manager.dispatchMprCrosshair(
               crosshairOriginId,
               dx,
@@ -1957,13 +2030,20 @@ export function initViewportInteraction(): void {
         case "crosshair":
         default:
           if (mprEngine.volume && state.isMprMode) {
-            mprEngine.applyCrosshairDelta2D(
-              "axial",
-              dx,
-              dy,
-              container.clientWidth || 300,
-              container.clientHeight || 300,
-            );
+            if (isRotatingMprCrosshair) {
+              const cam = mprEngine.getCamera(mprRotationPlane);
+              mprCoordinator.rotateAroundAxis(cam.normal, -dx * 0.01);
+            } else {
+              mprEngine.applyCrosshairDelta2D(
+                "axial",
+                dx,
+                dy,
+                container.clientWidth || 300,
+                container.clientHeight || 300,
+              );
+              const [nx, ny, nz] = mprEngine.crosshairNormalized;
+              mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
+            }
           }
           break;
       }
@@ -2174,6 +2254,7 @@ export function initViewportInteraction(): void {
     state.isDragging = false;
     activeMouseButton = 0;
     dragOriginViewportId = null;
+    isRotatingMprCrosshair = false;
   });
 
   container.addEventListener("dblclick", (e: MouseEvent) => {
@@ -2319,11 +2400,40 @@ function init3DControlsInteraction(): void {
     setView("sagittal"),
   );
   $("btn-view-sagittal")?.addEventListener("click", () => setView("sagittal"));
-  $("btn-mpr-sagittal")?.addEventListener("click", () => setView("sagittal"));
-
   $("btn-view-3d-3d")?.addEventListener("click", () => setView("3d"));
   $("btn-view-3d")?.addEventListener("click", () => setView("3d"));
   $("btn-mpr-3d")?.addEventListener("click", () => setView("3d"));
+
+  // Interactive Reference Cube (Gizmo) Hit-Testing & Smooth Alignment
+  const gizmoCanvases = [
+    $("view-3d-reference-cube"),
+    $("mpr-reference-cube"),
+  ].filter(Boolean) as HTMLCanvasElement[];
+
+  gizmoCanvases.forEach((gizmo) => {
+    gizmo.addEventListener("pointerdown", (e: PointerEvent) => {
+      e.stopPropagation();
+      const rect = gizmo.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const hitFace = view3DViewer.hitTestGizmoFace(clickX, clickY, gizmo);
+      if (hitFace) {
+        const targetAngles = view3DViewer.getTargetAnglesForFace(hitFace);
+        if (targetAngles) {
+          const main3DCanvas = (document.getElementById("view-3d-canvas") ||
+            document.getElementById(
+              "dicom-canvas",
+            )) as HTMLCanvasElement | null;
+          view3DViewer.animateCameraTo(
+            targetAngles.theta,
+            targetAngles.phi,
+            280,
+            main3DCanvas || undefined,
+          );
+        }
+      }
+    });
+  });
 }
 
 function updateOrientationButtonsUI(

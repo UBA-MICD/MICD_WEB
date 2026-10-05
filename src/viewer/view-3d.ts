@@ -184,6 +184,11 @@ export class View3DViewer {
   public windowCenter = 0;
   public windowWidth = 0;
   public debugAABB = false;
+  public presetMode = 0; // 0: Linear W/L, 1: Bone, 2: Soft Tissue, 3: MIP
+
+  public setPresetMode(mode: number): void {
+    this.presetMode = Math.max(0, Math.min(3, Math.round(mode)));
+  }
 
   public resetCamera(): void {
     this.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
@@ -463,7 +468,7 @@ void main() {
 }
 `;
 
-    // GLSL ES 3.00 Fragment Shader — Volume Ray Marching & Early Ray Termination
+    // GLSL ES 3.00 Fragment Shader — Volume Ray Marching, Phong Lighting & Presets
     const fsSource = `#version 300 es
 precision highp float;
 precision highp sampler3D;
@@ -482,6 +487,8 @@ uniform int u_activeView;      // 0: Axial, 1: Coronal, 2: Sagittal, 3: Full 3D 
 uniform float u_clipPlane;     // Clipping plane ratio [0..1]
 uniform int u_debugAABB;       // Debug flag: 1 = flat red debug color
 uniform bool u_flipY;          // IOP canonical flip Y flag
+uniform int u_presetMode;      // 0: Linear W/L, 1: Bone, 2: Soft Tissue, 3: MIP
+uniform vec3 u_voxelStep;      // 1.0 / volumeDimensions in texture space
 
 out vec4 fragColor;
 
@@ -506,6 +513,49 @@ vec3 getTexCoord(vec3 p) {
         tc.y = 1.0 - tc.y;
     }
     return tc;
+}
+
+// Finite differences gradient computation (6 neighbor samples)
+vec3 computeGradient(sampler3D vol, vec3 tc, vec3 step) {
+    float dx = texture(vol, tc + vec3(step.x, 0.0, 0.0)).r - texture(vol, tc - vec3(step.x, 0.0, 0.0)).r;
+    float dy = texture(vol, tc + vec3(0.0, step.y, 0.0)).r - texture(vol, tc - vec3(0.0, step.y, 0.0)).r;
+    float dz = texture(vol, tc + vec3(0.0, 0.0, step.z)).r - texture(vol, tc - vec3(0.0, 0.0, step.z)).r;
+    return vec3(dx, dy, dz) * 0.5;
+}
+
+// Blinn-Phong diffuse and specular shading based on density gradient
+vec3 applyLighting(vec3 baseCol, vec3 tc, vec3 rayDir) {
+    vec3 grad = computeGradient(u_volume, tc, u_voxelStep);
+    float gradLen = length(grad);
+    if (gradLen > 0.005) {
+        vec3 N = -normalize(grad);
+        vec3 L = normalize(-rayDir + vec3(0.2, 0.3, 0.1));
+        vec3 V = -rayDir;
+        vec3 H = normalize(L + V);
+        float diff = max(dot(N, L), 0.0);
+        float spec = pow(max(dot(N, H), 0.0), 32.0);
+        return baseCol * (0.35 + 0.65 * diff) + vec3(0.35) * spec;
+    }
+    return baseCol;
+}
+
+void samplePreset(float d, float minW, out vec3 col, out float alpha) {
+    if (u_presetMode == 1) {
+        // Preset 1: Bone (Dense structures: cortical/trabecular bone, teeth)
+        float t = clamp((d - 0.28) / 0.32, 0.0, 1.0);
+        col = mix(vec3(0.92, 0.85, 0.72), vec3(1.0, 0.98, 0.92), t);
+        alpha = t * t * 0.22;
+    } else if (u_presetMode == 2) {
+        // Preset 2: Soft Tissue (Organs, muscle, brain: ~ -50 to 150 HU)
+        float t = clamp((d - 0.21) / 0.14, 0.0, 1.0);
+        col = mix(vec3(0.82, 0.38, 0.32), vec3(0.96, 0.76, 0.65), t);
+        alpha = t * 0.12;
+    } else {
+        // Preset 0: Linear Window/Level
+        float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+        col = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
+        alpha = (val > 0.08) ? (val - 0.08) * 0.09 : 0.0;
+    }
 }
 
 void main() {
@@ -560,9 +610,57 @@ void main() {
         return;
     }
 
-    // ── Mode 3: 3D Triplanar Intersecting Orthogonal Planes + Volume Ray Marching ──
+    // ── Mode 3: 3D Volumetric Ray Marching & Presets ──
     vec4 accumColor = vec4(0.0);
 
+    // Preset 3: Maximum Intensity Projection (MIP)
+    if (u_presetMode == 3) {
+        const int MIP_STEPS = 120;
+        float stepSize = (tFar - tNear) / float(MIP_STEPS);
+        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
+        vec3 stepVec = rayDir * stepSize;
+        float maxVal = 0.0;
+        for (int i = 0; i < MIP_STEPS; i++) {
+            vec3 tc = getTexCoord(rayPos);
+            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+                float d = texture(u_volume, tc).r;
+                if (d > maxVal) maxVal = d;
+            }
+            rayPos += stepVec;
+        }
+        float intensity = clamp((maxVal - minW) / u_windowWidth, 0.0, 1.0);
+        fragColor = vec4(vec3(intensity), 1.0);
+        return;
+    }
+
+    // Preset 1 (Bone) or Preset 2 (Soft Tissue): Full Volume Ray Marching with Blinn-Phong
+    if (u_presetMode == 1 || u_presetMode == 2) {
+        const int VOL_STEPS = 100;
+        float stepSize = (tFar - tNear) / float(VOL_STEPS);
+        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
+        vec3 stepVec = rayDir * stepSize;
+        for (int i = 0; i < VOL_STEPS; i++) {
+            vec3 tc = getTexCoord(rayPos);
+            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+                float d = texture(u_volume, tc).r;
+                vec3 col;
+                float a;
+                samplePreset(d, minW, col, a);
+                if (a > 0.005) {
+                    vec3 litCol = applyLighting(col, tc, rayDir);
+                    accumColor.rgb += (1.0 - accumColor.a) * litCol * a;
+                    accumColor.a += (1.0 - accumColor.a) * a;
+                    if (accumColor.a >= 0.95) break;
+                }
+            }
+            rayPos += stepVec;
+        }
+        if (accumColor.a < 0.01) discard;
+        fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), min(accumColor.a, 1.0));
+        return;
+    }
+
+    // Preset 0 (Linear W/L): Triplanar Intersecting Orthogonal Planes + Volume Fallback
     // Analytical plane intersections for the 3 orthogonal planes
     float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
     float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
@@ -662,7 +760,8 @@ void main() {
                 if (val > 0.1) {
                     float a = (val - 0.1) * 0.08;
                     vec3 sampleColor = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
-                    accumColor.rgb += (1.0 - accumColor.a) * sampleColor * a;
+                    vec3 litColor = applyLighting(sampleColor, tc, rayDir);
+                    accumColor.rgb += (1.0 - accumColor.a) * litColor * a;
                     accumColor.a += (1.0 - accumColor.a) * a;
                     if (accumColor.a >= 0.95) break;
                 }
@@ -1221,6 +1320,20 @@ void main() {
       this.debugAABB ? 1 : 0,
     );
 
+    // Voxel step in normalized 3D texture space for finite differences gradient
+    gl.uniform3f(
+      gl.getUniformLocation(this.program, "u_voxelStep"),
+      1.0 / Math.max(1, cols),
+      1.0 / Math.max(1, rows),
+      1.0 / Math.max(1, depth),
+    );
+
+    // Transfer function preset mode (0: W/L, 1: Bone, 2: Soft Tissue, 3: MIP)
+    gl.uniform1i(
+      gl.getUniformLocation(this.program, "u_presetMode"),
+      this.presetMode,
+    );
+
     // Diagnostic logging of uniforms and matrices before drawArrays
     console.log("[View3D] Render Frame Uniforms & Matrices:", {
       u_windowCenter: normCenter,
@@ -1406,9 +1519,9 @@ void main() {
       }
     });
 
-    // Back edges (Faint lines)
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
-    ctx.lineWidth = 1;
+    // Back edges (WCAG 1.4.11 compliant contrast: >= 0.40 opacity)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+    ctx.lineWidth = 1.25;
     backEdges.forEach(([i, j]) => {
       ctx.beginPath();
       ctx.moveTo(projVertices[i].x, projVertices[i].y);
@@ -1428,9 +1541,9 @@ void main() {
     ctx.stroke();
     ctx.restore();
 
-    // Front edges (Crisp clinical white lines)
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-    ctx.lineWidth = 1.75;
+    // Front edges (Crisp clinical white lines >= 0.95 opacity)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.98)";
+    ctx.lineWidth = 2.0;
     frontEdges.forEach(([i, j]) => {
       ctx.beginPath();
       ctx.moveTo(projVertices[i].x, projVertices[i].y);
@@ -1448,10 +1561,10 @@ void main() {
       .sort((a, b) => b.avgZ - a.avgZ)
       .forEach((face) => {
         const cp = project(face.center[0], face.center[1], face.center[2]);
-        // Black outline for maximum clinical readability
+        // Black outline halo (WCAG 1.4.11) for maximum clinical readability
         if (typeof ctx.strokeText === "function") {
-          ctx.strokeStyle = "rgba(0, 0, 0, 0.95)";
-          ctx.lineWidth = 3;
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.98)";
+          ctx.lineWidth = 3.5;
           ctx.strokeText(face.label, cp.x, cp.y);
         }
 
@@ -1459,6 +1572,198 @@ void main() {
         ctx.fillStyle = face.color;
         ctx.fillText(face.label, cp.x, cp.y);
       });
+  }
+
+  /**
+   * Performs 2D polygon hit-testing on the front-facing faces of the reference cube.
+   * Returns face label ("A" | "P" | "R" | "L" | "S" | "I") or null.
+   */
+  public hitTestGizmoFace(
+    clickX: number,
+    clickY: number,
+    canvas: HTMLCanvasElement,
+  ): string | null {
+    if (!canvas) return null;
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const s = Math.min(w, h) * 0.28;
+
+    const cosT = Math.cos(this.camera.theta);
+    const sinT = Math.sin(this.camera.theta);
+    const cosP = Math.cos(this.camera.phi);
+    const sinP = Math.sin(this.camera.phi);
+
+    const project = (x: number, y: number, z: number) => {
+      const x1 = x * cosP + z * sinP;
+      const y1 = y;
+      const z1 = -x * sinP + z * cosP;
+
+      const x2 = x1;
+      const y2 = y1 * cosT - z1 * sinT;
+      const z2 = y1 * sinT + z1 * cosT;
+
+      return {
+        x: cx + x2,
+        y: cy - y2,
+        z: z2,
+      };
+    };
+
+    const rawVertices = [
+      [-s, -s, -s],
+      [s, -s, -s],
+      [s, s, -s],
+      [-s, s, -s],
+      [-s, -s, s],
+      [s, -s, s],
+      [s, s, s],
+      [-s, s, s],
+    ];
+    const projVertices = rawVertices.map((v) => project(v[0], v[1], v[2]));
+
+    const faces = [
+      { indices: [4, 5, 6, 7], label: "A" },
+      { indices: [1, 0, 3, 2], label: "P" },
+      { indices: [5, 1, 2, 6], label: "R" },
+      { indices: [0, 4, 7, 3], label: "L" },
+      { indices: [7, 6, 2, 3], label: "S" },
+      { indices: [0, 1, 5, 4], label: "I" },
+    ];
+
+    const isPointInQuad = (
+      px: number,
+      py: number,
+      pts: Array<{ x: number; y: number }>,
+    ) => {
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i].x,
+          yi = pts[i].y;
+        const xj = pts[j].x,
+          yj = pts[j].y;
+        const intersect =
+          yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    };
+
+    const frontFaces = faces
+      .map((face) => {
+        const p0 = projVertices[face.indices[0]];
+        const p1 = projVertices[face.indices[1]];
+        const p2 = projVertices[face.indices[2]];
+        const p3 = projVertices[face.indices[3]];
+        const avgZ = (p0.z + p1.z + p2.z + p3.z) / 4;
+        const cross =
+          (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+        return {
+          ...face,
+          avgZ,
+          isFront: cross < 0,
+          pts: [p0, p1, p2, p3],
+        };
+      })
+      .filter((f) => f.isFront)
+      .sort((a, b) => b.avgZ - a.avgZ);
+
+    for (const f of frontFaces) {
+      if (isPointInQuad(clickX, clickY, f.pts)) {
+        return f.label;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns canonical orbit angles { theta, phi } for a given anatomical face.
+   */
+  public getTargetAnglesForFace(
+    faceLabel: string,
+  ): { theta: number; phi: number } | null {
+    switch (faceLabel) {
+      case "A":
+        return { theta: 0, phi: 0 };
+      case "P":
+        return { theta: 0, phi: Math.PI };
+      case "R":
+        return { theta: 0, phi: Math.PI / 2 };
+      case "L":
+        return { theta: 0, phi: -Math.PI / 2 };
+      case "S":
+        return { theta: Math.PI / 2 - 0.001, phi: 0 };
+      case "I":
+        return { theta: -Math.PI / 2 + 0.001, phi: 0 };
+      default:
+        return null;
+    }
+  }
+
+  private cameraAnimFrameId: number | null = null;
+
+  /**
+   * Smoothly animates the orbital camera angles to the target orientation.
+   */
+  public animateCameraTo(
+    targetTheta: number,
+    targetPhi: number,
+    durationMs = 280,
+    renderCanvas?: HTMLCanvasElement,
+  ): void {
+    if (
+      this.cameraAnimFrameId !== null &&
+      typeof cancelAnimationFrame !== "undefined"
+    ) {
+      cancelAnimationFrame(this.cameraAnimFrameId);
+      this.cameraAnimFrameId = null;
+    }
+
+    const startTheta = this.camera.theta;
+    const startPhi = this.camera.phi;
+
+    // Shortest angular distance for yaw
+    let dPhi = targetPhi - startPhi;
+    dPhi = Math.atan2(Math.sin(dPhi), Math.cos(dPhi));
+    const finalPhi = startPhi + dPhi;
+
+    const startTime =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1.0, elapsed / durationMs);
+      const ease = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+
+      this.camera.theta = startTheta + (targetTheta - startTheta) * ease;
+      this.camera.phi = startPhi + (finalPhi - startPhi) * ease;
+
+      if (renderCanvas) {
+        this.render(renderCanvas);
+      }
+
+      if (progress < 1.0) {
+        if (typeof requestAnimationFrame !== "undefined") {
+          this.cameraAnimFrameId = requestAnimationFrame(step);
+        }
+      } else {
+        this.camera.theta = targetTheta;
+        this.camera.phi = targetPhi;
+        this.cameraAnimFrameId = null;
+        if (renderCanvas) {
+          this.render(renderCanvas);
+        }
+      }
+    };
+
+    if (typeof requestAnimationFrame !== "undefined") {
+      this.cameraAnimFrameId = requestAnimationFrame(step);
+    } else {
+      this.camera.theta = targetTheta;
+      this.camera.phi = targetPhi;
+      if (renderCanvas) this.render(renderCanvas);
+    }
   }
 
   /** Set axial slice index (Z dimension). */

@@ -3686,7 +3686,8 @@ body {
   bottom: 72px;
   left: 20px;
   z-index: 100;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   background: rgba(18, 18, 24, 0.75);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.12);

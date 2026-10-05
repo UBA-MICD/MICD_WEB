@@ -8,7 +8,7 @@
  *  - Maximization state and 1x1 toggle logic for multi-viewport quadrants.
  */
 
-import { mprEngine, type MPRPlane } from "./mpr-engine.js";
+import { Matrix3, mprEngine, type MPRPlane } from "./mpr-engine.js";
 import { view3DViewer } from "./view-3d.js";
 import { getViewportManager } from "./viewport-registry.js";
 
@@ -22,6 +22,7 @@ export type QuadrantType = "axial" | "sagittal" | "coronal" | "3d";
 
 export class MPRGridCoordinator {
   public crosshair: Crosshair3D = { x: 0, y: 0, z: 0 };
+  public rotation: Float32Array = Matrix3.identity();
   public dimensions: { cols: number; rows: number; depth: number } = {
     cols: 1,
     rows: 1,
@@ -29,6 +30,7 @@ export class MPRGridCoordinator {
   };
   public maximizedQuadrant: string | null = null;
   private listeners: Array<(c: Crosshair3D) => void> = [];
+  private rotationListeners: Array<(r: Float32Array) => void> = [];
 
   /**
    * Initializes the crosshair at the geometric center of the volume.
@@ -110,6 +112,56 @@ export class MPRGridCoordinator {
   }
 
   /**
+   * Sets the 3x3 rotation matrix for oblique slicing and synchronizes engines.
+   */
+  public setRotation(r: Float32Array): void {
+    this.rotation = new Float32Array(r);
+    mprEngine.setRotation(this.rotation);
+    this.syncEngines();
+    this.notifyRotationListeners();
+    this.notifyListeners();
+  }
+
+  /**
+   * Applies an incremental rotation around an arbitrary 3D axis vector.
+   */
+  public rotateAroundAxis(axis: [number, number, number], rad: number): void {
+    const rot = Matrix3.fromRotationAxis(axis, rad);
+    this.rotation = Matrix3.multiply(rot, this.rotation);
+    mprEngine.setRotation(this.rotation);
+    this.syncEngines();
+    this.notifyRotationListeners();
+    this.notifyListeners();
+  }
+
+  /**
+   * Resets rotation back to canonical Cartesian axes.
+   */
+  public resetRotation(): void {
+    this.rotation = Matrix3.identity();
+    mprEngine.resetRotation();
+    this.syncEngines();
+    this.notifyRotationListeners();
+    this.notifyListeners();
+  }
+
+  /**
+   * Subscribes to rotation changes.
+   */
+  public onRotationChange(cb: (r: Float32Array) => void): () => void {
+    this.rotationListeners.push(cb);
+    return () => {
+      this.rotationListeners = this.rotationListeners.filter((l) => l !== cb);
+    };
+  }
+
+  private notifyRotationListeners(): void {
+    for (const cb of this.rotationListeners) {
+      cb(this.rotation);
+    }
+  }
+
+  /**
    * Synchronizes crosshair coordinates to both MPREngine and View3DViewer instances.
    */
   public syncEngines(): void {
@@ -118,7 +170,8 @@ export class MPRGridCoordinator {
     const ny = dims.rows > 1 ? this.crosshair.y / (dims.rows - 1) : 0.5;
     const nz = dims.depth > 1 ? this.crosshair.z / (dims.depth - 1) : 0.5;
 
-    // Sync MPREngine slice cameras & normalized crosshair
+    // Sync MPREngine slice cameras, rotation & normalized crosshair
+    mprEngine.setRotation(this.rotation);
     if (mprEngine.volume) {
       mprEngine.crosshairNormalized = [nx, ny, nz];
       mprEngine.setSliceIndex("axial", this.crosshair.z);

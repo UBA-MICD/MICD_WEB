@@ -15,6 +15,13 @@ const DEFAULT_ANONYMIZER_URL = "http://127.0.0.1:8000";
 /** The service ignores the profile today but requires the field. */
 const PROFILE = "default";
 
+/**
+ * How long to wait on the local service before giving up. A hung anonymizer
+ * must fail the upload (fail closed) rather than leaving it pending forever,
+ * so every request carries an abort timeout.
+ */
+const TIMEOUT_MS = 30_000;
+
 /** The service could not be reached at all (not running, wrong URL). */
 export class AnonymizerUnavailableError extends Error {
   constructor(url: string, options?: { cause?: unknown }) {
@@ -59,7 +66,9 @@ export function anonymizerUrl(): string {
 /** True when the service answers its health check (`GET /`). */
 export async function isAnonymizerAvailable(): Promise<boolean> {
   try {
-    const res = await fetch(`${anonymizerUrl()}/`);
+    const res = await fetch(`${anonymizerUrl()}/`, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     return res.ok;
   } catch {
     return false;
@@ -77,8 +86,14 @@ export async function anonymizeWithLocalService(
 
   let res: Response;
   try {
-    res = await fetch(`${url}/anonymize/`, { method: "POST", body: form });
+    res = await fetch(`${url}/anonymize/`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
   } catch (err) {
+    // Network error or the abort timeout — either way the service did not
+    // give us anonymized bytes, so fail closed.
     throw new AnonymizerUnavailableError(url, { cause: err });
   }
   if (!res.ok) {

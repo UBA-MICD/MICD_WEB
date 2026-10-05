@@ -80,8 +80,25 @@ function installFakeXhr(): void {
 // A minimal fetch stub so auth.ts's real logout()/refreshAccessToken() never
 // hit the network. Individual tests overwrite this when they need /auth/refresh
 // to behave a specific way.
+// Stand-in for the local anonymization service (upload/local-anonymizer.ts)
+// on 127.0.0.1:8000: healthy, and /anonymize/ answers with `anonymizerReply`
+// (default: the received bytes, unchanged). Every other URL gets an empty 200.
+// Each file it receives is recorded in `anonymizerCalls`.
+const ANONYMIZER = "http://127.0.0.1:8000";
+let anonymizerCalls: File[] = [];
+let anonymizerReply: (file: File) => Promise<Response> = async (file) =>
+  new Response(await file.arrayBuffer(), { status: 200 });
+
 function stubFetchOk(): void {
-  (globalThis as any).fetch = async () => new Response(null, { status: 200 });
+  (globalThis as any).fetch = async (input: string, init?: RequestInit) => {
+    const url = String(input);
+    if (url === `${ANONYMIZER}/anonymize/`) {
+      const file = (init?.body as FormData).get("file") as File;
+      anonymizerCalls.push(file);
+      return anonymizerReply(file);
+    }
+    return new Response(null, { status: 200 });
+  };
 }
 
 const testUser: AuthUser = {
@@ -92,6 +109,9 @@ const testUser: AuthUser = {
 
 beforeEach(async () => {
   installFakeXhr();
+  anonymizerCalls = [];
+  anonymizerReply = async (file) =>
+    new Response(await file.arrayBuffer(), { status: 200 });
   stubFetchOk();
   await logout(); // reset auth.ts's module-level session between tests
 });
@@ -308,12 +328,9 @@ test("cancelUpload is a no-op when nothing is uploading", () => {
   assert.doesNotThrow(() => cancelUpload());
 });
 
-test("startExplorerUpload anonymizes the file bytes before sending them", async () => {
-  (globalThis as any).dicomParser = {
-    parseDicom: () => ({
-      elements: { x00100010: { dataOffset: 0, length: 2 } },
-    }),
-  };
+test("startExplorerUpload sends the raw file only to the local anonymizer, and uploads its output", async () => {
+  anonymizerReply = async () =>
+    new Response(new Uint8Array([0x20, 0x20, 0x42]), { status: 200 });
 
   setBody(`<div id="toast-container"></div>`);
   await signIn();
@@ -326,21 +343,28 @@ test("startExplorerUpload anonymizes the file bytes before sending them", async 
     await new Promise((r) => setTimeout(r, 0));
   }
 
+  assert.equal(anonymizerCalls.length, 1);
+  assert.deepEqual(
+    Array.from(new Uint8Array(await anonymizerCalls[0]!.arrayBuffer())),
+    [0xff, 0xff, 0x42],
+    "the anonymizer gets the original file",
+  );
   const sentFile = FakeXHR.latest().sentBody?.get("file") as File;
   const sentBytes = new Uint8Array(await sentFile.arrayBuffer());
-  assert.equal(sentBytes[0], 0x20, "PatientName bytes must be scrubbed");
-  assert.equal(sentBytes[1], 0x20);
-  assert.equal(sentBytes[2], 0x42, "non-PII bytes must be untouched");
+  assert.deepEqual(
+    Array.from(sentBytes),
+    [0x20, 0x20, 0x42],
+    "the backend gets the anonymizer's output",
+  );
+  assert.equal(sentFile.name, "phi.dcm");
 
-  delete (globalThis as any).dicomParser;
   FakeXHR.latest().respond(201, "{}");
   await done;
 });
 
 test("startExplorerUpload uses window.api.anonymizeDicom (desktop) when present", async () => {
-  // Desktop seam: the Electron main process anonymizes via Python. Here we stub
-  // it to return sentinel bytes and assert THOSE, not the JS-scrubbed original,
-  // are what gets sent — i.e. the browser JS fallback was bypassed.
+  // Desktop seam: stubbed to return sentinel bytes; assert THOSE are what gets
+  // sent and the local service was bypassed.
   (window as any).api = {
     anonymizeDicom: async () => new Uint8Array([0xde, 0xad]).buffer,
   };
@@ -359,10 +383,81 @@ test("startExplorerUpload uses window.api.anonymizeDicom (desktop) when present"
   const sentFile = FakeXHR.latest().sentBody?.get("file") as File;
   const sentBytes = new Uint8Array(await sentFile.arrayBuffer());
   assert.deepEqual(Array.from(sentBytes), [0xde, 0xad], "desktop seam output");
+  assert.equal(anonymizerCalls.length, 0);
 
   delete (window as any).api;
   FakeXHR.latest().respond(201, "{}");
   await done;
+});
+
+test("startExplorerUpload fails closed: a file the anonymizer rejects is never sent", async () => {
+  anonymizerReply = async () =>
+    new Response(JSON.stringify({ detail: "El archivo no es un DICOM válido." }), {
+      status: 400,
+    });
+  setBody(`<div id="toast-container"></div>`);
+  await signIn();
+  const statusEl = document.createElement("div");
+  document.body.appendChild(statusEl);
+
+  await startExplorerUpload([dcmFile("raw.dcm")], statusEl);
+
+  assert.equal(FakeXHR.instances.length, 0, "no request may carry the raw file");
+  const toasts = document.getElementById("toast-container")!.textContent ?? "";
+  assert.match(toasts, /raw\.dcm/);
+});
+
+test("startExplorerUpload refuses the whole batch when the local anonymizer is down", async () => {
+  (globalThis as any).fetch = async (input: string) => {
+    if (String(input).startsWith(ANONYMIZER)) throw new TypeError("Failed to fetch");
+    return new Response(null, { status: 200 });
+  };
+  setBody(`<div id="toast-container"></div>`);
+  await signIn();
+  const statusEl = document.createElement("div");
+  document.body.appendChild(statusEl);
+
+  await startExplorerUpload([dcmFile("a.dcm"), dcmFile("b.dcm")], statusEl);
+
+  assert.equal(FakeXHR.instances.length, 0, "nothing may be sent");
+  const toasts = document.getElementById("toast-container")!.textContent ?? "";
+  assert.match(toasts, /127\.0\.0\.1:8000/);
+  assert.equal(isUploading(), false);
+});
+
+test("startExplorerUpload fails closed when the anonymizer goes away mid-batch", async () => {
+  anonymizerReply = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  setBody(`<div id="toast-container"></div>`);
+  await signIn();
+  const statusEl = document.createElement("div");
+  document.body.appendChild(statusEl);
+
+  await startExplorerUpload([dcmFile("raw.dcm")], statusEl);
+
+  assert.equal(FakeXHR.instances.length, 0);
+  const toasts = document.getElementById("toast-container")!.textContent ?? "";
+  assert.match(toasts, /127\.0\.0\.1:8000/);
+});
+
+test("startExplorerUpload fails closed when the desktop anonymizer rejects", async () => {
+  (window as any).api = {
+    anonymizeDicom: async () => {
+      throw new Error("python crashed");
+    },
+  };
+  setBody(`<div id="toast-container"></div>`);
+  await signIn();
+  const statusEl = document.createElement("div");
+  document.body.appendChild(statusEl);
+
+  try {
+    await startExplorerUpload([dcmFile("raw.dcm")], statusEl);
+    assert.equal(FakeXHR.instances.length, 0);
+  } finally {
+    delete (window as any).api;
+  }
 });
 
 test("onUploadComplete is not fired by startExplorerUpload (row-based summaries only)", async () => {
@@ -464,6 +559,29 @@ test("initUploadPanel: file input change uploads via rows and reaches 100%", asy
     (document.getElementById("btn-upload-finish") as HTMLButtonElement)
       .disabled,
     false,
+  );
+});
+
+test("initUploadPanel: a file that can't be anonymized fails its row and is never sent", async () => {
+  anonymizerReply = async () => new Response("bad", { status: 400 });
+  uploadPanelFixture();
+  await signIn();
+  initUploadPanel();
+
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  setInputFiles(input, [dcmFile("raw.dcm")]);
+  input.dispatchEvent(new Event("change"));
+
+  const row = () => document.querySelector(".upload-row") as HTMLElement | null;
+  for (let i = 0; i < 10 && !row()?.classList.contains("upload-row--error"); i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  assert.equal(FakeXHR.instances.length, 0, "no request may carry the raw file");
+  assert.equal(row()!.classList.contains("upload-row--error"), true);
+  assert.equal(
+    row()!.querySelector(".upload-row__pct")!.textContent,
+    "No anonimizado: no enviado",
   );
 });
 

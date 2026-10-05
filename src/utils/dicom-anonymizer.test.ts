@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { anonymizeDicomBuffer, PII_TAGS } from "./dicom-anonymizer.ts";
+import {
+  anonymizeDicomBuffer,
+  DicomAnonymizationError,
+  PII_TAGS,
+} from "./dicom-anonymizer.ts";
 
 test("anonymizeDicomBuffer scrubs PII tag byte ranges using a custom parser", () => {
   const buffer = new Uint8Array(16).fill(0xff).buffer;
@@ -38,21 +42,21 @@ test("anonymizeDicomBuffer honors a custom replacementByte and tagsToScrub list"
   assert.deepEqual(Array.from(result.slice(0, 2)), [0x00, 0x00]);
 });
 
-test("anonymizeDicomBuffer returns the buffer unchanged when the dataset has no elements", () => {
+test("anonymizeDicomBuffer fails closed when the dataset has no elements", () => {
   const buffer = new Uint8Array([1, 2, 3]).buffer;
   const parser = { parseDicom: () => ({}) };
-  const result = new Uint8Array(
-    anonymizeDicomBuffer(buffer, { customParser: parser }),
+  assert.throws(
+    () => anonymizeDicomBuffer(buffer, { customParser: parser }),
+    DicomAnonymizationError,
   );
-  assert.deepEqual(Array.from(result), [1, 2, 3]);
 });
 
-test("anonymizeDicomBuffer returns the buffer unchanged when parseDicom is missing", () => {
+test("anonymizeDicomBuffer fails closed when parseDicom is missing", () => {
   const buffer = new Uint8Array([1, 2, 3]).buffer;
-  const result = new Uint8Array(
-    anonymizeDicomBuffer(buffer, { customParser: {} }),
+  assert.throws(
+    () => anonymizeDicomBuffer(buffer, { customParser: {} }),
+    DicomAnonymizationError,
   );
-  assert.deepEqual(Array.from(result), [1, 2, 3]);
 });
 
 test("anonymizeDicomBuffer skips elements with out-of-range or missing offsets", () => {
@@ -76,17 +80,19 @@ test("anonymizeDicomBuffer skips elements with out-of-range or missing offsets",
   assert.deepEqual(Array.from(result), [0xff, 0xff, 0xff, 0xff]);
 });
 
-test("anonymizeDicomBuffer catches a throwing parser and returns the buffer unchanged", () => {
+test("anonymizeDicomBuffer fails closed on a throwing parser, keeping the cause", () => {
   const buffer = new Uint8Array([9, 9]).buffer;
+  const cause = new Error("malformed DICOM");
   const parser = {
     parseDicom: () => {
-      throw new Error("malformed DICOM");
+      throw cause;
     },
   };
-  const result = new Uint8Array(
-    anonymizeDicomBuffer(buffer, { customParser: parser }),
+  assert.throws(
+    () => anonymizeDicomBuffer(buffer, { customParser: parser }),
+    (err: unknown) =>
+      err instanceof DicomAnonymizationError && err.cause === cause,
   );
-  assert.deepEqual(Array.from(result), [9, 9]);
 });
 
 test("defaults to the full PII_TAGS list when tagsToScrub is omitted", () => {
@@ -109,18 +115,17 @@ test("defaults to the full PII_TAGS list when tagsToScrub is omitted", () => {
   assert.deepEqual(seenTags, PII_TAGS);
 });
 
-test("getParserInstance falls back to window.dicomParser, then globalThis.dicomParser, then null", () => {
+test("getParserInstance falls back to window.dicomParser, then globalThis.dicomParser, then throws", () => {
   const originalWindow = (globalThis as any).window;
   const originalGlobalParser = (globalThis as any).dicomParser;
 
   try {
     delete (globalThis as any).window;
     delete (globalThis as any).dicomParser;
-    // No parser available anywhere and no customParser passed: falls through
-    // to the built-in `undefined`/null path and returns the buffer as-is.
+    // No parser available anywhere and no customParser passed: fails closed
+    // rather than handing the un-scrubbed buffer back.
     const buffer = new Uint8Array([7]).buffer;
-    const result = new Uint8Array(anonymizeDicomBuffer(buffer));
-    assert.deepEqual(Array.from(result), [7]);
+    assert.throws(() => anonymizeDicomBuffer(buffer), DicomAnonymizationError);
 
     // globalThis.dicomParser fallback
     (globalThis as any).dicomParser = {

@@ -1,5 +1,5 @@
 /* cspell:disable */
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   generateDescriptiveFilename,
@@ -11,6 +11,12 @@ import {
   type StudyExportMetadata,
 } from "./export-service.ts";
 import { anonymizeDicomBuffer, PII_TAGS } from "../utils/dicom-anonymizer.ts";
+
+// anonymizeDicomBuffer fails closed without a parser; the export tests feed
+// it placeholder bytes, so give them a parser that finds no PII to scrub.
+beforeEach(() => {
+  (globalThis as any).dicomParser = { parseDicom: () => ({ elements: {} }) };
+});
 import { state } from "../viewer/state.ts";
 import { dicomCache } from "../viewer/cache.ts";
 
@@ -294,21 +300,17 @@ test("anonymizeDicomBuffer replaces PII offsets with spaces (0x20)", () => {
   assert.equal(originalUint8[dataOffset], nameBytes[0]);
 });
 
-test("anonymizeDicomBuffer handles missing parser or corrupt buffer gracefully", () => {
-  const buffer = new Uint8Array([1, 2, 3, 4, 5]).buffer;
-  const result = anonymizeDicomBuffer(buffer, { customParser: null });
-  assert.equal(result.byteLength, 5);
-});
-
-test("anonymizeDicomBuffer handles corrupt buffer throwing in parser", () => {
+test("anonymizeDicomBuffer refuses (throws) on a corrupt buffer instead of exporting it raw", () => {
   const mockParser = {
     parseDicom: () => {
       throw new Error("Invalid DICOM header");
     },
   };
   const input = new Uint8Array([1, 2, 3, 4]).buffer;
-  const result = anonymizeDicomBuffer(input, { customParser: mockParser });
-  assert.equal(result.byteLength, 4);
+  assert.throws(
+    () => anonymizeDicomBuffer(input, { customParser: mockParser }),
+    /Failed to parse DICOM/,
+  );
 });
 
 test("anonymizeDicomBuffer handles out-of-bounds dataOffset or invalid element lengths", () => {

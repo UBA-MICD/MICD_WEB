@@ -6,7 +6,7 @@
 // La geometría vive en el backend (`POST /api/v1/ml/segmentation`). Este
 // módulo sólo la pide y decodifica la máscara RLE.
 
-import { authFetch, API_BASE } from "../../auth/auth.js";
+import { authFetch, API_BASE, isAuthenticated } from "../../auth/auth.js";
 import { t } from "../../i18n/i18n.js";
 
 export interface Point2D {
@@ -256,6 +256,10 @@ export async function getSegmentationForInstance(
  * (`classification.<key>`). Devuelve [] para invitado o ante un error.
  */
 export async function getPathologies(): Promise<{ id: number; key: string }[]> {
+  // A guest must not go through authFetch: its 401 would open the login prompt,
+  // which takes over whatever screen is showing (the invite / reset screens
+  // included) just because the viewer pre-loaded an optional catalog.
+  if (!isAuthenticated()) return [];
   try {
     const res = await authFetch(`${API_BASE}/v1/pathologies`);
     if (!res.ok) return [];

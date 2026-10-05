@@ -16,10 +16,13 @@
          what Electron's file:// CSP requires.
          worker-src blob: is required for fflate's off-thread ZIP decompression;
          without an explicit worker-src it falls back to script-src which doesn't
-         allow blob:, causing the worker creation to be blocked. -->
+         allow blob:, causing the worker creation to be blocked.
+         connect-src adds the local anonymization service (US-16,
+         upload/local-anonymizer.ts): raw DICOMs go only to loopback. -->
+
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000"
     />
     <script type="importmap">
       {
@@ -2479,6 +2482,16 @@
           >
             Ingresar
           </button>
+          <!-- Forgotten password: request a code by email, then enter it with a new
+               password in a modal (same reason as the invite one below). -->
+          <button
+            type="button"
+            class="auth-card__invite-link"
+            data-forgot-open
+            data-i18n="auth.forgotPassword"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
           <!-- Invited users activate here: no working email link is needed on
                desktop (Electron loads from file://), so the code is entered by
                hand in a modal. -->
@@ -3029,6 +3042,54 @@
         </div>
       </div>
     </section>
+    <!-- Public reset-password screen, entered from ?reset=<code>. -->
+    <section
+      id="reset-screen"
+      class="screen server-screen hidden"
+      aria-labelledby="reset-heading"
+    >
+      <div class="server-auth">
+        <div class="auth-card">
+          <h2
+            class="auth-card__title"
+            id="reset-heading"
+            data-screen-heading
+            tabindex="-1"
+            data-i18n="reset.title"
+          >
+            Restablecer contraseña
+          </h2>
+          <p class="auth-card__msg" data-reset-email></p>
+
+          <form data-reset-form class="hidden">
+            <label class="auth-field">
+              <span data-i18n="reset.newPassword">Nueva contraseña</span>
+              <input
+                type="password"
+                data-reset-password
+                autocomplete="new-password"
+              />
+            </label>
+            <p class="form-error hidden" data-reset-error role="alert"></p>
+            <button
+              class="btn btn--accent"
+              type="submit"
+              data-reset-submit
+              data-i18n="reset.submit"
+            >
+              Cambiar contraseña e ingresar
+            </button>
+          </form>
+
+          <p
+            class="form-error hidden"
+            data-reset-invalid
+            role="alert"
+            data-i18n="reset.invalid"
+          ></p>
+        </div>
+      </div>
+    </section>
 
     <!-- Announced once when the session is nearly over. Separate from the
          visible countdown, which updates every second and must not be live. -->
@@ -3307,6 +3368,128 @@
           </button>
         </div>
       </form>
+    </div>
+
+    <!-- "Forgot your password?" dialog: step 1 requests a code, step 2 redeems it. -->
+    <div id="forgot-dialog" class="dialog-overlay hidden">
+      <div
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="forgot-dialog-title"
+      >
+        <h3
+          class="dialog__title"
+          id="forgot-dialog-title"
+          data-i18n="reset.dialog.title"
+        >
+          Recuperar contraseña
+        </h3>
+
+        <form data-forgot-request-form novalidate>
+          <p class="dialog__msg" data-i18n="reset.dialog.requestMsg">
+            Ingresá el email de tu cuenta y te enviaremos un código para elegir
+            una contraseña nueva.
+          </p>
+          <label class="login-field">
+            <span data-i18n="auth.emailLabel">Email</span>
+            <input
+              type="email"
+              data-forgot-email
+              data-dialog-autofocus
+              required
+              autocomplete="username"
+            />
+          </label>
+          <p
+            class="login-error hidden"
+            data-forgot-request-error
+            role="alert"
+          ></p>
+          <div class="dialog__actions">
+            <button
+              class="btn btn--accent"
+              type="submit"
+              data-forgot-request-submit
+              data-i18n="reset.dialog.sendCode"
+            >
+              Enviar código
+            </button>
+            <button
+              class="btn btn--secondary"
+              type="button"
+              data-forgot-cancel
+              data-i18n="common.cancel"
+            >
+              Cancelar
+            </button>
+          </div>
+          <button
+            type="button"
+            class="auth-card__invite-link"
+            data-forgot-have-code
+            data-i18n="reset.dialog.haveCode"
+          >
+            Ya tengo un código
+          </button>
+        </form>
+
+        <form data-forgot-reset-form class="hidden" novalidate>
+          <p class="dialog__msg" data-forgot-sent role="status"></p>
+          <label class="login-field">
+            <span data-i18n="reset.dialog.codeLabel"
+              >Código de recuperación</span
+            >
+            <input
+              type="text"
+              data-forgot-code
+              required
+              autocomplete="one-time-code"
+              spellcheck="false"
+            />
+          </label>
+          <label class="login-field">
+            <span data-i18n="reset.newPassword">Nueva contraseña</span>
+            <input
+              type="password"
+              data-forgot-password
+              required
+              autocomplete="new-password"
+            />
+          </label>
+          <p
+            class="login-error hidden"
+            data-forgot-reset-error
+            role="alert"
+          ></p>
+          <div class="dialog__actions">
+            <button
+              class="btn btn--accent"
+              type="submit"
+              data-forgot-reset-submit
+              data-i18n="reset.submit"
+            >
+              Cambiar contraseña e ingresar
+            </button>
+            <button
+              class="btn btn--secondary"
+              type="button"
+              data-forgot-cancel
+              data-i18n="common.cancel"
+            >
+              Cancelar
+            </button>
+          </div>
+          <button
+            type="button"
+            class="auth-card__invite-link"
+            data-forgot-back
+            data-i18n="reset.dialog.back"
+          >
+            Pedir un código nuevo
+          </button>
+        </form>
+      </div>
     </div>
 
     <!-- Validation confirmation dialog (US-26) -->

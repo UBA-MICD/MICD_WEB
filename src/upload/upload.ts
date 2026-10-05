@@ -520,6 +520,11 @@ async function uploadOne(
         setRowProgress(row, 100);
         setRowState(row, "ok");
         rememberUploadedStudy(xhr.responseText);
+        // TK-11: stored, but the backend's PHI check may have flagged it for
+        // review (warn mode, or a burned-in-annotation warning). Tell the user,
+        // without blocking — the tag keywords are PHI-free.
+        const tags = reviewTagNames(xhr.responseText);
+        if (tags) showToast(t("upload.needsReview", { tags }), "warning");
         resolve("ok");
         return;
       }
@@ -570,6 +575,16 @@ async function uploadOne(
       setRowState(row, "error");
       if (xhr.status === 413) {
         showUploadStatus(t("upload.fileTooLarge"), "error");
+      } else if (xhr.status === 422 && isNotAnonymized(xhr.responseText)) {
+        // TK-11 strict mode: the backend refused to store a study that still
+        // carries identifying tags, and tells us which (names only).
+        row.pct.textContent = t("upload.stateNotAnonymized");
+        showUploadStatus(
+          t("upload.notAnonymized", {
+            tags: reviewTagNames(xhr.responseText) || "—",
+          }),
+          "error",
+        );
       } else {
         showUploadStatus(
           safeMessage(xhr.responseText) || t("upload.genericError"),
@@ -603,6 +618,34 @@ function safeMessage(responseText: string): string {
   try {
     const body = JSON.parse(responseText);
     return body?.message ?? body?.error ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** True when a 422 body is the backend's "still has PHI" rejection (TK-11). */
+function isNotAnonymized(responseText: string): boolean {
+  try {
+    return JSON.parse(responseText)?.error === "not_anonymized";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The PHI-check finding keywords from an upload response — the 422 rejection
+ * (`tags`) or the 201 review notice (`verification.findings`). Returns the
+ * distinct tag names joined for display, or "" if there are none. These are
+ * DICOM keywords, never the offending values.
+ */
+function reviewTagNames(responseText: string): string {
+  try {
+    const body = JSON.parse(responseText);
+    const list = body?.tags ?? body?.verification?.findings ?? [];
+    const names = Array.isArray(list)
+      ? list.map((f: { name?: string }) => f?.name).filter(Boolean)
+      : [];
+    return [...new Set(names)].join(", ");
   } catch {
     return "";
   }

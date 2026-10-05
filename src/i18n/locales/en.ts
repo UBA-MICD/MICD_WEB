@@ -28,6 +28,7 @@ export const en: Record<string, string> = {
   "auth.hidePassword": "Hide password",
   "auth.submitLogin": "Sign in",
   "auth.wereYouInvited": "Were you invited? Activate your account",
+  "auth.forgotPassword": "Forgot your password?",
   "auth.loginRequiredMsg":
     "A session is required to search or upload studies on the server. Local viewing doesn't need one.",
   "auth.sessionActive": "Active session",
@@ -577,6 +578,26 @@ export const en: Record<string, string> = {
   "invite.dialog.emailMismatch":
     "That code doesn't match that email. Check both.",
 
+  // ── Password recovery ───────────────────────────────────────────────────────
+  "reset.title": "Reset password",
+  "reset.forEmail": "Choose a new password for {{email}}.",
+  "reset.newPassword": "New password",
+  "reset.submit": "Change password and sign in",
+  "reset.invalid": "This reset code is invalid or has expired.",
+  "reset.error.tooMany": "Too many attempts. Try again in a few minutes.",
+  "reset.dialog.title": "Recover password",
+  "reset.dialog.requestMsg":
+    "Enter your account email and we'll send you a code to choose a new password.",
+  "reset.dialog.sendCode": "Send code",
+  "reset.dialog.haveCode": "I already have a code",
+  "reset.dialog.haveCodeMsg":
+    "Enter the code you received by email and choose a new password.",
+  "reset.dialog.sent":
+    "If there is an active account for {{email}}, we sent it a code. It expires in 1 hour.",
+  "reset.dialog.codeLabel": "Reset code",
+  "reset.dialog.back": "Request a new code",
+  "reset.dialog.missingEmail": "Enter your email.",
+  "reset.dialog.missingCode": "Enter the code you received.",
   // ── System panel (admin) ────────────────────────────────────────────────────
   "system.tab": "System",
   "system.orthancStorage": "Orthanc Storage",

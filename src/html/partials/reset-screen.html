@@ -1,0 +1,48 @@
+<!-- Public reset-password screen, entered from ?reset=<code>. -->
+<section
+  id="reset-screen"
+  class="screen server-screen hidden"
+  aria-labelledby="reset-heading"
+>
+  <div class="server-auth">
+    <div class="auth-card">
+      <h2
+        class="auth-card__title"
+        id="reset-heading"
+        data-screen-heading
+        tabindex="-1"
+        data-i18n="reset.title"
+      >
+        Restablecer contraseña
+      </h2>
+      <p class="auth-card__msg" data-reset-email></p>
+
+      <form data-reset-form class="hidden">
+        <label class="auth-field">
+          <span data-i18n="reset.newPassword">Nueva contraseña</span>
+          <input
+            type="password"
+            data-reset-password
+            autocomplete="new-password"
+          />
+        </label>
+        <p class="form-error hidden" data-reset-error role="alert"></p>
+        <button
+          class="btn btn--accent"
+          type="submit"
+          data-reset-submit
+          data-i18n="reset.submit"
+        >
+          Cambiar contraseña e ingresar
+        </button>
+      </form>
+
+      <p
+        class="form-error hidden"
+        data-reset-invalid
+        role="alert"
+        data-i18n="reset.invalid"
+      ></p>
+    </div>
+  </div>
+</section>

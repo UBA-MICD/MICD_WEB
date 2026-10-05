@@ -1242,12 +1242,12 @@ void main() {
     let wwHU = this.windowWidth > 0 ? this.windowWidth : 0;
 
     if (wwHU <= 0 || isNaN(wwHU)) {
-      if (this.volume && this.volume.windowWidth > 0) {
-        wcHU = this.volume.windowCenter;
-        wwHU = this.volume.windowWidth;
-      } else if (state.viewport && state.viewport.windowWidth > 0) {
+      if (state.viewport && state.viewport.windowWidth > 0) {
         wcHU = state.viewport.windowCenter;
         wwHU = state.viewport.windowWidth;
+      } else if (this.volume && this.volume.windowWidth > 0) {
+        wcHU = this.volume.windowCenter;
+        wwHU = this.volume.windowWidth;
       } else {
         wcHU = 40;
         wwHU = 400;

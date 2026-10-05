@@ -462,25 +462,66 @@ test("initToolbar: export png/zip buttons close the dialog without throwing", ()
   );
 });
 
-test("initToolbar: wl slider input adjusts window width/center and renders", () => {
+test("initToolbar: wl slider input adjusts window width/center, updates engines, and reflects in UI", () => {
   initToolbar();
   const sliderWW = document.getElementById("slider-ww") as HTMLInputElement;
   sliderWW.value = "500";
   sliderWW.dispatchEvent(new Event("input"));
   assert.equal(state.viewport.windowWidth, 500);
+  assert.equal(mprEngine.windowWidth, 500);
+  assert.equal(view3DViewer.windowWidth, 500);
+  assert.equal(document.getElementById("val-ww")?.textContent, "500");
 
   const sliderWL = document.getElementById("slider-wl") as HTMLInputElement;
   sliderWL.value = "50";
   sliderWL.dispatchEvent(new Event("input"));
   assert.equal(state.viewport.windowCenter, 50);
+  assert.equal(mprEngine.windowCenter, 50);
+  assert.equal(view3DViewer.windowCenter, 50);
+  assert.equal(document.getElementById("val-wl")?.textContent, "50");
 });
 
-test("initToolbar: preset buttons apply their window/level values", () => {
+test("initToolbar: preset buttons apply their window/level values across engines and UI", () => {
   initToolbar();
-  document
-    .getElementById("btn-preset-lung")!
-    .dispatchEvent(new MouseEvent("click"));
-  assert.notEqual(state.viewport.windowWidth, 0);
+  const btnBone = document.getElementById("btn-preset-bone")!;
+  btnBone.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.windowWidth, 1800);
+  assert.equal(state.viewport.windowCenter, 400);
+  assert.equal(state.windowWidth, 1800);
+  assert.equal(state.windowCenter, 400);
+  assert.equal(mprEngine.windowWidth, 1800);
+  assert.equal(mprEngine.windowCenter, 400);
+  assert.equal(view3DViewer.windowWidth, 1800);
+  assert.equal(view3DViewer.windowCenter, 400);
+  assert.equal(view3DViewer.presetMode, 1);
+  assert.equal(
+    (document.getElementById("slider-ww") as HTMLInputElement).value,
+    "1800",
+  );
+  assert.equal(
+    (document.getElementById("slider-wl") as HTMLInputElement).value,
+    "400",
+  );
+  assert.equal(document.getElementById("val-ww")?.textContent, "1800");
+  assert.equal(document.getElementById("val-wl")?.textContent, "400");
+
+  const btnLung = document.getElementById("btn-preset-lung")!;
+  btnLung.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.windowWidth, 1500);
+  assert.equal(state.viewport.windowCenter, -600);
+  assert.equal(mprEngine.windowWidth, 1500);
+  assert.equal(mprEngine.windowCenter, -600);
+  assert.equal(view3DViewer.presetMode, 0);
+  assert.equal(
+    (document.getElementById("slider-ww") as HTMLInputElement).value,
+    "1500",
+  );
+  assert.equal(
+    (document.getElementById("slider-wl") as HTMLInputElement).value,
+    "-600",
+  );
+  assert.equal(document.getElementById("val-ww")?.textContent, "1500");
+  assert.equal(document.getElementById("val-wl")?.textContent, "-600");
 });
 
 test("updateToolbarUI: preserves pan in 3D mode (US-50) and forces crosshair back to wl outside it", () => {

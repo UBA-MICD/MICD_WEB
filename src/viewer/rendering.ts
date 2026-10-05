@@ -23,6 +23,15 @@ export function render(): void {
     // Show and update depth slider and orientation widget
     update3DControls();
     updateOrientationLabels();
+    updateWlControlsUI();
+    return;
+  }
+
+  const manager = getViewportManager();
+  if (manager && state.isMprMode) {
+    manager.getAllViewports().forEach((vp) => vp.render());
+    updateOrientationLabels();
+    updateWlControlsUI();
     return;
   }
 
@@ -30,16 +39,11 @@ export function render(): void {
   hide3DControls();
   if (!state.parsed?.pixelData) {
     updateOrientationLabels();
+    updateWlControlsUI();
     return;
   }
 
-  const manager = getViewportManager();
   if (manager) {
-    if (state.isMprMode) {
-      manager.getAllViewports().forEach((vp) => vp.render());
-      updateOrientationLabels();
-      return;
-    }
     // Multi-viewport Grid architecture (1x1, 1x2, 2x2)
     const activeVp = manager.activeViewport;
     if (activeVp) {

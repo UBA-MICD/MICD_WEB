@@ -410,24 +410,37 @@ function initWlControlsInteraction(): void {
     sliderWW.addEventListener("input", () => {
       const val = parseFloat(sliderWW.value);
       if (isNaN(val)) return;
+      const targetW = Math.max(1, val);
+      state.viewport.windowWidth = targetW;
+      mprEngine.setWindowLevel(state.viewport.windowCenter, targetW);
+      view3DViewer.setWindowLevel(state.viewport.windowCenter, targetW);
+
       const manager = getViewportManager();
-      const vp = manager?.activeViewport;
-      if (vp && manager) {
-        vp.data.viewport.windowWidth = Math.max(1, val);
-        state.viewport.windowWidth = vp.data.viewport.windowWidth;
-        vp.render();
-        if (manager.isSynchronized) {
-          for (const otherVp of manager.getAllViewports()) {
-            if (otherVp.id !== vp.id) {
-              otherVp.data.viewport.windowWidth = Math.max(1, val);
-              otherVp.render();
+      if (manager) {
+        if (state.isMprMode) {
+          for (const gridVp of manager.getAllViewports()) {
+            gridVp.data.viewport.windowWidth = targetW;
+            gridVp.render();
+          }
+        } else {
+          const vp = manager.activeViewport;
+          if (vp) {
+            vp.data.viewport.windowWidth = targetW;
+            vp.render();
+          }
+          if (manager.isSynchronized) {
+            for (const otherVp of manager.getAllViewports()) {
+              if (!vp || otherVp.id !== vp.id) {
+                otherVp.data.viewport.windowWidth = targetW;
+                otherVp.render();
+              }
             }
           }
         }
       } else {
-        state.viewport.windowWidth = Math.max(1, val);
         render();
       }
+      updateWlControlsUI();
     });
   }
 
@@ -435,24 +448,37 @@ function initWlControlsInteraction(): void {
     sliderWL.addEventListener("input", () => {
       const val = parseFloat(sliderWL.value);
       if (isNaN(val)) return;
+      const targetC = val;
+      state.viewport.windowCenter = targetC;
+      mprEngine.setWindowLevel(targetC, state.viewport.windowWidth);
+      view3DViewer.setWindowLevel(targetC, state.viewport.windowWidth);
+
       const manager = getViewportManager();
-      const vp = manager?.activeViewport;
-      if (vp && manager) {
-        vp.data.viewport.windowCenter = val;
-        state.viewport.windowCenter = val;
-        vp.render();
-        if (manager.isSynchronized) {
-          for (const otherVp of manager.getAllViewports()) {
-            if (otherVp.id !== vp.id) {
-              otherVp.data.viewport.windowCenter = val;
-              otherVp.render();
+      if (manager) {
+        if (state.isMprMode) {
+          for (const gridVp of manager.getAllViewports()) {
+            gridVp.data.viewport.windowCenter = targetC;
+            gridVp.render();
+          }
+        } else {
+          const vp = manager.activeViewport;
+          if (vp) {
+            vp.data.viewport.windowCenter = targetC;
+            vp.render();
+          }
+          if (manager.isSynchronized) {
+            for (const otherVp of manager.getAllViewports()) {
+              if (!vp || otherVp.id !== vp.id) {
+                otherVp.data.viewport.windowCenter = targetC;
+                otherVp.render();
+              }
             }
           }
         }
       } else {
-        state.viewport.windowCenter = val;
         render();
       }
+      updateWlControlsUI();
     });
   }
 
@@ -473,6 +499,10 @@ function initWlControlsInteraction(): void {
         if (preset) {
           state.viewport.windowCenter = preset.windowCenter;
           state.viewport.windowWidth = preset.windowWidth;
+
+          mprEngine.setWindowLevel(preset.windowCenter, preset.windowWidth);
+          view3DViewer.setWindowLevel(preset.windowCenter, preset.windowWidth);
+
           if (key === "bone") {
             view3DViewer.setPresetMode(1);
           } else if (key === "soft") {
@@ -480,7 +510,37 @@ function initWlControlsInteraction(): void {
           } else {
             view3DViewer.setPresetMode(0);
           }
-          render();
+
+          const manager = getViewportManager();
+          if (manager) {
+            if (state.isMprMode) {
+              for (const vp of manager.getAllViewports()) {
+                vp.data.viewport.windowCenter = preset.windowCenter;
+                vp.data.viewport.windowWidth = preset.windowWidth;
+                vp.render();
+              }
+            } else {
+              const activeVp = manager.activeViewport;
+              if (activeVp) {
+                activeVp.data.viewport.windowCenter = preset.windowCenter;
+                activeVp.data.viewport.windowWidth = preset.windowWidth;
+                activeVp.render();
+              }
+              if (manager.isSynchronized) {
+                for (const otherVp of manager.getAllViewports()) {
+                  if (!activeVp || otherVp.id !== activeVp.id) {
+                    otherVp.data.viewport.windowCenter = preset.windowCenter;
+                    otherVp.data.viewport.windowWidth = preset.windowWidth;
+                    otherVp.render();
+                  }
+                }
+              }
+            }
+          } else {
+            render();
+          }
+
+          updateWlControlsUI();
         }
       });
     }
@@ -490,7 +550,15 @@ function initWlControlsInteraction(): void {
   if (btnMip) {
     btnMip.addEventListener("click", () => {
       view3DViewer.setPresetMode(3);
-      render();
+      const manager = getViewportManager();
+      if (manager) {
+        for (const vp of manager.getAllViewports()) {
+          vp.render();
+        }
+      } else {
+        render();
+      }
+      updateWlControlsUI();
     });
   }
 }
@@ -1874,12 +1942,26 @@ export function initViewportInteraction(): void {
 
     // ── Radiological Standard: Right Click Drag = Window / Level ─────────────
     if (activeMouseButton === 2) {
+      if (state.isMprMode && manager) {
+        manager.dispatchWindowLevel(activeVp?.id || "vp-0", dx * 2, dy * 2);
+        updateWlControlsUI();
+        return;
+      }
+
       if (is3DTarget) {
         state.viewport.windowWidth = Math.max(
           1,
           state.viewport.windowWidth + dx * 2,
         );
         state.viewport.windowCenter += dy * 2;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
         const canvas = (document.getElementById("view-3d-canvas") ||
           document.getElementById("dicom-canvas")) as HTMLCanvasElement;
         if (state.is3DMode && canvas) {
@@ -1889,17 +1971,36 @@ export function initViewportInteraction(): void {
         } else {
           render();
         }
+        updateWlControlsUI();
       } else if (activeVp && manager) {
         manager.dispatchWindowLevel(activeVp.id, dx * 2, dy * 2);
         state.viewport.windowWidth = activeVp.data.viewport.windowWidth;
         state.viewport.windowCenter = activeVp.data.viewport.windowCenter;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        updateWlControlsUI();
       } else {
         state.viewport.windowWidth = Math.max(
           1,
           state.viewport.windowWidth + dx * 2,
         );
         state.viewport.windowCenter += dy * 2;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
         render();
+        updateWlControlsUI();
       }
       return;
     }
@@ -1920,6 +2021,21 @@ export function initViewportInteraction(): void {
           state.viewport.windowWidth + dx * 2,
         );
         state.viewport.windowCenter += dy * 2;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        if (state.isMprMode && manager) {
+          for (const vp of manager.getAllViewports()) {
+            vp.data.viewport.windowWidth = state.viewport.windowWidth;
+            vp.data.viewport.windowCenter = state.viewport.windowCenter;
+          }
+        }
+        updateWlControlsUI();
       } else {
         // Priority 3D Orbit Controls (Rotate Camera)
         const sensitivity = 0.01;
@@ -1958,6 +2074,15 @@ export function initViewportInteraction(): void {
           // Mirror into global state so W/L sliders stay in sync.
           state.viewport.windowWidth = activeVp.data.viewport.windowWidth;
           state.viewport.windowCenter = activeVp.data.viewport.windowCenter;
+          mprEngine.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          view3DViewer.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          updateWlControlsUI();
           break;
         case "zoom":
           manager.dispatchZoom(activeVp.id, 1 - dy * 0.005);
@@ -2041,6 +2166,15 @@ export function initViewportInteraction(): void {
             state.viewport.windowWidth + dx * 2,
           );
           state.viewport.windowCenter += dy * 2;
+          mprEngine.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          view3DViewer.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          updateWlControlsUI();
           break;
         case "zoom":
           state.viewport.zoom = Math.max(

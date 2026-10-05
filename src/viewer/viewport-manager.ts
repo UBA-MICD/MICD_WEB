@@ -320,6 +320,20 @@ export class Viewport {
 
   public render(): void {
     if ((mprEngine.volume || view3DViewer.volume) && state.isMprMode) {
+      const currentWc =
+        this.data.viewport.windowWidth > 0
+          ? this.data.viewport.windowCenter
+          : state.viewport.windowCenter;
+      const currentWw =
+        this.data.viewport.windowWidth > 0
+          ? this.data.viewport.windowWidth
+          : state.viewport.windowWidth;
+
+      if (currentWw > 0) {
+        mprEngine.setWindowLevel(currentWc, currentWw);
+        view3DViewer.setWindowLevel(currentWc, currentWw);
+      }
+
       if (this.id === "vp-3") {
         if (this.glCanvasElement) {
           this.glCanvasElement.style.display = "block";
@@ -537,6 +551,14 @@ export class ViewportManager {
     mprEngine.loadVolume(data);
     view3DViewer.setVolume(data as unknown as VoxelVolume);
     mprCoordinator.initFromVolume(data.cols, data.rows, data.depth);
+    if (data.windowWidth > 0) {
+      state.viewport.windowCenter = data.windowCenter;
+      state.viewport.windowWidth = data.windowWidth;
+      for (const vp of this.viewports.values()) {
+        vp.data.viewport.windowCenter = data.windowCenter;
+        vp.data.viewport.windowWidth = data.windowWidth;
+      }
+    }
   }
 
   public get activeViewport(): Viewport | null {
@@ -783,6 +805,32 @@ export class ViewportManager {
     dWidth: number,
     dCenter: number,
   ): void {
+    if (state.isMprMode) {
+      const origin = this.viewports.get(originId);
+      const baseW =
+        origin && origin.data.viewport.windowWidth > 0
+          ? origin.data.viewport.windowWidth
+          : state.viewport.windowWidth;
+      const baseC =
+        origin && origin.data.viewport.windowWidth > 0
+          ? origin.data.viewport.windowCenter
+          : state.viewport.windowCenter;
+      const newW = Math.max(1, baseW + dWidth);
+      const newC = baseC + dCenter;
+
+      state.viewport.windowWidth = newW;
+      state.viewport.windowCenter = newC;
+      mprEngine.setWindowLevel(newC, newW);
+      view3DViewer.setWindowLevel(newC, newW);
+
+      for (const vp of this.viewports.values()) {
+        vp.data.viewport.windowWidth = newW;
+        vp.data.viewport.windowCenter = newC;
+        vp.render();
+      }
+      return;
+    }
+
     this.viewports.get(originId)?.applyWindowLevelDelta(dWidth, dCenter);
 
     if (this.isSynchronized) {

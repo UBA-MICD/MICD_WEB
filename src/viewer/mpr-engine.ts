@@ -13,6 +13,7 @@
  */
 
 import { getCanonicalFlip } from "../dicom/spatial-math.js";
+import { state as appState } from "./state.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -890,6 +891,10 @@ export class MPREngine {
     this.volume = new MPRVolume(data);
     this.windowCenter = data.windowCenter;
     this.windowWidth = data.windowWidth;
+    if (this === mprEngine && appState?.viewport && data.windowWidth > 0) {
+      appState.viewport.windowCenter = data.windowCenter;
+      appState.viewport.windowWidth = data.windowWidth;
+    }
     this.volumeVersion++;
 
     // Initialize slice offsets and crosshair to volume centers
@@ -1045,12 +1050,12 @@ export class MPREngine {
     if (!this.volume) return false;
     if (!this.contextCache.has(canvas) && !this.initGL(canvas)) return false;
 
-    const state = this.contextCache.get(canvas);
-    if (!state) return false;
+    const ctxState = this.contextCache.get(canvas);
+    if (!ctxState) return false;
 
-    const gl = state.gl;
-    this.ensureTexture(state);
-    if (!state.texture) return false;
+    const gl = ctxState.gl;
+    this.ensureTexture(ctxState);
+    if (!ctxState.texture) return false;
 
     const width = canvas.clientWidth || canvas.width || 300;
     const height = canvas.clientHeight || canvas.height || 300;
@@ -1064,31 +1069,41 @@ export class MPREngine {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    gl.useProgram(state.program);
+    gl.useProgram(ctxState.program);
 
     // Compute M_screenToTex
     const camera = this.getCamera(plane);
     const screenToTex = camera.getScreenToTexMatrix(this.volume, width, height);
 
     const uScreenToTexLoc = gl.getUniformLocation(
-      state.program,
+      ctxState.program,
       "u_screenToTex",
     );
-    const uVolumeLoc = gl.getUniformLocation(state.program, "u_volume");
+    const uVolumeLoc = gl.getUniformLocation(ctxState.program, "u_volume");
     const uWindowCenterLoc = gl.getUniformLocation(
-      state.program,
+      ctxState.program,
       "u_windowCenter",
     );
     const uWindowWidthLoc = gl.getUniformLocation(
-      state.program,
+      ctxState.program,
       "u_windowWidth",
     );
 
     gl.uniformMatrix4fv(uScreenToTexLoc, false, screenToTex);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_3D, state.texture);
+    gl.bindTexture(gl.TEXTURE_3D, ctxState.texture);
     gl.uniform1i(uVolumeLoc, 0);
+
+    // Ensure W/L uniform is synchronized from global state for the active MPR engine
+    if (
+      this === mprEngine &&
+      appState?.viewport &&
+      appState.viewport.windowWidth > 0
+    ) {
+      this.windowCenter = appState.viewport.windowCenter;
+      this.windowWidth = appState.viewport.windowWidth;
+    }
 
     // Window/Level normalized [0, 1] relative to HU [-1024, 3071]
     const normCenter = (this.windowCenter + 1024) / 4095;
@@ -1097,7 +1112,7 @@ export class MPREngine {
     gl.uniform1f(uWindowCenterLoc, normCenter);
     gl.uniform1f(uWindowWidthLoc, normWidth);
 
-    gl.bindVertexArray(state.vao);
+    gl.bindVertexArray(ctxState.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
 
@@ -1173,6 +1188,10 @@ export class MPREngine {
   public setWindowLevel(center: number, width: number): void {
     this.windowCenter = center;
     this.windowWidth = Math.max(1, width);
+    if (this === mprEngine && appState?.viewport) {
+      appState.viewport.windowCenter = center;
+      appState.viewport.windowWidth = this.windowWidth;
+    }
   }
 
   /**

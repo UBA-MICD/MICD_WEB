@@ -44,3 +44,4 @@ src/vendor/fflate.js
 
 # ── Claude Code skills (vendored tool binaries, not project code) ──────────────
 .claude/skills/
+src/index.html

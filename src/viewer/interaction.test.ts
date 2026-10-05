@@ -23,10 +23,12 @@ import {
   initMeasurementControlsInteraction,
   initGridLayoutControls,
   setViewportSync,
+  update3DSlidersUI,
 } from "./interaction.ts";
 import { state, itemCount } from "./state.ts";
 import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
 import { mprEngine } from "./mpr-engine.ts";
+import { mprCoordinator } from "./mpr-coordinator.ts";
 import { dicomCache } from "./cache.ts";
 import { ViewportManager } from "./viewport-manager.ts";
 import { initViewportManager } from "./viewport-registry.ts";
@@ -154,11 +156,11 @@ test("initToolbar: clicking zoom activates it and closes the wl panel", () => {
   );
 });
 
-test("initToolbar: pan is a no-op in 3D mode, crosshair is a no-op outside it", () => {
+test("initToolbar: pan is enabled in 3D mode (US-50), crosshair is a no-op outside it", () => {
   initToolbar();
   state.is3DMode = true;
   document.getElementById("tool-pan")!.dispatchEvent(new MouseEvent("click"));
-  assert.notEqual(state.activeTool, "pan");
+  assert.equal(state.activeTool, "pan");
 
   state.is3DMode = false;
   document
@@ -460,30 +462,75 @@ test("initToolbar: export png/zip buttons close the dialog without throwing", ()
   );
 });
 
-test("initToolbar: wl slider input adjusts window width/center and renders", () => {
+test("initToolbar: wl slider input adjusts window width/center, updates engines, and reflects in UI", () => {
   initToolbar();
   const sliderWW = document.getElementById("slider-ww") as HTMLInputElement;
   sliderWW.value = "500";
   sliderWW.dispatchEvent(new Event("input"));
   assert.equal(state.viewport.windowWidth, 500);
+  assert.equal(mprEngine.windowWidth, 500);
+  assert.equal(view3DViewer.windowWidth, 500);
+  assert.equal(document.getElementById("val-ww")?.textContent, "500");
 
   const sliderWL = document.getElementById("slider-wl") as HTMLInputElement;
   sliderWL.value = "50";
   sliderWL.dispatchEvent(new Event("input"));
   assert.equal(state.viewport.windowCenter, 50);
+  assert.equal(mprEngine.windowCenter, 50);
+  assert.equal(view3DViewer.windowCenter, 50);
+  assert.equal(document.getElementById("val-wl")?.textContent, "50");
 });
 
-test("initToolbar: preset buttons apply their window/level values", () => {
+test("initToolbar: preset buttons apply their window/level values across engines and UI", () => {
   initToolbar();
-  document
-    .getElementById("btn-preset-lung")!
-    .dispatchEvent(new MouseEvent("click"));
-  assert.notEqual(state.viewport.windowWidth, 0);
+  const btnBone = document.getElementById("btn-preset-bone")!;
+  btnBone.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.windowWidth, 1800);
+  assert.equal(state.viewport.windowCenter, 400);
+  assert.equal(state.windowWidth, 1800);
+  assert.equal(state.windowCenter, 400);
+  assert.equal(mprEngine.windowWidth, 1800);
+  assert.equal(mprEngine.windowCenter, 400);
+  assert.equal(view3DViewer.windowWidth, 1800);
+  assert.equal(view3DViewer.windowCenter, 400);
+  assert.equal(view3DViewer.presetMode, 1);
+  assert.equal(
+    (document.getElementById("slider-ww") as HTMLInputElement).value,
+    "1800",
+  );
+  assert.equal(
+    (document.getElementById("slider-wl") as HTMLInputElement).value,
+    "400",
+  );
+  assert.equal(document.getElementById("val-ww")?.textContent, "1800");
+  assert.equal(document.getElementById("val-wl")?.textContent, "400");
+
+  const btnLung = document.getElementById("btn-preset-lung")!;
+  btnLung.dispatchEvent(new MouseEvent("click"));
+  assert.equal(state.viewport.windowWidth, 1500);
+  assert.equal(state.viewport.windowCenter, -600);
+  assert.equal(mprEngine.windowWidth, 1500);
+  assert.equal(mprEngine.windowCenter, -600);
+  assert.equal(view3DViewer.presetMode, 0);
+  assert.equal(
+    (document.getElementById("slider-ww") as HTMLInputElement).value,
+    "1500",
+  );
+  assert.equal(
+    (document.getElementById("slider-wl") as HTMLInputElement).value,
+    "-600",
+  );
+  assert.equal(document.getElementById("val-ww")?.textContent, "1500");
+  assert.equal(document.getElementById("val-wl")?.textContent, "-600");
 });
 
-test("updateToolbarUI: forces the tool back to wl leaving pan in 3D or crosshair outside it", () => {
+test("updateToolbarUI: preserves pan in 3D mode (US-50) and forces crosshair back to wl outside it", () => {
   state.is3DMode = true;
   state.activeTool = "pan";
+  updateToolbarUI();
+  assert.equal(state.activeTool, "pan");
+
+  state.activeTool = "length";
   updateToolbarUI();
   assert.equal(state.activeTool, "wl");
 
@@ -493,14 +540,14 @@ test("updateToolbarUI: forces the tool back to wl leaving pan in 3D or crosshair
   assert.equal(state.activeTool, "wl");
 });
 
-test("updateToolbarUI: disables pan/enables crosshair in 3D mode, and sets export button state", () => {
+test("updateToolbarUI: pan is enabled and crosshair enabled in 3D mode, and sets export button state", () => {
   state.is3DMode = true;
   state.activeTool = "wl";
   state.parsed = mockParsed();
   updateToolbarUI();
   assert.equal(
     (document.getElementById("tool-pan") as HTMLButtonElement).disabled,
-    true,
+    false,
   );
   assert.equal(
     (document.getElementById("tool-crosshair") as HTMLButtonElement).disabled,
@@ -1283,12 +1330,12 @@ test("keyboard: Delete or Backspace deletes selected annotation", () => {
   assert.equal(state.annotations["1.2.3.4.5"].length, 0);
 });
 
-test("keyboard: p is a no-op in 3D mode, c is a no-op outside it", () => {
+test("keyboard: p selects pan in 3D mode (US-50), c is a no-op outside it", () => {
   initKeyboardShortcuts();
   initToolbar();
   state.is3DMode = true;
   document.dispatchEvent(key("p"));
-  assert.notEqual(state.activeTool, "pan");
+  assert.equal(state.activeTool, "pan");
 
   state.is3DMode = false;
   document.dispatchEvent(key("c"));
@@ -2266,4 +2313,190 @@ test("toggle3DMode returns false and shows error when no files are loaded (count
   );
   // 3D mode should not have been activated
   assert.equal(state.is3DMode, false);
+});
+
+// ── US-50 Radiological Mouse Mapping Tests ────────────────────────────────────
+
+test("US-50 mouse: middle-click drag triggers pan even when activeTool is wl or crosshair", () => {
+  const container = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(container);
+  initViewportInteraction();
+
+  let panDispatched = false;
+  manager.dispatchPan = () => {
+    panDispatched = true;
+  };
+
+  state.parsed = mockParsed();
+  state.activeTool = "wl"; // activeTool is WL, but middle click must Pan
+
+  // Middle-click mousedown (button 1)
+  const cell = document.querySelector(".viewport-cell") || container;
+  cell.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      clientX: 100,
+      clientY: 100,
+      button: 1,
+    }),
+  );
+  // Mousemove
+  document.dispatchEvent(
+    new MouseEvent("mousemove", {
+      bubbles: true,
+      clientX: 120,
+      clientY: 130,
+      button: 1,
+    }),
+  );
+
+  assert.equal(panDispatched, true, "Middle-click drag should execute Pan");
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  manager.destroy();
+});
+
+test("US-50 mouse: right-click drag triggers window/level even when activeTool is pan or crosshair", () => {
+  const container = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(container);
+  initViewportInteraction();
+
+  let wlDispatched = false;
+  manager.dispatchWindowLevel = () => {
+    wlDispatched = true;
+  };
+
+  state.parsed = mockParsed();
+  state.activeTool = "pan"; // activeTool is Pan, but right click must W/L
+
+  // Right-click mousedown (button 2)
+  const cell = document.querySelector(".viewport-cell") || container;
+  cell.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      clientX: 100,
+      clientY: 100,
+      button: 2,
+    }),
+  );
+  // Mousemove
+  document.dispatchEvent(
+    new MouseEvent("mousemove", {
+      bubbles: true,
+      clientX: 110,
+      clientY: 115,
+      button: 2,
+    }),
+  );
+
+  assert.equal(
+    wlDispatched,
+    true,
+    "Right-click drag should execute Window/Level",
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  manager.destroy();
+});
+
+test("US-50 mouse: contextmenu is prevented on viewport-container to support right-click drag", () => {
+  const container = document.getElementById("viewport-container")!;
+  initViewportInteraction();
+
+  const event = new MouseEvent("contextmenu", {
+    bubbles: true,
+    cancelable: true,
+  });
+  container.dispatchEvent(event);
+
+  assert.equal(
+    event.defaultPrevented,
+    true,
+    "contextmenu should be prevented on container",
+  );
+});
+
+test("3-axis panel wiring and bidirectional reactivity with MPRGridCoordinator", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  // Mock volume on view3DViewer
+  view3DViewer.volume = {
+    cols: 100,
+    rows: 80,
+    depth: 40,
+    data: new Int16Array(100 * 80 * 40),
+    spacing: [1, 1, 1],
+    origin: [0, 0, 0],
+    windowCenter: 40,
+    windowWidth: 400,
+  } as any;
+  mprCoordinator.initFromVolume(100, 80, 40);
+
+  const axialSlider = document.getElementById(
+    "view-3d-scroll-axial",
+  ) as HTMLInputElement;
+  const coronalSlider = document.getElementById(
+    "view-3d-scroll-coronal",
+  ) as HTMLInputElement;
+  const sagittalSlider = document.getElementById(
+    "view-3d-scroll-sagittal",
+  ) as HTMLInputElement;
+
+  const valAxial = document.getElementById("view-3d-val-axial");
+  const valCoronal = document.getElementById("view-3d-val-coronal");
+  const valSagittal = document.getElementById("view-3d-val-sagittal");
+
+  update3DSlidersUI();
+
+  // Moving axial slider updates only Z coordinate and triggers reactivity
+  axialSlider.value = "12";
+  axialSlider.dispatchEvent(new Event("input"));
+  assert.equal(mprCoordinator.crosshair.z, 12);
+  assert.equal(mprCoordinator.crosshair.x, 50);
+  assert.equal(mprCoordinator.crosshair.y, 40);
+  assert.equal(valAxial?.textContent, "12");
+
+  // Moving coronal slider updates only Y coordinate
+  coronalSlider.value = "64";
+  coronalSlider.dispatchEvent(new Event("input"));
+  assert.equal(mprCoordinator.crosshair.y, 64);
+  assert.equal(mprCoordinator.crosshair.x, 50);
+  assert.equal(mprCoordinator.crosshair.z, 12);
+  assert.equal(valCoronal?.textContent, "64");
+
+  // Moving sagittal slider updates only X coordinate
+  sagittalSlider.value = "88";
+  sagittalSlider.dispatchEvent(new Event("input"));
+  assert.equal(mprCoordinator.crosshair.x, 88);
+  assert.equal(mprCoordinator.crosshair.y, 64);
+  assert.equal(mprCoordinator.crosshair.z, 12);
+  assert.equal(valSagittal?.textContent, "88");
+
+  // Focus guard: while sagittal slider has focus / active interaction, coordinator updates do not fight user .value
+  sagittalSlider.focus();
+  mprCoordinator.setCrosshair(15, 25, 35);
+  assert.equal(
+    sagittalSlider.value,
+    "88",
+    "Focused slider value must not be overwritten by coordinator",
+  );
+  assert.equal(
+    valSagittal?.textContent,
+    "15",
+    "Display text label still updates to reflect current crosshair",
+  );
+
+  // On blur / mouseup, releasing interaction allows reverse reactivity to update value
+  sagittalSlider.blur();
+  window.dispatchEvent(new Event("mouseup"));
+  mprCoordinator.setCrosshair(15, 25, 35);
+  assert.equal(axialSlider.value, "35");
+  assert.equal(coronalSlider.value, "25");
+  assert.equal(sagittalSlider.value, "15");
+  assert.equal(valAxial?.textContent, "35");
+  assert.equal(valCoronal?.textContent, "25");
+  assert.equal(valSagittal?.textContent, "15");
+
+  view3DViewer.volume = null;
 });

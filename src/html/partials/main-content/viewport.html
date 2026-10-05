@@ -1,24 +1,7 @@
-<!-- 3D Unified Depth Slider (Right) -->
 <div
-  class="view-3d-depth-slider-wrap mpr-depth-slider-wrap hidden"
-  id="view-3d-depth-slider-wrap"
+  class="viewport-container mpr-grid-container cursor-wl"
+  id="viewport-container"
 >
-  <span
-    class="view-3d-depth-counter mpr-depth-counter"
-    id="view-3d-depth-counter"
-    >Corte: 1/1</span
-  >
-  <input
-    type="range"
-    id="view-3d-depth-slider"
-    class="view-3d-depth-slider mpr-depth-slider"
-    min="0"
-    max="0"
-    value="0"
-  />
-</div>
-
-<div class="viewport-container cursor-wl" id="viewport-container">
   <!-- 3D Dedicated Container (Isolated overlay) -->
   <div id="view-3d-container" class="view-3d-container hidden">
     <canvas id="view-3d-canvas" class="view-3d-canvas"></canvas>
@@ -36,23 +19,46 @@
   <div
     id="view-3d-orientation-widget"
     class="view-3d-orientation-widget mpr-orientation-widget"
+    role="radiogroup"
+    aria-label="Proyección de orientación anatómica"
+    data-i18n-attr="aria-label:viewer.view3d.orientGroupAria"
   >
-    <button class="view-3d-btn btn-orient active" id="btn-view-3d-axial">
+    <button
+      class="view-3d-btn btn-orient active"
+      id="btn-view-3d-axial"
+      role="radio"
+      aria-checked="true"
+      aria-pressed="true"
+      data-i18n="viewer.view3d.axial"
+    >
       Axial
     </button>
     <button
       class="view-3d-btn btn-orient"
       id="btn-view-3d-sagittal"
+      role="radio"
+      aria-checked="false"
+      aria-pressed="false"
       data-i18n="viewer.view3d.sagittal"
     >
       Sagital
     </button>
-    <button class="view-3d-btn btn-orient" id="btn-view-3d-coronal">
+    <button
+      class="view-3d-btn btn-orient"
+      id="btn-view-3d-coronal"
+      role="radio"
+      aria-checked="false"
+      aria-pressed="false"
+      data-i18n="viewer.view3d.coronal"
+    >
       Coronal
     </button>
     <button
       class="view-3d-btn btn-orient"
       id="btn-view-3d-3d"
+      role="radio"
+      aria-checked="false"
+      aria-pressed="false"
       data-i18n="viewer.view3d.volumetricView"
     >
       Vista Volumétrica
@@ -63,29 +69,59 @@
   <div
     id="view-3d-sliders-panel"
     class="view-3d-sliders-panel mpr-sliders-panel"
+    role="region"
+    aria-label="Controles de cortes triplanares"
+    data-i18n-attr="aria-label:viewer.view3d.triplanarSlidersAria"
   >
     <div class="view-3d-slider-row mpr-slider-row">
-      <label for="view-3d-scroll-axial">Axial</label>
-      <input type="range" id="view-3d-scroll-axial" min="0" max="0" value="0" />
+      <div class="mpr-slider-label-group">
+        <label for="view-3d-scroll-axial" data-i18n="viewer.view3d.axial"
+          >Axial</label
+        >
+        <span class="mpr-slider-val" id="view-3d-val-axial">0</span>
+      </div>
+      <input
+        type="range"
+        id="view-3d-scroll-axial"
+        min="0"
+        max="0"
+        value="0"
+        aria-label="Corte Axial"
+        data-i18n-attr="aria-label:viewer.view3d.axialCutAria"
+      />
     </div>
     <div class="view-3d-slider-row mpr-slider-row">
-      <label for="view-3d-scroll-coronal">Coronal</label>
+      <div class="mpr-slider-label-group">
+        <label for="view-3d-scroll-coronal" data-i18n="viewer.view3d.coronal"
+          >Coronal</label
+        >
+        <span class="mpr-slider-val" id="view-3d-val-coronal">0</span>
+      </div>
       <input
         type="range"
         id="view-3d-scroll-coronal"
         min="0"
         max="0"
         value="0"
+        aria-label="Corte Coronal"
+        data-i18n-attr="aria-label:viewer.view3d.coronalCutAria"
       />
     </div>
     <div class="view-3d-slider-row mpr-slider-row">
-      <label for="view-3d-scroll-sagittal">Sagital</label>
+      <div class="mpr-slider-label-group">
+        <label for="view-3d-scroll-sagittal" data-i18n="viewer.view3d.sagittal"
+          >Sagital</label
+        >
+        <span class="mpr-slider-val" id="view-3d-val-sagittal">0</span>
+      </div>
       <input
         type="range"
         id="view-3d-scroll-sagittal"
         min="0"
         max="0"
         value="0"
+        aria-label="Corte Sagital"
+        data-i18n-attr="aria-label:viewer.view3d.sagittalCutAria"
       />
     </div>
   </div>

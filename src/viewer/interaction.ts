@@ -25,6 +25,10 @@ import {
   updateWlControlsUI,
   hide3DControls,
   update3DControls,
+  update3DSlidersUI,
+  updateMPRSlidersUI,
+  setActiveInteractingSlider,
+  getActiveInteractingSlider,
 } from "./rendering.js";
 import {
   loadCurrent,
@@ -35,6 +39,7 @@ import {
 } from "./loading.js";
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
+import { mprCoordinator } from "./mpr-coordinator.js";
 import { dicomCache } from "./cache.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
@@ -138,10 +143,7 @@ export function initToolbar(): void {
       btn.addEventListener("click", () => {
         if (
           state.is3DMode &&
-          (tool === "pan" ||
-            tool === "length" ||
-            tool === "ellipse" ||
-            tool === "polygon")
+          (tool === "length" || tool === "ellipse" || tool === "polygon")
         ) {
           return;
         }
@@ -204,6 +206,8 @@ export function initToolbar(): void {
         }
       }
       if (state.is3DMode) view3DViewer.resetCamera();
+      mprCoordinator.resetRotation();
+      view3DViewer.setPresetMode(0);
       // Keep global state + the zoom slider aligned with the active viewport.
       state.viewport = { ...activeVp.data.viewport };
       updateZoomControlsUI();
@@ -406,24 +410,37 @@ function initWlControlsInteraction(): void {
     sliderWW.addEventListener("input", () => {
       const val = parseFloat(sliderWW.value);
       if (isNaN(val)) return;
+      const targetW = Math.max(1, val);
+      state.viewport.windowWidth = targetW;
+      mprEngine.setWindowLevel(state.viewport.windowCenter, targetW);
+      view3DViewer.setWindowLevel(state.viewport.windowCenter, targetW);
+
       const manager = getViewportManager();
-      const vp = manager?.activeViewport;
-      if (vp && manager) {
-        vp.data.viewport.windowWidth = Math.max(1, val);
-        state.viewport.windowWidth = vp.data.viewport.windowWidth;
-        vp.render();
-        if (manager.isSynchronized) {
-          for (const otherVp of manager.getAllViewports()) {
-            if (otherVp.id !== vp.id) {
-              otherVp.data.viewport.windowWidth = Math.max(1, val);
-              otherVp.render();
+      if (manager) {
+        if (state.isMprMode) {
+          for (const gridVp of manager.getAllViewports()) {
+            gridVp.data.viewport.windowWidth = targetW;
+            gridVp.render();
+          }
+        } else {
+          const vp = manager.activeViewport;
+          if (vp) {
+            vp.data.viewport.windowWidth = targetW;
+            vp.render();
+          }
+          if (manager.isSynchronized) {
+            for (const otherVp of manager.getAllViewports()) {
+              if (!vp || otherVp.id !== vp.id) {
+                otherVp.data.viewport.windowWidth = targetW;
+                otherVp.render();
+              }
             }
           }
         }
       } else {
-        state.viewport.windowWidth = Math.max(1, val);
         render();
       }
+      updateWlControlsUI();
     });
   }
 
@@ -431,24 +448,37 @@ function initWlControlsInteraction(): void {
     sliderWL.addEventListener("input", () => {
       const val = parseFloat(sliderWL.value);
       if (isNaN(val)) return;
+      const targetC = val;
+      state.viewport.windowCenter = targetC;
+      mprEngine.setWindowLevel(targetC, state.viewport.windowWidth);
+      view3DViewer.setWindowLevel(targetC, state.viewport.windowWidth);
+
       const manager = getViewportManager();
-      const vp = manager?.activeViewport;
-      if (vp && manager) {
-        vp.data.viewport.windowCenter = val;
-        state.viewport.windowCenter = val;
-        vp.render();
-        if (manager.isSynchronized) {
-          for (const otherVp of manager.getAllViewports()) {
-            if (otherVp.id !== vp.id) {
-              otherVp.data.viewport.windowCenter = val;
-              otherVp.render();
+      if (manager) {
+        if (state.isMprMode) {
+          for (const gridVp of manager.getAllViewports()) {
+            gridVp.data.viewport.windowCenter = targetC;
+            gridVp.render();
+          }
+        } else {
+          const vp = manager.activeViewport;
+          if (vp) {
+            vp.data.viewport.windowCenter = targetC;
+            vp.render();
+          }
+          if (manager.isSynchronized) {
+            for (const otherVp of manager.getAllViewports()) {
+              if (!vp || otherVp.id !== vp.id) {
+                otherVp.data.viewport.windowCenter = targetC;
+                otherVp.render();
+              }
             }
           }
         }
       } else {
-        state.viewport.windowCenter = val;
         render();
       }
+      updateWlControlsUI();
     });
   }
 
@@ -469,11 +499,68 @@ function initWlControlsInteraction(): void {
         if (preset) {
           state.viewport.windowCenter = preset.windowCenter;
           state.viewport.windowWidth = preset.windowWidth;
-          render();
+
+          mprEngine.setWindowLevel(preset.windowCenter, preset.windowWidth);
+          view3DViewer.setWindowLevel(preset.windowCenter, preset.windowWidth);
+
+          if (key === "bone") {
+            view3DViewer.setPresetMode(1);
+          } else if (key === "soft") {
+            view3DViewer.setPresetMode(2);
+          } else {
+            view3DViewer.setPresetMode(0);
+          }
+
+          const manager = getViewportManager();
+          if (manager) {
+            if (state.isMprMode) {
+              for (const vp of manager.getAllViewports()) {
+                vp.data.viewport.windowCenter = preset.windowCenter;
+                vp.data.viewport.windowWidth = preset.windowWidth;
+                vp.render();
+              }
+            } else {
+              const activeVp = manager.activeViewport;
+              if (activeVp) {
+                activeVp.data.viewport.windowCenter = preset.windowCenter;
+                activeVp.data.viewport.windowWidth = preset.windowWidth;
+                activeVp.render();
+              }
+              if (manager.isSynchronized) {
+                for (const otherVp of manager.getAllViewports()) {
+                  if (!activeVp || otherVp.id !== activeVp.id) {
+                    otherVp.data.viewport.windowCenter = preset.windowCenter;
+                    otherVp.data.viewport.windowWidth = preset.windowWidth;
+                    otherVp.render();
+                  }
+                }
+              }
+            }
+          } else {
+            render();
+          }
+
+          updateWlControlsUI();
         }
       });
     }
   });
+
+  const btnMip = $("btn-preset-mip") || $("btn-view-3d-mip");
+  if (btnMip) {
+    btnMip.addEventListener("click", () => {
+      view3DViewer.setPresetMode(3);
+      const manager = getViewportManager();
+      if (manager) {
+        for (const vp of manager.getAllViewports()) {
+          vp.render();
+        }
+      } else {
+        render();
+      }
+      updateWlControlsUI();
+    });
+  }
 }
 
 function initZoomControlsInteraction(): void {
@@ -896,6 +983,7 @@ export async function toggle3DMode(): Promise<boolean> {
 
   if (state.isMprMode) {
     state.isMprMode = false;
+    $("viewport-container")?.classList.remove("mode-mpr");
   }
 
   showLoading(true);
@@ -960,7 +1048,9 @@ export async function toggleMprMode(): Promise<boolean> {
   const manager = getViewportManager();
   if (state.isMprMode) {
     state.isMprMode = false;
+    $("viewport-container")?.classList.remove("mode-mpr");
     manager?.setLayout("1x1");
+    hide3DControls();
     updateToolbarUI();
     render();
     return false;
@@ -977,11 +1067,15 @@ export async function toggleMprMode(): Promise<boolean> {
 
     state.isMprMode = true;
     state.activeTool = "crosshair";
+    $("viewport-container")?.classList.add("mode-mpr");
 
     // Set 2x2 triplanar layout
     manager?.setLayout("2x2");
     manager?.getAllViewports().forEach((vp) => vp.render());
 
+    $("view-3d-sliders-panel")?.classList.remove("hidden");
+    $("mpr-sliders-panel")?.classList.remove("hidden");
+    update3DSlidersUI();
     updateToolbarUI();
     return true;
   } catch (err: any) {
@@ -995,8 +1089,7 @@ export async function toggleMprMode(): Promise<boolean> {
 export function updateToolbarUI(): void {
   if (
     state.is3DMode &&
-    (state.activeTool === "pan" ||
-      state.activeTool === "length" ||
+    (state.activeTool === "length" ||
       state.activeTool === "ellipse" ||
       state.activeTool === "polygon")
   ) {
@@ -1011,7 +1104,7 @@ export function updateToolbarUI(): void {
 
   const panBtn = $("tool-pan") as HTMLButtonElement | null;
   if (panBtn) {
-    panBtn.disabled = state.is3DMode;
+    panBtn.disabled = false;
   }
 
   const lengthBtn = $("tool-length") as HTMLButtonElement | null;
@@ -1225,6 +1318,24 @@ export function initViewportInteraction(): void {
   }
 
   let dragOriginViewportId: string | null = null;
+  let activeMouseButton = 0;
+  let isRotatingMprCrosshair = false;
+  let mprRotationPlane: "axial" | "coronal" | "sagittal" = "axial";
+  let mprCrosshairScreenCenter: [number, number] = [0, 0];
+
+  if (container) {
+    container.addEventListener("contextmenu", (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, select, textarea, button, .view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel",
+        )
+      ) {
+        return;
+      }
+      e.preventDefault();
+    });
+  }
 
   function getTargetMetrics(
     e: MouseEvent,
@@ -1278,7 +1389,30 @@ export function initViewportInteraction(): void {
         return;
       }
       const plane = activeVp?.plane || "axial";
+      const [cx, cy] = mprEngine.getCrosshairScreenCoords(plane, viewW, viewH);
+      const distToCenter = Math.hypot(clickX - cx, clickY - cy);
+
+      // Check if clicking on crosshair arm/handle to rotate oblique slice
+      if (distToCenter > 30) {
+        const { line1, line2 } = mprEngine.getCrosshairLineDirections(plane);
+        const distToLine1 = Math.abs(
+          (clickX - cx) * line1.dirY - (clickY - cy) * line1.dirX,
+        );
+        const distToLine2 = Math.abs(
+          (clickX - cx) * line2.dirY - (clickY - cy) * line2.dirX,
+        );
+        if (distToLine1 <= 18 || distToLine2 <= 18) {
+          isRotatingMprCrosshair = true;
+          mprRotationPlane = plane;
+          mprCrosshairScreenCenter = [cx, cy];
+          return;
+        }
+      }
+
+      isRotatingMprCrosshair = false;
       mprEngine.setCrosshairFromScreen(plane, clickX, clickY, viewW, viewH);
+      const [nx, ny, nz] = mprEngine.crosshairNormalized;
+      mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
       if (manager) {
         for (const vp of manager.getAllViewports()) {
           vp.render();
@@ -1291,13 +1425,30 @@ export function initViewportInteraction(): void {
 
     if (state.is3DMode && state.activeTool === "crosshair") {
       view3DViewer.updateCrosshairFromPointer(clickX, clickY, viewW, viewH);
+      mprCoordinator.setCrosshair(
+        view3DViewer.crosshair.x,
+        view3DViewer.crosshair.y,
+        view3DViewer.crosshair.z,
+      );
       render();
     }
   };
 
   container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+
+    // Do NOT intercept clicks or block native events on interactive UI controls
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "input, select, textarea, button, label, .view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel, .view-3d-orientation-widget, .mpr-orientation-widget, #view-3d-reference-cube, #mpr-reference-cube",
+      )
+    ) {
+      return;
+    }
+
+    activeMouseButton = e.button;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
@@ -1319,6 +1470,12 @@ export function initViewportInteraction(): void {
       (manager && dragOriginViewportId
         ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
         : null) || manager?.activeViewport;
+
+    // Right and Middle clicks are dedicated to W/L and Pan navigation
+    if (e.button === 1 || e.button === 2) {
+      e.preventDefault();
+      return;
+    }
 
     if (
       state.activeTool !== "length" &&
@@ -1726,7 +1883,130 @@ export function initViewportInteraction(): void {
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
 
-    if (state.is3DMode && state.isDragging) {
+    const manager = getViewportManager();
+    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
+    const activeVp =
+      (manager && originId
+        ? manager.getAllViewports().find((v) => v.id === originId)
+        : null) || manager?.activeViewport;
+    const is3DTarget =
+      state.is3DMode || (manager && manager.isCombined3DViewport(originId));
+
+    // ── Radiological Standard: Middle Click Drag = Pan ──────────────────────
+    if (activeMouseButton === 1) {
+      if (is3DTarget) {
+        view3DViewer.camera.panX += dx;
+        view3DViewer.camera.panY += dy;
+        const canvas = (document.getElementById("view-3d-canvas") ||
+          document.getElementById("dicom-canvas")) as HTMLCanvasElement;
+        if (state.is3DMode && canvas) {
+          view3DViewer.render(canvas);
+        } else if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        } else {
+          render();
+        }
+      } else if (activeVp && manager) {
+        if (mprEngine.volume && state.isMprMode) {
+          manager.dispatchMprPan(
+            activeVp.id,
+            dx,
+            dy,
+            activeVp.canvasElement.clientWidth || container.clientWidth || 300,
+            activeVp.canvasElement.clientHeight ||
+              container.clientHeight ||
+              300,
+          );
+        } else {
+          manager.dispatchPan(activeVp.id, dx, dy);
+          state.viewport.panX = activeVp.data.viewport.panX;
+          state.viewport.panY = activeVp.data.viewport.panY;
+        }
+      } else {
+        if (mprEngine.volume && state.isMprMode) {
+          mprEngine.applyPanDelta2D(
+            "axial",
+            dx,
+            dy,
+            container.clientWidth || 300,
+            container.clientHeight || 300,
+          );
+        } else {
+          state.viewport.panX += dx;
+          state.viewport.panY += dy;
+        }
+        render();
+      }
+      return;
+    }
+
+    // ── Radiological Standard: Right Click Drag = Window / Level ─────────────
+    if (activeMouseButton === 2) {
+      if (state.isMprMode && manager) {
+        manager.dispatchWindowLevel(activeVp?.id || "vp-0", dx * 2, dy * 2);
+        updateWlControlsUI();
+        return;
+      }
+
+      if (is3DTarget) {
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
+        state.viewport.windowCenter += dy * 2;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        const canvas = (document.getElementById("view-3d-canvas") ||
+          document.getElementById("dicom-canvas")) as HTMLCanvasElement;
+        if (state.is3DMode && canvas) {
+          view3DViewer.render(canvas);
+        } else if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        } else {
+          render();
+        }
+        updateWlControlsUI();
+      } else if (activeVp && manager) {
+        manager.dispatchWindowLevel(activeVp.id, dx * 2, dy * 2);
+        state.viewport.windowWidth = activeVp.data.viewport.windowWidth;
+        state.viewport.windowCenter = activeVp.data.viewport.windowCenter;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        updateWlControlsUI();
+      } else {
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
+        state.viewport.windowCenter += dy * 2;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        render();
+        updateWlControlsUI();
+      }
+      return;
+    }
+
+    // ── Left Button Drag (or Active Tool interaction) ───────────────────────
+    if (is3DTarget && state.isDragging) {
       if (state.activeTool === "pan") {
         view3DViewer.camera.panX += dx;
         view3DViewer.camera.panY += dy;
@@ -1741,6 +2021,21 @@ export function initViewportInteraction(): void {
           state.viewport.windowWidth + dx * 2,
         );
         state.viewport.windowCenter += dy * 2;
+        mprEngine.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        view3DViewer.setWindowLevel(
+          state.viewport.windowCenter,
+          state.viewport.windowWidth,
+        );
+        if (state.isMprMode && manager) {
+          for (const vp of manager.getAllViewports()) {
+            vp.data.viewport.windowWidth = state.viewport.windowWidth;
+            vp.data.viewport.windowCenter = state.viewport.windowCenter;
+          }
+        }
+        updateWlControlsUI();
       } else {
         // Priority 3D Orbit Controls (Rotate Camera)
         const sensitivity = 0.01;
@@ -1763,6 +2058,8 @@ export function initViewportInteraction(): void {
         document.getElementById("dicom-canvas")) as HTMLCanvasElement;
       if (state.is3DMode && canvas) {
         view3DViewer.render(canvas);
+      } else if (manager) {
+        for (const vp of manager.getAllViewports()) vp.render();
       } else {
         render();
       }
@@ -1770,13 +2067,6 @@ export function initViewportInteraction(): void {
     }
 
     // ── 2D / MPR tools: route through ViewportManager so sync propagates ──
-    const manager = getViewportManager();
-    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
-    const activeVp =
-      (manager && originId
-        ? manager.getAllViewports().find((v) => v.id === originId)
-        : null) || manager?.activeViewport;
-
     if (activeVp && manager) {
       switch (state.activeTool) {
         case "wl":
@@ -1784,6 +2074,15 @@ export function initViewportInteraction(): void {
           // Mirror into global state so W/L sliders stay in sync.
           state.viewport.windowWidth = activeVp.data.viewport.windowWidth;
           state.viewport.windowCenter = activeVp.data.viewport.windowCenter;
+          mprEngine.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          view3DViewer.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          updateWlControlsUI();
           break;
         case "zoom":
           manager.dispatchZoom(activeVp.id, 1 - dy * 0.005);
@@ -1809,11 +2108,41 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
+        default:
           if (mprEngine.volume && state.isMprMode) {
             const crosshairOriginId = dragOriginViewportId || activeVp.id;
             if (manager.isCombined3DViewport(crosshairOriginId)) {
               break;
             }
+
+            if (isRotatingMprCrosshair) {
+              const [cx, cy] = mprCrosshairScreenCenter;
+              const vpRect =
+                activeVp.canvasElement.getBoundingClientRect?.() ?? {
+                  left: 0,
+                  top: 0,
+                };
+              const prevRelX = state.lastMouseX - dx - vpRect.left - cx;
+              const prevRelY = state.lastMouseY - dy - vpRect.top - cy;
+              const currRelX = state.lastMouseX - vpRect.left - cx;
+              const currRelY = state.lastMouseY - vpRect.top - cy;
+
+              const anglePrev = Math.atan2(prevRelY, prevRelX);
+              const angleCurr = Math.atan2(currRelY, currRelX);
+              let dAngle = angleCurr - anglePrev;
+              if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+              if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+
+              if (Math.abs(dAngle) > 1e-4) {
+                const cam = mprEngine.getCamera(mprRotationPlane);
+                mprCoordinator.rotateAroundAxis(cam.normal, -dAngle);
+                for (const vp of manager.getAllViewports()) {
+                  vp.render();
+                }
+              }
+              break;
+            }
+
             manager.dispatchMprCrosshair(
               crosshairOriginId,
               dx,
@@ -1837,6 +2166,15 @@ export function initViewportInteraction(): void {
             state.viewport.windowWidth + dx * 2,
           );
           state.viewport.windowCenter += dy * 2;
+          mprEngine.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          view3DViewer.setWindowLevel(
+            state.viewport.windowCenter,
+            state.viewport.windowWidth,
+          );
+          updateWlControlsUI();
           break;
         case "zoom":
           state.viewport.zoom = Math.max(
@@ -1859,14 +2197,22 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
+        default:
           if (mprEngine.volume && state.isMprMode) {
-            mprEngine.applyCrosshairDelta2D(
-              "axial",
-              dx,
-              dy,
-              container.clientWidth || 300,
-              container.clientHeight || 300,
-            );
+            if (isRotatingMprCrosshair) {
+              const cam = mprEngine.getCamera(mprRotationPlane);
+              mprCoordinator.rotateAroundAxis(cam.normal, -dx * 0.01);
+            } else {
+              mprEngine.applyCrosshairDelta2D(
+                "axial",
+                dx,
+                dy,
+                container.clientWidth || 300,
+                container.clientHeight || 300,
+              );
+              const [nx, ny, nz] = mprEngine.crosshairNormalized;
+              mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
+            }
           }
           break;
       }
@@ -2075,10 +2421,20 @@ export function initViewportInteraction(): void {
       console.groupEnd();
     }
     state.isDragging = false;
+    activeMouseButton = 0;
     dragOriginViewportId = null;
+    isRotatingMprCrosshair = false;
   });
 
   container.addEventListener("dblclick", (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "input, select, textarea, button, .view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel",
+      )
+    ) {
+      return;
+    }
     if (state.activeTool === "polygon") {
       completeActivePolygon();
       e.preventDefault();
@@ -2090,6 +2446,14 @@ export function initViewportInteraction(): void {
     "wheel",
     async (e: WheelEvent) => {
       if (!state.parsed) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          ".view-3d-sliders-panel, .mpr-sliders-panel, #view-3d-sliders-panel, .view-3d-orientation-widget, .mpr-orientation-widget",
+        )
+      ) {
+        return;
+      }
       e.preventDefault();
 
       if (state.is3DMode) {
@@ -2140,7 +2504,27 @@ export function initViewportInteraction(): void {
 // ── 3D Controls & Orientation Interactions ───────────────────────────────────
 
 function init3DControlsInteraction(): void {
-  // Depth slider
+  const render3D = () => {
+    const canvas = (document.getElementById("view-3d-canvas") ||
+      document.getElementById("dicom-canvas")) as HTMLCanvasElement;
+    if (canvas && state.is3DMode) {
+      view3DViewer.render(canvas);
+    }
+  };
+
+  const syncAndRenderAfterSlider = () => {
+    render3D();
+    const manager = getViewportManager();
+    if (manager) {
+      for (const vp of manager.getAllViewports()) {
+        vp.render();
+      }
+    } else {
+      render();
+    }
+  };
+
+  // Depth slider (legacy fallback if present in test DOM)
   const depthSliders = [
     $("view-3d-depth-slider"),
     $("mpr-depth-slider"),
@@ -2150,40 +2534,46 @@ function init3DControlsInteraction(): void {
     depthSlider.addEventListener("input", () => {
       const idx = parseInt(depthSlider.value, 10);
       view3DViewer.setDepthIndex(idx);
-      update3DSlidersUI();
-      render();
+      mprCoordinator.updateCrosshairAxis("axial", idx);
+      syncAndRenderAfterSlider();
     });
   });
 
-  const render3D = () => {
-    const canvas = (document.getElementById("view-3d-canvas") ||
-      document.getElementById("dicom-canvas")) as HTMLCanvasElement;
-    if (canvas && state.is3DMode) {
-      view3DViewer.render(canvas);
-    }
-  };
+  // Stop propagation on floating slider panels to isolate from viewport navigation
+  const sliderPanels = [
+    $("view-3d-sliders-panel"),
+    $("mpr-sliders-panel"),
+  ].filter(Boolean) as HTMLElement[];
+
+  sliderPanels.forEach((panel) => {
+    panel.addEventListener("mousedown", (e) => e.stopPropagation());
+    panel.addEventListener("pointerdown", (e) => e.stopPropagation());
+  });
 
   const onAxialInput = (slider: HTMLInputElement) => {
+    setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      view3DViewer.setAxialIndex(idx);
-      render3D();
+      mprCoordinator.updateCrosshairAxis("axial", idx);
+      syncAndRenderAfterSlider();
     }
   };
 
   const onCoronalInput = (slider: HTMLInputElement) => {
+    setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      view3DViewer.setCoronalIndex(idx);
-      render3D();
+      mprCoordinator.updateCrosshairAxis("coronal", idx);
+      syncAndRenderAfterSlider();
     }
   };
 
   const onSagittalInput = (slider: HTMLInputElement) => {
+    setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      view3DViewer.setSagittalIndex(idx);
-      render3D();
+      mprCoordinator.updateCrosshairAxis("sagittal", idx);
+      syncAndRenderAfterSlider();
     }
   };
 
@@ -2200,6 +2590,46 @@ function init3DControlsInteraction(): void {
   ["view-3d-scroll-sagittal", "mpr-scroll-sagittal"].forEach((id) => {
     const el = $(id) as HTMLInputElement | null;
     el?.addEventListener("input", () => onSagittalInput(el));
+  });
+
+  // Track active interacting slider to break reactivity loops
+  const all3DSliders = [
+    "view-3d-scroll-axial",
+    "mpr-scroll-axial",
+    "view-3d-scroll-coronal",
+    "mpr-scroll-coronal",
+    "view-3d-scroll-sagittal",
+    "mpr-scroll-sagittal",
+  ]
+    .map((id) => $(id) as HTMLInputElement | null)
+    .filter(Boolean) as HTMLInputElement[];
+
+  all3DSliders.forEach((slider) => {
+    slider.addEventListener("pointerdown", () =>
+      setActiveInteractingSlider(slider),
+    );
+    slider.addEventListener("mousedown", () =>
+      setActiveInteractingSlider(slider),
+    );
+    slider.addEventListener("focus", () => setActiveInteractingSlider(slider));
+    slider.addEventListener("blur", () => {
+      if (getActiveInteractingSlider() === slider) {
+        setActiveInteractingSlider(null);
+      }
+    });
+    slider.addEventListener("change", () => setActiveInteractingSlider(null));
+  });
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("pointerup", () =>
+      setActiveInteractingSlider(null),
+    );
+    window.addEventListener("mouseup", () => setActiveInteractingSlider(null));
+  }
+
+  // Reverse reactivity: update 3-axis sliders & counters on any crosshair change
+  mprCoordinator.onCrosshairChange(() => {
+    update3DSlidersUI();
   });
 
   // Quick view orientation buttons
@@ -2221,11 +2651,40 @@ function init3DControlsInteraction(): void {
     setView("sagittal"),
   );
   $("btn-view-sagittal")?.addEventListener("click", () => setView("sagittal"));
-  $("btn-mpr-sagittal")?.addEventListener("click", () => setView("sagittal"));
-
   $("btn-view-3d-3d")?.addEventListener("click", () => setView("3d"));
   $("btn-view-3d")?.addEventListener("click", () => setView("3d"));
   $("btn-mpr-3d")?.addEventListener("click", () => setView("3d"));
+
+  // Interactive Reference Cube (Gizmo) Hit-Testing & Smooth Alignment
+  const gizmoCanvases = [
+    $("view-3d-reference-cube"),
+    $("mpr-reference-cube"),
+  ].filter(Boolean) as HTMLCanvasElement[];
+
+  gizmoCanvases.forEach((gizmo) => {
+    gizmo.addEventListener("pointerdown", (e: PointerEvent) => {
+      e.stopPropagation();
+      const rect = gizmo.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const hitFace = view3DViewer.hitTestGizmoFace(clickX, clickY, gizmo);
+      if (hitFace) {
+        const targetAngles = view3DViewer.getTargetAnglesForFace(hitFace);
+        if (targetAngles) {
+          const main3DCanvas = (document.getElementById("view-3d-canvas") ||
+            document.getElementById(
+              "dicom-canvas",
+            )) as HTMLCanvasElement | null;
+          view3DViewer.animateCameraTo(
+            targetAngles.theta,
+            targetAngles.phi,
+            280,
+            main3DCanvas || undefined,
+          );
+        }
+      }
+    });
+  });
 }
 
 function updateOrientationButtonsUI(
@@ -2247,58 +2706,12 @@ function updateOrientationButtonsUI(
   });
 }
 
-export function update3DSlidersUI(): void {
-  const dims = view3DViewer.getVolumeDimensions();
-  const indices = view3DViewer.getCurrentIndices();
-
-  const axialSliders = [
-    $("view-3d-scroll-axial") as HTMLInputElement | null,
-    $("mpr-scroll-axial") as HTMLInputElement | null,
-  ];
-  const coronalSliders = [
-    $("view-3d-scroll-coronal") as HTMLInputElement | null,
-    $("mpr-scroll-coronal") as HTMLInputElement | null,
-  ];
-  const sagittalSliders = [
-    $("view-3d-scroll-sagittal") as HTMLInputElement | null,
-    $("mpr-scroll-sagittal") as HTMLInputElement | null,
-  ];
-
-  if (dims) {
-    axialSliders.forEach((scrollAxial) => {
-      if (scrollAxial) {
-        scrollAxial.min = "0";
-        scrollAxial.max = String(Math.max(0, dims.depth - 1));
-        if (document.activeElement !== scrollAxial) {
-          scrollAxial.value = String(indices.z);
-        }
-      }
-    });
-
-    coronalSliders.forEach((scrollCoronal) => {
-      if (scrollCoronal) {
-        scrollCoronal.min = "0";
-        scrollCoronal.max = String(Math.max(0, dims.rows - 1));
-        if (document.activeElement !== scrollCoronal) {
-          scrollCoronal.value = String(indices.y);
-        }
-      }
-    });
-
-    sagittalSliders.forEach((scrollSagittal) => {
-      if (scrollSagittal) {
-        scrollSagittal.min = "0";
-        scrollSagittal.max = String(Math.max(0, dims.cols - 1));
-        if (document.activeElement !== scrollSagittal) {
-          scrollSagittal.value = String(indices.x);
-        }
-      }
-    });
-  }
-}
-
-// Backwards-compatible alias for existing tests and callers
-export const updateMPRSlidersUI = update3DSlidersUI;
+export {
+  update3DSlidersUI,
+  updateMPRSlidersUI,
+  setActiveInteractingSlider,
+  getActiveInteractingSlider,
+};
 
 // ── Series Navigation ────────────────────────────────────────────────────────
 
@@ -2456,9 +2869,7 @@ export function initKeyboardShortcuts(): void {
     } else if (e.key === "z" || e.key === "Z") {
       $("tool-zoom")?.click();
     } else if (e.key === "p" || e.key === "P") {
-      if (!state.is3DMode) {
-        $("tool-pan")?.click();
-      }
+      $("tool-pan")?.click();
     } else if (e.key === "c" || e.key === "C") {
       if (state.is3DMode) {
         $("tool-crosshair")?.click();

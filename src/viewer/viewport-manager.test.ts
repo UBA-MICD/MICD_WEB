@@ -8,6 +8,9 @@ import { stubCanvas2DContext } from "../../test/viewer-fixture.ts";
 import { initViewportManager } from "./viewport-registry.ts";
 import type { ViewportManager } from "./viewport-manager.ts";
 import type { ParsedDicom } from "../dicom/dicom-parser-util.ts";
+import { state } from "./state.ts";
+import { mprEngine } from "./mpr-engine.ts";
+import { view3DViewer } from "./view-3d.ts";
 
 test.before(() => {
   installDom();
@@ -310,4 +313,32 @@ test("applyZoomFactor with visible segmentation calls render and returns early",
   );
   // Zoom is still applied before the early return
   assert.equal(vp.data.viewport.zoom, 2);
+});
+
+test("dispatchWindowLevel fans out to all viewports and updates engines in MPR mode", () => {
+  manager.setLayout("2x2");
+  state.isMprMode = true;
+  manager.setSync(false); // even with sync false, MPR mode broadcasts to all viewports
+  const [vp0, vp1, vp2, vp3] = manager.getAllViewports();
+  for (const vp of [vp0, vp1, vp2, vp3]) {
+    vp!.data.viewport = {
+      windowCenter: 40,
+      windowWidth: 400,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+    };
+  }
+  manager.dispatchWindowLevel("vp-0", 200, 50);
+  assert.equal(state.viewport.windowWidth, 600);
+  assert.equal(state.viewport.windowCenter, 90);
+  assert.equal(mprEngine.windowWidth, 600);
+  assert.equal(mprEngine.windowCenter, 90);
+  assert.equal(view3DViewer.windowWidth, 600);
+  assert.equal(view3DViewer.windowCenter, 90);
+  for (const vp of [vp0, vp1, vp2, vp3]) {
+    assert.equal(vp!.data.viewport.windowWidth, 600);
+    assert.equal(vp!.data.viewport.windowCenter, 90);
+  }
+  state.isMprMode = false;
 });

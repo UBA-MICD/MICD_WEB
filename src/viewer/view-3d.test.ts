@@ -426,6 +426,11 @@ test("View3DViewer.render passes u_flipY uniform and unscaled camera coordinates
   (viewer as any).program = {};
   (viewer as any).volumeTexture = {};
   (viewer as any).vao = {};
+  (viewer as any).uniformLocations = {
+    u_mvp: { name: "u_mvp" } as any,
+    u_cameraPos: { name: "u_cameraPos" } as any,
+    u_flipY: { name: "u_flipY" } as any,
+  };
   viewer.volume = {
     data: new Uint8Array(8),
     depth: 2,
@@ -456,4 +461,200 @@ test("View3DViewer.render passes u_flipY uniform and unscaled camera coordinates
   assert.ok(passedUniforms.cameraPos);
   assert.ok(passedUniforms.cameraPos[1] > 0);
   assert.ok(passedUniforms.mvp);
+});
+
+test("View3DViewer: setPresetMode updates preset state and clamps bounds [0..3]", () => {
+  const viewer = new View3DViewer();
+  assert.equal(viewer.presetMode, 0);
+
+  viewer.setPresetMode(1); // Bone
+  assert.equal(viewer.presetMode, 1);
+
+  viewer.setPresetMode(2); // Soft tissue
+  assert.equal(viewer.presetMode, 2);
+
+  viewer.setPresetMode(3); // MIP
+  assert.equal(viewer.presetMode, 3);
+
+  viewer.setPresetMode(99); // Clamps to 3
+  assert.equal(viewer.presetMode, 3);
+
+  viewer.setPresetMode(-5); // Clamps to 0
+  assert.equal(viewer.presetMode, 0);
+});
+
+test("View3DViewer: getTargetAnglesForFace returns canonical clinical viewing angles", () => {
+  const viewer = new View3DViewer();
+
+  const anglesA = viewer.getTargetAnglesForFace("A");
+  assert.deepEqual(anglesA, { theta: 0, phi: 0 });
+
+  const anglesP = viewer.getTargetAnglesForFace("P");
+  assert.deepEqual(anglesP, { theta: 0, phi: Math.PI });
+
+  const anglesR = viewer.getTargetAnglesForFace("R");
+  assert.deepEqual(anglesR, { theta: 0, phi: Math.PI / 2 });
+
+  const anglesL = viewer.getTargetAnglesForFace("L");
+  assert.deepEqual(anglesL, { theta: 0, phi: -Math.PI / 2 });
+
+  const anglesS = viewer.getTargetAnglesForFace("S");
+  assert.ok(anglesS);
+  assert.ok(Math.abs(anglesS.theta - Math.PI / 2) < 0.01);
+  assert.equal(anglesS.phi, 0);
+
+  const anglesI = viewer.getTargetAnglesForFace("I");
+  assert.ok(anglesI);
+  assert.ok(Math.abs(anglesI.theta - -Math.PI / 2) < 0.01);
+  assert.equal(anglesI.phi, 0);
+
+  assert.equal(viewer.getTargetAnglesForFace("INVALID"), null);
+});
+
+test("View3DViewer: hitTestGizmoFace correctly identifies front-facing face clicked", () => {
+  const viewer = new View3DViewer();
+  // Camera facing Anterior (+Z): theta = 0, phi = 0
+  viewer.camera.theta = 0;
+  viewer.camera.phi = 0;
+
+  const mockCanvas: any = {
+    width: 200,
+    height: 200,
+  };
+
+  // Center of the canvas (100, 100) should hit Anterior face "A"
+  const hit = viewer.hitTestGizmoFace(100, 100, mockCanvas);
+  assert.equal(hit, "A");
+
+  // Far outside the cube should return null
+  const miss = viewer.hitTestGizmoFace(5, 5, mockCanvas);
+  assert.equal(miss, null);
+});
+
+test("View3DViewer.render releases old WebGL context with WEBGL_lose_context when canvas changes", () => {
+  const viewer = new View3DViewer();
+  let loseContextCalled = false;
+
+  const mockContext1: any = {
+    ...createMockWebGL2Context(),
+    getExtension: (name: string) => {
+      if (name === "WEBGL_lose_context") {
+        return {
+          loseContext: () => {
+            loseContextCalled = true;
+          },
+        };
+      }
+      return null;
+    },
+  };
+
+  const canvas1: any = {
+    width: 256,
+    height: 256,
+    clientWidth: 256,
+    clientHeight: 256,
+    getContext: () => mockContext1,
+  };
+  mockContext1.canvas = canvas1;
+
+  viewer.render(canvas1);
+  assert.equal(loseContextCalled, false);
+
+  const mockContext2: any = {
+    ...createMockWebGL2Context(),
+  };
+  const canvas2: any = {
+    width: 256,
+    height: 256,
+    clientWidth: 256,
+    clientHeight: 256,
+    getContext: () => mockContext2,
+  };
+  mockContext2.canvas = canvas2;
+
+  viewer.render(canvas2);
+  assert.equal(loseContextCalled, true);
+});
+
+test("View3DViewer.initGL caches uniform locations and render uses them without calling getUniformLocation", () => {
+  const viewer = new View3DViewer();
+  let getUniformCalls = 0;
+
+  const queriedLocations: string[] = [];
+  const mockGL: any = {
+    ...createMockWebGL2Context(),
+    getUniformLocation: (_prog: any, name: string) => {
+      getUniformCalls++;
+      queriedLocations.push(name);
+      return { name };
+    },
+  };
+
+  const canvas: any = {
+    width: 256,
+    height: 256,
+    clientWidth: 256,
+    clientHeight: 256,
+    getContext: () => mockGL,
+  };
+  mockGL.canvas = canvas;
+
+  viewer.initGL(canvas);
+
+  // During initGL, all 14 uniforms should be queried and cached
+  assert.ok(getUniformCalls >= 14);
+  assert.ok(queriedLocations.includes("u_mvp"));
+  assert.ok(queriedLocations.includes("u_volume"));
+  assert.ok(queriedLocations.includes("u_flipY"));
+  assert.ok(queriedLocations.includes("u_cameraPos"));
+  assert.ok(queriedLocations.includes("u_presetMode"));
+
+  const callsAfterInit = getUniformCalls;
+
+  // Set up volume so render proceeds past checks
+  viewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  viewer.render(canvas);
+
+  // During render, getUniformLocation should NOT be called again
+  assert.equal(getUniformCalls, callsAfterInit);
+});
+
+test("View3DViewer.buildVolume strictly types imageOrientationPatient as 6-tuple and handles malformed data", () => {
+  const viewer = new View3DViewer();
+  const validSlice: any = [
+    {
+      pixelData: new Int16Array(4),
+      metadata: {
+        rows: 2,
+        columns: 2,
+        imageOrientationPatient: [1, 0, 0, 0, 1, 0],
+      },
+    },
+  ];
+  const volValid = viewer.buildVolume(validSlice);
+  assert.deepEqual(volValid.imageOrientationPatient, [1, 0, 0, 0, 1, 0]);
+
+  const invalidSlice: any = [
+    {
+      pixelData: new Int16Array(4),
+      metadata: {
+        rows: 2,
+        columns: 2,
+        imageOrientationPatient: [1, 0],
+      },
+    },
+  ];
+  const volInvalid = viewer.buildVolume(invalidSlice);
+  assert.equal(volInvalid.imageOrientationPatient, undefined);
 });

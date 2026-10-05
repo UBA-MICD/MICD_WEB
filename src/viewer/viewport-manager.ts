@@ -22,6 +22,7 @@ import {
 import { escapeHtml } from "../shared/dom.js";
 import { mprEngine, type MPRPlane, type MPRVolumeData } from "./mpr-engine.js";
 import { view3DViewer, type VoxelVolume } from "./view-3d.js";
+import { mprCoordinator } from "./mpr-coordinator.js";
 import { state } from "./state.js";
 import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
 import {
@@ -175,6 +176,11 @@ export class Viewport {
       this.onSelectCallback?.(this.id);
     });
 
+    this.cellElement.addEventListener("dblclick", (e: MouseEvent) => {
+      e.stopPropagation();
+      mprCoordinator.toggleMaximize(this.id);
+    });
+
     this.resizeObserver = new ResizeObserver(() => {
       const w = this.cellElement.clientWidth;
       const h = this.cellElement.clientHeight;
@@ -313,7 +319,18 @@ export class Viewport {
   // ── Rendering ─────────────────────────────────────────────────────────────
 
   public render(): void {
-    if (mprEngine.volume && state.isMprMode) {
+    if ((mprEngine.volume || view3DViewer.volume) && state.isMprMode) {
+      if (this.id === "vp-3") {
+        if (this.glCanvasElement) {
+          this.glCanvasElement.style.display = "block";
+          view3DViewer.render(this.glCanvasElement);
+        }
+        this.clear();
+        this.updateOrientationLabels();
+        this.updateInfoOverlay();
+        return;
+      }
+
       if (this.glCanvasElement) {
         this.glCanvasElement.style.display = "block";
         mprEngine.renderView(this.plane, this.glCanvasElement);
@@ -429,6 +446,13 @@ export class Viewport {
     }
 
     if (state.isMprMode) {
+      if (this.id === "vp-3") {
+        this.orientTop.textContent = "";
+        this.orientBottom.textContent = "";
+        this.orientLeft.textContent = "";
+        this.orientRight.textContent = "";
+        return;
+      }
       if (this.plane === "coronal") {
         this.orientTop.textContent = "S";
         this.orientBottom.textContent = "I";
@@ -512,6 +536,7 @@ export class ViewportManager {
   public setVolume(data: MPRVolumeData): void {
     mprEngine.loadVolume(data);
     view3DViewer.setVolume(data as unknown as VoxelVolume);
+    mprCoordinator.initFromVolume(data.cols, data.rows, data.depth);
   }
 
   public get activeViewport(): Viewport | null {
@@ -531,6 +556,12 @@ export class ViewportManager {
   public setLayout(layout: GridLayout): void {
     this.currentLayout = layout;
     const requiredCount = layout === "1x1" ? 1 : layout === "1x2" ? 2 : 4;
+
+    // Reset any maximized quadrant state on layout switch
+    if (mprCoordinator.maximizedQuadrant) {
+      mprCoordinator.maximizedQuadrant = null;
+      mprCoordinator.applyMaximizationUI();
+    }
 
     // Update grid classes on the container
     this.container.classList.remove(
@@ -565,11 +596,41 @@ export class ViewportManager {
       }
     }
 
+    // Configure quadrant plane classes and dataset
+    this.updateCellPlaneAttributes();
+
     // Ensure a valid active viewport
     if (!this.activeViewportId || !this.viewports.has(this.activeViewportId)) {
       this.setActiveViewport("vp-0");
     } else {
       this.setActiveViewport(this.activeViewportId);
+    }
+  }
+
+  private updateCellPlaneAttributes(): void {
+    const planes: Array<{ plane: MPRPlane; type: string }> = [
+      { plane: "axial", type: "axial" },
+      { plane: "coronal", type: "coronal" },
+      { plane: "sagittal", type: "sagittal" },
+      { plane: "axial", type: "3d" },
+    ];
+    for (let i = 0; i < 4; i++) {
+      const vp = this.viewports.get(`vp-${i}`);
+      if (!vp) continue;
+      vp.cellElement.classList.remove(
+        "viewport-cell--axial",
+        "viewport-cell--coronal",
+        "viewport-cell--sagittal",
+        "viewport-cell--3d",
+      );
+      if (this.currentLayout === "2x2") {
+        const info = planes[i];
+        vp.plane = info.plane;
+        vp.cellElement.classList.add(`viewport-cell--${info.type}`);
+        vp.cellElement.dataset.plane = info.type;
+      } else {
+        delete vp.cellElement.dataset.plane;
+      }
     }
   }
 
@@ -664,6 +725,9 @@ export class ViewportManager {
       viewportWidth,
       viewportHeight,
     );
+
+    const [nx, ny, nz] = mprEngine.crosshairNormalized;
+    mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
 
     // Re-render all viewports in real time reflecting synchronized cuts
     for (const vp of this.viewports.values()) {

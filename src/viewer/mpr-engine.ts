@@ -984,8 +984,8 @@ export class MPREngine {
   }
 
   public setSliceIndex(plane: MPRPlane, index: number): void {
-    if (!this.volume) return;
-    const [sx, sy, sz] = this.volume.physicalSize;
+    if (!this.volume || !this.volume.data) return;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     const { depth, rows, cols } = this.volume.data;
 
     if (plane === "axial") {
@@ -1015,7 +1015,7 @@ export class MPREngine {
   ): [number, number, number] {
     if (!this.volume) return [0, 0, 0];
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     let baseW = sx;
     let baseH = sy;
 
@@ -1076,15 +1076,17 @@ export class MPREngine {
       viewportHeight,
     );
 
-    this.volume.translate(dx, dy, dz);
+    if (typeof this.volume.translate === "function") {
+      this.volume.translate(dx, dy, dz);
+    }
     this.clampVolumeTranslation();
   }
 
   /** Restricts volume translation so the patient volume cannot be lost in the void. */
   public clampVolumeTranslation(): void {
-    if (!this.volume) return;
-    const [sx, sy, sz] = this.volume.physicalSize;
-    const s = this.volume.transform.scale;
+    if (!this.volume || !this.volume.transform) return;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
+    const s = this.volume.transform.scale ?? 1;
 
     // Bounded to 85% of volume dimensions
     const maxTx = sx * s * 0.85;
@@ -1183,7 +1185,7 @@ export class MPREngine {
   ): void {
     if (!this.volume) return;
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     let baseW = sx;
     let baseH = sy;
 
@@ -1219,7 +1221,7 @@ export class MPREngine {
   ): [number, number] {
     if (!this.volume) return [viewportWidth / 2, viewportHeight / 2];
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     let baseW = sx;
     let baseH = sy;
 

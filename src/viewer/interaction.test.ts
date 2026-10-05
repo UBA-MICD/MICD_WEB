@@ -154,11 +154,11 @@ test("initToolbar: clicking zoom activates it and closes the wl panel", () => {
   );
 });
 
-test("initToolbar: pan is a no-op in 3D mode, crosshair is a no-op outside it", () => {
+test("initToolbar: pan is enabled in 3D mode (US-50), crosshair is a no-op outside it", () => {
   initToolbar();
   state.is3DMode = true;
   document.getElementById("tool-pan")!.dispatchEvent(new MouseEvent("click"));
-  assert.notEqual(state.activeTool, "pan");
+  assert.equal(state.activeTool, "pan");
 
   state.is3DMode = false;
   document
@@ -481,9 +481,13 @@ test("initToolbar: preset buttons apply their window/level values", () => {
   assert.notEqual(state.viewport.windowWidth, 0);
 });
 
-test("updateToolbarUI: forces the tool back to wl leaving pan in 3D or crosshair outside it", () => {
+test("updateToolbarUI: preserves pan in 3D mode (US-50) and forces crosshair back to wl outside it", () => {
   state.is3DMode = true;
   state.activeTool = "pan";
+  updateToolbarUI();
+  assert.equal(state.activeTool, "pan");
+
+  state.activeTool = "length";
   updateToolbarUI();
   assert.equal(state.activeTool, "wl");
 
@@ -493,14 +497,14 @@ test("updateToolbarUI: forces the tool back to wl leaving pan in 3D or crosshair
   assert.equal(state.activeTool, "wl");
 });
 
-test("updateToolbarUI: disables pan/enables crosshair in 3D mode, and sets export button state", () => {
+test("updateToolbarUI: pan is enabled and crosshair enabled in 3D mode, and sets export button state", () => {
   state.is3DMode = true;
   state.activeTool = "wl";
   state.parsed = mockParsed();
   updateToolbarUI();
   assert.equal(
     (document.getElementById("tool-pan") as HTMLButtonElement).disabled,
-    true,
+    false,
   );
   assert.equal(
     (document.getElementById("tool-crosshair") as HTMLButtonElement).disabled,
@@ -1283,12 +1287,12 @@ test("keyboard: Delete or Backspace deletes selected annotation", () => {
   assert.equal(state.annotations["1.2.3.4.5"].length, 0);
 });
 
-test("keyboard: p is a no-op in 3D mode, c is a no-op outside it", () => {
+test("keyboard: p selects pan in 3D mode (US-50), c is a no-op outside it", () => {
   initKeyboardShortcuts();
   initToolbar();
   state.is3DMode = true;
   document.dispatchEvent(key("p"));
-  assert.notEqual(state.activeTool, "pan");
+  assert.equal(state.activeTool, "pan");
 
   state.is3DMode = false;
   document.dispatchEvent(key("c"));
@@ -2266,4 +2270,105 @@ test("toggle3DMode returns false and shows error when no files are loaded (count
   );
   // 3D mode should not have been activated
   assert.equal(state.is3DMode, false);
+});
+
+// ── US-50 Radiological Mouse Mapping Tests ────────────────────────────────────
+
+test("US-50 mouse: middle-click drag triggers pan even when activeTool is wl or crosshair", () => {
+  const container = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(container);
+  initViewportInteraction();
+
+  let panDispatched = false;
+  manager.dispatchPan = () => {
+    panDispatched = true;
+  };
+
+  state.parsed = mockParsed();
+  state.activeTool = "wl"; // activeTool is WL, but middle click must Pan
+
+  // Middle-click mousedown (button 1)
+  const cell = document.querySelector(".viewport-cell") || container;
+  cell.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      clientX: 100,
+      clientY: 100,
+      button: 1,
+    }),
+  );
+  // Mousemove
+  document.dispatchEvent(
+    new MouseEvent("mousemove", {
+      bubbles: true,
+      clientX: 120,
+      clientY: 130,
+      button: 1,
+    }),
+  );
+
+  assert.equal(panDispatched, true, "Middle-click drag should execute Pan");
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  manager.destroy();
+});
+
+test("US-50 mouse: right-click drag triggers window/level even when activeTool is pan or crosshair", () => {
+  const container = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(container);
+  initViewportInteraction();
+
+  let wlDispatched = false;
+  manager.dispatchWindowLevel = () => {
+    wlDispatched = true;
+  };
+
+  state.parsed = mockParsed();
+  state.activeTool = "pan"; // activeTool is Pan, but right click must W/L
+
+  // Right-click mousedown (button 2)
+  const cell = document.querySelector(".viewport-cell") || container;
+  cell.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      clientX: 100,
+      clientY: 100,
+      button: 2,
+    }),
+  );
+  // Mousemove
+  document.dispatchEvent(
+    new MouseEvent("mousemove", {
+      bubbles: true,
+      clientX: 110,
+      clientY: 115,
+      button: 2,
+    }),
+  );
+
+  assert.equal(
+    wlDispatched,
+    true,
+    "Right-click drag should execute Window/Level",
+  );
+
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  manager.destroy();
+});
+
+test("US-50 mouse: contextmenu is prevented on viewport-container to support right-click drag", () => {
+  const container = document.getElementById("viewport-container")!;
+  initViewportInteraction();
+
+  const event = new MouseEvent("contextmenu", {
+    bubbles: true,
+    cancelable: true,
+  });
+  container.dispatchEvent(event);
+
+  assert.equal(
+    event.defaultPrevented,
+    true,
+    "contextmenu should be prevented on container",
+  );
 });

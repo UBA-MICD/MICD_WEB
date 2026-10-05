@@ -138,10 +138,7 @@ export function initToolbar(): void {
       btn.addEventListener("click", () => {
         if (
           state.is3DMode &&
-          (tool === "pan" ||
-            tool === "length" ||
-            tool === "ellipse" ||
-            tool === "polygon")
+          (tool === "length" || tool === "ellipse" || tool === "polygon")
         ) {
           return;
         }
@@ -995,8 +992,7 @@ export async function toggleMprMode(): Promise<boolean> {
 export function updateToolbarUI(): void {
   if (
     state.is3DMode &&
-    (state.activeTool === "pan" ||
-      state.activeTool === "length" ||
+    (state.activeTool === "length" ||
       state.activeTool === "ellipse" ||
       state.activeTool === "polygon")
   ) {
@@ -1011,7 +1007,7 @@ export function updateToolbarUI(): void {
 
   const panBtn = $("tool-pan") as HTMLButtonElement | null;
   if (panBtn) {
-    panBtn.disabled = state.is3DMode;
+    panBtn.disabled = false;
   }
 
   const lengthBtn = $("tool-length") as HTMLButtonElement | null;
@@ -1225,6 +1221,13 @@ export function initViewportInteraction(): void {
   }
 
   let dragOriginViewportId: string | null = null;
+  let activeMouseButton = 0;
+
+  if (container) {
+    container.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+    });
+  }
 
   function getTargetMetrics(
     e: MouseEvent,
@@ -1297,7 +1300,8 @@ export function initViewportInteraction(): void {
 
   container.addEventListener("mousedown", (e: MouseEvent) => {
     if (!state.parsed) return;
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+    activeMouseButton = e.button;
     state.isDragging = true;
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
@@ -1319,6 +1323,12 @@ export function initViewportInteraction(): void {
       (manager && dragOriginViewportId
         ? manager.getAllViewports().find((v) => v.id === dragOriginViewportId)
         : null) || manager?.activeViewport;
+
+    // Right and Middle clicks are dedicated to W/L and Pan navigation
+    if (e.button === 1 || e.button === 2) {
+      e.preventDefault();
+      return;
+    }
 
     if (
       state.activeTool !== "length" &&
@@ -1726,7 +1736,97 @@ export function initViewportInteraction(): void {
     state.lastMouseX = e.clientX;
     state.lastMouseY = e.clientY;
 
-    if (state.is3DMode && state.isDragging) {
+    const manager = getViewportManager();
+    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
+    const activeVp =
+      (manager && originId
+        ? manager.getAllViewports().find((v) => v.id === originId)
+        : null) || manager?.activeViewport;
+    const is3DTarget =
+      state.is3DMode || (manager && manager.isCombined3DViewport(originId));
+
+    // ── Radiological Standard: Middle Click Drag = Pan ──────────────────────
+    if (activeMouseButton === 1) {
+      if (is3DTarget) {
+        view3DViewer.camera.panX += dx;
+        view3DViewer.camera.panY += dy;
+        const canvas = (document.getElementById("view-3d-canvas") ||
+          document.getElementById("dicom-canvas")) as HTMLCanvasElement;
+        if (state.is3DMode && canvas) {
+          view3DViewer.render(canvas);
+        } else if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        } else {
+          render();
+        }
+      } else if (activeVp && manager) {
+        if (mprEngine.volume && state.isMprMode) {
+          manager.dispatchMprPan(
+            activeVp.id,
+            dx,
+            dy,
+            activeVp.canvasElement.clientWidth || container.clientWidth || 300,
+            activeVp.canvasElement.clientHeight ||
+              container.clientHeight ||
+              300,
+          );
+        } else {
+          manager.dispatchPan(activeVp.id, dx, dy);
+          state.viewport.panX = activeVp.data.viewport.panX;
+          state.viewport.panY = activeVp.data.viewport.panY;
+        }
+      } else {
+        if (mprEngine.volume && state.isMprMode) {
+          mprEngine.applyPanDelta2D(
+            "axial",
+            dx,
+            dy,
+            container.clientWidth || 300,
+            container.clientHeight || 300,
+          );
+        } else {
+          state.viewport.panX += dx;
+          state.viewport.panY += dy;
+        }
+        render();
+      }
+      return;
+    }
+
+    // ── Radiological Standard: Right Click Drag = Window / Level ─────────────
+    if (activeMouseButton === 2) {
+      if (is3DTarget) {
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
+        state.viewport.windowCenter += dy * 2;
+        const canvas = (document.getElementById("view-3d-canvas") ||
+          document.getElementById("dicom-canvas")) as HTMLCanvasElement;
+        if (state.is3DMode && canvas) {
+          view3DViewer.render(canvas);
+        } else if (manager) {
+          for (const vp of manager.getAllViewports()) vp.render();
+        } else {
+          render();
+        }
+      } else if (activeVp && manager) {
+        manager.dispatchWindowLevel(activeVp.id, dx * 2, dy * 2);
+        state.viewport.windowWidth = activeVp.data.viewport.windowWidth;
+        state.viewport.windowCenter = activeVp.data.viewport.windowCenter;
+      } else {
+        state.viewport.windowWidth = Math.max(
+          1,
+          state.viewport.windowWidth + dx * 2,
+        );
+        state.viewport.windowCenter += dy * 2;
+        render();
+      }
+      return;
+    }
+
+    // ── Left Button Drag (or Active Tool interaction) ───────────────────────
+    if (is3DTarget && state.isDragging) {
       if (state.activeTool === "pan") {
         view3DViewer.camera.panX += dx;
         view3DViewer.camera.panY += dy;
@@ -1763,6 +1863,8 @@ export function initViewportInteraction(): void {
         document.getElementById("dicom-canvas")) as HTMLCanvasElement;
       if (state.is3DMode && canvas) {
         view3DViewer.render(canvas);
+      } else if (manager) {
+        for (const vp of manager.getAllViewports()) vp.render();
       } else {
         render();
       }
@@ -1770,13 +1872,6 @@ export function initViewportInteraction(): void {
     }
 
     // ── 2D / MPR tools: route through ViewportManager so sync propagates ──
-    const manager = getViewportManager();
-    const originId = dragOriginViewportId || manager?.activeViewport?.id || "";
-    const activeVp =
-      (manager && originId
-        ? manager.getAllViewports().find((v) => v.id === originId)
-        : null) || manager?.activeViewport;
-
     if (activeVp && manager) {
       switch (state.activeTool) {
         case "wl":
@@ -1809,6 +1904,7 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
+        default:
           if (mprEngine.volume && state.isMprMode) {
             const crosshairOriginId = dragOriginViewportId || activeVp.id;
             if (manager.isCombined3DViewport(crosshairOriginId)) {
@@ -1859,6 +1955,7 @@ export function initViewportInteraction(): void {
           }
           break;
         case "crosshair":
+        default:
           if (mprEngine.volume && state.isMprMode) {
             mprEngine.applyCrosshairDelta2D(
               "axial",
@@ -2075,6 +2172,7 @@ export function initViewportInteraction(): void {
       console.groupEnd();
     }
     state.isDragging = false;
+    activeMouseButton = 0;
     dragOriginViewportId = null;
   });
 
@@ -2456,9 +2554,7 @@ export function initKeyboardShortcuts(): void {
     } else if (e.key === "z" || e.key === "Z") {
       $("tool-zoom")?.click();
     } else if (e.key === "p" || e.key === "P") {
-      if (!state.is3DMode) {
-        $("tool-pan")?.click();
-      }
+      $("tool-pan")?.click();
     } else if (e.key === "c" || e.key === "C") {
       if (state.is3DMode) {
         $("tool-crosshair")?.click();

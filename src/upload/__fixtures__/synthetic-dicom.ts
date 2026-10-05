@@ -187,7 +187,8 @@ function build(
   const preamble = new Uint8Array(128); // 128 NUL bytes
   const magic = new TextEncoder().encode("DICM");
 
-  return concat([preamble, magic, meta, ...dataset]).buffer;
+  // Freshly allocated, so .buffer is a plain ArrayBuffer (not shared).
+  return concat([preamble, magic, meta, ...dataset]).buffer as ArrayBuffer;
 }
 
 /**

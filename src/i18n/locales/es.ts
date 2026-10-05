@@ -337,7 +337,16 @@ export const es: Record<string, string> = {
   "upload.unauthorizedRetry": "No autorizado. Iniciá sesión de nuevo.",
   "upload.fileTooLarge": "El archivo supera el límite de 2 GB.",
   "upload.genericError": "Error al cargar el archivo.",
+  "upload.anonymizerUnavailable":
+    "El anonimizador local no responde en {{url}}. Inicialo y volvé a intentar: no se envió ningún archivo.",
+  "upload.anonymizationFailed":
+    "No se pudo anonimizar {{name}}: la carga se canceló y el archivo no se envió.",
   "upload.rowLabel": "Progreso de {{name}}",
+  "upload.stateNotAnonymized": "No anonimizado: no enviado",
+  "upload.notAnonymized":
+    "El estudio conserva datos identificatorios y no se guardó. Tags: {{tags}}",
+  "upload.needsReview":
+    "Subido, pero marcado para revisión (verificación de anonimización): {{tags}}",
   "upload.stateDuplicate": "Duplicado",
   "upload.stateAborted": "Cancelado",
   "upload.explorerUploadingProgress": "Subiendo {{count}} archivo{{plural}}…",

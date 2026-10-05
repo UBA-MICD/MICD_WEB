@@ -37,10 +37,23 @@ export interface AnonymizeOptions {
 }
 
 /**
+ * Thrown when a buffer cannot be anonymized (no parser, unparseable DICOM).
+ * Callers must treat it as "do not send/save this file": returning the input
+ * unchanged would let PHI through (US-16: fail closed).
+ */
+export class DicomAnonymizationError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "DicomAnonymizationError";
+  }
+}
+
+/**
  * Anonymizes a DICOM file in-memory by zeroing/padding PII tag values
  * based on element byte offsets identified by dicom-parser.
  *
- * Returns a new ArrayBuffer containing the sanitized DICOM file.
+ * Returns a new ArrayBuffer containing the sanitized DICOM file. Throws
+ * DicomAnonymizationError instead of ever returning un-scrubbed bytes.
  */
 export function anonymizeDicomBuffer(
   buffer: ArrayBuffer,
@@ -56,35 +69,36 @@ export function anonymizeDicomBuffer(
   const parser = customParser ?? getParserInstance();
 
   if (!parser || typeof parser.parseDicom !== "function") {
-    return copy.buffer;
+    throw new DicomAnonymizationError("DICOM parser not available");
   }
 
+  let dataSet: any;
   try {
-    const dataSet = parser.parseDicom(copy);
-    if (!dataSet || !dataSet.elements) {
-      return copy.buffer;
-    }
+    dataSet = parser.parseDicom(copy);
+  } catch (err) {
+    throw new DicomAnonymizationError(
+      "Failed to parse DICOM for anonymization",
+      { cause: err },
+    );
+  }
+  if (!dataSet || !dataSet.elements) {
+    throw new DicomAnonymizationError("Parsed DICOM has no data elements");
+  }
 
-    for (const tag of tagsToScrub) {
-      const el = dataSet.elements[tag];
-      if (
-        el &&
-        typeof el.dataOffset === "number" &&
-        typeof el.length === "number" &&
-        el.length > 0
-      ) {
-        const start = el.dataOffset;
-        const end = start + el.length;
-        if (start >= 0 && end <= copy.length) {
-          copy.fill(replacementByte, start, end);
-        }
+  for (const tag of tagsToScrub) {
+    const el = dataSet.elements[tag];
+    if (
+      el &&
+      typeof el.dataOffset === "number" &&
+      typeof el.length === "number" &&
+      el.length > 0
+    ) {
+      const start = el.dataOffset;
+      const end = start + el.length;
+      if (start >= 0 && end <= copy.length) {
+        copy.fill(replacementByte, start, end);
       }
     }
-  } catch (err) {
-    console.warn(
-      "DICOM anonymization warning: Failed parsing dataset during scrub.",
-      err,
-    );
   }
 
   return copy.buffer;

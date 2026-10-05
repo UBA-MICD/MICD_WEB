@@ -41,6 +41,9 @@ jobs:
       - name: Run unit tests
         run: npm run test:coverage
 
+      - name: Enforce anonymization integration coverage (TK-15)
+        run: npm run check:anon-coverage
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:

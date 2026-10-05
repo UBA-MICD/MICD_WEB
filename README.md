@@ -171,29 +171,29 @@ propia), no este repo:
 - **Se conservan a propósito:** sexo, edad, grupo étnico y las descripciones de
   estudio y serie, por su valor científico.
 
-> ⚠️ **No se tocan los píxeles.** El texto quemado en la imagen (*burned-in
-> annotation*) sobrevive a la anonimización. Es el hallazgo H1 de
+> ⚠️ **No se tocan los píxeles.** El texto quemado en la imagen (_burned-in
+> annotation_) sobrevive a la anonimización. Es el hallazgo H1 de
 > `ANONYMIZATION_SECURITY_REVIEW.md` y sigue abierto: no subas estudios de
-> ecografía o *secondary capture* sin revisarlos.
+> ecografía o _secondary capture_ sin revisarlos.
 
-### Comportamiento ante fallos (*fail closed*)
+### Comportamiento ante fallos (_fail closed_)
 
 Nunca hay una vía degradada: si la anonimización no se puede hacer, el archivo
 **no se sube**.
 
-| Situación | Qué pasa |
-|---|---|
-| El servicio no responde al iniciar la cola | No se envía ningún archivo; el mensaje incluye la URL |
-| El servicio rechaza un archivo (no es DICOM válido) | Esa fila queda en «No anonimizado: no enviado»; las demás siguen |
-| El servicio se cae a mitad de la cola | Igual que arriba, archivo por archivo |
+| Situación                                                 | Qué pasa                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| El servicio no responde al iniciar la cola                | No se envía ningún archivo; el mensaje incluye la URL                            |
+| El servicio rechaza un archivo (no es DICOM válido)       | Esa fila queda en «No anonimizado: no enviado»; las demás siguen                 |
+| El servicio se cae a mitad de la cola                     | Igual que arriba, archivo por archivo                                            |
 | Falta `dicomParser` en el navegador (ruta de exportación) | `anonymizeDicomBuffer` lanza un error en lugar de devolver los bytes sin limpiar |
 
 ### Configuración
 
-| Clave | Dónde | Por defecto | Para qué |
-|---|---|---|---|
-| `micd_anonymizer_url` | `localStorage` | `http://127.0.0.1:8000` | URL del servicio de anonimización |
-| `window.MICD_ANONYMIZER_URL` | variable global | — | Alternativa a la anterior, con menor prioridad |
+| Clave                        | Dónde           | Por defecto             | Para qué                                       |
+| ---------------------------- | --------------- | ----------------------- | ---------------------------------------------- |
+| `micd_anonymizer_url`        | `localStorage`  | `http://127.0.0.1:8000` | URL del servicio de anonimización              |
+| `window.MICD_ANONYMIZER_URL` | variable global | —                       | Alternativa a la anterior, con menor prioridad |
 
 La **CSP** de `index.html` fija `connect-src` a `http://127.0.0.1:8000` y
 `http://localhost:8000`. Es deliberado: aunque alguien cambie
@@ -216,6 +216,37 @@ cd ../web && MICD_PHI_FIXTURES=../testing/anonymization/fixtures npm test
 Sin `MICD_PHI_FIXTURES`, la suite de fixtures se saltea en lugar de fallar. La
 suite completa (contrato del servicio, extremo a extremo contra Orthanc y
 Cypress sobre la UI real) vive en `testing/anonymization/` — ver su README.
+
+### Pruebas de integración de la anonimización (TK-15)
+
+Estas pruebas cubren **nuestra integración** con el módulo externo del otro
+equipo (`Imagenes-medicas-anonimizacion`), para detectar regresiones cuando ese
+equipo actualiza su módulo. **No** prueban el algoritmo de anonimización de ellos.
+
+| Archivo                                          | Qué cubre                                                                                                                                                                                                                                           |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/upload/__fixtures__/synthetic-dicom.ts`     | Fábrica de DICOM **sintéticos** en memoria (sin datos reales), con PII falsa en tags de primer nivel, una secuencia anidada, un tag privado y UIDs; más el helper `expectNoPII`. Corre en CI sin corpus externo.                                    |
+| `src/upload/anonymization-integration.test.ts`   | Contra un servicio **falso**: un anonimizador correcto devuelve bytes sin PII; uno que deja PII es detectado (la aserción no es vacua); salida vacía/no-DICOM/timeout/error de red/no-2xx fallan cerrado; los errores nunca filtran valores de PII. |
+| `src/upload/anonymizer-contract.ts` + `.test.ts` | Contrato versionado del servicio (`GET /` salud, `POST /anonymize/` con `file`+`profile`, 2xx = bytes, errores `{detail}`) y chequeos que marcan desviaciones con el mensaje `the external anonymization contract changed: …`.                      |
+
+```bash
+npm test                      # corre todo lo anterior (sintético, en CI)
+npm run test:coverage         # genera coverage/lcov.info
+npm run check:anon-coverage   # exige >= 80% (líneas y ramas) en el módulo de integración
+```
+
+**Smoke test contra el servicio real** (opcional, no arranca Docker): con el
+anonimizador Python corriendo, poné `MICD_ANONYMIZER_SMOKE=1` (y opcionalmente
+`MICD_ANONYMIZER_URL`) y corré `npm test`. Sin esa variable, el caso se saltea.
+
+**Cómo actualizar el contrato** cuando el otro equipo publica una versión nueva
+a propósito: subí `CONTRACT_VERSION` y ajustá `ANONYMIZER_CONTRACT` en
+`src/upload/anonymizer-contract.ts` en el mismo commit — el diff queda como
+registro del cambio.
+
+**Qué NO cubren:** el algoritmo del otro equipo y los datos quemados en los
+píxeles (_burned-in annotation_) quedan fuera de alcance; la verificación previa
+al almacenamiento vive en el backend (ver su README).
 
 ---
 

@@ -196,6 +196,7 @@ export class View3DViewer {
 
   public setVolume(vol: VoxelVolume): void {
     this.volume = vol;
+    this.renderEpoch++;
     this.windowCenter =
       vol.windowCenter ||
       (state.viewport?.windowCenter ? state.viewport.windowCenter : 40);
@@ -227,9 +228,46 @@ export class View3DViewer {
   private vbo: WebGLBuffer | null = null;
   private animationFrameId: number | null = null;
   private uniformLocations: Record<string, WebGLUniformLocation | null> = {};
+  // Render-on-demand: the loop only draws when the scene actually changed since
+  // the last frame. `lastRenderSig` is the signature of everything render()
+  // depends on; `renderEpoch` is bumped for changes that aren't captured by
+  // that signature (a new volume), so loading a different study still repaints.
+  private lastRenderSig = "";
+  private renderEpoch = 0;
+
+  /** Signature of everything render() reads, so the loop can skip redundant
+   *  frames. Any change — camera, window/level, preset, active view, crosshair,
+   *  canvas size, or a new volume (renderEpoch) — flips it and triggers exactly
+   *  one redraw, no matter which call site made the change. */
+  private renderSignature(canvas: HTMLCanvasElement): string {
+    const c = this.camera;
+    const x = this.crosshair;
+    const w = canvas.clientWidth || canvas.width || 0;
+    const h = canvas.clientHeight || canvas.height || 0;
+    return [
+      this.renderEpoch,
+      c.theta,
+      c.phi,
+      c.zoom,
+      c.panX,
+      c.panY,
+      this.windowCenter,
+      this.windowWidth,
+      this.presetMode,
+      this.activeView,
+      x.x,
+      x.y,
+      x.z,
+      this.debugAABB ? 1 : 0,
+      w,
+      h,
+    ].join("|");
+  }
 
   public startRenderLoop(canvas?: HTMLCanvasElement): void {
     this.stopRenderLoop();
+    // Force the first frame after (re)starting to draw, whatever the scene is.
+    this.lastRenderSig = "";
     const getTargetCanvas = (): HTMLCanvasElement | null =>
       canvas ||
       (typeof document !== "undefined"
@@ -239,6 +277,13 @@ export class View3DViewer {
             )) as HTMLCanvasElement | null)
         : null);
 
+    // Render on demand. The volume ray-marcher is expensive and the context
+    // uses preserveDrawingBuffer:true (so PNG export can read the canvas), which
+    // makes every drawn frame cost a GPU readback/stall. Redrawing 60×/s while
+    // the scene sits still stalled the whole page; instead the loop keeps
+    // spinning but only calls render() when the signature changed, so an idle 3D
+    // view does no GPU work while a drag or the camera animation (which mutate
+    // the signature every frame) still animate smoothly.
     const loop = () => {
       if (!this.isActive) {
         this.animationFrameId = null;
@@ -246,7 +291,11 @@ export class View3DViewer {
       }
       const target = getTargetCanvas();
       if (target) {
-        this.render(target);
+        const sig = this.renderSignature(target);
+        if (sig !== this.lastRenderSig) {
+          this.render(target);
+          this.lastRenderSig = sig;
+        }
       }
       if (typeof requestAnimationFrame !== "undefined") {
         this.animationFrameId = requestAnimationFrame(loop);

@@ -571,6 +571,33 @@ test("initUploadPanel: file input change uploads via rows and reaches 100%", asy
   );
 });
 
+test("initUploadPanel: file input change is blocked when the anonymizer is unavailable", async () => {
+  // The Cargar-tab pre-flight: a down anonymizer must stop the whole batch and
+  // surface the message in the status line, with nothing uploaded.
+  (globalThis as any).fetch = async (input: string) => {
+    if (String(input).startsWith(ANONYMIZER))
+      throw new TypeError("Failed to fetch");
+    return new Response(null, { status: 200 });
+  };
+  uploadPanelFixture();
+  await signIn();
+  initUploadPanel();
+
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  setInputFiles(input, [dcmFile()]);
+  input.dispatchEvent(new Event("change"));
+
+  for (let i = 0; i < 6 && FakeXHR.instances.length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  assert.equal(FakeXHR.instances.length, 0, "nothing may be uploaded");
+  assert.equal(
+    document.getElementById("upload-status")!.textContent,
+    t("upload.anonymizerUnavailable"),
+  );
+});
+
 test("initUploadPanel: a file that can't be anonymized fails its row and is never sent", async () => {
   anonymizerReply = async () => new Response("bad", { status: 400 });
   uploadPanelFixture();

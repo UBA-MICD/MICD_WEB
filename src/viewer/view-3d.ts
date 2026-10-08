@@ -452,6 +452,19 @@ export class View3DViewer {
       console.warn("WebGL2 context unavailable.");
       return false;
     }
+
+    // getContext() on the same canvas hands back the same context, and the
+    // shader program and unit-cube geometry are volume-independent — so build
+    // them once and reuse them. Re-running the whole init on every 3D entry
+    // recompiled the shaders and allocated a fresh program/VAO/VBO each time
+    // while orphaning the previous ones on the GPU; entering and leaving 3D
+    // repeatedly then piled up leaked GPU resources until the whole page
+    // degraded. (The context itself is not recreated here — only these were
+    // leaking. The volume texture is uploaded separately, in
+    // uploadVolumeTexture(), so loading a different study still refreshes it.)
+    if (this.gl === gl && this.program) {
+      return true;
+    }
     this.gl = gl;
 
     // GLSL ES 3.00 Vertex Shader — 3D Cube Bounding Box Proxy Geometry

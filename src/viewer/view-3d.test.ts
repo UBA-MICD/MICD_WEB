@@ -364,6 +364,29 @@ test("View3DViewer.initGL attaches both vertex and fragment shaders before linki
   );
 });
 
+test("View3DViewer.initGL reuses the program on re-entry (no per-entry GPU leak)", () => {
+  const viewer = new View3DViewer();
+  let programsCreated = 0;
+  const mockGL = {
+    ...createMockWebGL2Context(),
+    createProgram: () => {
+      programsCreated++;
+      return {};
+    },
+  };
+  const canvas: any = {
+    getContext: (type: string) => (type === "webgl2" ? mockGL : null),
+  };
+
+  assert.equal(viewer.initGL(canvas), true);
+  assert.equal(viewer.initGL(canvas), true); // simulates leaving and re-entering 3D
+  assert.equal(
+    programsCreated,
+    1,
+    "the shader program must be built once per context, not rebuilt on every 3D entry",
+  );
+});
+
 test("Matrix4.scale multiplies matrix by scaling factors", () => {
   const m = Matrix4.identity();
   const scaled = Matrix4.scale(m, [2, -1, 3]);

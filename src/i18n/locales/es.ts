@@ -350,7 +350,7 @@ export const es: Record<string, string> = {
   "upload.fileTooLarge": "El archivo supera el límite de 2 GB.",
   "upload.genericError": "Error al cargar el archivo.",
   "upload.anonymizerUnavailable":
-    "El anonimizador local no responde en {{url}}. Inicialo y volvé a intentar: no se envió ningún archivo.",
+    "No se puede subir: no se pudo anonimizar el estudio. Contactá a un administrador.",
   "upload.anonymizationFailed":
     "No se pudo anonimizar {{name}}: la carga se canceló y el archivo no se envió.",
   "upload.rowLabel": "Progreso de {{name}}",

@@ -9,6 +9,7 @@ import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
 import { adoptSession, logout, type AuthUser } from "../auth/auth.ts";
+import { t } from "../i18n/i18n.ts";
 import {
   getLastUploadedStudyId,
   onUploadComplete,
@@ -392,9 +393,12 @@ test("startExplorerUpload uses window.api.anonymizeDicom (desktop) when present"
 
 test("startExplorerUpload fails closed: a file the anonymizer rejects is never sent", async () => {
   anonymizerReply = async () =>
-    new Response(JSON.stringify({ detail: "El archivo no es un DICOM válido." }), {
-      status: 400,
-    });
+    new Response(
+      JSON.stringify({ detail: "El archivo no es un DICOM válido." }),
+      {
+        status: 400,
+      },
+    );
   setBody(`<div id="toast-container"></div>`);
   await signIn();
   const statusEl = document.createElement("div");
@@ -402,14 +406,19 @@ test("startExplorerUpload fails closed: a file the anonymizer rejects is never s
 
   await startExplorerUpload([dcmFile("raw.dcm")], statusEl);
 
-  assert.equal(FakeXHR.instances.length, 0, "no request may carry the raw file");
+  assert.equal(
+    FakeXHR.instances.length,
+    0,
+    "no request may carry the raw file",
+  );
   const toasts = document.getElementById("toast-container")!.textContent ?? "";
   assert.match(toasts, /raw\.dcm/);
 });
 
 test("startExplorerUpload refuses the whole batch when the local anonymizer is down", async () => {
   (globalThis as any).fetch = async (input: string) => {
-    if (String(input).startsWith(ANONYMIZER)) throw new TypeError("Failed to fetch");
+    if (String(input).startsWith(ANONYMIZER))
+      throw new TypeError("Failed to fetch");
     return new Response(null, { status: 200 });
   };
   setBody(`<div id="toast-container"></div>`);
@@ -421,7 +430,7 @@ test("startExplorerUpload refuses the whole batch when the local anonymizer is d
 
   assert.equal(FakeXHR.instances.length, 0, "nothing may be sent");
   const toasts = document.getElementById("toast-container")!.textContent ?? "";
-  assert.match(toasts, /127\.0\.0\.1:8000/);
+  assert.ok(toasts.includes(t("upload.anonymizerUnavailable")));
   assert.equal(isUploading(), false);
 });
 
@@ -438,7 +447,7 @@ test("startExplorerUpload fails closed when the anonymizer goes away mid-batch",
 
   assert.equal(FakeXHR.instances.length, 0);
   const toasts = document.getElementById("toast-container")!.textContent ?? "";
-  assert.match(toasts, /127\.0\.0\.1:8000/);
+  assert.ok(toasts.includes(t("upload.anonymizerUnavailable")));
 });
 
 test("startExplorerUpload fails closed when the desktop anonymizer rejects", async () => {
@@ -573,11 +582,19 @@ test("initUploadPanel: a file that can't be anonymized fails its row and is neve
   input.dispatchEvent(new Event("change"));
 
   const row = () => document.querySelector(".upload-row") as HTMLElement | null;
-  for (let i = 0; i < 10 && !row()?.classList.contains("upload-row--error"); i++) {
+  for (
+    let i = 0;
+    i < 10 && !row()?.classList.contains("upload-row--error");
+    i++
+  ) {
     await new Promise((r) => setTimeout(r, 0));
   }
 
-  assert.equal(FakeXHR.instances.length, 0, "no request may carry the raw file");
+  assert.equal(
+    FakeXHR.instances.length,
+    0,
+    "no request may carry the raw file",
+  );
   assert.equal(row()!.classList.contains("upload-row--error"), true);
   assert.equal(
     row()!.querySelector(".upload-row__pct")!.textContent,

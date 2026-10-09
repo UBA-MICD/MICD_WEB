@@ -75,13 +75,15 @@ export async function isAnonymizerAvailable(): Promise<boolean> {
   }
 }
 
-/** Sends one file to the service and returns the anonymized DICOM bytes. */
-export async function anonymizeWithLocalService(
-  file: File,
+/** POSTs one DICOM to the service's /anonymize/ and returns the anonymized
+ *  bytes. The filename is only the multipart field name. Fails closed. */
+async function postToService(
+  file: Blob,
+  filename: string,
 ): Promise<ArrayBuffer> {
   const url = anonymizerUrl();
   const form = new FormData();
-  form.append("file", file, file.name);
+  form.append("file", file, filename);
   form.append("profile", PROFILE);
 
   let res: Response;
@@ -107,4 +109,35 @@ export async function anonymizeWithLocalService(
     throw new AnonymizationRejectedError(res.status, detail);
   }
   return res.arrayBuffer();
+}
+
+/** Sends one file to the service and returns the anonymized DICOM bytes. */
+export async function anonymizeWithLocalService(
+  file: File,
+): Promise<ArrayBuffer> {
+  return postToService(file, file.name);
+}
+
+/**
+ * The single anonymization entry point shared by upload and export, so both
+ * apply the same (strong, service-side) profile and fail closed identically.
+ *
+ * Prefers the desktop seam (`window.api.anonymizeDicom` → the main process
+ * calls the service; the renderer's `file://` origin can't reach it under CORS);
+ * otherwise POSTs to the loopback service directly. There is deliberately no
+ * weaker in-process fallback — silently shipping less-anonymized bytes is the
+ * bug US-16 exists to prevent.
+ */
+export async function anonymizeDicomBytes(
+  data: ArrayBuffer,
+  filename: string,
+): Promise<ArrayBuffer> {
+  const seam =
+    typeof window !== "undefined" ? window.api?.anonymizeDicom : undefined;
+  return seam
+    ? seam(data)
+    : postToService(
+        new File([data], filename, { type: "application/dicom" }),
+        filename,
+      );
 }

@@ -1,5 +1,5 @@
 /* cspell:disable */
-import test, { beforeEach } from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
 import {
   generateDescriptiveFilename,
@@ -10,13 +10,6 @@ import {
   exportStudyByIdAsZip,
   type StudyExportMetadata,
 } from "./export-service.ts";
-import { anonymizeDicomBuffer, PII_TAGS } from "../utils/dicom-anonymizer.ts";
-
-// anonymizeDicomBuffer fails closed without a parser; the export tests feed
-// it placeholder bytes, so give them a parser that finds no PII to scrub.
-beforeEach(() => {
-  (globalThis as any).dicomParser = { parseDicom: () => ({ elements: {} }) };
-});
 import { state } from "../viewer/state.ts";
 import { dicomCache } from "../viewer/cache.ts";
 
@@ -36,6 +29,13 @@ function setupBrowserEnvironment() {
   elementsMap.set("app-banner", bannerEl);
 
   (globalThis as any).window = globalThis;
+  // Export anonymizes through the same seam as upload (window.api.anonymizeDicom
+  // on desktop, else the loopback service). Stub the seam with an identity
+  // anonymizer so the happy-path export tests don't need a running service;
+  // fail-closed tests override it to throw.
+  (globalThis as any).api = {
+    anonymizeDicom: async (data: ArrayBuffer) => data,
+  };
   (globalThis as any).URL = {
     createObjectURL: () => "blob:mock-url",
     revokeObjectURL: () => {},
@@ -267,94 +267,29 @@ test("exportCurrentStudyAsZip surfaces a failed disk write as an error", async (
   assert.equal(bannerEl.className, "app-banner app-banner--error");
 });
 
-// ── Anonymizer Unit Tests ───────────────────────────────────────────────────
+// ── Export anonymization (same strong profile as upload, fail closed) ───────
 
-test("anonymizeDicomBuffer replaces PII offsets with spaces (0x20)", () => {
-  const textEncoder = new TextEncoder();
-  const samplePiiName = "DOE^JOHN^MIDDLE";
-  const nameBytes = textEncoder.encode(samplePiiName);
-
-  const bufferSize = 100;
-  const originalUint8 = new Uint8Array(bufferSize);
-  const dataOffset = 20;
-
-  originalUint8.set(nameBytes, dataOffset);
-
-  const mockParser = {
-    parseDicom: () => ({
-      elements: {
-        x00100010: { dataOffset: 20, length: nameBytes.length },
-      },
-    }),
-  };
-
-  const anonymizedBuffer = anonymizeDicomBuffer(originalUint8.buffer, {
-    customParser: mockParser,
-  });
-
-  const anonymizedUint8 = new Uint8Array(anonymizedBuffer);
-
-  for (let i = dataOffset; i < dataOffset + nameBytes.length; i++) {
-    assert.equal(anonymizedUint8[i], 0x20);
-  }
-  assert.equal(originalUint8[dataOffset], nameBytes[0]);
-});
-
-test("anonymizeDicomBuffer refuses (throws) on a corrupt buffer instead of exporting it raw", () => {
-  const mockParser = {
-    parseDicom: () => {
-      throw new Error("Invalid DICOM header");
+test("exportCurrentStudyAsZip fails closed when anonymization fails: error, nothing saved", async () => {
+  const { bannerEl } = setupBrowserEnvironment();
+  resetState();
+  state.files = [
+    {
+      name: "slice1.dcm",
+      arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+    } as unknown as File,
+  ];
+  // The anonymizer is down: the export must surface an error and never package
+  // the un-anonymized bytes (US-16 fail closed — no weaker in-process fallback).
+  (globalThis as any).api = {
+    anonymizeDicom: async () => {
+      throw new Error("anonymizer down");
     },
   };
-  const input = new Uint8Array([1, 2, 3, 4]).buffer;
-  assert.throws(
-    () => anonymizeDicomBuffer(input, { customParser: mockParser }),
-    /Failed to parse DICOM/,
-  );
-});
 
-test("anonymizeDicomBuffer handles out-of-bounds dataOffset or invalid element lengths", () => {
-  const mockParser = {
-    parseDicom: () => ({
-      elements: {
-        x00100010: { dataOffset: 999, length: 50 },
-        x00100020: { dataOffset: -5, length: 10 },
-        x00100030: { dataOffset: 0, length: 0 },
-      },
-    }),
-  };
-  const input = new Uint8Array(20).buffer;
-  const result = anonymizeDicomBuffer(input, { customParser: mockParser });
-  assert.equal(result.byteLength, 20);
-});
+  await exportCurrentStudyAsZip({ anonymize: true });
 
-test("anonymizeDicomBuffer supports custom tags and replacement byte", () => {
-  const input = new Uint8Array([65, 66, 67, 68, 69]); // ABCDE
-  const mockParser = {
-    parseDicom: () => ({
-      elements: {
-        customTag: { dataOffset: 1, length: 3 },
-      },
-    }),
-  };
-  const result = anonymizeDicomBuffer(input, {
-    customParser: mockParser,
-    tagsToScrub: ["customTag"],
-    replacementByte: 0x58, // 'X'
-  });
-  const resultArray = new Uint8Array(result);
-  assert.equal(resultArray[0], 65); // A
-  assert.equal(resultArray[1], 88); // X
-  assert.equal(resultArray[2], 88); // X
-  assert.equal(resultArray[3], 88); // X
-  assert.equal(resultArray[4], 69); // E
-});
-
-test("anonymizeDicomBuffer lists standard DICOM PII tags", () => {
-  assert.ok(PII_TAGS.includes("x00100010"));
-  assert.ok(PII_TAGS.includes("x00100020"));
-  assert.ok(PII_TAGS.includes("x00100030"));
-  assert.ok(PII_TAGS.includes("x00100040"));
+  assert.match(bannerEl.textContent, /Error al exportar estudio/);
+  assert.equal(bannerEl.className, "app-banner app-banner--error");
 });
 
 // ── Tests para exportCurrentViewToPNG ───────────────────────────────────────

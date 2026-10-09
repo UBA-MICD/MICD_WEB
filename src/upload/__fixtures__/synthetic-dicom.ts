@@ -7,12 +7,11 @@
  * PII values are obvious fakes ("TEST^SYNTHETIC", "SYN-0001", …) chosen so a
  * test can prove they were removed. This file never reads from disk or the
  * network; the bytes are assembled here so the suite runs in CI with no
- * external corpus (unlike dicom-anonymizer.fixtures.test.ts, which is gated on
- * MICD_PHI_FIXTURES).
+ * external corpus and no running anonymization service.
  *
  * The output is a real Part-10 file (128-byte preamble + "DICM" + file-meta +
  * dataset, Explicit VR Little Endian) so the production `dicom-parser` parses
- * it and reports the same element offsets the scrubber relies on.
+ * it the same way the app does.
  */
 
 /** Explicit VR Little Endian — the transfer syntax the dataset is encoded in. */
@@ -193,8 +192,7 @@ function build(
 
 /**
  * Build a synthetic DICOM Part-10 file carrying the fake PII above, a nested
- * sequence, a private element, UIDs and a little pixel data (to prove the
- * scrubber leaves image bytes alone).
+ * sequence, a private element, UIDs and a little pixel data.
  */
 export function buildSyntheticDicom(
   options: SyntheticDicomOptions = {},

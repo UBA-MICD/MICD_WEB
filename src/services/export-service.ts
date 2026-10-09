@@ -6,7 +6,7 @@
  */
 
 import { zipSync } from "fflate";
-import { anonymizeDicomBuffer } from "../utils/dicom-anonymizer.js";
+import { anonymizeDicomBytes } from "../upload/local-anonymizer.js";
 import { showBanner } from "../shared/banner.js";
 import { authFetch, API_BASE } from "../auth/auth.js";
 import { fetchStudyInstances, fetchInstanceFile } from "./api.js";
@@ -217,7 +217,7 @@ export async function exportCurrentStudyAsZip(
         }
 
         if (anonymize && buf) {
-          buf = anonymizeDicomBuffer(buf);
+          buf = await anonymizeDicomBytes(buf, "instance.dcm");
         }
 
         if (buf) {
@@ -239,7 +239,7 @@ export async function exportCurrentStudyAsZip(
         const file = state.files[i];
         let buf = await file.arrayBuffer();
         if (anonymize) {
-          buf = anonymizeDicomBuffer(buf);
+          buf = await anonymizeDicomBytes(buf, file.name || "instance.dcm");
         }
         filesToZip.push({
           name: file.name || `image_${i + 1}.dcm`,
@@ -312,7 +312,7 @@ export async function exportStudyByIdAsZip(
       let buf = await fRes.arrayBuffer();
 
       if (anonymize) {
-        buf = anonymizeDicomBuffer(buf);
+        buf = await anonymizeDicomBytes(buf, "instance.dcm");
       }
 
       const numStr = String(i + 1).padStart(4, "0");

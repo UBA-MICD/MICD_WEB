@@ -16,7 +16,7 @@ import { loadStudyExplorer, markStudyAsNew } from "../explorer/explorer.js";
 import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
-  anonymizeWithLocalService,
+  anonymizeDicomBytes,
   anonymizerUrl,
   AnonymizerUnavailableError,
   isAnonymizerAvailable,
@@ -439,9 +439,10 @@ export function isUploading(): boolean {
  * bytes, and callers must not send the file when it does.
  */
 async function anonymizeForUpload(file: File): Promise<File> {
-  const anonBuffer = window.api?.anonymizeDicom
-    ? await window.api.anonymizeDicom(await file.arrayBuffer())
-    : await anonymizeWithLocalService(file);
+  const anonBuffer = await anonymizeDicomBytes(
+    await file.arrayBuffer(),
+    file.name,
+  );
   return new File([anonBuffer], file.name, { type: "application/dicom" });
 }
 

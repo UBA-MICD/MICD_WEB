@@ -66,6 +66,7 @@ export const es: Record<string, string> = {
   "server.apiOriginSave": "Guardar y reiniciar",
   "server.apiOriginInvalid": "Dirección de servidor inválida.",
   "dialog.activityTitle": "Historial de actividad",
+  "upload.uploadedBanner": "{{count}} archivo(s) subido(s) correctamente",
   "server.studyLoadedBanner": "Estudio cargado · volviendo al visualizador",
   "server.studiesLoadedBanner":
     "{{count}} estudios cargados · volviendo al visualizador",
@@ -87,6 +88,7 @@ export const es: Record<string, string> = {
   "explorer.prevPage": "Página anterior",
   "explorer.nextPage": "Página siguiente",
   "explorer.openSelected": "Abrir estudio seleccionado",
+  "explorer.downloadSelected": "Descargar estudio seleccionado",
   "explorer.loadingStudies": "Cargando estudios…",
   "explorer.noStudiesFiltered": "No hay estudios con esos filtros.",
   "explorer.noStudiesLoaded": "No hay estudios cargados.",
@@ -561,6 +563,7 @@ export const es: Record<string, string> = {
   "users.role.admin": "Administrador",
   "users.role.medico": "Médico",
   "users.role.investigador": "Investigador",
+  "users.role.informatico": "Informático de clínica",
   "users.status.active": "Activo",
   "users.status.invited": "Invitado",
   "users.status.blocked": "Bloqueado",
@@ -695,6 +698,15 @@ export const es: Record<string, string> = {
   "tour.investigador.done.title": "Todo listo",
   "tour.investigador.done.body":
     "Ese es tu kit de investigador — buscar, revisar y exportar anonimizado. Subir estudios, la administración de usuarios y la publicación no forman parte de este rol. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.informatico.download.title": "Descargar estudios",
+  "tour.informatico.download.body":
+    "Buscá el estudio, seleccionalo y descargalo como .zip con este botón.",
+  "tour.informatico.upload.title": "Subir DICOM",
+  "tour.informatico.upload.body":
+    "Arrastrá aquí archivos DICOM, una carpeta o un .zip para subirlos al servidor.",
+  "tour.informatico.done.title": "Listo",
+  "tour.informatico.done.body":
+    "Tu rol permite subir y descargar estudios. Si necesitás algo más, pedilo al equipo de desarrollo. Reabrí este tutorial cuando quieras desde el botón ?.",
   "tour.staff.search.title": "Buscar estudios",
   "tour.staff.search.body":
     "Encuentra estudios por paciente, modalidad o fecha. Como personal clínico ves los datos completos del paciente.",

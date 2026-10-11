@@ -20,7 +20,7 @@ async function freshEngine() {
 function step(over: Partial<TourStep> = {}): TourStep {
   return {
     id: "s",
-    roles: ["admin", "medico", "investigador"],
+    roles: ["admin", "medico", "investigador", "informatico"],
     target: "#t",
     titleKey: "title.key",
     bodyKey: "body.key",
@@ -60,7 +60,7 @@ beforeEach(() => {
 test("applicableSteps keeps a role's steps; a guest gets the common core only", async () => {
   const { applicableSteps, isCommonStep } = await freshEngine();
   const steps = [
-    step({ id: "core", roles: ["admin", "medico", "investigador"] }),
+    step({ id: "core", roles: ["admin", "medico", "investigador", "informatico"] }),
     step({ id: "adminOnly", roles: ["admin"] }),
     step({ id: "staff", roles: ["admin", "medico"] }),
   ];

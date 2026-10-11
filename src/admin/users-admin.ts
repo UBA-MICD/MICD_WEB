@@ -112,6 +112,7 @@ export const ROLE_OPTIONS: readonly Role[] = [
   "admin",
   "medico",
   "investigador",
+  "informatico",
 ];
 
 /** Format last_login_at as "YYYY-MM-DD HH:MM" (UTC), or a dash when never. */

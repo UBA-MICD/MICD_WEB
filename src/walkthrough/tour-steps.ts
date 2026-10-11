@@ -6,14 +6,15 @@
 //
 // Ordering is the order the user is walked through. The common viewer core is
 // shown to every role — and therefore to a guest too, since local viewing needs
-// no session. The role-specific branches (investigador / medico / admin) append
+// no session. The role-specific branches (investigador / informatico / medico /
+// admin) append
 // after this core in later steps.
 
 import type { Role } from "../auth/auth.js";
 import type { TourStep } from "./walkthrough.js";
 
 /** Shown to every signed-in role, and to a guest (see `isCommonStep`). */
-const ALL: Role[] = ["admin", "medico", "investigador"];
+const ALL: Role[] = ["admin", "medico", "investigador", "informatico"];
 
 // ── A. Common core — viewer basics ─────────────────────────────────────────────
 
@@ -203,6 +204,44 @@ const investigadorSteps: TourStep[] = [
     target: "center",
     titleKey: "tour.investigador.done.title",
     bodyKey: "tour.investigador.done.body",
+    placement: "center",
+    advance: { on: "next" },
+  },
+];
+
+// ── B2. informatico — clinic IT: upload and download only ──────────────────────
+
+const informaticoSteps: TourStep[] = [
+  {
+    id: "inf.download",
+    roles: ["informatico"],
+    target: "#btn-open-selected",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.informatico.download.title",
+    bodyKey: "tour.informatico.download.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inf.upload",
+    roles: ["informatico"],
+    target: "#upload-drop",
+    screen: "server",
+    tab: "cargar",
+    titleKey: "tour.informatico.upload.title",
+    bodyKey: "tour.informatico.upload.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inf.done",
+    roles: ["informatico"],
+    target: "center",
+    titleKey: "tour.informatico.done.title",
+    bodyKey: "tour.informatico.done.body",
     placement: "center",
     advance: { on: "next" },
   },
@@ -447,6 +486,7 @@ const adminSteps: TourStep[] = [
 export const tourSteps: TourStep[] = [
   ...coreSteps,
   ...investigadorSteps,
+  ...informaticoSteps,
   ...staffSteps,
   ...adminSteps,
 ];

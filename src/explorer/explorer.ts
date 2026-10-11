@@ -2,7 +2,9 @@ import {
   authFetch,
   ensureAuthenticated,
   isAuthenticated,
+  isInformatico,
 } from "../auth/auth.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
 import { fetchStudies, serverFetch } from "../services/api.js";
 import { escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
@@ -175,6 +177,8 @@ function wireView(view: ExplorerView): void {
 
     if (view.mode === "select") {
       setSelected(studyId);
+    } else if (isInformatico()) {
+      void exportStudyByIdAsZip(studyId, undefined, { anonymize: false });
     } else {
       void openStudy(studyId);
     }

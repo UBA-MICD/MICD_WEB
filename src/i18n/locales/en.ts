@@ -64,6 +64,7 @@ export const en: Record<string, string> = {
   "server.apiOriginSave": "Save and restart",
   "server.apiOriginInvalid": "Invalid server address.",
   "dialog.activityTitle": "Activity history",
+  "upload.uploadedBanner": "{{count}} file(s) uploaded successfully",
   "server.studyLoadedBanner": "Study loaded · returning to viewer",
   "server.studiesLoadedBanner":
     "{{count}} studies loaded · returning to viewer",
@@ -85,6 +86,7 @@ export const en: Record<string, string> = {
   "explorer.prevPage": "Previous page",
   "explorer.nextPage": "Next page",
   "explorer.openSelected": "Open selected study",
+  "explorer.downloadSelected": "Download selected study",
   "explorer.loadingStudies": "Loading studies…",
   "explorer.noStudiesFiltered": "No studies match those filters.",
   "explorer.noStudiesLoaded": "No studies loaded.",
@@ -555,6 +557,7 @@ export const en: Record<string, string> = {
   "users.role.admin": "Administrator",
   "users.role.medico": "Physician",
   "users.role.investigador": "Researcher",
+  "users.role.informatico": "Clinic IT",
   "users.status.active": "Active",
   "users.status.invited": "Invited",
   "users.status.blocked": "Blocked",
@@ -688,6 +691,15 @@ export const en: Record<string, string> = {
   "tour.investigador.done.title": "You're set",
   "tour.investigador.done.body":
     "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
+  "tour.informatico.download.title": "Download studies",
+  "tour.informatico.download.body":
+    "Find the study, select it and download it as a .zip with this button.",
+  "tour.informatico.upload.title": "Upload DICOM",
+  "tour.informatico.upload.body":
+    "Drop DICOM files, a folder or a .zip here to upload them to the server.",
+  "tour.informatico.done.title": "All set",
+  "tour.informatico.done.body":
+    "Your role can upload and download studies. If you need anything else, ask the development team. Reopen this tour anytime from the ? button.",
   "tour.staff.search.title": "Search studies",
   "tour.staff.search.body":
     "Find studies by patient, modality or date. As clinical staff you see full patient details.",

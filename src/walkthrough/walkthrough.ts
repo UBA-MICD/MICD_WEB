@@ -16,7 +16,12 @@ import { createOverlay, type Overlay, type Placement } from "./overlay.js";
 
 export type { Placement };
 
-const ALL_ROLES: readonly Role[] = ["admin", "medico", "investigador"];
+const ALL_ROLES: readonly Role[] = [
+  "admin",
+  "medico",
+  "investigador",
+  "informatico",
+];
 
 export interface TourStep {
   id: string;

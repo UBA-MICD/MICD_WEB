@@ -13,8 +13,11 @@ import {
   isAuthenticated,
   isAdmin,
   isStaff,
+  isUploader,
+  isInformatico,
   onAuthChange,
 } from "../auth/auth.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
 import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
@@ -60,10 +63,12 @@ const TABS: ServerTab[] = [
 ];
 
 /** Can the current session use a tab? "usuarios" and "sistema" are admin-only;
- *  "cargar" (upload) and "validaciones" are staff-only (medico + admin). */
+ *  "validaciones" is staff-only (medico + admin); "cargar" (upload) also admits
+ *  informatico. */
 function canUseTab(tab: ServerTab): boolean {
   if (tab === "usuarios" || tab === "sistema") return isAdmin();
-  if (tab === "cargar" || tab === "validaciones") return isStaff();
+  if (tab === "validaciones") return isStaff();
+  if (tab === "cargar") return isUploader();
   return true;
 }
 
@@ -129,6 +134,15 @@ function renderForSession(): void {
   TABS.forEach((tab) =>
     tabButton(tab).classList.toggle("hidden", !canUseTab(tab)),
   );
+  // informatico has no viewer access: the Buscar primary action downloads.
+  const primaryKey = isInformatico()
+    ? "explorer.downloadSelected"
+    : "explorer.openSelected";
+  const openSelected = document.getElementById("btn-open-selected");
+  if (openSelected) {
+    openSelected.dataset.i18n = primaryKey;
+    openSelected.textContent = t(primaryKey);
+  }
   if (!canUseTab(activeTab)) activeTab = "buscar";
   showTab(activeTab);
 }
@@ -251,6 +265,11 @@ export function initServerScreen(): void {
 
   const openSelectedStudy = async (studyId: string): Promise<void> => {
     openSelected.disabled = true;
+    if (isInformatico()) {
+      await exportStudyByIdAsZip(studyId, undefined, { anonymize: false });
+      openSelected.disabled = false;
+      return;
+    }
     await openStudy(studyId);
     closeServerScreen();
     showBanner(t("server.studyLoadedBanner"));
@@ -285,6 +304,11 @@ export function initServerScreen(): void {
       summary.duplicates === 0 &&
       summary.ok > 0;
     if (!clean) return;
+    // informatico stays on the upload screen: it has no viewer access.
+    if (isInformatico()) {
+      showBanner(t("upload.uploadedBanner", { count: summary.ok }), "success");
+      return;
+    }
     if (summary.studyId) await openStudy(summary.studyId);
     closeServerScreen();
     showBanner(

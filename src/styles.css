@@ -2510,6 +2510,18 @@ body {
   justify-content: flex-end;
 }
 
+/* #forgot-dialog is a .dialog <div> wrapping two <form> steps, so the .dialog
+   flex gap only spaces the forms from each other — not the message, fields and
+   action row inside each form, which would otherwise stack flush together (the
+   send-code / cancel button row sitting right against the email input). Repeat
+   the column layout on the forms so their contents breathe the same way the
+   single-form dialogs (invite, server-config) already do. */
+#forgot-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .login-field {
   display: flex;
   flex-direction: column;

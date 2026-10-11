@@ -735,7 +735,7 @@ export const en: Record<string, string> = {
     "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
   "tour.staff.uploadStatus.title": "Progress & status",
   "tour.staff.uploadStatus.body":
-    "Track per-file progress and status here as your studies upload.",
+    "Follow the whole upload here: one percentage, the current step, and the estimated time left.",
   "tour.staff.zenodoImport.title": "Zenodo datasets",
   "tour.staff.zenodoImport.body":
     "Search Zenodo's public corpus and import datasets straight into the server.",

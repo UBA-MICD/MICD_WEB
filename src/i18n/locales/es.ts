@@ -742,7 +742,7 @@ export const es: Record<string, string> = {
     "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
   "tour.staff.uploadStatus.title": "Progreso y estado",
   "tour.staff.uploadStatus.body":
-    "Sigue aquí el progreso y el estado de cada archivo mientras se suben tus estudios.",
+    "Seguí aquí toda la carga: un solo porcentaje, el paso actual y el tiempo restante estimado.",
   "tour.staff.zenodoImport.title": "Conjuntos de datos de Zenodo",
   "tour.staff.zenodoImport.body":
     "Busca en el corpus público de Zenodo e importa conjuntos de datos directamente al servidor.",

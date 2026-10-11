@@ -345,7 +345,7 @@ const staffSteps: TourStep[] = [
   {
     id: "staff.uploadStatus",
     roles: ["medico", "admin"],
-    target: "#upload-rows",
+    target: "#upload-progress",
     screen: "server",
     tab: "cargar",
     titleKey: "tour.staff.uploadStatus.title",

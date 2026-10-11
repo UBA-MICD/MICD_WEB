@@ -39,7 +39,10 @@ declare global {
        * it, upload.ts sends the file to the local anonymization service
        * (upload/local-anonymizer.ts) — never to the backend un-anonymized.
        */
-      anonymizeDicom?: (data: ArrayBuffer) => Promise<ArrayBuffer>;
+      anonymizeDicom?: (
+        data: ArrayBuffer,
+        filename?: string,
+      ) => Promise<ArrayBuffer>;
       getApiOrigin: () => Promise<string>;
       setApiOrigin: (origin: string) => Promise<void>;
     };

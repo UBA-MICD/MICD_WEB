@@ -16,8 +16,7 @@ import { loadStudyExplorer, markStudyAsNew } from "../explorer/explorer.js";
 import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
-  anonymizeWithLocalService,
-  anonymizerUrl,
+  anonymizeDicomBytes,
   AnonymizerUnavailableError,
   isAnonymizerAvailable,
 } from "./local-anonymizer.js";
@@ -343,10 +342,7 @@ async function startUpload(files: File[]): Promise<void> {
   }
   if (!(await anonymizerReady())) {
     uploading = false;
-    showUploadStatus(
-      t("upload.anonymizerUnavailable", { url: anonymizerUrl() }),
-      "error",
-    );
+    showUploadStatus(t("upload.anonymizerUnavailable"), "error");
     return;
   }
   if (!(await confirmClassification(files.length))) {
@@ -439,9 +435,10 @@ export function isUploading(): boolean {
  * bytes, and callers must not send the file when it does.
  */
 async function anonymizeForUpload(file: File): Promise<File> {
-  const anonBuffer = window.api?.anonymizeDicom
-    ? await window.api.anonymizeDicom(await file.arrayBuffer())
-    : await anonymizeWithLocalService(file);
+  const anonBuffer = await anonymizeDicomBytes(
+    await file.arrayBuffer(),
+    file.name,
+  );
   return new File([anonBuffer], file.name, { type: "application/dicom" });
 }
 
@@ -453,7 +450,7 @@ async function anonymizerReady(): Promise<boolean> {
 
 function anonymizationErrorMessage(err: unknown, file: File): string {
   return err instanceof AnonymizerUnavailableError
-    ? t("upload.anonymizerUnavailable", { url: anonymizerUrl() })
+    ? t("upload.anonymizerUnavailable")
     : t("upload.anonymizationFailed", { name: file.name });
 }
 
@@ -781,10 +778,7 @@ export async function startExplorerUpload(
   }
   if (!(await anonymizerReady())) {
     uploading = false;
-    showToast(
-      t("upload.anonymizerUnavailable", { url: anonymizerUrl() }),
-      "error",
-    );
+    showToast(t("upload.anonymizerUnavailable"), "error");
     return;
   }
 

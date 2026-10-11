@@ -1,6 +1,7 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
+  anonymizeDicomBytes,
   anonymizerUrl,
   anonymizeWithLocalService,
   AnonymizationRejectedError,
@@ -80,4 +81,24 @@ test("isAnonymizerAvailable reflects the health check", async () => {
     throw new TypeError("Failed to fetch");
   }) as typeof fetch;
   assert.equal(await isAnonymizerAvailable(), false);
+});
+
+test("anonymizeDicomBytes passes the filename to the desktop seam", async () => {
+  const calls: Array<[ArrayBuffer, string | undefined]> = [];
+  const out = new Uint8Array([9]).buffer;
+  (globalThis as any).window = {
+    api: {
+      anonymizeDicom: async (data: ArrayBuffer, filename?: string) => {
+        calls.push([data, filename]);
+        return out;
+      },
+    },
+  };
+  try {
+    const input = new Uint8Array([1, 2]).buffer;
+    assert.equal(await anonymizeDicomBytes(input, "slice_0001.dcm"), out);
+    assert.deepEqual(calls, [[input, "slice_0001.dcm"]]);
+  } finally {
+    delete (globalThis as any).window;
+  }
 });

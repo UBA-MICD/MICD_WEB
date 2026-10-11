@@ -243,6 +243,46 @@ test("View3DViewer.startRenderLoop and stopRenderLoop control requestAnimationFr
   }
 });
 
+test("startRenderLoop renders on demand: redraws only when the scene changed", () => {
+  const viewer = new View3DViewer();
+  let renderCount = 0;
+  (viewer as any).render = () => {
+    renderCount++;
+  };
+
+  let loopCb: ((t: number) => void) | null = null;
+  const originalRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = ((cb: any) => {
+    loopCb = cb;
+    return 1;
+  }) as any;
+
+  try {
+    viewer.isActive = true;
+    const canvas: any = {
+      clientWidth: 400,
+      clientHeight: 400,
+      width: 400,
+      height: 400,
+    };
+    viewer.startRenderLoop(canvas);
+
+    loopCb!(0); // first frame always draws
+    loopCb!(0); // nothing changed → no extra GPU work
+    assert.equal(renderCount, 1, "an idle scene must not redraw every frame");
+
+    viewer.camera.zoom = 2; // the scene changed
+    loopCb!(0);
+    assert.equal(
+      renderCount,
+      2,
+      "a camera change must trigger exactly one redraw",
+    );
+  } finally {
+    globalThis.requestAnimationFrame = originalRaf;
+  }
+});
+
 test("View3DViewer.render safely handles canvas with 0 dimensions without throwing", () => {
   const viewer = new View3DViewer();
   const mockGL = createMockWebGL2Context();
@@ -361,6 +401,29 @@ test("View3DViewer.initGL attaches both vertex and fragment shaders before linki
     attachedShaders.length,
     2,
     "Both VS and FS must be attached to the program",
+  );
+});
+
+test("View3DViewer.initGL reuses the program on re-entry (no per-entry GPU leak)", () => {
+  const viewer = new View3DViewer();
+  let programsCreated = 0;
+  const mockGL = {
+    ...createMockWebGL2Context(),
+    createProgram: () => {
+      programsCreated++;
+      return {};
+    },
+  };
+  const canvas: any = {
+    getContext: (type: string) => (type === "webgl2" ? mockGL : null),
+  };
+
+  assert.equal(viewer.initGL(canvas), true);
+  assert.equal(viewer.initGL(canvas), true); // simulates leaving and re-entering 3D
+  assert.equal(
+    programsCreated,
+    1,
+    "the shader program must be built once per context, not rebuilt on every 3D entry",
   );
 });
 

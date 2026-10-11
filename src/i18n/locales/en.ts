@@ -348,7 +348,7 @@ export const en: Record<string, string> = {
   "upload.fileTooLarge": "The file exceeds the 2 GB limit.",
   "upload.genericError": "Error uploading the file.",
   "upload.anonymizerUnavailable":
-    "The local anonymizer is not responding at {{url}}. Start it and try again: no file was sent.",
+    "Can't upload: the study couldn't be anonymized. Contact an administrator.",
   "upload.anonymizationFailed":
     "Could not anonymize {{name}}: the upload was cancelled and the file was not sent.",
   "upload.stateNotAnonymized": "Not anonymized: not sent",

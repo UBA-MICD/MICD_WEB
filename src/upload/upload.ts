@@ -580,13 +580,11 @@ async function uploadOne(
       } else if (xhr.status === 422 && isNotAnonymized(xhr.responseText)) {
         // TK-11 strict mode: the backend refused to store a study that still
         // carries identifying tags, and tells us which (names only).
-        addFailure(file, t("upload.stateNotAnonymized"));
-        showUploadStatus(
-          t("upload.notAnonymized", {
-            tags: reviewTagNames(xhr.responseText) || "—",
-          }),
-          "error",
-        );
+        // The tag names go in the failure entry too: the status line is
+        // replaced by the batch summary when the upload ends.
+        const tags = reviewTagNames(xhr.responseText) || "—";
+        addFailure(file, `${t("upload.stateNotAnonymized")} (${tags})`);
+        showUploadStatus(t("upload.notAnonymized", { tags }), "error");
       } else {
         const message =
           safeMessage(xhr.responseText) || t("upload.genericError");

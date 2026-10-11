@@ -1009,3 +1009,130 @@ test("estimateRemaining stays quiet early on, then projects from the average rat
   assert.equal(estimateRemaining(0.5, 10000), "menos de 1 min restante");
   assert.equal(estimateRemaining(0.25, 120000), "≈ 6 min restantes");
 });
+
+// ── Progress panel: every failure lands in the collapsed list ───────────────
+
+/** Starts a one-file Cargar-tab upload and returns its first XHR. */
+async function startPanelUpload(name = "slice.dcm"): Promise<FakeXHR> {
+  uploadPanelFixture();
+  await signIn();
+  initUploadPanel();
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  setInputFiles(input, [dcmFile(name)]);
+  input.dispatchEvent(new Event("change"));
+  await waitUntil(() => FakeXHR.instances.length > 0);
+  return FakeXHR.latest();
+}
+
+async function panelFinished(): Promise<HTMLElement> {
+  const panel = document.getElementById("upload-progress")!;
+  await waitUntil(
+    () =>
+      panel.classList.contains("upload-progress--done") ||
+      panel.classList.contains("upload-progress--error"),
+  );
+  return panel;
+}
+
+const failureText = (): string =>
+  document.querySelector("#upload-error-list li")?.textContent ?? "";
+
+for (const [label, drive, reason] of [
+  ["a network error", (x: FakeXHR) => x.fail(), t("upload.networkError")],
+  ["a 413", (x: FakeXHR) => x.respond(413, ""), t("upload.fileTooLarge")],
+  [
+    "a 422 PHI rejection",
+    (x: FakeXHR) =>
+      x.respond(
+        422,
+        JSON.stringify({
+          error: "not_anonymized",
+          tags: [{ name: "PatientName" }],
+        }),
+      ),
+    t("upload.stateNotAnonymized"),
+  ],
+  [
+    "a 500 with a server message",
+    (x: FakeXHR) => x.respond(500, JSON.stringify({ message: "disco lleno" })),
+    "disco lleno",
+  ],
+] as const) {
+  test(`progress panel: ${label} is listed as a failed file`, async () => {
+    const xhr = await startPanelUpload("bad.dcm");
+    drive(xhr);
+    const panel = await panelFinished();
+
+    assert.equal(panel.classList.contains("upload-progress--error"), true);
+    assert.equal(
+      document.getElementById("upload-progress-title")!.textContent,
+      t("upload.progressDoneWithErrors"),
+    );
+    assert.match(failureText(), /bad\.dcm/);
+    assert.ok(failureText().includes(reason), failureText());
+  });
+}
+
+test("progress panel: a 422 failure keeps the offending tag names after the summary", async () => {
+  const xhr = await startPanelUpload();
+  xhr.respond(
+    422,
+    JSON.stringify({ error: "not_anonymized", tags: [{ name: "PatientName" }] }),
+  );
+  await panelFinished();
+  assert.match(failureText(), /PatientName/);
+});
+
+/** Keeps the anonymizer stub, and answers /auth/refresh with `refresh`. */
+function withRefresh(refresh: () => Response): void {
+  const base = (globalThis as any).fetch;
+  (globalThis as any).fetch = async (input: string, init?: RequestInit) =>
+    String(input).includes("/auth/refresh") ? refresh() : base(input, init);
+}
+
+test("progress panel: a 401 refreshes the session and retries the file once", async () => {
+  const xhr = await startPanelUpload();
+  withRefresh(
+    () =>
+      new Response(
+        JSON.stringify({ accessToken: "new-token", refreshToken: "new-refresh" }),
+        { status: 200 },
+      ),
+  );
+  xhr.respond(401, "");
+  await waitUntil(() => FakeXHR.instances.length === 2);
+  FakeXHR.latest().respond(201, "{}");
+
+  const panel = await panelFinished();
+  assert.equal(panel.classList.contains("upload-progress--done"), true);
+});
+
+test("progress panel: a second 401 after the retry is listed as a failure", async () => {
+  const xhr = await startPanelUpload();
+  withRefresh(
+    () =>
+      new Response(
+        JSON.stringify({ accessToken: "new-token", refreshToken: "new-refresh" }),
+        { status: 200 },
+      ),
+  );
+  xhr.respond(401, "");
+  await waitUntil(() => FakeXHR.instances.length === 2);
+  FakeXHR.latest().respond(401, "");
+
+  await panelFinished();
+  assert.ok(failureText().includes(t("upload.unauthorizedRetry")), failureText());
+});
+
+test("progress panel: a 401 whose refresh fails is listed as session expired", async () => {
+  const xhr = await startPanelUpload();
+  withRefresh(() => new Response(null, { status: 401 }));
+  xhr.respond(401, "");
+
+  await panelFinished();
+  assert.equal(FakeXHR.instances.length, 1, "no retry without a session");
+  assert.ok(
+    failureText().includes(t("upload.sessionExpiredRetry")),
+    failureText(),
+  );
+});

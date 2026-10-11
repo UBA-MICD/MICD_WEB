@@ -15,6 +15,9 @@ import {
   closeServerScreen,
 } from "./server-screen.ts";
 import { currentScreen } from "../shared/screen.ts";
+import { hideBanner } from "../shared/banner.ts";
+import { initStudyExplorer } from "../explorer/explorer.ts";
+import { initUploadPanel } from "../upload/upload.ts";
 
 const SRC = join(import.meta.dirname, "..");
 const INCLUDE = /^\s*<!--\s*@include\s+(\S+)\s*-->\s*$/;
@@ -34,24 +37,90 @@ function pageBody(): string {
   return html.slice(html.indexOf("<body"), html.lastIndexOf("</body>"));
 }
 
+const STUDY = {
+  orthanc_study_id: "study-1",
+  modality: "CT",
+  patient_name: "ANON",
+  study_date: "20240101",
+  study_description: "Torax",
+  num_instances: 1,
+};
+
+/** Every URL the app fetched, so tests can assert what an action requested. */
+let fetched: string[] = [];
+
+const json = (body: unknown): Response =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+
+// Node has no XMLHttpRequest; uploads go through this stand-in. It is a Node
+// EventTarget (declared before installDom), so it must dispatch Node's Event.
+const NodeEvent = Event;
+class FakeXHR extends EventTarget {
+  static instances: FakeXHR[] = [];
+  upload = new EventTarget();
+  status = 0;
+  responseText = "";
+  constructor() {
+    super();
+    FakeXHR.instances.push(this);
+  }
+  open(): void {}
+  setRequestHeader(): void {}
+  send(): void {}
+  abort(): void {}
+  respond(status: number, body: string): void {
+    this.status = status;
+    this.responseText = body;
+    this.dispatchEvent(new NodeEvent("load"));
+  }
+}
+
 test.before(() => {
   installDom();
-  // Every server call answers an empty, successful list: these tests are
-  // about which controls a role sees, not about data.
-  (globalThis as any).fetch = async () =>
-    new Response(JSON.stringify({ studies: [], total: 0, page: 1 }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+  (globalThis as any).XMLHttpRequest = FakeXHR;
+  (globalThis as any).fetch = async (input: string, init?: RequestInit) => {
+    const url = String(input);
+    fetched.push(url);
+    if (url.endsWith("/anonymize/")) {
+      const file = (init?.body as FormData).get("file") as File;
+      return new Response(await file.arrayBuffer(), { status: 200 });
+    }
+    if (url.includes("/instances")) return json({ instances: [] });
+    if (url.includes("/v1/pathologies")) return json([]);
+    if (url.includes("/v1/studies")) {
+      return json({ studies: [STUDY], total: 1, page: 1, totalPages: 1 });
+    }
+    return json({});
+  };
   document.body.innerHTML = pageBody();
+  initStudyExplorer();
+  initUploadPanel();
   initServerScreen();
 });
-test.after(() => uninstallDom());
+test.after(() => {
+  hideBanner(); // clears its auto-dismiss timer before the DOM goes away
+  uninstallDom();
+});
 
 beforeEach(async () => {
   await logout();
   closeServerScreen();
+  fetched = [];
+  FakeXHR.instances = [];
+  hideBanner();
 });
+
+async function waitUntil(cond: () => boolean, maxTicks = 200): Promise<void> {
+  for (let i = 0; i < maxTicks && !cond(); i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
+}
+
+const requestedInstances = (): boolean =>
+  fetched.some((u) => u.includes(`/v1/studies/${STUDY.orthanc_study_id}/instances`));
 
 async function signInAs(role: Role): Promise<void> {
   const user: AuthUser = { id: 7, email: `${role}@micd.local`, role };
@@ -152,4 +221,69 @@ test("admin sees every tab and the settings gear", async () => {
   ]) {
     assert.equal(hidden(id), false, id);
   }
+});
+
+test("informatico: Descargar in Buscar downloads the selected study and stays put", async () => {
+  await signInAs("informatico");
+  openServerScreen("buscar");
+
+  const item = (): HTMLElement | null =>
+    document.querySelector<HTMLElement>(
+      `[data-explorer-view="server"] [data-id="${STUDY.orthanc_study_id}"]`,
+    );
+  await waitUntil(() => item() !== null);
+  item()!.click();
+
+  const button = document.getElementById("btn-open-selected") as HTMLButtonElement;
+  assert.equal(button.disabled, false);
+  button.click();
+  await waitUntil(requestedInstances);
+
+  assert.equal(requestedInstances(), true);
+  assert.equal(currentScreen(), "server");
+  await waitUntil(() => !button.disabled);
+  assert.equal(button.disabled, false, "re-enabled after the download");
+});
+
+test("informatico: clicking a study in the sidebar list downloads it", async () => {
+  await signInAs("informatico");
+  openServerScreen("buscar");
+
+  const item = (): HTMLElement | null =>
+    document.querySelector<HTMLElement>(
+      `[data-explorer-view]:not([data-explorer-view="server"]) [data-id="${STUDY.orthanc_study_id}"]`,
+    );
+  await waitUntil(() => item() !== null);
+  item()!.click();
+  await waitUntil(requestedInstances);
+
+  assert.equal(requestedInstances(), true);
+  assert.equal(currentScreen(), "server");
+});
+
+test("informatico: a clean upload ends with a banner and stays on Cargar", async () => {
+  await signInAs("informatico");
+  openServerScreen("cargar");
+
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  Object.defineProperty(input, "files", {
+    value: [new File(["dicom"], "a.dcm")],
+    configurable: true,
+  });
+  input.dispatchEvent(new Event("change"));
+
+  const dialog = document.getElementById("classify-dialog")!;
+  await waitUntil(() => !dialog.classList.contains("hidden"));
+  document.getElementById("classify-confirm")!.click();
+
+  await waitUntil(() => FakeXHR.instances.length > 0);
+  FakeXHR.instances[0]!.respond(
+    201,
+    JSON.stringify({ study: { orthanc_study_id: "new-study" } }),
+  );
+
+  const banner = document.getElementById("app-banner")!;
+  await waitUntil(() => banner.textContent !== "");
+  assert.equal(banner.textContent, "1 archivo(s) subido(s) correctamente");
+  assert.equal(currentScreen(), "server");
 });

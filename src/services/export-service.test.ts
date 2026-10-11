@@ -8,6 +8,7 @@ import {
   exportCurrentViewToPNG,
   exportCurrentStudyAsZip,
   exportStudyByIdAsZip,
+  mapInBatches,
   type StudyExportMetadata,
 } from "./export-service.ts";
 import { state } from "../viewer/state.ts";
@@ -529,4 +530,31 @@ test("exportStudyByIdAsZip success case: fetches instances iteratively and creat
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("mapInBatches keeps input order and caps concurrency at the batch size", async () => {
+  let inFlight = 0;
+  let peak = 0;
+  const out = await mapInBatches([5, 1, 4, 2, 3], 2, async (n, i) => {
+    inFlight++;
+    peak = Math.max(peak, inFlight);
+    await new Promise((r) => setTimeout(r, n));
+    inFlight--;
+    return `${i}:${n}`;
+  });
+  assert.deepEqual(out, ["0:5", "1:1", "2:4", "3:2", "4:3"]);
+  assert.equal(peak, 2);
+});
+
+test("mapInBatches rejects on the first failure and starts no later batch", async () => {
+  const seen: number[] = [];
+  await assert.rejects(
+    mapInBatches([1, 2, 3, 4], 2, async (n) => {
+      seen.push(n);
+      if (n === 2) throw new Error("boom");
+      return n;
+    }),
+    /boom/,
+  );
+  assert.deepEqual(seen, [1, 2]);
 });

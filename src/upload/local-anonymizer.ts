@@ -135,7 +135,7 @@ export async function anonymizeDicomBytes(
   const seam =
     typeof window !== "undefined" ? window.api?.anonymizeDicom : undefined;
   return seam
-    ? seam(data)
+    ? seam(data, filename)
     : postToService(
         new File([data], filename, { type: "application/dicom" }),
         filename,

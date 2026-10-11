@@ -153,6 +153,27 @@ export async function exportCurrentViewToPNG(
   });
 }
 
+// Files fetched/anonymized at once: enough to hide per-file latency on large
+// series without flooding the anonymization service or holding a whole CT in memory.
+export const EXPORT_CONCURRENCY = 8;
+
+/**
+ * Maps `items` through `fn` with at most `batchSize` calls in flight, keeping
+ * input order. Rejects on the first failure, so an export still fails closed.
+ */
+export async function mapInBatches<T, R>(
+  items: readonly T[],
+  batchSize: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let start = 0; start < items.length; start += batchSize) {
+    const batch = items.slice(start, start + batchSize);
+    out.push(...(await Promise.all(batch.map((item, j) => fn(item, start + j)))));
+  }
+  return out;
+}
+
 /**
  * Packages multiple files into a single .zip Blob using fflate.
  *
@@ -199,32 +220,28 @@ export async function exportCurrentStudyAsZip(
         "warning",
       );
 
-      for (let i = 0; i < instances.length; i++) {
-        const instanceId = instances[i];
-        let buf: ArrayBuffer | undefined = undefined;
-
-        // Try cache first
-        const cached = dicomCache.get(i);
-        if (cached?.rawDataSet?.byteArray?.buffer) {
-          buf = cached.rawDataSet.byteArray.buffer.slice(0);
-        } else {
-          const res = await fetchInstanceFile(studyId, instanceId);
-          if (!res.ok)
-            throw new Error(
-              t("export.instanceDownloadError", { index: i + 1 }),
-            );
-          buf = await res.arrayBuffer();
-        }
-
-        if (anonymize && buf) {
-          buf = await anonymizeDicomBytes(buf, "instance.dcm");
-        }
-
-        if (buf) {
-          const numStr = String(i + 1).padStart(4, "0");
-          filesToZip.push({ name: `slice_${numStr}.dcm`, buffer: buf });
-        }
-      }
+      const slices = await mapInBatches(
+        instances,
+        EXPORT_CONCURRENCY,
+        async (instanceId, i) => {
+          const name = `slice_${String(i + 1).padStart(4, "0")}.dcm`;
+          let buf: ArrayBuffer;
+          const cached = dicomCache.get(i);
+          if (cached?.rawDataSet?.byteArray?.buffer) {
+            buf = cached.rawDataSet.byteArray.buffer.slice(0);
+          } else {
+            const res = await fetchInstanceFile(studyId, instanceId);
+            if (!res.ok)
+              throw new Error(
+                t("export.instanceDownloadError", { index: i + 1 }),
+              );
+            buf = await res.arrayBuffer();
+          }
+          if (anonymize) buf = await anonymizeDicomBytes(buf, name);
+          return { name, buffer: buf };
+        },
+      );
+      filesToZip.push(...slices);
 
       if (state.parsed?.metadata) {
         meta = {
@@ -235,17 +252,17 @@ export async function exportCurrentStudyAsZip(
       }
     } else if (state.files.length > 0) {
       // Local files
-      for (let i = 0; i < state.files.length; i++) {
-        const file = state.files[i];
-        let buf = await file.arrayBuffer();
-        if (anonymize) {
-          buf = await anonymizeDicomBytes(buf, file.name || "instance.dcm");
-        }
-        filesToZip.push({
-          name: file.name || `image_${i + 1}.dcm`,
-          buffer: buf,
-        });
-      }
+      const localFiles = await mapInBatches(
+        state.files,
+        EXPORT_CONCURRENCY,
+        async (file, i) => {
+          const name = file.name || `image_${i + 1}.dcm`;
+          let buf = await file.arrayBuffer();
+          if (anonymize) buf = await anonymizeDicomBytes(buf, name);
+          return { name, buffer: buf };
+        },
+      );
+      filesToZip.push(...localFiles);
 
       if (state.parsed?.metadata) {
         meta = {
@@ -302,22 +319,19 @@ export async function exportStudyByIdAsZip(
       t("export.downloadingFiles", { count: instanceIds.length }),
       "warning",
     );
-    const filesToZip: Array<{ name: string; buffer: ArrayBuffer }> = [];
-
-    for (let i = 0; i < instanceIds.length; i++) {
-      const instId = instanceIds[i];
-      const fRes = await fetchInstanceFile(studyId, instId);
-      if (!fRes.ok)
-        throw new Error(t("export.fileFetchError", { index: i + 1 }));
-      let buf = await fRes.arrayBuffer();
-
-      if (anonymize) {
-        buf = await anonymizeDicomBytes(buf, "instance.dcm");
-      }
-
-      const numStr = String(i + 1).padStart(4, "0");
-      filesToZip.push({ name: `instance_${numStr}.dcm`, buffer: buf });
-    }
+    const filesToZip = await mapInBatches(
+      instanceIds,
+      EXPORT_CONCURRENCY,
+      async (instId, i) => {
+        const name = `instance_${String(i + 1).padStart(4, "0")}.dcm`;
+        const fRes = await fetchInstanceFile(studyId, instId);
+        if (!fRes.ok)
+          throw new Error(t("export.fileFetchError", { index: i + 1 }));
+        let buf = await fRes.arrayBuffer();
+        if (anonymize) buf = await anonymizeDicomBytes(buf, name);
+        return { name, buffer: buf };
+      },
+    );
 
     const zipFilename = generateDescriptiveFilename(studyMeta, "zip");
     const saved = await downloadBlob(buildStudyZip(filesToZip), zipFilename);

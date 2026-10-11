@@ -17,7 +17,6 @@ import { showToast } from "../shared/banner.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
   anonymizeDicomBytes,
-  anonymizerUrl,
   AnonymizerUnavailableError,
   isAnonymizerAvailable,
 } from "./local-anonymizer.js";
@@ -344,10 +343,7 @@ async function startUpload(files: File[]): Promise<void> {
   }
   if (!(await anonymizerReady())) {
     uploading = false;
-    showUploadStatus(
-      t("upload.anonymizerUnavailable", { url: anonymizerUrl() }),
-      "error",
-    );
+    showUploadStatus(t("upload.anonymizerUnavailable"), "error");
     return;
   }
   if (!(await confirmClassification(files.length))) {
@@ -454,7 +450,7 @@ async function anonymizerReady(): Promise<boolean> {
 
 function anonymizationErrorMessage(err: unknown, file: File): string {
   return err instanceof AnonymizerUnavailableError
-    ? t("upload.anonymizerUnavailable", { url: anonymizerUrl() })
+    ? t("upload.anonymizerUnavailable")
     : t("upload.anonymizationFailed", { name: file.name });
 }
 
@@ -752,10 +748,7 @@ export async function startExplorerUpload(
   }
   if (!(await anonymizerReady())) {
     uploading = false;
-    showToast(
-      t("upload.anonymizerUnavailable", { url: anonymizerUrl() }),
-      "error",
-    );
+    showToast(t("upload.anonymizerUnavailable"), "error");
     return;
   }
 

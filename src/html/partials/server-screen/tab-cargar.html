@@ -36,11 +36,44 @@
       </div>
     </div>
 
-    <!-- One row per file. Not a live region: per-byte updates would
-               flood a screen reader. The per-file count below is announced
-               instead, and each bar carries aria-valuenow for on-demand
-               reading. -->
-    <ul class="upload-rows" id="upload-rows"></ul>
+    <!-- One panel for the whole upload, however many files (slices) it has.
+         Not a live region: per-byte updates would flood a screen reader. The
+         start and the final summary are announced via #upload-status, and
+         the bar carries aria-valuenow for on-demand reading. -->
+    <section
+      class="upload-progress hidden"
+      id="upload-progress"
+      aria-labelledby="upload-progress-title"
+    >
+      <div class="upload-progress__head">
+        <h3 class="upload-progress__title" id="upload-progress-title"></h3>
+        <span
+          class="upload-progress__pct"
+          id="upload-percent"
+          aria-hidden="true"
+        ></span>
+      </div>
+      <div
+        class="upload-progress__track"
+        id="upload-track"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        data-i18n-attr="aria-label:upload.progressLabel"
+        aria-label="Progreso de la carga"
+      >
+        <span class="upload-progress__bar" id="upload-bar"></span>
+      </div>
+      <p class="upload-progress__meta">
+        <span id="upload-phase"></span>
+        <span class="upload-progress__bytes" id="upload-bytes"></span>
+      </p>
+      <details class="upload-errors hidden" id="upload-errors">
+        <summary id="upload-errors-summary"></summary>
+        <ul class="upload-errors__list" id="upload-error-list"></ul>
+      </details>
+    </section>
 
     <p class="upload-summary">
       <span
@@ -48,11 +81,6 @@
         class="upload-status"
         role="status"
         aria-live="polite"
-      ></span>
-      <span
-        id="upload-percent"
-        class="upload-percent"
-        aria-hidden="true"
       ></span>
     </p>
 

@@ -10,6 +10,8 @@ import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../test/dom-setup.ts";
 import { adoptSession, logout, type AuthUser } from "../auth/auth.ts";
 import {
+  estimateRemaining,
+  formatBytes,
   getLastUploadedStudyId,
   onUploadComplete,
   cancelUpload,
@@ -69,6 +71,13 @@ class FakeXHR extends EventTarget {
     const xhr = FakeXHR.instances[FakeXHR.instances.length - 1];
     if (!xhr) throw new Error("no FakeXHR created yet");
     return xhr;
+  }
+}
+
+/** Lets the async anonymize → upload chain run; fails loudly if it never settles. */
+async function waitUntil(cond: () => boolean, maxTicks = 100): Promise<void> {
+  for (let i = 0; i < maxTicks && !cond(); i++) {
+    await new Promise((r) => setTimeout(r, 0));
   }
 }
 
@@ -339,9 +348,7 @@ test("startExplorerUpload sends the raw file only to the local anonymizer, and u
 
   const file = new File([new Uint8Array([0xff, 0xff, 0x42])], "phi.dcm");
   const done = startExplorerUpload([file], statusEl);
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
 
   assert.equal(anonymizerCalls.length, 1);
   assert.deepEqual(
@@ -376,9 +383,7 @@ test("startExplorerUpload uses window.api.anonymizeDicom (desktop) when present"
 
   const file = new File([new Uint8Array([0x11, 0x22, 0x33])], "phi.dcm");
   const done = startExplorerUpload([file], statusEl);
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
 
   const sentFile = FakeXHR.latest().sentBody?.get("file") as File;
   const sentBytes = new Uint8Array(await sentFile.arrayBuffer());
@@ -487,9 +492,20 @@ function uploadPanelFixture(): void {
     <div id="upload-drop"></div>
     <button id="btn-refresh-studies">Actualizar</button>
     <p id="upload-note"></p>
-    <ul id="upload-rows"></ul>
+    <section id="upload-progress" class="hidden">
+      <h3 id="upload-progress-title"></h3>
+      <span id="upload-percent"></span>
+      <div id="upload-track" role="progressbar" aria-valuenow="0">
+        <span id="upload-bar"></span>
+      </div>
+      <span id="upload-phase"></span>
+      <span id="upload-bytes"></span>
+      <details id="upload-errors" class="hidden">
+        <summary id="upload-errors-summary"></summary>
+        <ul id="upload-error-list"></ul>
+      </details>
+    </section>
     <div id="upload-status"></div>
-    <span id="upload-percent"></span>
     <button id="btn-upload-finish">Finalizar</button>
     <div id="duplicate-dialog" class="hidden">
       <div class="dialog" role="dialog" aria-modal="true">
@@ -524,7 +540,7 @@ test("initUploadPanel: btn-upload-server gates the file picker on auth", async (
   assert.equal(clicked, true);
 });
 
-test("initUploadPanel: file input change uploads via rows and reaches 100%", async () => {
+test("initUploadPanel: one progress panel tracks the upload and reaches 100%", async () => {
   uploadPanelFixture();
   await signIn();
   initUploadPanel();
@@ -534,27 +550,31 @@ test("initUploadPanel: file input change uploads via rows and reaches 100%", asy
   input.dispatchEvent(new Event("change"));
 
   // expandFiles/collectDicomFiles are real async work before startUpload runs.
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
   const xhr = FakeXHR.latest();
-  xhr.progress(50, 100);
+  const panel = document.getElementById("upload-progress")!;
+  assert.equal(panel.classList.contains("hidden"), false);
+  assert.match(
+    document.getElementById("upload-phase")!.textContent!,
+    /Subiendo archivo 1 de 1/,
+  );
 
-  const row = document.querySelector(".upload-row") as HTMLElement;
-  assert.equal(row.querySelector(".upload-row__pct")!.textContent, "50%");
+  xhr.progress(50, 100);
+  assert.equal(document.getElementById("upload-percent")!.textContent, "50%");
+  assert.equal(
+    document.getElementById("upload-track")!.getAttribute("aria-valuenow"),
+    "50",
+  );
 
   xhr.respond(
     201,
     JSON.stringify({ study: { orthanc_study_id: "row-study" } }),
   );
-  await new Promise((r) => setTimeout(r, 0));
-  await new Promise((r) => setTimeout(r, 0));
+  await waitUntil(() => panel.classList.contains("upload-progress--done"));
 
-  assert.equal(row.classList.contains("upload-row--ok"), true);
-  assert.equal(
-    document.getElementById("upload-percent")!.textContent,
-    " · 100%",
-  );
+  assert.equal(panel.classList.contains("upload-progress--done"), true);
+  assert.equal(document.getElementById("upload-percent")!.textContent, "100%");
+  assert.equal(document.querySelectorAll(".upload-row").length, 0);
   assert.equal(
     (document.getElementById("btn-upload-finish") as HTMLButtonElement)
       .disabled,
@@ -562,7 +582,7 @@ test("initUploadPanel: file input change uploads via rows and reaches 100%", asy
   );
 });
 
-test("initUploadPanel: a file that can't be anonymized fails its row and is never sent", async () => {
+test("initUploadPanel: a file that can't be anonymized is listed as failed and never sent", async () => {
   anonymizerReply = async () => new Response("bad", { status: 400 });
   uploadPanelFixture();
   await signIn();
@@ -572,17 +592,17 @@ test("initUploadPanel: a file that can't be anonymized fails its row and is neve
   setInputFiles(input, [dcmFile("raw.dcm")]);
   input.dispatchEvent(new Event("change"));
 
-  const row = () => document.querySelector(".upload-row") as HTMLElement | null;
-  for (let i = 0; i < 10 && !row()?.classList.contains("upload-row--error"); i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  const errors = document.getElementById("upload-errors")!;
+  await waitUntil(() => !errors.classList.contains("hidden"));
 
   assert.equal(FakeXHR.instances.length, 0, "no request may carry the raw file");
-  assert.equal(row()!.classList.contains("upload-row--error"), true);
-  assert.equal(
-    row()!.querySelector(".upload-row__pct")!.textContent,
-    "No anonimizado: no enviado",
+  assert.match(
+    document.getElementById("upload-errors-summary")!.textContent!,
+    /\(1\)/,
   );
+  const item = document.querySelector("#upload-error-list li")!.textContent!;
+  assert.match(item, /raw\.dcm/);
+  assert.match(item, /No anonimizado: no enviado/);
 });
 
 test("initUploadPanel: folder input change collects and uploads files", async () => {
@@ -596,9 +616,7 @@ test("initUploadPanel: folder input change collects and uploads files", async ()
   setInputFiles(input, [dcmFile("folder-a.dcm")]);
   input.dispatchEvent(new Event("change"));
 
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
   assert.equal(FakeXHR.instances.length, 1);
   FakeXHR.latest().respond(201, "{}");
   await new Promise((r) => setTimeout(r, 0));
@@ -647,9 +665,7 @@ test("initUploadPanel: classify dialog holds the upload until confirmed", async 
     document.getElementById("upload-classification") as HTMLSelectElement
   ).value = "3";
   document.getElementById("classify-confirm")!.click();
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
   assert.equal(dialog.classList.contains("hidden"), true);
   assert.equal(FakeXHR.latest().sentBody!.get("classification_id"), "3");
   FakeXHR.latest().respond(201, "{}");
@@ -681,9 +697,7 @@ test("initUploadPanel: shows an error status when uploading twice concurrently",
   const input = document.getElementById("upload-input") as HTMLInputElement;
   setInputFiles(input, [dcmFile()]);
   input.dispatchEvent(new Event("change"));
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
 
   setInputFiles(input, [dcmFile("second.dcm")]);
   input.dispatchEvent(new Event("change"));
@@ -704,9 +718,7 @@ test("initUploadPanel: duplicate dialog 'replace' re-uploads with force=true", a
   const input = document.getElementById("upload-input") as HTMLInputElement;
   setInputFiles(input, [dcmFile("dup.dcm")]);
   input.dispatchEvent(new Event("change"));
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
 
   FakeXHR.latest().respond(409, JSON.stringify({ message: "ya existe" }));
   await new Promise((r) => setTimeout(r, 0));
@@ -719,7 +731,7 @@ test("initUploadPanel: duplicate dialog 'replace' re-uploads with force=true", a
   );
 
   (document.getElementById("duplicate-yes") as HTMLButtonElement).click();
-  await new Promise((r) => setTimeout(r, 0));
+  await waitUntil(() => FakeXHR.instances.length === 2);
 
   assert.equal(dialog.classList.contains("hidden"), true);
   assert.equal(FakeXHR.instances.length, 2);
@@ -737,9 +749,7 @@ test("initUploadPanel: duplicate dialog 'no' keeps the outcome as duplicate", as
   const input = document.getElementById("upload-input") as HTMLInputElement;
   setInputFiles(input, [dcmFile("dup2.dcm")]);
   input.dispatchEvent(new Event("change"));
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
 
   FakeXHR.latest().respond(409, "");
   await new Promise((r) => setTimeout(r, 0));
@@ -747,9 +757,47 @@ test("initUploadPanel: duplicate dialog 'no' keeps the outcome as duplicate", as
   (document.getElementById("duplicate-no") as HTMLButtonElement).click();
   await new Promise((r) => setTimeout(r, 0));
 
-  const row = document.querySelector(".upload-row") as HTMLElement;
-  assert.equal(row.classList.contains("upload-row--duplicate"), true);
+  await waitUntil(() =>
+    /ya existían/.test(document.getElementById("upload-status")!.textContent!),
+  );
+  assert.match(
+    document.getElementById("upload-status")!.textContent!,
+    /1 ya existían/,
+  );
   assert.equal(FakeXHR.instances.length, 1);
+});
+
+test("initUploadPanel: the duplicate answer is asked once and reused for the batch", async () => {
+  uploadPanelFixture();
+  await signIn();
+  initUploadPanel();
+
+  const input = document.getElementById("upload-input") as HTMLInputElement;
+  setInputFiles(input, [dcmFile("s1.dcm"), dcmFile("s2.dcm")]);
+  input.dispatchEvent(new Event("change"));
+  await waitUntil(() => FakeXHR.instances.length > 0);
+
+  const dialog = document.getElementById("duplicate-dialog")!;
+  FakeXHR.instances[0]!.respond(409, "");
+  await waitUntil(() => !dialog.classList.contains("hidden"));
+  assert.match(
+    document.getElementById("duplicate-msg")!.textContent!,
+    /todos los archivos repetidos/,
+  );
+  (document.getElementById("duplicate-no") as HTMLButtonElement).click();
+
+  await waitUntil(() => FakeXHR.instances.length === 2);
+  FakeXHR.instances[1]!.respond(409, "");
+  await waitUntil(() =>
+    /ya existían/.test(document.getElementById("upload-status")!.textContent!),
+  );
+
+  assert.equal(dialog.classList.contains("hidden"), true, "asked only once");
+  assert.equal(FakeXHR.instances.length, 2, "skipped, never forced");
+  assert.match(
+    document.getElementById("upload-status")!.textContent!,
+    /2 ya existían/,
+  );
 });
 
 test("initUploadPanel: cancelling mid-upload marks the summary cancelled", async () => {
@@ -765,9 +813,7 @@ test("initUploadPanel: cancelling mid-upload marks the summary cancelled", async
   const input = document.getElementById("upload-input") as HTMLInputElement;
   setInputFiles(input, [dcmFile("a.dcm"), dcmFile("b.dcm")]);
   input.dispatchEvent(new Event("change"));
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
 
   cancelUpload();
   await new Promise((r) => setTimeout(r, 0));
@@ -821,13 +867,14 @@ test("initUploadPanel: dropping a folder uploads the files inside it", async () 
   });
   document.getElementById("upload-drop")!.dispatchEvent(dropEvt);
 
-  for (let i = 0; i < 10 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
-  assert.equal(document.querySelectorAll(".upload-row").length, 3);
-  for (let n = 0; n < 3; n++) {
+  await waitUntil(() => FakeXHR.instances.length > 0);
+  assert.equal(
+    document.getElementById("upload-progress-title")!.textContent,
+    "Subiendo estudio · 3 archivos",
+  );
+  for (let n = 1; n <= 3; n++) {
+    await waitUntil(() => FakeXHR.instances.length === n);
     FakeXHR.latest().respond(201, "{}");
-    await new Promise((r) => setTimeout(r, 0));
   }
 });
 
@@ -852,9 +899,7 @@ test("initUploadPanel: drop zone toggles drag-over and uploads dropped files", a
   });
   zone.dispatchEvent(dropEvt);
 
-  for (let i = 0; i < 5 && FakeXHR.instances.length === 0; i++) {
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  await waitUntil(() => FakeXHR.instances.length > 0);
   assert.equal(zone.classList.contains("drag-over"), false);
   assert.equal(FakeXHR.instances.length, 1);
   FakeXHR.latest().respond(201, "{}");
@@ -914,4 +959,18 @@ test("initUploadPanel: renders the unencrypted-transport note over http", () => 
   initUploadPanel();
   const note = document.getElementById("upload-note")!.textContent ?? "";
   assert.notEqual(note, "");
+});
+
+test("formatBytes picks KB, MB or GB", () => {
+  assert.equal(formatBytes(512), "1 KB");
+  assert.equal(formatBytes(5 * 1024 * 1024), "5.0 MB");
+  assert.equal(formatBytes(1.5 * 1024 ** 3), "1.5 GB");
+});
+
+test("estimateRemaining stays quiet early on, then projects from the average rate", () => {
+  assert.equal(estimateRemaining(0.5, 1000), "", "too early");
+  assert.equal(estimateRemaining(0.01, 60000), "", "too little progress");
+  assert.equal(estimateRemaining(1, 60000), "", "done");
+  assert.equal(estimateRemaining(0.5, 10000), "menos de 1 min restante");
+  assert.equal(estimateRemaining(0.25, 120000), "≈ 6 min restantes");
 });

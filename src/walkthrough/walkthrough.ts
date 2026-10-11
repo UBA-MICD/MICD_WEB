@@ -16,12 +16,9 @@ import { createOverlay, type Overlay, type Placement } from "./overlay.js";
 
 export type { Placement };
 
-const ALL_ROLES: readonly Role[] = [
-  "admin",
-  "medico",
-  "investigador",
-  "informatico",
-];
+// The roles that share the viewer core. informatico is left out on purpose:
+// its tour is only upload + download, so it never gets the common steps.
+const ALL_ROLES: readonly Role[] = ["admin", "medico", "investigador"];
 
 export interface TourStep {
   id: string;

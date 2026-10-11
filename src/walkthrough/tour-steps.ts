@@ -14,7 +14,7 @@ import type { Role } from "../auth/auth.js";
 import type { TourStep } from "./walkthrough.js";
 
 /** Shown to every signed-in role, and to a guest (see `isCommonStep`). */
-const ALL: Role[] = ["admin", "medico", "investigador", "informatico"];
+const ALL: Role[] = ["admin", "medico", "investigador"];
 
 // ── A. Common core — viewer basics ─────────────────────────────────────────────
 
@@ -210,20 +210,11 @@ const investigadorSteps: TourStep[] = [
 ];
 
 // ── B2. informatico — clinic IT: upload and download only ──────────────────────
+//
+// No viewer core: the role can't use the viewer, so its whole tour is
+// uploading, then downloading.
 
 const informaticoSteps: TourStep[] = [
-  {
-    id: "inf.download",
-    roles: ["informatico"],
-    target: "#btn-open-selected",
-    screen: "server",
-    tab: "buscar",
-    titleKey: "tour.informatico.download.title",
-    bodyKey: "tour.informatico.download.body",
-    placement: "top",
-    optional: true,
-    advance: { on: "next" },
-  },
   {
     id: "inf.upload",
     roles: ["informatico"],
@@ -233,6 +224,18 @@ const informaticoSteps: TourStep[] = [
     titleKey: "tour.informatico.upload.title",
     bodyKey: "tour.informatico.upload.body",
     placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inf.download",
+    roles: ["informatico"],
+    target: "#btn-open-selected",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.informatico.download.title",
+    bodyKey: "tour.informatico.download.body",
+    placement: "top",
     optional: true,
     advance: { on: "next" },
   },

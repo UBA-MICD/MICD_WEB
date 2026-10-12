@@ -16,6 +16,8 @@ import { createOverlay, type Overlay, type Placement } from "./overlay.js";
 
 export type { Placement };
 
+// The roles that share the viewer core. informatico is left out on purpose:
+// its tour is only upload + download, so it never gets the common steps.
 const ALL_ROLES: readonly Role[] = ["admin", "medico", "investigador"];
 
 export interface TourStep {
@@ -99,6 +101,16 @@ function resolveTarget(step: TourStep): HTMLElement | null {
   } catch {
     return null; // malformed selector — treat as a missing target
   }
+}
+
+/** A target that resolved but has no layout box — hidden via display:none, a
+ *  collapsed panel, or sitting on the inactive (hidden) screen/tab — is, for
+ *  tour purposes, the same as missing: its rect is 0×0, so the spotlight would
+ *  land on nothing and the popover would jump to the top-left corner instead of
+ *  the control. `offsetParent` is this codebase's visibility check (see the
+ *  overlay focus trap and roving groups); it is null exactly in those cases. */
+function isTargetVisible(el: HTMLElement | null): el is HTMLElement {
+  return el !== null && el.offsetParent !== null;
 }
 
 function nextFrame(): Promise<void> {
@@ -202,9 +214,15 @@ async function enterStep(i: number): Promise<void> {
   await nextFrame();
   if (token !== runToken || !active) return;
 
-  const target = resolveTarget(step);
-  if (!target && !isCenter(step) && step.optional) {
-    // Target hidden for this role/state — skip cleanly rather than stall.
+  // A target that is absent *or* present-but-hidden (display:none, a collapsed
+  // panel, the inactive screen/tab) can't be spotlighted — its rect is 0×0, so
+  // the popover would jump to the corner instead of the control. Treat both the
+  // same: skip if the step is optional, otherwise fall back to a centered,
+  // spotlight-free popover so the copy stays readable on screen.
+  const resolved = resolveTarget(step);
+  const target = isCenter(step) || isTargetVisible(resolved) ? resolved : null;
+  if (target === null && !isCenter(step) && step.optional) {
+    // Nothing to point at for this role/state — skip cleanly rather than stall.
     if (i >= steps.length - 1) {
       finish("completed");
     } else {

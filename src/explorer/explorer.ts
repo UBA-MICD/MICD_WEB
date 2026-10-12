@@ -2,7 +2,9 @@ import {
   authFetch,
   ensureAuthenticated,
   isAuthenticated,
+  isInformatico,
 } from "../auth/auth.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
 import { fetchStudies, serverFetch } from "../services/api.js";
 import { escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
@@ -37,6 +39,8 @@ interface StudyRecord {
   validation_status?: string | null;
   validated_by?: string | null;
   validated_at?: string | null;
+  classification_id?: number | null;
+  classification_key?: string | null;
 }
 
 interface StudiesResponse {
@@ -173,6 +177,8 @@ function wireView(view: ExplorerView): void {
 
     if (view.mode === "select") {
       setSelected(studyId);
+    } else if (isInformatico()) {
+      void exportStudyByIdAsZip(studyId, undefined, { anonymize: false });
     } else {
       void openStudy(studyId);
     }
@@ -525,6 +531,7 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
         <span class="study-item__badge">${modality}</span>
         ${imgLabel}
         ${s.validation_status ? `<span class="study-item__validation-badge study-item__validation-badge--${escapeAttr(s.validation_status)}">${escapeHtml(t(`validation.status.${s.validation_status}`))}</span>` : ""}
+        ${s.classification_key ? `<span class="study-item__classification-badge study-item__classification-badge--${escapeAttr(s.classification_key)}">${escapeHtml(t(`classification.${s.classification_key}`))}</span>` : `<span class="study-item__classification-badge study-item__classification-badge--none">${escapeHtml(t("classification.none"))}</span>`}
       </span>
       ${zenodoBadges ? `<span class="study-item__zenodo-badges">${zenodoBadges}</span>` : ""}
     </span>`;

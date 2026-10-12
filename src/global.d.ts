@@ -33,6 +33,16 @@ declare global {
       };
       /** Native save dialog + disk write, in place of the browser's `<a download>`. */
       saveFile: (filename: string, data: ArrayBuffer) => Promise<boolean>;
+      /**
+       * Optional desktop seam to anonymize a DICOM buffer before upload (e.g.
+       * the main process calling the anonymization service itself). Without
+       * it, upload.ts sends the file to the local anonymization service
+       * (upload/local-anonymizer.ts) — never to the backend un-anonymized.
+       */
+      anonymizeDicom?: (
+        data: ArrayBuffer,
+        filename?: string,
+      ) => Promise<ArrayBuffer>;
       getApiOrigin: () => Promise<string>;
       setApiOrigin: (origin: string) => Promise<void>;
     };

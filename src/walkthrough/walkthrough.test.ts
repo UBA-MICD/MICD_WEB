@@ -195,6 +195,28 @@ test("an optional step whose target is missing is skipped", async () => {
   assert.equal(progressText(), "Step 3 of 3");
 });
 
+test("an optional step whose target exists but is hidden is skipped", async () => {
+  const { startTour } = await freshEngine();
+  // #hidden is in the DOM but display:none — the shimmed offsetParent returns
+  // null for it, same as a genuinely missing target, so it must skip not stall.
+  const hidden = document.getElementById("u") as HTMLElement;
+  hidden.id = "hidden";
+  hidden.style.display = "none";
+  startTour(
+    [
+      step({ id: "s1", target: "#t" }),
+      step({ id: "offstage", target: "#hidden", optional: true }),
+      step({ id: "s3", target: "#opener" }),
+    ],
+    { role: "admin" },
+  );
+  await flush();
+
+  click("[data-tour-next]"); // leave s1 → s2 hidden → auto-skip to s3
+  await flush();
+  assert.equal(progressText(), "Step 3 of 3");
+});
+
 test("navigate is invoked for each step before spotlighting", async () => {
   const { startTour } = await freshEngine();
   const seen: string[] = [];

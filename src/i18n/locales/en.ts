@@ -28,6 +28,7 @@ export const en: Record<string, string> = {
   "auth.hidePassword": "Hide password",
   "auth.submitLogin": "Sign in",
   "auth.wereYouInvited": "Were you invited? Activate your account",
+  "auth.forgotPassword": "Forgot your password?",
   "auth.loginRequiredMsg":
     "A session is required to search or upload studies on the server. Local viewing doesn't need one.",
   "auth.sessionActive": "Active session",
@@ -63,6 +64,7 @@ export const en: Record<string, string> = {
   "server.apiOriginSave": "Save and restart",
   "server.apiOriginInvalid": "Invalid server address.",
   "dialog.activityTitle": "Activity history",
+  "upload.uploadedBanner": "{{count}} file(s) uploaded successfully",
   "server.studyLoadedBanner": "Study loaded · returning to viewer",
   "server.studiesLoadedBanner":
     "{{count}} studies loaded · returning to viewer",
@@ -84,6 +86,7 @@ export const en: Record<string, string> = {
   "explorer.prevPage": "Previous page",
   "explorer.nextPage": "Next page",
   "explorer.openSelected": "Open selected study",
+  "explorer.downloadSelected": "Download selected study",
   "explorer.loadingStudies": "Loading studies…",
   "explorer.noStudiesFiltered": "No studies match those filters.",
   "explorer.noStudiesLoaded": "No studies loaded.",
@@ -181,8 +184,19 @@ export const en: Record<string, string> = {
   "viewer.view3d.volumeLoadError": "Error loading the 3D volume: {{message}}",
   "viewer.view3d.webglUnavailable":
     "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.view3d.axial": "Axial",
+  "viewer.view3d.coronal": "Coronal",
   "viewer.view3d.sagittal": "Sagittal",
   "viewer.view3d.volumetricView": "Volumetric View",
+  "viewer.view3d.orientGroupAria": "Anatomical orientation projection",
+  "viewer.view3d.depthControlAria": "Depth control",
+  "viewer.view3d.depthSliderAria": "Slice depth",
+  "viewer.view3d.triplanarSlidersAria": "Triplanar slice controls",
+  "viewer.view3d.axialCutAria": "Axial cut",
+  "viewer.view3d.coronalCutAria": "Coronal cut",
+  "viewer.view3d.sagittalCutAria": "Sagittal cut",
+  "viewer.mpr.layout2x2": "2x2 Grid",
+  "viewer.mpr.3d": "3D Volume",
   "viewer.layers.title": "Layer Adjustment",
   "viewer.layers.loadBtn": "Load Overlay Study",
   "viewer.layers.opacity": "Opacity",
@@ -221,6 +235,7 @@ export const en: Record<string, string> = {
   "viewer.segmentation.discarded": "Segmentation discarded.",
   "viewer.segmentation.discardRestore": "Restore",
   "viewer.segmentation.restored": "Segmentation restored.",
+  "viewer.segmentation.pathologyAria": "Segmentation pathology type",
   "viewer.segmentation.reset": "Discard correction",
   "viewer.segmentation.resetHint":
     "Go back to the outline the AI originally proposed.",
@@ -300,6 +315,10 @@ export const en: Record<string, string> = {
   "upload.dropHint": "Drag .dcm, .zip files or a folder here",
   "upload.selectFiles": "Select files or ZIP",
   "upload.selectFolder": "Select folder",
+  "upload.classifyTitle": "Classify this study",
+  "upload.classifyMessage":
+    "{{count}} file(s) ready. Choose a classification for this study (optional), then confirm to upload.",
+  "upload.classifyConfirm": "Upload",
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",
   "upload.replace": "Replace",
@@ -328,9 +347,30 @@ export const en: Record<string, string> = {
   "upload.unauthorizedRetry": "Not authorized. Log in again.",
   "upload.fileTooLarge": "The file exceeds the 2 GB limit.",
   "upload.genericError": "Error uploading the file.",
-  "upload.rowLabel": "Progress for {{name}}",
-  "upload.stateDuplicate": "Duplicate",
-  "upload.stateAborted": "Cancelled",
+  "upload.anonymizerUnavailable":
+    "Can't upload: the study couldn't be anonymized. Contact an administrator.",
+  "upload.anonymizationFailed":
+    "Could not anonymize {{name}}: the upload was cancelled and the file was not sent.",
+  "upload.stateNotAnonymized": "Not anonymized: not sent",
+  "upload.startedStatus": "Uploading {{count}} file(s)…",
+  "upload.progressTitleOne": "Uploading 1 file",
+  "upload.progressTitleMany": "Uploading study · {{count}} files",
+  "upload.progressDone": "Upload complete",
+  "upload.progressDoneWithErrors": "Upload finished with errors",
+  "upload.progressCancelled": "Upload cancelled",
+  "upload.progressLabel": "Upload progress",
+  "upload.phaseAnonymizing": "Anonymizing file {{current}} of {{total}}",
+  "upload.phaseUploading": "Uploading file {{current}} of {{total}}",
+  "upload.bytesProgress": "{{done}} of {{total}}",
+  "upload.etaUnderMinute": "under 1 min left",
+  "upload.etaMinutes": "≈ {{minutes}} min left",
+  "upload.errorsSummary": "Show files with problems ({{count}})",
+  "upload.duplicateAppliesToAll":
+    "Your choice will apply to every repeated file in this upload.",
+  "upload.notAnonymized":
+    "The study still carries identifying data and was not stored. Tags: {{tags}}",
+  "upload.needsReview":
+    "Uploaded, but flagged for review (anonymization check): {{tags}}",
   "upload.explorerUploadingProgress": "Uploading {{count}} file{{plural}}…",
   "upload.explorerSummaryUploaded": "{{ok}} of {{total}} uploaded",
   "upload.explorerSummaryDuplicates": "{{count}} already existed",
@@ -529,6 +569,7 @@ export const en: Record<string, string> = {
   "users.role.admin": "Administrator",
   "users.role.medico": "Physician",
   "users.role.investigador": "Researcher",
+  "users.role.informatico": "Clinic IT",
   "users.status.active": "Active",
   "users.status.invited": "Invited",
   "users.status.blocked": "Blocked",
@@ -572,6 +613,26 @@ export const en: Record<string, string> = {
   "invite.dialog.emailMismatch":
     "That code doesn't match that email. Check both.",
 
+  // ── Password recovery ───────────────────────────────────────────────────────
+  "reset.title": "Reset password",
+  "reset.forEmail": "Choose a new password for {{email}}.",
+  "reset.newPassword": "New password",
+  "reset.submit": "Change password and sign in",
+  "reset.invalid": "This reset code is invalid or has expired.",
+  "reset.error.tooMany": "Too many attempts. Try again in a few minutes.",
+  "reset.dialog.title": "Recover password",
+  "reset.dialog.requestMsg":
+    "Enter your account email and we'll send you a code to choose a new password.",
+  "reset.dialog.sendCode": "Send code",
+  "reset.dialog.haveCode": "I already have a code",
+  "reset.dialog.haveCodeMsg":
+    "Enter the code you received by email and choose a new password.",
+  "reset.dialog.sent":
+    "If there is an active account for {{email}}, we sent it a code. It expires in 1 hour.",
+  "reset.dialog.codeLabel": "Reset code",
+  "reset.dialog.back": "Request a new code",
+  "reset.dialog.missingEmail": "Enter your email.",
+  "reset.dialog.missingCode": "Enter the code you received.",
   // ── System panel (admin) ────────────────────────────────────────────────────
   "system.tab": "System",
   "system.orthancStorage": "Orthanc Storage",
@@ -642,6 +703,15 @@ export const en: Record<string, string> = {
   "tour.investigador.done.title": "You're set",
   "tour.investigador.done.body":
     "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
+  "tour.informatico.download.title": "Download studies",
+  "tour.informatico.download.body":
+    "Find the study, select it and download it as a .zip with this button.",
+  "tour.informatico.upload.title": "Upload DICOM",
+  "tour.informatico.upload.body":
+    "Drop DICOM files, a folder or a .zip here to upload them to the server.",
+  "tour.informatico.done.title": "All set",
+  "tour.informatico.done.body":
+    "Your role can upload and download studies. If you need anything else, ask the development team. Reopen this tour anytime from the ? button.",
   "tour.staff.search.title": "Search studies",
   "tour.staff.search.body":
     "Find studies by patient, modality or date. As clinical staff you see full patient details.",
@@ -665,7 +735,7 @@ export const en: Record<string, string> = {
     "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
   "tour.staff.uploadStatus.title": "Progress & status",
   "tour.staff.uploadStatus.body":
-    "Track per-file progress and status here as your studies upload.",
+    "Follow the whole upload here: one percentage, the current step, and the estimated time left.",
   "tour.staff.zenodoImport.title": "Zenodo datasets",
   "tour.staff.zenodoImport.body":
     "Search Zenodo's public corpus and import datasets straight into the server.",
@@ -726,6 +796,14 @@ export const en: Record<string, string> = {
   "validation.status.rejected": "Rejected",
   "validation.status.review": "Flagged for review",
   "validation.status.none": "Not validated",
+  "classification.label": "Classification",
+  "classification.none": "Unclassified",
+  "classification.acv": "Stroke",
+  "classification.hemorragia": "Hemorrhage",
+  "classification.tumor": "Tumor",
+  "classification.desmielinizante": "Demyelinating",
+  "classification.normales": "Normal",
+  "classification.otros": "Other",
   "validation.toast.success.approved": "Study approved.",
   "validation.toast.success.rejected": "Study rejected.",
   "validation.toast.success.review": "Study flagged for review.",
@@ -782,6 +860,9 @@ export const en: Record<string, string> = {
   "annotations.perimeter": "Perimeter",
   "viewer.measure.panelTitle": "Measurement Settings",
   "viewer.measure.unitLabel": "Units",
+  "viewer.measure.pathologyLabel": "Pathology",
+  "viewer.measure.pathologyNeedPolygon":
+    "Select a polygon to assign it a pathology.",
   "viewer.measure.unitMm": "Millimeters (mm)",
   "viewer.measure.unitCm": "Centimeters (cm)",
   "viewer.measure.lineWidthLabel": "Line Width",

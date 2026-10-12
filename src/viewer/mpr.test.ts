@@ -282,7 +282,7 @@ test("MPR3DViewer renderGizmo draws axes on 2D context", () => {
   });
 });
 
-test("updateToolbarUI disables Pan in 3D mode and Crosshair in 2D mode", () => {
+test("updateToolbarUI enables Pan in 3D mode (US-50) and disables Crosshair in 2D mode", () => {
   const mockPanBtn: any = {
     disabled: false,
     classList: { toggle: () => {} },
@@ -328,13 +328,17 @@ test("updateToolbarUI disables Pan in 3D mode and Crosshair in 2D mode", () => {
     assert.equal(mockPanBtn.disabled, false);
     assert.equal(mockCrosshairBtn.disabled, true);
 
-    // Test 3D mode (state.is3DMode = true)
+    // Test 3D mode (state.is3DMode = true) - US-50: Pan is allowed in 3D
     state.is3DMode = true;
     state.activeTool = "pan";
     updateToolbarUI();
-    assert.equal(state.activeTool, "wl");
-    assert.equal(mockPanBtn.disabled, true);
+    assert.equal(state.activeTool, "pan");
+    assert.equal(mockPanBtn.disabled, false);
     assert.equal(mockCrosshairBtn.disabled, false);
+
+    state.activeTool = "length";
+    updateToolbarUI();
+    assert.equal(state.activeTool, "wl");
   } finally {
     (globalThis as any).document = originalDoc;
   }

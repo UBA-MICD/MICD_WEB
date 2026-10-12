@@ -13,6 +13,7 @@
  */
 
 import { getCanonicalFlip } from "../dicom/spatial-math.js";
+import { state as appState } from "./state.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,123 @@ export interface MPRTransform {
   translation: [number, number, number]; // [tx, ty, tz] in mm
   rotation: [number, number, number]; // [pitch (X), yaw (Y), roll (Z)] in radians
   scale: number; // uniform scale factor
+}
+
+// ── Matrix3 Math Helper (US-50 Phase 2: Oblique MPR Math) ────────────────────
+
+export class Matrix3 {
+  public static create(): Float32Array {
+    const out = new Float32Array(9);
+    out[0] = 1;
+    out[4] = 1;
+    out[8] = 1;
+    return out;
+  }
+
+  public static identity(): Float32Array {
+    return Matrix3.create();
+  }
+
+  /**
+   * Column-major matrix multiplication: out = a * b
+   */
+  public static multiply(a: Float32Array, b: Float32Array): Float32Array {
+    const out = new Float32Array(9);
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        out[j * 3 + i] =
+          a[i] * b[j * 3] + a[i + 3] * b[j * 3 + 1] + a[i + 6] * b[j * 3 + 2];
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Transforms a 3D vector: out = M * v
+   */
+  public static transformVector(
+    m: Float32Array,
+    v: [number, number, number],
+  ): [number, number, number] {
+    const x = v[0];
+    const y = v[1];
+    const z = v[2];
+    return [
+      m[0] * x + m[3] * y + m[6] * z,
+      m[1] * x + m[4] * y + m[7] * z,
+      m[2] * x + m[5] * y + m[8] * z,
+    ];
+  }
+
+  /**
+   * Rodrigues rotation formula around an arbitrary unit axis vector.
+   * Generates a column-major 3x3 rotation matrix.
+   */
+  public static fromRotationAxis(
+    axis: [number, number, number],
+    rad: number,
+  ): Float32Array {
+    const len = Math.hypot(axis[0], axis[1], axis[2]) || 1;
+    const x = axis[0] / len;
+    const y = axis[1] / len;
+    const z = axis[2] / len;
+
+    const c = Math.cos(rad);
+    const s = Math.sin(rad);
+    const t = 1 - c;
+
+    const out = new Float32Array(9);
+    // Column 0
+    out[0] = t * x * x + c;
+    out[1] = t * x * y + s * z;
+    out[2] = t * x * z - s * y;
+
+    // Column 1
+    out[3] = t * x * y - s * z;
+    out[4] = t * y * y + c;
+    out[5] = t * y * z + s * x;
+
+    // Column 2
+    out[6] = t * x * z + s * y;
+    out[7] = t * y * z - s * x;
+    out[8] = t * z * z + c;
+
+    return out;
+  }
+
+  public static determinant(m: Float32Array): number {
+    return (
+      m[0] * (m[4] * m[8] - m[7] * m[5]) -
+      m[3] * (m[1] * m[8] - m[7] * m[2]) +
+      m[6] * (m[1] * m[5] - m[4] * m[2])
+    );
+  }
+
+  public static isOrthonormal(m: Float32Array, eps = 1e-4): boolean {
+    const c0: [number, number, number] = [m[0], m[1], m[2]];
+    const c1: [number, number, number] = [m[3], m[4], m[5]];
+    const c2: [number, number, number] = [m[6], m[7], m[8]];
+
+    const dot = (a: [number, number, number], b: [number, number, number]) =>
+      a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+    const d00 = dot(c0, c0);
+    const d11 = dot(c1, c1);
+    const d22 = dot(c2, c2);
+    const d01 = dot(c0, c1);
+    const d02 = dot(c0, c2);
+    const d12 = dot(c1, c2);
+
+    return (
+      Math.abs(d00 - 1) < eps &&
+      Math.abs(d11 - 1) < eps &&
+      Math.abs(d22 - 1) < eps &&
+      Math.abs(d01) < eps &&
+      Math.abs(d02) < eps &&
+      Math.abs(d12) < eps &&
+      Math.abs(Matrix3.determinant(m) - 1) < eps
+    );
+  }
 }
 
 // ── Matrix4 Math Helper ──────────────────────────────────────────────────────
@@ -476,10 +594,15 @@ export class MPRVolume {
 export class MPRCamera {
   public readonly plane: MPRPlane;
 
-  // Basis vectors in World Space defining the fixed projection plane:
-  public readonly uAxis: [number, number, number]; // Screen Right
-  public readonly vAxis: [number, number, number]; // Screen Up
-  public readonly normal: [number, number, number]; // Viewing normal (slice depth axis)
+  // Base canonical basis vectors in World Space:
+  public readonly baseUAxis: [number, number, number];
+  public readonly baseVAxis: [number, number, number];
+  public readonly baseNormal: [number, number, number];
+
+  // Active (possibly rotated/oblique) basis vectors:
+  public uAxis: [number, number, number];
+  public vAxis: [number, number, number];
+  public normal: [number, number, number];
 
   public sliceOffset = 0; // Displacement in mm along viewing normal
   public zoom = 1.0;
@@ -493,9 +616,9 @@ export class MPRCamera {
         // Screen Right: Patient Left (+X)
         // Screen Up: Patient Anterior (-Y in DICOM space)
         // Normal: Superior (+Z)
-        this.uAxis = [1, 0, 0];
-        this.vAxis = [0, -1, 0];
-        this.normal = [0, 0, 1];
+        this.baseUAxis = [1, 0, 0];
+        this.baseVAxis = [0, -1, 0];
+        this.baseNormal = [0, 0, 1];
         break;
 
       case "coronal":
@@ -503,9 +626,9 @@ export class MPRCamera {
         // Screen Right: Patient Left (+X)
         // Screen Up: Patient Superior (+Z in DICOM space, Head pointing to top)
         // Normal: Posterior (+Y)
-        this.uAxis = [1, 0, 0];
-        this.vAxis = [0, 0, 1];
-        this.normal = [0, 1, 0];
+        this.baseUAxis = [1, 0, 0];
+        this.baseVAxis = [0, 0, 1];
+        this.baseNormal = [0, 1, 0];
         break;
 
       case "sagittal":
@@ -513,11 +636,27 @@ export class MPRCamera {
         // Screen Right: Patient Posterior (+Y)
         // Screen Up: Patient Superior (+Z in DICOM space, Head pointing to top)
         // Normal: Left (+X)
-        this.uAxis = [0, 1, 0];
-        this.vAxis = [0, 0, 1];
-        this.normal = [1, 0, 0];
+        this.baseUAxis = [0, 1, 0];
+        this.baseVAxis = [0, 0, 1];
+        this.baseNormal = [1, 0, 0];
         break;
     }
+
+    this.uAxis = [...this.baseUAxis];
+    this.vAxis = [...this.baseVAxis];
+    this.normal = [...this.baseNormal];
+  }
+
+  public applyRotation(r: Float32Array): void {
+    this.uAxis = Matrix3.transformVector(r, this.baseUAxis);
+    this.vAxis = Matrix3.transformVector(r, this.baseVAxis);
+    this.normal = Matrix3.transformVector(r, this.baseNormal);
+  }
+
+  public resetRotation(): void {
+    this.uAxis = [...this.baseUAxis];
+    this.vAxis = [...this.baseVAxis];
+    this.normal = [...this.baseNormal];
   }
 
   public setSliceOffset(offsetMm: number): void {
@@ -702,6 +841,7 @@ export class MPREngine {
 
   public crosshairWorld: [number, number, number] = [0, 0, 0];
   public crosshairNormalized: [number, number, number] = [0.5, 0.5, 0.5];
+  public rotationMatrix: Float32Array = Matrix3.identity();
 
   private contextCache: Map<HTMLCanvasElement, GLContextState> = new Map();
   private volumeVersion = 0;
@@ -712,11 +852,49 @@ export class MPREngine {
     this.sagittalCamera = new MPRCamera("sagittal");
   }
 
+  /** Sets rotation matrix (3x3) for oblique MPR slicing across all 3 viewports. */
+  public setRotation(r: Float32Array): void {
+    this.rotationMatrix = new Float32Array(r);
+    this.axialCamera.applyRotation(this.rotationMatrix);
+    this.coronalCamera.applyRotation(this.rotationMatrix);
+    this.sagittalCamera.applyRotation(this.rotationMatrix);
+    this.syncCameraSliceOffsets();
+  }
+
+  /** Resets rotation to canonical orthogonal Cartesian axes. */
+  public resetRotation(): void {
+    this.setRotation(Matrix3.identity());
+  }
+
+  /** Synchronizes orthogonal slice depths so planes pass through current crosshairWorld. */
+  public syncCameraSliceOffsets(): void {
+    const [x, y, z] = this.crosshairWorld;
+    this.axialCamera.setSliceOffset(
+      this.axialCamera.normal[0] * x +
+        this.axialCamera.normal[1] * y +
+        this.axialCamera.normal[2] * z,
+    );
+    this.coronalCamera.setSliceOffset(
+      this.coronalCamera.normal[0] * x +
+        this.coronalCamera.normal[1] * y +
+        this.coronalCamera.normal[2] * z,
+    );
+    this.sagittalCamera.setSliceOffset(
+      this.sagittalCamera.normal[0] * x +
+        this.sagittalCamera.normal[1] * y +
+        this.sagittalCamera.normal[2] * z,
+    );
+  }
+
   /** Loads volume data into the MPR engine. */
   public loadVolume(data: MPRVolumeData): void {
     this.volume = new MPRVolume(data);
     this.windowCenter = data.windowCenter;
     this.windowWidth = data.windowWidth;
+    if (this === mprEngine && appState?.viewport && data.windowWidth > 0) {
+      appState.viewport.windowCenter = data.windowCenter;
+      appState.viewport.windowWidth = data.windowWidth;
+    }
     this.volumeVersion++;
 
     // Initialize slice offsets and crosshair to volume centers
@@ -872,12 +1050,12 @@ export class MPREngine {
     if (!this.volume) return false;
     if (!this.contextCache.has(canvas) && !this.initGL(canvas)) return false;
 
-    const state = this.contextCache.get(canvas);
-    if (!state) return false;
+    const ctxState = this.contextCache.get(canvas);
+    if (!ctxState) return false;
 
-    const gl = state.gl;
-    this.ensureTexture(state);
-    if (!state.texture) return false;
+    const gl = ctxState.gl;
+    this.ensureTexture(ctxState);
+    if (!ctxState.texture) return false;
 
     const width = canvas.clientWidth || canvas.width || 300;
     const height = canvas.clientHeight || canvas.height || 300;
@@ -891,31 +1069,41 @@ export class MPREngine {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    gl.useProgram(state.program);
+    gl.useProgram(ctxState.program);
 
     // Compute M_screenToTex
     const camera = this.getCamera(plane);
     const screenToTex = camera.getScreenToTexMatrix(this.volume, width, height);
 
     const uScreenToTexLoc = gl.getUniformLocation(
-      state.program,
+      ctxState.program,
       "u_screenToTex",
     );
-    const uVolumeLoc = gl.getUniformLocation(state.program, "u_volume");
+    const uVolumeLoc = gl.getUniformLocation(ctxState.program, "u_volume");
     const uWindowCenterLoc = gl.getUniformLocation(
-      state.program,
+      ctxState.program,
       "u_windowCenter",
     );
     const uWindowWidthLoc = gl.getUniformLocation(
-      state.program,
+      ctxState.program,
       "u_windowWidth",
     );
 
     gl.uniformMatrix4fv(uScreenToTexLoc, false, screenToTex);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_3D, state.texture);
+    gl.bindTexture(gl.TEXTURE_3D, ctxState.texture);
     gl.uniform1i(uVolumeLoc, 0);
+
+    // Ensure W/L uniform is synchronized from global state for the active MPR engine
+    if (
+      this === mprEngine &&
+      appState?.viewport &&
+      appState.viewport.windowWidth > 0
+    ) {
+      this.windowCenter = appState.viewport.windowCenter;
+      this.windowWidth = appState.viewport.windowWidth;
+    }
 
     // Window/Level normalized [0, 1] relative to HU [-1024, 3071]
     const normCenter = (this.windowCenter + 1024) / 4095;
@@ -924,7 +1112,7 @@ export class MPREngine {
     gl.uniform1f(uWindowCenterLoc, normCenter);
     gl.uniform1f(uWindowWidthLoc, normWidth);
 
-    gl.bindVertexArray(state.vao);
+    gl.bindVertexArray(ctxState.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
 
@@ -984,8 +1172,8 @@ export class MPREngine {
   }
 
   public setSliceIndex(plane: MPRPlane, index: number): void {
-    if (!this.volume) return;
-    const [sx, sy, sz] = this.volume.physicalSize;
+    if (!this.volume || !this.volume.data) return;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     const { depth, rows, cols } = this.volume.data;
 
     if (plane === "axial") {
@@ -1000,6 +1188,10 @@ export class MPREngine {
   public setWindowLevel(center: number, width: number): void {
     this.windowCenter = center;
     this.windowWidth = Math.max(1, width);
+    if (this === mprEngine && appState?.viewport) {
+      appState.viewport.windowCenter = center;
+      appState.viewport.windowWidth = this.windowWidth;
+    }
   }
 
   /**
@@ -1015,7 +1207,7 @@ export class MPREngine {
   ): [number, number, number] {
     if (!this.volume) return [0, 0, 0];
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     let baseW = sx;
     let baseH = sy;
 
@@ -1076,15 +1268,17 @@ export class MPREngine {
       viewportHeight,
     );
 
-    this.volume.translate(dx, dy, dz);
+    if (typeof this.volume.translate === "function") {
+      this.volume.translate(dx, dy, dz);
+    }
     this.clampVolumeTranslation();
   }
 
   /** Restricts volume translation so the patient volume cannot be lost in the void. */
   public clampVolumeTranslation(): void {
-    if (!this.volume) return;
-    const [sx, sy, sz] = this.volume.physicalSize;
-    const s = this.volume.transform.scale;
+    if (!this.volume || !this.volume.transform) return;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
+    const s = this.volume.transform.scale ?? 1;
 
     // Bounded to 85% of volume dimensions
     const maxTx = sx * s * 0.85;
@@ -1144,10 +1338,8 @@ export class MPREngine {
       clampedW,
     ]);
 
-    // Update static camera slice offsets to pass through crosshair point
-    this.axialCamera.setSliceOffset(this.crosshairWorld[2]);
-    this.coronalCamera.setSliceOffset(this.crosshairWorld[1]);
-    this.sagittalCamera.setSliceOffset(this.crosshairWorld[0]);
+    // Update camera slice offsets to pass through crosshair point
+    this.syncCameraSliceOffsets();
   }
 
   /**
@@ -1183,7 +1375,7 @@ export class MPREngine {
   ): void {
     if (!this.volume) return;
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     let baseW = sx;
     let baseH = sy;
 
@@ -1219,7 +1411,7 @@ export class MPREngine {
   ): [number, number] {
     if (!this.volume) return [viewportWidth / 2, viewportHeight / 2];
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize;
+    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
     let baseW = sx;
     let baseH = sy;
 
@@ -1268,7 +1460,70 @@ export class MPREngine {
   }
 
   /**
+   * Computes the 2D unit direction vectors on the viewing canvas for the two intersecting
+   * crosshair lines (which represent the intersections of the other two cut planes).
+   */
+  public getCrosshairLineDirections(plane: MPRPlane): {
+    line1: { dirX: number; dirY: number; color: string };
+    line2: { dirX: number; dirY: number; color: string };
+  } {
+    const cam = this.getCamera(plane);
+    const n = cam.normal;
+    const u = cam.uAxis;
+    const v = cam.vAxis;
+
+    let otherCam1: MPRCamera;
+    let otherCam2: MPRCamera;
+    let col1: string;
+    let col2: string;
+
+    if (plane === "axial") {
+      otherCam1 = this.coronalCamera;
+      otherCam2 = this.sagittalCamera;
+      col1 = "#34d399"; // Coronal line = Emerald
+      col2 = "#f87171"; // Sagittal line = Coral
+    } else if (plane === "coronal") {
+      otherCam1 = this.axialCamera;
+      otherCam2 = this.sagittalCamera;
+      col1 = "#38bdf8"; // Axial line = Sky Blue
+      col2 = "#f87171"; // Sagittal line = Coral
+    } else {
+      otherCam1 = this.axialCamera;
+      otherCam2 = this.coronalCamera;
+      col1 = "#38bdf8"; // Axial line = Sky Blue
+      col2 = "#34d399"; // Coronal line = Emerald
+    }
+
+    const n1 = otherCam1.normal;
+    const n2 = otherCam2.normal;
+
+    // Cross product: L = n x n_other gives 3D line direction of intersection
+    // Project into screen space (u, v) where ScreenX = u, ScreenY = -v
+    const computeScreenDir = (otherN: [number, number, number]) => {
+      const lx = n[1] * otherN[2] - n[2] * otherN[1];
+      const ly = n[2] * otherN[0] - n[0] * otherN[2];
+      const lz = n[0] * otherN[1] - n[1] * otherN[0];
+
+      const sx = lx * u[0] + ly * u[1] + lz * u[2];
+      const sy = -(lx * v[0] + ly * v[1] + lz * v[2]); // -v because screen Y points down
+
+      const len = Math.hypot(sx, sy);
+      if (len < 1e-5) return { dirX: 1, dirY: 0 };
+      return { dirX: sx / len, dirY: sy / len };
+    };
+
+    const d1 = computeScreenDir(n1);
+    const d2 = computeScreenDir(n2);
+
+    return {
+      line1: { ...d1, color: col1 },
+      line2: { ...d2, color: col2 },
+    };
+  }
+
+  /**
    * Renders high-contrast clinical crosshair lines with a center gap on a 2D canvas context.
+   * Dynamically aligns lines along oblique plane intersections and draws rotation indicators.
    */
   public renderCrosshair(
     plane: MPRPlane,
@@ -1281,31 +1536,72 @@ export class MPREngine {
       viewportWidth,
       viewportHeight,
     );
-    const colors = this.getCrosshairColors(plane);
+    const { line1, line2 } = this.getCrosshairLineDirections(plane);
     const gap = 8; // Center clearance gap
+    const span = Math.max(viewportWidth, viewportHeight) * 1.5;
 
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
     ctx.shadowBlur = 3;
     ctx.lineWidth = 1.5;
 
-    // Vertical line (broken by gap)
-    ctx.strokeStyle = colors.vertical;
+    // Line 1
+    ctx.strokeStyle = line1.color;
     ctx.beginPath();
-    ctx.moveTo(cx, 0);
-    ctx.lineTo(cx, Math.max(0, cy - gap));
-    ctx.moveTo(cx, Math.min(viewportHeight, cy + gap));
-    ctx.lineTo(cx, viewportHeight);
+    ctx.moveTo(cx - span * line1.dirX, cy - span * line1.dirY);
+    ctx.lineTo(cx - gap * line1.dirX, cy - gap * line1.dirY);
+    ctx.moveTo(cx + gap * line1.dirX, cy + gap * line1.dirY);
+    ctx.lineTo(cx + span * line1.dirX, cy + span * line1.dirY);
     ctx.stroke();
 
-    // Horizontal line (broken by gap)
-    ctx.strokeStyle = colors.horizontal;
+    // Line 2
+    ctx.strokeStyle = line2.color;
     ctx.beginPath();
-    ctx.moveTo(0, cy);
-    ctx.lineTo(Math.max(0, cx - gap), cy);
-    ctx.moveTo(Math.min(viewportWidth, cx + gap), cy);
-    ctx.lineTo(viewportWidth, cy);
+    ctx.moveTo(cx - span * line2.dirX, cy - span * line2.dirY);
+    ctx.lineTo(cx - gap * line2.dirX, cy - gap * line2.dirY);
+    ctx.moveTo(cx + gap * line2.dirX, cy + gap * line2.dirY);
+    ctx.lineTo(cx + span * line2.dirX, cy + span * line2.dirY);
     ctx.stroke();
+
+    // Clinical rotation handle dots along the lines
+    if (typeof ctx.arc === "function") {
+      const handleDist = 55;
+      ctx.fillStyle = line1.color;
+      ctx.beginPath();
+      ctx.arc(
+        cx + handleDist * line1.dirX,
+        cy + handleDist * line1.dirY,
+        2.5,
+        0,
+        Math.PI * 2,
+      );
+      ctx.arc(
+        cx - handleDist * line1.dirX,
+        cy - handleDist * line1.dirY,
+        2.5,
+        0,
+        Math.PI * 2,
+      );
+      if (typeof ctx.fill === "function") ctx.fill();
+
+      ctx.fillStyle = line2.color;
+      ctx.beginPath();
+      ctx.arc(
+        cx + handleDist * line2.dirX,
+        cy + handleDist * line2.dirY,
+        2.5,
+        0,
+        Math.PI * 2,
+      );
+      ctx.arc(
+        cx - handleDist * line2.dirX,
+        cy - handleDist * line2.dirY,
+        2.5,
+        0,
+        Math.PI * 2,
+      );
+      if (typeof ctx.fill === "function") ctx.fill();
+    }
 
     ctx.restore();
   }

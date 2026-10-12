@@ -182,7 +182,7 @@ sees full PHI), plus:
 | #   | Target                                        | Teach                                                                            | Advance           |
 | --- | --------------------------------------------- | -------------------------------------------------------------------------------- | ----------------- |
 | M1  | `#tab-cargar` / `#upload-drop`                | Upload studies (drag-drop)                                                       | ▶ open upload tab |
-| M2  | `#btn-upload-folder` / `#upload-folder-input` | Upload a whole folder                                                            | ▷                 |
+| M2  | `#btn-upload-folder` / `#upload-folder-input` | Upload a whole folder (desktop only — `optional`, skipped in the browser build)  | ▷                 |
 | M3  | `#upload-rows` / `#upload-status`             | Progress & per-file status                                                       | ▷                 |
 | M4  | `#btn-open-zenodo` → `#z-tab-search` + import | Search **and import** public datasets                                            | ▷                 |
 | M5  | `#btn-export-explorer` / study-detail export  | Export a study (PNG / ZIP) with full metadata                                    | ▷                 |

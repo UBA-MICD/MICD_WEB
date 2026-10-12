@@ -47,6 +47,8 @@ export interface AppState {
     validatedBy: string;
     validatedAt: string;
   } | null;
+  windowWidth?: number;
+  windowCenter?: number;
 }
 
 export const SERVER_URL_STORAGE_KEY = "micd_server_url";
@@ -107,6 +109,18 @@ export const state: AppState = {
   areAnnotationsVisible: true,
   areLabelsVisible: true,
   serverValidation: null,
+  get windowWidth(): number {
+    return this.viewport.windowWidth;
+  },
+  set windowWidth(val: number) {
+    this.viewport.windowWidth = val;
+  },
+  get windowCenter(): number {
+    return this.viewport.windowCenter;
+  },
+  set windowCenter(val: number) {
+    this.viewport.windowCenter = val;
+  },
 };
 
 export function setAnnotationsVisible(visible: boolean): void {

@@ -76,6 +76,19 @@
       Sistema
     </button>
   </div>
+  <!-- Server-only mode (informatico): this screen is the whole app, so the
+       session lives here instead of in the viewer's sidebar. -->
+  <div class="server-session hidden" id="server-session">
+    <span class="server-session__email" id="server-session-email"></span>
+    <button
+      type="button"
+      class="btn btn--secondary btn--sm"
+      id="btn-server-logout"
+      data-i18n="auth.logout"
+    >
+      Cerrar sesión
+    </button>
+  </div>
   <!-- Admin-only server configuration (TK-29, spec 001). Starts hidden;
              server-screen.ts renderForSession() reveals it only for admins. The
              main page has no path to change the server on purpose. -->

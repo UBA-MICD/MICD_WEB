@@ -29,6 +29,7 @@ export const es: Record<string, string> = {
   "auth.hidePassword": "Ocultar contraseña",
   "auth.submitLogin": "Ingresar",
   "auth.wereYouInvited": "¿Te invitaron? Activá tu cuenta",
+  "auth.forgotPassword": "¿Olvidaste tu contraseña?",
   "auth.loginRequiredMsg":
     "Se requiere sesión para buscar o subir estudios en el servidor. La visualización local no la necesita.",
   "auth.sessionActive": "Sesión activa",
@@ -65,6 +66,7 @@ export const es: Record<string, string> = {
   "server.apiOriginSave": "Guardar y reiniciar",
   "server.apiOriginInvalid": "Dirección de servidor inválida.",
   "dialog.activityTitle": "Historial de actividad",
+  "upload.uploadedBanner": "{{count}} archivo(s) subido(s) correctamente",
   "server.studyLoadedBanner": "Estudio cargado · volviendo al visualizador",
   "server.studiesLoadedBanner":
     "{{count}} estudios cargados · volviendo al visualizador",
@@ -86,6 +88,7 @@ export const es: Record<string, string> = {
   "explorer.prevPage": "Página anterior",
   "explorer.nextPage": "Página siguiente",
   "explorer.openSelected": "Abrir estudio seleccionado",
+  "explorer.downloadSelected": "Descargar estudio seleccionado",
   "explorer.loadingStudies": "Cargando estudios…",
   "explorer.noStudiesFiltered": "No hay estudios con esos filtros.",
   "explorer.noStudiesLoaded": "No hay estudios cargados.",
@@ -184,8 +187,19 @@ export const es: Record<string, string> = {
   "viewer.view3d.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
   "viewer.view3d.webglUnavailable":
     "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.view3d.axial": "Axial",
+  "viewer.view3d.coronal": "Coronal",
   "viewer.view3d.sagittal": "Sagital",
   "viewer.view3d.volumetricView": "Vista Volumétrica",
+  "viewer.view3d.orientGroupAria": "Proyección de orientación anatómica",
+  "viewer.view3d.depthControlAria": "Control de profundidad",
+  "viewer.view3d.depthSliderAria": "Profundidad de corte",
+  "viewer.view3d.triplanarSlidersAria": "Controles de cortes triplanares",
+  "viewer.view3d.axialCutAria": "Corte Axial",
+  "viewer.view3d.coronalCutAria": "Corte Coronal",
+  "viewer.view3d.sagittalCutAria": "Corte Sagital",
+  "viewer.mpr.layout2x2": "Grilla 2x2",
+  "viewer.mpr.3d": "3D Volumen",
   "viewer.layers.title": "Ajuste de Capas",
   "viewer.layers.loadBtn": "Cargar Estudio Superpuesto",
   "viewer.layers.opacity": "Opacidad",
@@ -223,6 +237,7 @@ export const es: Record<string, string> = {
   "viewer.segmentation.discarded": "Segmentación descartada.",
   "viewer.segmentation.discardRestore": "Restaurar",
   "viewer.segmentation.restored": "Segmentación restaurada.",
+  "viewer.segmentation.pathologyAria": "Tipo de patología de la segmentación",
   "viewer.segmentation.reset": "Descartar corrección",
   "viewer.segmentation.resetHint":
     "Volver al contorno original que propuso la IA.",
@@ -304,6 +319,10 @@ export const es: Record<string, string> = {
   "upload.dropHint": "Arrastrá archivos .dcm, .zip o una carpeta aquí",
   "upload.selectFiles": "Seleccionar archivos o ZIP",
   "upload.selectFolder": "Seleccionar carpeta",
+  "upload.classifyTitle": "Clasificar estudio",
+  "upload.classifyMessage":
+    "{{count}} archivo(s) listos. Elegí una clasificación para este estudio (opcional) y confirmá para subir.",
+  "upload.classifyConfirm": "Subir",
   "upload.finish": "Finalizar",
   "upload.duplicateTitle": "Estudio duplicado",
   "upload.replace": "Reemplazar",
@@ -332,9 +351,30 @@ export const es: Record<string, string> = {
   "upload.unauthorizedRetry": "No autorizado. Iniciá sesión de nuevo.",
   "upload.fileTooLarge": "El archivo supera el límite de 2 GB.",
   "upload.genericError": "Error al cargar el archivo.",
-  "upload.rowLabel": "Progreso de {{name}}",
-  "upload.stateDuplicate": "Duplicado",
-  "upload.stateAborted": "Cancelado",
+  "upload.anonymizerUnavailable":
+    "No se puede subir: no se pudo anonimizar el estudio. Contactá a un administrador.",
+  "upload.anonymizationFailed":
+    "No se pudo anonimizar {{name}}: la carga se canceló y el archivo no se envió.",
+  "upload.stateNotAnonymized": "No anonimizado: no enviado",
+  "upload.startedStatus": "Subiendo {{count}} archivo(s)…",
+  "upload.progressTitleOne": "Subiendo 1 archivo",
+  "upload.progressTitleMany": "Subiendo estudio · {{count}} archivos",
+  "upload.progressDone": "Carga completa",
+  "upload.progressDoneWithErrors": "Carga terminada con errores",
+  "upload.progressCancelled": "Carga cancelada",
+  "upload.progressLabel": "Progreso de la carga",
+  "upload.phaseAnonymizing": "Anonimizando archivo {{current}} de {{total}}",
+  "upload.phaseUploading": "Subiendo archivo {{current}} de {{total}}",
+  "upload.bytesProgress": "{{done}} de {{total}}",
+  "upload.etaUnderMinute": "menos de 1 min restante",
+  "upload.etaMinutes": "≈ {{minutes}} min restantes",
+  "upload.errorsSummary": "Ver archivos con problemas ({{count}})",
+  "upload.duplicateAppliesToAll":
+    "Tu elección se aplicará a todos los archivos repetidos de esta carga.",
+  "upload.notAnonymized":
+    "El estudio conserva datos identificatorios y no se guardó. Tags: {{tags}}",
+  "upload.needsReview":
+    "Subido, pero marcado para revisión (verificación de anonimización): {{tags}}",
   "upload.explorerUploadingProgress": "Subiendo {{count}} archivo{{plural}}…",
   "upload.explorerSummaryUploaded": "{{ok}} de {{total}} subido{{plural}}",
   "upload.explorerSummaryDuplicates": "{{count}} ya existían",
@@ -535,6 +575,7 @@ export const es: Record<string, string> = {
   "users.role.admin": "Administrador",
   "users.role.medico": "Médico",
   "users.role.investigador": "Investigador",
+  "users.role.informatico": "Informático de clínica",
   "users.status.active": "Activo",
   "users.status.invited": "Invitado",
   "users.status.blocked": "Bloqueado",
@@ -579,6 +620,26 @@ export const es: Record<string, string> = {
   "invite.dialog.emailMismatch":
     "Ese código no corresponde a ese email. Revisá ambos.",
 
+  // ── Password recovery ───────────────────────────────────────────────────────
+  "reset.title": "Restablecer contraseña",
+  "reset.forEmail": "Elegí una contraseña nueva para {{email}}.",
+  "reset.newPassword": "Nueva contraseña",
+  "reset.submit": "Cambiar contraseña e ingresar",
+  "reset.invalid": "Este código de recuperación no es válido o ya venció.",
+  "reset.error.tooMany": "Demasiados intentos. Probá de nuevo en unos minutos.",
+  "reset.dialog.title": "Recuperar contraseña",
+  "reset.dialog.requestMsg":
+    "Ingresá el email de tu cuenta y te enviaremos un código para elegir una contraseña nueva.",
+  "reset.dialog.sendCode": "Enviar código",
+  "reset.dialog.haveCode": "Ya tengo un código",
+  "reset.dialog.haveCodeMsg":
+    "Ingresá el código que recibiste por correo y elegí una contraseña nueva.",
+  "reset.dialog.sent":
+    "Si existe una cuenta activa para {{email}}, te enviamos un código. Vence en 1 hora.",
+  "reset.dialog.codeLabel": "Código de recuperación",
+  "reset.dialog.back": "Pedir un código nuevo",
+  "reset.dialog.missingEmail": "Ingresá tu email.",
+  "reset.dialog.missingCode": "Ingresá el código que recibiste.",
   // ── System panel (admin) ────────────────────────────────────────────────────
   "system.tab": "Sistema",
   "system.orthancStorage": "Almacenamiento Orthanc",
@@ -649,6 +710,15 @@ export const es: Record<string, string> = {
   "tour.investigador.done.title": "Todo listo",
   "tour.investigador.done.body":
     "Ese es tu kit de investigador — buscar, revisar y exportar anonimizado. Subir estudios, la administración de usuarios y la publicación no forman parte de este rol. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.informatico.download.title": "Descargar estudios",
+  "tour.informatico.download.body":
+    "Buscá el estudio, seleccionalo y descargalo como .zip con este botón.",
+  "tour.informatico.upload.title": "Subir DICOM",
+  "tour.informatico.upload.body":
+    "Arrastrá aquí archivos DICOM, una carpeta o un .zip para subirlos al servidor.",
+  "tour.informatico.done.title": "Listo",
+  "tour.informatico.done.body":
+    "Tu rol permite subir y descargar estudios. Si necesitás algo más, pedilo al equipo de desarrollo. Reabrí este tutorial cuando quieras desde el botón ?.",
   "tour.staff.search.title": "Buscar estudios",
   "tour.staff.search.body":
     "Encuentra estudios por paciente, modalidad o fecha. Como personal clínico ves los datos completos del paciente.",
@@ -672,7 +742,7 @@ export const es: Record<string, string> = {
     "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
   "tour.staff.uploadStatus.title": "Progreso y estado",
   "tour.staff.uploadStatus.body":
-    "Sigue aquí el progreso y el estado de cada archivo mientras se suben tus estudios.",
+    "Seguí aquí toda la carga: un solo porcentaje, el paso actual y el tiempo restante estimado.",
   "tour.staff.zenodoImport.title": "Conjuntos de datos de Zenodo",
   "tour.staff.zenodoImport.body":
     "Busca en el corpus público de Zenodo e importa conjuntos de datos directamente al servidor.",
@@ -734,6 +804,14 @@ export const es: Record<string, string> = {
   "validation.status.rejected": "Rechazado",
   "validation.status.review": "Para revisión",
   "validation.status.none": "Sin validación",
+  "classification.label": "Clasificación",
+  "classification.none": "Sin clasificar",
+  "classification.acv": "ACV",
+  "classification.hemorragia": "Hemorragia",
+  "classification.tumor": "Tumor",
+  "classification.desmielinizante": "Desmielinizante",
+  "classification.normales": "Normales",
+  "classification.otros": "Otros",
   "validation.toast.success.approved": "Estudio aprobado.",
   "validation.toast.success.rejected": "Estudio rechazado.",
   "validation.toast.success.review": "Estudio marcado para revisión.",
@@ -790,6 +868,9 @@ export const es: Record<string, string> = {
   "annotations.perimeter": "Perímetro",
   "viewer.measure.panelTitle": "Ajuste de Mediciones",
   "viewer.measure.unitLabel": "Unidades",
+  "viewer.measure.pathologyLabel": "Patología",
+  "viewer.measure.pathologyNeedPolygon":
+    "Seleccioná un polígono para asignarle una patología.",
   "viewer.measure.unitMm": "Milímetros (mm)",
   "viewer.measure.unitCm": "Centímetros (cm)",
   "viewer.measure.lineWidthLabel": "Grosor de línea",

@@ -37,6 +37,13 @@ test("each role gets the common core plus its own branch", () => {
   }
 });
 
+test("informatico gets only the upload and download steps, no viewer core", () => {
+  assert.deepEqual(
+    applicableSteps(tourSteps, "informatico").map((s) => s.id),
+    ["inf.upload", "inf.download", "inf.done"],
+  );
+});
+
 test("step ids are unique", () => {
   const ids = tourSteps.map((s) => s.id);
   assert.equal(new Set(ids).size, ids.length);

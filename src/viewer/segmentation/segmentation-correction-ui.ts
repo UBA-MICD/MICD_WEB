@@ -13,7 +13,7 @@
 
 import { $ } from "../../shared/dom.js";
 import { formatDate } from "../../shared/dom.js";
-import { t } from "../../i18n/i18n.js";
+import { t, onLocaleChange } from "../../i18n/i18n.js";
 import { showBanner } from "../../shared/banner.js";
 import { state } from "../state.js";
 import { getViewportManager } from "../viewport-registry.js";
@@ -42,6 +42,7 @@ import {
   getSegmentationForInstance,
   acceptSegmentation,
   discardSegmentation,
+  getPathologies,
   decodeMaskRle,
 } from "./segmentation-api.js";
 import { getLastSegmentation } from "./segmentation-ui.js";
@@ -83,6 +84,70 @@ function setButtonLabel(id: string, key: string, pressed?: boolean): void {
   btn.dataset.i18n = key;
   btn.textContent = t(key);
   if (pressed !== undefined) btn.setAttribute("aria-pressed", String(pressed));
+}
+
+// ── Selector de patología (mismo catálogo que la carga de estudios) ──────────
+
+let pathologyOptionsLoaded = false;
+
+function pathologySelect(): HTMLSelectElement | null {
+  return $("seg-pathology") as HTMLSelectElement | null;
+}
+
+/** Trae el catálogo una vez y arma las <option>. No-op para invitado o error:
+ *  queda sólo "Sin clasificar", así el flujo sigue funcionando (es opcional). */
+async function ensurePathologyOptions(): Promise<void> {
+  if (pathologyOptionsLoaded) return;
+  const sel = pathologySelect();
+  if (!sel) return;
+  const cats = await getPathologies();
+  if (cats.length === 0) return;
+  sel.querySelectorAll("option[data-id]").forEach((o) => o.remove());
+  for (const c of cats) {
+    const opt = document.createElement("option");
+    opt.value = String(c.id);
+    opt.dataset.id = String(c.id);
+    opt.dataset.key = c.key;
+    opt.textContent = t(`classification.${c.key}`);
+    sel.appendChild(opt);
+  }
+  pathologyOptionsLoaded = true;
+  if (current) syncPathologySelect();
+}
+
+/** Re-traduce las opciones al cambiar de idioma (sin re-fetch). */
+function relabelPathologyOptions(): void {
+  pathologySelect()
+    ?.querySelectorAll<HTMLOptionElement>("option[data-key]")
+    .forEach((o) => {
+      if (o.dataset.key) o.textContent = t(`classification.${o.dataset.key}`);
+    });
+}
+
+/** Refleja en el <select> la patología de la anotación IA en pantalla. */
+function syncPathologySelect(): void {
+  const sel = pathologySelect();
+  if (!sel) return;
+  const ann = findActiveAnnotation();
+  sel.value = ann?.pathologyId != null ? String(ann.pathologyId) : "";
+}
+
+/** Al elegir una patología: la guarda en la anotación IA y la muestra en el tag. */
+function onPathologyChange(): void {
+  const sel = pathologySelect();
+  const ann = findActiveAnnotation();
+  if (!sel || !ann || !current) return;
+  const opt = sel.selectedOptions[0];
+  if (sel.value === "") {
+    delete ann.pathologyId;
+    delete ann.pathologyKey;
+  } else {
+    ann.pathologyId = Number(sel.value);
+    ann.pathologyKey = opt?.dataset.key;
+  }
+  updateAnnotation(ann);
+  saveToLocalStorage(current.sopInstanceUid);
+  renderSegViewport();
 }
 
 /** Re-renderiza TODOS los viewports (el 1x2 de la predicción muestra la misma
@@ -165,6 +230,8 @@ function refreshButtons(): void {
 
   show("seg-ia-chip", has);
   show("seg-correction-attribution", has);
+  // Selector de patología: mientras haya candidato y no esté descartado.
+  show("seg-pathology", has && !discarded);
 
   // Corregir / edición: sólo si no está descartada.
   show("btn-seg-correct", has && !discarded);
@@ -235,6 +302,8 @@ export function showAiSegmentation(result: SegmentationResult): void {
   // Vista comparativa: original limpio a la izquierda, candidato IA a la derecha.
   enterComparisonView();
   refreshButtons();
+  void ensurePathologyOptions().then(syncPathologySelect);
+  syncPathologySelect();
   renderSegViewport();
   const attr = $("seg-correction-attribution");
   if (attr) attr.textContent = t("viewer.segmentation.bySystem");
@@ -415,7 +484,7 @@ async function submitCorrection(): Promise<void> {
     current.segmentationId,
     current.width,
     current.height,
-    { editedVertices: ann.points.length },
+    { editedVertices: ann.points.length, pathologyId: ann.pathologyId },
   );
   if (!res.ok) {
     showBanner(res.error, "error");
@@ -502,7 +571,11 @@ async function transferToOriginal(): Promise<void> {
         current.segmentationId,
         current.width,
         current.height,
-        { editedVertices: ann.points.length, transferred: true },
+        {
+          editedVertices: ann.points.length,
+          transferred: true,
+          pathologyId: ann.pathologyId,
+        },
       );
     }
     const res = await acceptSegmentation(current.segmentationId);
@@ -600,5 +673,7 @@ export function initSegmentationCorrection(): void {
     "click",
     () => void discardCandidate(),
   );
+  pathologySelect()?.addEventListener("change", () => onPathologyChange());
+  onLocaleChange(relabelPathologyOptions);
   refreshButtons();
 }

@@ -447,71 +447,86 @@ body {
   flex-wrap: wrap;
   justify-content: center;
 }
-/* One row per file: name, its own track, and its own outcome. */
-.upload-rows {
-  list-style: none;
+/* One panel for the whole upload: title + %, a single bar, phase and bytes,
+   and a collapsed list of only the files that failed. */
+.upload-progress {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.upload-rows:empty {
-  display: none;
-}
-.upload-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 16px 18px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  font-size: 13px;
 }
-.upload-row__name {
-  flex: 0 0 200px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.upload-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.upload-progress__title {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
 }
-.upload-row__track {
-  flex: 1;
-  height: 8px;
+.upload-progress__pct {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.upload-progress__track {
+  height: 10px;
   border-radius: 999px;
   background: var(--bg-base);
   overflow: hidden;
 }
-.upload-row__bar {
+.upload-progress__bar {
   display: block;
   height: 100%;
   width: 0%;
   border-radius: 999px;
   background: var(--accent);
-  transition: width 0.1s linear;
+  transition: width 0.2s linear;
 }
-/* The outcome is in this cell as text, so colour is never the only carrier
-   of the result (WCAG 1.4.1). */
-.upload-row__pct {
-  flex: 0 0 90px;
-  text-align: right;
+.upload-progress--error .upload-progress__bar {
+  background: var(--danger);
+}
+.upload-progress--done .upload-progress__title {
+  color: var(--accent);
+}
+.upload-progress--error .upload-progress__title {
+  color: var(--danger);
+}
+.upload-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
-.upload-row--ok .upload-row__pct {
-  color: var(--accent);
-}
-.upload-row--duplicate .upload-row__pct {
-  color: var(--amber);
-}
-.upload-row--duplicate .upload-row__bar {
-  background: var(--amber);
-}
-.upload-row--error .upload-row__pct {
+.upload-errors summary {
+  cursor: pointer;
+  font-size: 12px;
   color: var(--danger);
 }
-.upload-row--error .upload-row__bar {
-  background: var(--danger);
+.upload-errors__list {
+  list-style: none;
+  margin-top: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.upload-errors__name {
+  color: var(--text-primary);
+}
+.upload-errors__reason {
+  color: var(--text-muted);
 }
 
 .upload-summary {
@@ -520,9 +535,14 @@ body {
   align-items: baseline;
   font-size: 13px;
 }
-.upload-percent {
+
+.server-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 12px;
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 .upload-note {
@@ -1249,6 +1269,67 @@ body {
   filter: brightness(0.9);
 }
 
+/* ── MPR 2x2 Thematic Quadrant Borders & 1x1 Maximization (US-50) ────────── */
+.mpr-has-maximized .viewport-cell.is-hidden-by-maximize {
+  display: none !important;
+}
+
+.viewport-cell.is-maximized {
+  grid-column: 1 / -1 !important;
+  grid-row: 1 / -1 !important;
+  z-index: 10 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.viewport-cell--axial,
+.viewport-cell[data-plane="axial"] {
+  border-top: 3px solid #00c8ff !important;
+}
+.viewport-cell--axial.active,
+.viewport-cell[data-plane="axial"].active {
+  border-color: #00c8ff !important;
+  box-shadow:
+    inset 0 0 0 1px #00c8ff,
+    0 0 12px rgba(0, 200, 255, 0.25);
+}
+
+.viewport-cell--coronal,
+.viewport-cell[data-plane="coronal"] {
+  border-top: 3px solid #2ee6a8 !important;
+}
+.viewport-cell--coronal.active,
+.viewport-cell[data-plane="coronal"].active {
+  border-color: #2ee6a8 !important;
+  box-shadow:
+    inset 0 0 0 1px #2ee6a8,
+    0 0 12px rgba(46, 230, 168, 0.25);
+}
+
+.viewport-cell--sagittal,
+.viewport-cell[data-plane="sagittal"] {
+  border-top: 3px solid #ff5252 !important;
+}
+.viewport-cell--sagittal.active,
+.viewport-cell[data-plane="sagittal"].active {
+  border-color: #ff5252 !important;
+  box-shadow:
+    inset 0 0 0 1px #ff5252,
+    0 0 12px rgba(255, 82, 82, 0.25);
+}
+
+.viewport-cell--3d,
+.viewport-cell[data-plane="3d"] {
+  border-top: 3px solid #e0af68 !important;
+}
+.viewport-cell--3d.active,
+.viewport-cell[data-plane="3d"].active {
+  border-color: #e0af68 !important;
+  box-shadow:
+    inset 0 0 0 1px #e0af68,
+    0 0 12px rgba(224, 175, 104, 0.25);
+}
+
 .viewport-canvas {
   image-rendering: auto;
   transform-origin: center center;
@@ -1803,6 +1884,22 @@ body {
   color: #2ee6a8;
 }
 
+.measure-select {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.measure-select:hover,
+.measure-select:focus {
+  border-color: var(--accent);
+}
+
 .measure-clear-btn {
   width: 100%;
   display: flex;
@@ -1886,6 +1983,20 @@ body {
 }
 .btn--seg-soft:hover {
   background: rgba(26, 188, 156, 0.24);
+  border-color: #1abc9c;
+}
+.validation-bar__seg-select {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(26, 188, 156, 0.55);
+  background: rgba(26, 188, 156, 0.12);
+  color: #5fe0c8;
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+}
+.validation-bar__seg-select:hover {
   border-color: #1abc9c;
 }
 
@@ -2417,6 +2528,18 @@ body {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* #forgot-dialog is a .dialog <div> wrapping two <form> steps, so the .dialog
+   flex gap only spaces the forms from each other — not the message, fields and
+   action row inside each form, which would otherwise stack flush together (the
+   send-code / cancel button row sitting right against the email input). Repeat
+   the column layout on the forms so their contents breathe the same way the
+   single-form dialogs (invite, server-config) already do. */
+#forgot-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .login-field {
@@ -3534,45 +3657,30 @@ body {
   touch-action: none;
 }
 
-/* Right-side Depth Slider */
+/* Obsolete Depth Slider Capsule — Hidden permanently in favor of 3-axis panel */
 .view-3d-depth-slider-wrap,
 .mpr-depth-slider-wrap {
-  position: absolute;
-  top: 20px;
-  right: 16px;
-  bottom: 80px;
-  z-index: 70;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  background: rgba(18, 18, 24, 0.9);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-strong, #3f3f46);
-  padding: 12px 8px;
-  border-radius: var(--radius-md, 8px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
-  pointer-events: auto;
+  display: none !important;
 }
 
 .view-3d-depth-counter,
 .mpr-depth-counter {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent, #00b4d8);
   white-space: nowrap;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  writing-mode: horizontal-tb;
+  transform: none;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
 }
 
 .view-3d-depth-slider,
 .mpr-depth-slider {
-  writing-mode: vertical-lr;
-  direction: rtl;
+  writing-mode: horizontal-tb;
+  direction: ltr;
   flex: 1;
-  width: 8px;
+  height: 6px;
   accent-color: var(--accent, #00b4d8);
   cursor: pointer;
   transition: opacity var(--transition, 0.15s ease);
@@ -3591,7 +3699,8 @@ body {
   bottom: 72px;
   left: 20px;
   z-index: 100;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   background: rgba(18, 18, 24, 0.75);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -3710,7 +3819,11 @@ body {
 #viewport-container.mode-3d #view-3d-sliders-panel,
 #viewport-container.mode-3d .view-3d-sliders-panel,
 #viewport-container.mode-3d #mpr-sliders-panel,
-#viewport-container.mode-3d .mpr-sliders-panel {
+#viewport-container.mode-3d .mpr-sliders-panel,
+#viewport-container.mode-mpr #view-3d-sliders-panel,
+#viewport-container.mode-mpr .view-3d-sliders-panel,
+#viewport-container.mode-mpr #mpr-sliders-panel,
+#viewport-container.mode-mpr .mpr-sliders-panel {
   display: flex;
 }
 
@@ -3720,6 +3833,23 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.mpr-slider-label-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 90px;
+  gap: 8px;
+}
+
+.mpr-slider-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #d4d4d8);
+  min-width: 24px;
+  text-align: right;
 }
 
 .view-3d-slider-row label,
@@ -4247,6 +4377,24 @@ body {
   background: var(--amber-soft);
   color: var(--amber);
 }
+.study-item__classification-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+.study-item__classification-badge--none {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
 
 .validations-row-actions {
   display: flex;
@@ -4542,4 +4690,31 @@ body {
   border: 2px solid var(--segmentation);
   background: var(--segmentation-soft);
   flex: none;
+}
+
+/* Classify-before-upload dialog field. */
+.classify-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.classify-field select {
+  padding: 8px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.classify-field select:focus-visible {
+  border-color: var(--accent);
+}
+.classify-field select option {
+  background: var(--bg-elevated);
 }

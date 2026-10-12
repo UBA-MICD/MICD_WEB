@@ -3,6 +3,7 @@ import {
   refreshAccessToken,
   setLoginPrompt,
   onAuthChange,
+  isInformatico,
 } from "./auth/auth.js";
 import { updateAuthUI, initActivityHistory } from "./auth/session-ui.js";
 import {
@@ -10,6 +11,11 @@ import {
   initInviteDialog,
   enterInviteFlowIfPresent,
 } from "./auth/accept-invite.js";
+import {
+  initResetScreen,
+  initForgotPasswordDialog,
+  enterResetFlowIfPresent,
+} from "./auth/password-reset.js";
 import { showScreen } from "./shared/screen.js";
 import {
   initServerScreen,
@@ -99,6 +105,7 @@ async function initApp(): Promise<void> {
   setLoginPrompt(promptLoginOnServerScreen);
   onAuthChange(() => updateAuthUI());
   $("btn-logout").addEventListener("click", () => void onLogout());
+  $("btn-server-logout").addEventListener("click", () => void onLogout());
   $("btn-login").addEventListener("click", (e) =>
     openServerScreen("buscar", e.currentTarget as HTMLElement),
   );
@@ -120,6 +127,8 @@ async function initApp(): Promise<void> {
   // An invite link takes over the landing: it strips the code from the URL,
   // shows the accept-invite screen, and skips the normal signed-out flow.
   if (await enterInviteFlowIfPresent()) return;
+  // Same for a password reset link (?reset=<code>).
+  if (await enterResetFlowIfPresent()) return;
 
   // Silent session restore from the stored refresh token; never a popup here.
   const restored = await refreshAccessToken();
@@ -150,12 +159,15 @@ function startApp(): void {
   initStudyExplorer();
   initServerScreen();
   const onInviteAccepted = (): void => {
-    showScreen("viewer");
+    // informatico's app is the server screen alone (its auth listener opens it).
+    if (!isInformatico()) showScreen("viewer");
     updateAuthUI();
     void loadStudyExplorer();
   };
   initInviteScreen({ onAccepted: onInviteAccepted });
   initInviteDialog({ onAccepted: onInviteAccepted });
+  initResetScreen({ onReset: onInviteAccepted });
+  initForgotPasswordDialog({ onReset: onInviteAccepted });
   initActivityHistory();
   initZenodoPanel();
   initStudyDetailPanel();

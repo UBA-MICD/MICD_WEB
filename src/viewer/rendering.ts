@@ -3,6 +3,8 @@ import { getOrientationLabels } from "../dicom/spatial-math.js";
 import { $, escapeHtml } from "../shared/dom.js";
 import { state, itemCount } from "./state.js";
 import { view3DViewer, mpr3DViewer } from "./view-3d.js";
+import { mprEngine } from "./mpr-engine.js";
+import { mprCoordinator } from "./mpr-coordinator.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import { getViewportManager } from "./viewport-registry.js";
 import { renderMeasurementOverlay } from "./measurements/measurement-overlay.js";
@@ -21,6 +23,15 @@ export function render(): void {
     // Show and update depth slider and orientation widget
     update3DControls();
     updateOrientationLabels();
+    updateWlControlsUI();
+    return;
+  }
+
+  const manager = getViewportManager();
+  if (manager && state.isMprMode) {
+    manager.getAllViewports().forEach((vp) => vp.render());
+    updateOrientationLabels();
+    updateWlControlsUI();
     return;
   }
 
@@ -28,16 +39,11 @@ export function render(): void {
   hide3DControls();
   if (!state.parsed?.pixelData) {
     updateOrientationLabels();
+    updateWlControlsUI();
     return;
   }
 
-  const manager = getViewportManager();
   if (manager) {
-    if (state.isMprMode) {
-      manager.getAllViewports().forEach((vp) => vp.render());
-      updateOrientationLabels();
-      return;
-    }
     // Multi-viewport Grid architecture (1x1, 1x2, 2x2)
     const activeVp = manager.activeViewport;
     if (activeVp) {
@@ -122,9 +128,94 @@ export function updateOrientationLabels(): void {
 
 // ── 3D Controls Update ───────────────────────────────────────────────────────
 
+let activeInteractingSlider: HTMLInputElement | null = null;
+
+export function setActiveInteractingSlider(el: HTMLInputElement | null): void {
+  activeInteractingSlider = el;
+}
+
+export function getActiveInteractingSlider(): HTMLInputElement | null {
+  return activeInteractingSlider;
+}
+
+export function update3DSlidersUI(): void {
+  const dims =
+    view3DViewer.getVolumeDimensions() ||
+    (mprEngine.volume ? mprCoordinator.getDimensions() : null);
+  const indices = mprCoordinator.crosshair;
+
+  const axialSliders = [
+    $("view-3d-scroll-axial") as HTMLInputElement | null,
+    $("mpr-scroll-axial") as HTMLInputElement | null,
+  ];
+  const coronalSliders = [
+    $("view-3d-scroll-coronal") as HTMLInputElement | null,
+    $("mpr-scroll-coronal") as HTMLInputElement | null,
+  ];
+  const sagittalSliders = [
+    $("view-3d-scroll-sagittal") as HTMLInputElement | null,
+    $("mpr-scroll-sagittal") as HTMLInputElement | null,
+  ];
+
+  if (dims) {
+    const isInteracting = (slider: HTMLInputElement) => {
+      return (
+        document.activeElement === slider || activeInteractingSlider === slider
+      );
+    };
+
+    axialSliders.forEach((scrollAxial) => {
+      if (scrollAxial) {
+        const maxVal = String(Math.max(0, dims.depth - 1));
+        if (scrollAxial.min !== "0") scrollAxial.min = "0";
+        if (scrollAxial.max !== maxVal) scrollAxial.max = maxVal;
+        if (!isInteracting(scrollAxial)) {
+          scrollAxial.value = String(indices.z);
+        }
+      }
+    });
+
+    coronalSliders.forEach((scrollCoronal) => {
+      if (scrollCoronal) {
+        const maxVal = String(Math.max(0, dims.rows - 1));
+        if (scrollCoronal.min !== "0") scrollCoronal.min = "0";
+        if (scrollCoronal.max !== maxVal) scrollCoronal.max = maxVal;
+        if (!isInteracting(scrollCoronal)) {
+          scrollCoronal.value = String(indices.y);
+        }
+      }
+    });
+
+    sagittalSliders.forEach((scrollSagittal) => {
+      if (scrollSagittal) {
+        const maxVal = String(Math.max(0, dims.cols - 1));
+        if (scrollSagittal.min !== "0") scrollSagittal.min = "0";
+        if (scrollSagittal.max !== maxVal) scrollSagittal.max = maxVal;
+        if (!isInteracting(scrollSagittal)) {
+          scrollSagittal.value = String(indices.x);
+        }
+      }
+    });
+
+    // Update numeric displays
+    const valAxial = $("view-3d-val-axial") || $("mpr-val-axial");
+    if (valAxial) valAxial.textContent = String(indices.z);
+
+    const valCoronal = $("view-3d-val-coronal") || $("mpr-val-coronal");
+    if (valCoronal) valCoronal.textContent = String(indices.y);
+
+    const valSagittal = $("view-3d-val-sagittal") || $("mpr-val-sagittal");
+    if (valSagittal) valSagittal.textContent = String(indices.x);
+  }
+}
+
+export const updateMPRSlidersUI = update3DSlidersUI;
+
 export function update3DControls(): void {
   [
     "view-3d-container",
+    "view-3d-sliders-panel",
+    "mpr-sliders-panel",
     "view-3d-depth-slider-wrap",
     "mpr-depth-slider-wrap",
     "view-3d-orientation-widget",
@@ -163,41 +254,14 @@ export function update3DControls(): void {
   });
 
   updateView3DButtonState();
-
-  // Update Tri-Planar sliders
-  if (view3DViewer.volume) {
-    ["view-3d-scroll-axial", "mpr-scroll-axial"].forEach((id) => {
-      const scrollAxial = $(id) as HTMLInputElement | null;
-      if (scrollAxial && document.activeElement !== scrollAxial) {
-        scrollAxial.min = "0";
-        scrollAxial.max = String(Math.max(0, view3DViewer.volume!.depth - 1));
-        scrollAxial.value = String(view3DViewer.crosshair.z);
-      }
-    });
-
-    ["view-3d-scroll-coronal", "mpr-scroll-coronal"].forEach((id) => {
-      const scrollCoronal = $(id) as HTMLInputElement | null;
-      if (scrollCoronal && document.activeElement !== scrollCoronal) {
-        scrollCoronal.min = "0";
-        scrollCoronal.max = String(Math.max(0, view3DViewer.volume!.rows - 1));
-        scrollCoronal.value = String(view3DViewer.crosshair.y);
-      }
-    });
-
-    ["view-3d-scroll-sagittal", "mpr-scroll-sagittal"].forEach((id) => {
-      const scrollSagittal = $(id) as HTMLInputElement | null;
-      if (scrollSagittal && document.activeElement !== scrollSagittal) {
-        scrollSagittal.min = "0";
-        scrollSagittal.max = String(Math.max(0, view3DViewer.volume!.cols - 1));
-        scrollSagittal.value = String(view3DViewer.crosshair.x);
-      }
-    });
-  }
+  update3DSlidersUI();
 }
 
 export function hide3DControls(): void {
   [
     "view-3d-container",
+    "view-3d-sliders-panel",
+    "mpr-sliders-panel",
     "view-3d-depth-slider-wrap",
     "mpr-depth-slider-wrap",
     "view-3d-orientation-widget",

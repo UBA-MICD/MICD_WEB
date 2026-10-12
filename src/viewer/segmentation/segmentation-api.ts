@@ -6,7 +6,7 @@
 // La geometría vive en el backend (`POST /api/v1/ml/segmentation`). Este
 // módulo sólo la pide y decodifica la máscara RLE.
 
-import { authFetch, API_BASE } from "../../auth/auth.js";
+import { authFetch, API_BASE, isAuthenticated } from "../../auth/auth.js";
 import { t } from "../../i18n/i18n.js";
 
 export interface Point2D {
@@ -248,6 +248,25 @@ export async function getSegmentationForInstance(
     return { ok: false, status: res.status, error: await readError(res) };
   }
   return { ok: true, data: await res.json() };
+}
+
+/**
+ * Catálogo de patologías (mismo que usa la carga de estudios: `GET
+ * /v1/pathologies`). Las etiquetas se traducen en el cliente por `key`
+ * (`classification.<key>`). Devuelve [] para invitado o ante un error.
+ */
+export async function getPathologies(): Promise<{ id: number; key: string }[]> {
+  // A guest must not go through authFetch: its 401 would open the login prompt,
+  // which takes over whatever screen is showing (the invite / reset screens
+  // included) just because the viewer pre-loaded an optional catalog.
+  if (!isAuthenticated()) return [];
+  try {
+    const res = await authFetch(`${API_BASE}/v1/pathologies`);
+    if (!res.ok) return [];
+    return (await res.json()) as { id: number; key: string }[];
+  } catch {
+    return [];
+  }
 }
 
 /** Candidato + cadena completa de correcciones (más nueva primero). */

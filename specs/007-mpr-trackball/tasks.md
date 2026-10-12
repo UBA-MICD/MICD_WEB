@@ -13,8 +13,8 @@
 
 ## Phase 2 — Matemática (web)
 
-- [ ] T020 [P] `src/viewer/mpr-rotation.ts`: cuaterniones, `orthonormalize`, `matrixToPitchYaw`, `applyPitchYawDelta`.
-- [ ] T021 [P] `src/viewer/mpr-rotation.test.ts`: casos del plan (Rodrigues, ortonormalidad, round-trip, ±90°).
+- [x] T020 [P] `src/viewer/mpr-rotation.ts`: cuaterniones, `orthonormalize`, `matrixToPitchYaw`, `applyPitchYawDelta`.
+- [x] T021 [P] `src/viewer/mpr-rotation.test.ts`: casos del plan (Rodrigues, ortonormalidad, round-trip, ±90°).
 - [ ] T022 `src/viewer/mpr-coordinator.ts`: `rotatePitchYaw`, `getPitchYawDegrees`, `resetToOrthogonal`, `rotationQuat`.
 - [ ] T023 `src/viewer/mpr-coordinator.test.ts`: reset conserva crosshair; normales ortogonales.
 

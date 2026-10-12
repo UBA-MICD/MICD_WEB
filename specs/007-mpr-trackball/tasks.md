@@ -4,7 +4,7 @@
 
 ## Phase 0 — Setup
 
-- [ ] T001 Rama de trabajo actual: `feat/rotator-tools` (web, desktop).
+- [x] T001 Rama de trabajo actual: `feat/rotator-tools` (web, desktop).
 - [x] T002 Open questions resueltas (brazos del crosshair eliminados; triedro completo): reflejado en spec FR-2/FR-6 y plan §1.2/§3.3.
 
 ## Phase 1 — Acceptance
@@ -33,12 +33,12 @@
 
 ## Phase 5 — Desktop parity
 
-- [ ] T050 `make sync-web` in `desktop/`.
-- [ ] T051 `make parity` prints match.
-- [ ] T052 `npm run build` && `npm test` (desktop) green.
+- [x] T050 `make sync-web` in `desktop/`.
+- [x] T051 `make parity` prints match.
+- [x] T052 `npm run build` && `npm test` (desktop) green.
 
 ## Phase 6 — Verify & deliver
 
-- [ ] T060 `npm run build` && `npm test` && `pre-commit run --all-files` (web) green.
-- [ ] T061 Manual check de los escenarios del `.feature` (ambos temas, ES/EN, sólo teclado).
-- [ ] T062 Commit (with required trailers) and push the branch(es).
+- [x] T060 `npm run build` && `npm test` && `pre-commit run --all-files` (web) green.
+- [x] T061 Manual check de los escenarios del `.feature` (ambos temas, ES/EN, sólo teclado).
+- [x] T062 Commit (with required trailers) and push the branch(es).

@@ -27,7 +27,7 @@
 ## Phase 4 — Eventos (web)
 
 - [x] T040 `mpr-trackball.ts`: PointerEvents con captura, rAF, mapeo ΔX/ΔY→ángulos, Shift fino, clamp 15°.
-- [ ] T041 `src/viewer/interaction.ts`: montaje del trackball y flag `isTrackballDragging`.
+- [x] T041 `src/viewer/interaction.ts`: montaje del trackball y flag `isTrackballDragging`.
 - [x] T042 `src/viewer/interaction.ts`: retirar rotación por brazos (según T002).
 - [x] T043 `mpr-trackball.test.ts` + `interaction.test.ts`: aislamiento del crosshair, teclado, anuncio único del Reset.
 

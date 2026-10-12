@@ -36,18 +36,22 @@ export function createMprTrackball(): MprTrackballHandle {
   const labelSpan = document.createElement("span");
   labelSpan.id = "mpr-trackball-label";
   labelSpan.setAttribute("data-i18n", "viewer.mpr.trackball.label");
+  labelSpan.textContent = t("viewer.mpr.trackball.label") || "Trackball MPR";
   root.appendChild(labelSpan);
 
   // Pointer-only virtual trackball sphere (aria-hidden)
   const sphere = document.createElement("div");
   sphere.className = "mpr-trackball-sphere";
   sphere.setAttribute("aria-hidden", "true");
+  sphere.title =
+    t("viewer.mpr.trackball.hint") || "Arrastrá para rotar · Shift = fino";
   root.appendChild(sphere);
 
   // Pitch accessible slider (range [-90, 90])
   const pitchLabel = document.createElement("label");
   const pitchSpan = document.createElement("span");
   pitchSpan.setAttribute("data-i18n", "viewer.mpr.trackball.pitch");
+  pitchSpan.textContent = t("viewer.mpr.trackball.pitch") || "Pitch";
   pitchLabel.appendChild(pitchSpan);
 
   const pitchInput = document.createElement("input");
@@ -64,6 +68,7 @@ export function createMprTrackball(): MprTrackballHandle {
   const yawLabel = document.createElement("label");
   const yawSpan = document.createElement("span");
   yawSpan.setAttribute("data-i18n", "viewer.mpr.trackball.yaw");
+  yawSpan.textContent = t("viewer.mpr.trackball.yaw") || "Yaw";
   yawLabel.appendChild(yawSpan);
 
   const yawInput = document.createElement("input");
@@ -86,9 +91,15 @@ export function createMprTrackball(): MprTrackballHandle {
   const resetButton = document.createElement("button");
   resetButton.type = "button";
   resetButton.className = "mpr-trackball-reset";
+  resetButton.textContent = t("viewer.mpr.trackball.reset") || "Reset";
+  resetButton.title = t("viewer.mpr.trackball.reset") || "Restablecer";
   resetButton.setAttribute(
     "data-i18n-attr",
     "aria-label:viewer.mpr.trackball.reset; title:viewer.mpr.trackball.reset",
+  );
+  resetButton.setAttribute(
+    "aria-label",
+    t("viewer.mpr.trackball.reset") || "Restablecer",
   );
   root.appendChild(resetButton);
 

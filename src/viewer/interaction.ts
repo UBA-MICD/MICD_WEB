@@ -40,6 +40,10 @@ import {
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
 import { mprCoordinator } from "./mpr-coordinator.js";
+import {
+  createMprTrackball,
+  type MprTrackballHandle,
+} from "./mpr-trackball.js";
 import { dicomCache } from "./cache.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
@@ -125,9 +129,46 @@ async function navigateSliceDelta(delta: number): Promise<void> {
   }
 }
 
+// ── MPR Trackball Mounting (spec 007, TK-30) ─────────────────────────────────
+
+let mprTrackballInstance: MprTrackballHandle | null = null;
+
+export function getMprTrackball(): MprTrackballHandle | null {
+  return mprTrackballInstance;
+}
+
+export function ensureMprTrackballMounted(): MprTrackballHandle | null {
+  const toolbar = $("viewer-toolbar") || $("tool-mpr")?.parentElement;
+  if (!toolbar) return null;
+
+  if (!mprTrackballInstance || !mprTrackballInstance.el.isConnected) {
+    if (mprTrackballInstance) {
+      try {
+        mprTrackballInstance.destroy();
+      } catch {
+        // Safe cleanup
+      }
+      mprTrackballInstance = null;
+    }
+    mprTrackballInstance = createMprTrackball();
+    const mprBtn = $("tool-mpr");
+    if (mprBtn && mprBtn.parentElement) {
+      mprBtn.parentElement.insertBefore(
+        mprTrackballInstance.el,
+        mprBtn.nextSibling,
+      );
+    } else {
+      toolbar.appendChild(mprTrackballInstance.el);
+    }
+  }
+
+  return mprTrackballInstance;
+}
+
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
 export function initToolbar(): void {
+  ensureMprTrackballMounted();
   const tools = [
     "wl",
     "zoom",
@@ -1151,6 +1192,18 @@ export function updateToolbarUI(): void {
     mprBtn.setAttribute("aria-pressed", String(Boolean(state.isMprMode)));
   }
 
+  const trackball = ensureMprTrackballMounted();
+  if (trackball) {
+    const manager = getViewportManager();
+    const isCombined3D = Boolean(
+      manager?.activeViewport &&
+      manager.isCombined3DViewport(manager.activeViewport.id),
+    );
+    const shouldShow = Boolean(state.isMprMode && !isCombined3D);
+    trackball.el.hidden = !shouldShow;
+    trackball.el.classList.toggle("hidden", !shouldShow);
+  }
+
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
   // would also strip the metadata toggle's state, leaving its class and
   // aria-expanded disagreeing with the open panel.
@@ -1313,6 +1366,7 @@ export function initViewportInteraction(): void {
         state.viewport = { ...activeVp.data.viewport };
         updateZoomControlsUI();
         updateWlControlsUI();
+        updateToolbarUI();
       }
     });
   }
@@ -1441,6 +1495,7 @@ export function initViewportInteraction(): void {
       dragOriginViewportId !== manager.activeViewport?.id
     ) {
       manager.setActiveViewport(dragOriginViewportId);
+      updateToolbarUI();
     }
     const activeVp =
       (manager && dragOriginViewportId

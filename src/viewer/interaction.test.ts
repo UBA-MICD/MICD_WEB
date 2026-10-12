@@ -24,6 +24,7 @@ import {
   initGridLayoutControls,
   setViewportSync,
   update3DSlidersUI,
+  getMprTrackball,
 } from "./interaction.ts";
 import { state, itemCount } from "./state.ts";
 import { mpr3DViewer, view3DViewer } from "./view-3d.ts";
@@ -2499,4 +2500,32 @@ test("3-axis panel wiring and bidirectional reactivity with MPRGridCoordinator",
   assert.equal(valSagittal?.textContent, "15");
 
   view3DViewer.volume = null;
+});
+
+test("initToolbar: mounts MPR trackball into DOM and toggles visibility with isMprMode", () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  const trackball = getMprTrackball();
+  assert.ok(trackball, "Trackball handle must exist after initToolbar");
+  assert.ok(
+    document.body.contains(trackball.el),
+    "Trackball element must be injected into the DOM",
+  );
+
+  // Initially not in MPR mode -> trackball must be hidden
+  state.isMprMode = false;
+  updateToolbarUI();
+  assert.equal(trackball.el.hidden, true);
+  assert.ok(trackball.el.classList.contains("hidden"));
+
+  // When MPR mode is active -> trackball must be visible
+  state.isMprMode = true;
+  updateToolbarUI();
+  assert.equal(trackball.el.hidden, false);
+  assert.equal(trackball.el.classList.contains("hidden"), false);
+
+  // Restore state
+  state.isMprMode = false;
+  updateToolbarUI();
 });

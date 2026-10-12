@@ -1,12 +1,17 @@
 /**
- * mpr-trackball.ts — MPR Trackball UI component skeleton (spec 007, TK-30 Phase 2).
+ * mpr-trackball.ts — MPR Trackball UI component (spec 007, TK-30 Phase 3).
  *
- * Programmatic DOM construction for the trackball control group on the MPR toolbar.
- * WCAG 2.2 AA compliant structure:
- *  - Native <input type="range"> sliders provide accessible 1-pointer / keyboard controls (2.5.7).
- *  - Virtual sphere element is marked aria-hidden="true".
- *  - Readout output has aria-live="off" to avoid spamming screen readers per drag event.
+ * Programmatic DOM construction and event wiring for the trackball control group on the MPR toolbar:
+ *  - PointerEvents on virtual sphere for 2-axis Pitch/Yaw rotation with pointer capture.
+ *  - Dragging maps horizontal delta to Yaw and vertical delta to Pitch (1px = 1deg, 0.1deg with Shift).
+ *  - Native <input type="range"> sliders provide accessible 1-pointer / keyboard controls (WCAG 2.5.7).
+ *  - Reset button restores canonical orthogonal planes and announces once via polite live region.
  */
+
+import { mprCoordinator } from "./mpr-coordinator.js";
+import { getViewportManager } from "./viewport-registry.js";
+import { t, onLocaleChange } from "../i18n/i18n.js";
+import type { MPRPlane } from "./mpr-engine.js";
 
 export interface MprTrackballHandle {
   el: HTMLElement;
@@ -19,7 +24,7 @@ export interface MprTrackballHandle {
 }
 
 /**
- * Creates and returns the DOM skeleton for the MPR trackball control group.
+ * Creates and wires the DOM and event listeners for the MPR trackball control group.
  */
 export function createMprTrackball(): MprTrackballHandle {
   const root = document.createElement("div");
@@ -87,8 +92,252 @@ export function createMprTrackball(): MprTrackballHandle {
   );
   root.appendChild(resetButton);
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function getActivePlane(): MPRPlane {
+    const manager = getViewportManager();
+    const activeVp = manager?.activeViewport;
+    if (
+      activeVp &&
+      activeVp.plane &&
+      !manager?.isCombined3DViewport(activeVp.id)
+    ) {
+      return activeVp.plane as MPRPlane;
+    }
+    return "axial";
+  }
+
+  function updateReadoutAndSliders(): void {
+    const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
+    pitchInput.value = String(pitch);
+    yawInput.value = String(yaw);
+
+    const pitchStr = pitch.toFixed(1);
+    const yawStr = yaw.toFixed(1);
+
+    pitchInput.setAttribute(
+      "aria-valuetext",
+      `${pitchStr} ${t("viewer.mpr.trackball.valueText") || "grados"}`,
+    );
+    yawInput.setAttribute(
+      "aria-valuetext",
+      `${yawStr} ${t("viewer.mpr.trackball.valueText") || "grados"}`,
+    );
+
+    readout.textContent =
+      t("viewer.mpr.trackball.readout", {
+        pitch: pitchStr,
+        yaw: yawStr,
+      }) || `Pitch ${pitchStr}° · Yaw ${yawStr}°`;
+  }
+
+  // ── Sphere PointerEvents ───────────────────────────────────────────────────
+
+  let isDragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let activePointerId: number | null = null;
+
+  const onPointerDown = (e: PointerEvent): void => {
+    if (e.button !== 0) return;
+    if (e.isPrimary === false && e.pointerType === "touch") return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    activePointerId = e.pointerId;
+
+    try {
+      sphere.setPointerCapture(e.pointerId);
+    } catch {
+      // Safe fallback if not supported in test environment
+    }
+
+    root.setAttribute("data-dragging", "true");
+    sphere.setAttribute("data-dragging", "true");
+  };
+
+  const onPointerMove = (e: PointerEvent): void => {
+    if (!isDragging) return;
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    if (dx === 0 && dy === 0) return;
+
+    const sensitivity = e.shiftKey ? 0.1 : 1.0;
+    const DEG_TO_RAD = Math.PI / 180;
+    const MAX_RAD = 15 * DEG_TO_RAD;
+
+    // Horizontal drag maps to Yaw, vertical drag maps to Pitch
+    // Drag right (dx > 0) => positive Yaw; drag down (dy > 0) => positive Pitch
+    const dYaw = Math.max(
+      -MAX_RAD,
+      Math.min(MAX_RAD, dx * sensitivity * DEG_TO_RAD),
+    );
+    const dPitch = Math.max(
+      -MAX_RAD,
+      Math.min(MAX_RAD, dy * sensitivity * DEG_TO_RAD),
+    );
+
+    const plane = getActivePlane();
+    mprCoordinator.rotatePitchYaw(dPitch, dYaw, plane);
+
+    const manager = getViewportManager();
+    if (manager) {
+      for (const vp of manager.getAllViewports()) {
+        vp.render();
+      }
+    }
+    updateReadoutAndSliders();
+  };
+
+  const stopDrag = (e: PointerEvent): void => {
+    if (!isDragging) return;
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    isDragging = false;
+    root.removeAttribute("data-dragging");
+    sphere.removeAttribute("data-dragging");
+
+    if (activePointerId !== null) {
+      try {
+        if (sphere.hasPointerCapture(activePointerId)) {
+          sphere.releasePointerCapture(activePointerId);
+        }
+      } catch {
+        // Safe release
+      }
+      activePointerId = null;
+    }
+  };
+
+  sphere.addEventListener("pointerdown", onPointerDown);
+  sphere.addEventListener("pointermove", onPointerMove);
+  sphere.addEventListener("pointerup", stopDrag);
+  sphere.addEventListener("pointercancel", stopDrag);
+  sphere.addEventListener("lostpointercapture", stopDrag);
+
+  // ── Accessible Sliders & Keyboard Events ───────────────────────────────────
+
+  const onPitchInput = (): void => {
+    const targetPitch = Number(pitchInput.value);
+    const current = mprCoordinator.getPitchYawDegrees().pitch;
+    const deltaDeg = targetPitch - current;
+    if (Math.abs(deltaDeg) > 1e-4) {
+      const plane = getActivePlane();
+      mprCoordinator.rotatePitchYaw(deltaDeg * (Math.PI / 180), 0, plane);
+      const manager = getViewportManager();
+      if (manager) {
+        for (const vp of manager.getAllViewports()) vp.render();
+      }
+      updateReadoutAndSliders();
+    }
+  };
+
+  const onYawInput = (): void => {
+    const targetYaw = Number(yawInput.value);
+    const current = mprCoordinator.getPitchYawDegrees().yaw;
+    let deltaDeg = targetYaw - current;
+    if (deltaDeg > 180) deltaDeg -= 360;
+    if (deltaDeg < -180) deltaDeg += 360;
+    if (Math.abs(deltaDeg) > 1e-4) {
+      const plane = getActivePlane();
+      mprCoordinator.rotatePitchYaw(0, deltaDeg * (Math.PI / 180), plane);
+      const manager = getViewportManager();
+      if (manager) {
+        for (const vp of manager.getAllViewports()) vp.render();
+      }
+      updateReadoutAndSliders();
+    }
+  };
+
+  const handleSliderKeydown = (
+    e: KeyboardEvent,
+    axis: "pitch" | "yaw",
+  ): void => {
+    let delta = 0;
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+      delta = e.shiftKey ? 10 : 1;
+    } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+      delta = e.shiftKey ? -10 : -1;
+    } else if (e.key === "PageUp") {
+      delta = 15;
+    } else if (e.key === "PageDown") {
+      delta = -15;
+    }
+
+    if (delta !== 0) {
+      e.preventDefault();
+      const plane = getActivePlane();
+      const dPitchRad = axis === "pitch" ? delta * (Math.PI / 180) : 0;
+      const dYawRad = axis === "yaw" ? delta * (Math.PI / 180) : 0;
+      mprCoordinator.rotatePitchYaw(dPitchRad, dYawRad, plane);
+      const manager = getViewportManager();
+      if (manager) {
+        for (const vp of manager.getAllViewports()) vp.render();
+      }
+      updateReadoutAndSliders();
+    }
+  };
+
+  pitchInput.addEventListener("input", onPitchInput);
+  yawInput.addEventListener("input", onYawInput);
+  pitchInput.addEventListener("keydown", (e) =>
+    handleSliderKeydown(e, "pitch"),
+  );
+  yawInput.addEventListener("keydown", (e) => handleSliderKeydown(e, "yaw"));
+
+  // ── Reset Button ───────────────────────────────────────────────────────────
+
+  const onResetClick = (e: MouseEvent): void => {
+    e.preventDefault();
+    mprCoordinator.resetToOrthogonal();
+
+    const manager = getViewportManager();
+    if (manager) {
+      for (const vp of manager.getAllViewports()) {
+        vp.render();
+      }
+    }
+    updateReadoutAndSliders();
+
+    const announceEl =
+      document.getElementById("measure-announce") ||
+      document.getElementById("session-announce");
+    if (announceEl) {
+      announceEl.textContent =
+        t("viewer.mpr.trackball.resetAnnounce") ||
+        "Planos restablecidos a ortogonales";
+    }
+  };
+  resetButton.addEventListener("click", onResetClick);
+
+  // ── Initial State & Subscriptions ──────────────────────────────────────────
+
+  updateReadoutAndSliders();
+  const unsubRotation = mprCoordinator.onRotationChange(
+    updateReadoutAndSliders,
+  );
+  const unsubLocale = onLocaleChange(updateReadoutAndSliders);
+
   const destroy = (): void => {
-    // Teardown placeholder for event listeners (wired in later phases)
+    unsubRotation();
+    unsubLocale();
+    sphere.removeEventListener("pointerdown", onPointerDown);
+    sphere.removeEventListener("pointermove", onPointerMove);
+    sphere.removeEventListener("pointerup", stopDrag);
+    sphere.removeEventListener("pointercancel", stopDrag);
+    sphere.removeEventListener("lostpointercapture", stopDrag);
+    pitchInput.removeEventListener("input", onPitchInput);
+    yawInput.removeEventListener("input", onYawInput);
+    resetButton.removeEventListener("click", onResetClick);
   };
 
   return {

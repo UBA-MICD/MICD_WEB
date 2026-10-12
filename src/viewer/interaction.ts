@@ -1319,9 +1319,6 @@ export function initViewportInteraction(): void {
 
   let dragOriginViewportId: string | null = null;
   let activeMouseButton = 0;
-  let isRotatingMprCrosshair = false;
-  let mprRotationPlane: "axial" | "coronal" | "sagittal" = "axial";
-  let mprCrosshairScreenCenter: [number, number] = [0, 0];
 
   if (container) {
     container.addEventListener("contextmenu", (e: MouseEvent) => {
@@ -1389,27 +1386,6 @@ export function initViewportInteraction(): void {
         return;
       }
       const plane = activeVp?.plane || "axial";
-      const [cx, cy] = mprEngine.getCrosshairScreenCoords(plane, viewW, viewH);
-      const distToCenter = Math.hypot(clickX - cx, clickY - cy);
-
-      // Check if clicking on crosshair arm/handle to rotate oblique slice
-      if (distToCenter > 30) {
-        const { line1, line2 } = mprEngine.getCrosshairLineDirections(plane);
-        const distToLine1 = Math.abs(
-          (clickX - cx) * line1.dirY - (clickY - cy) * line1.dirX,
-        );
-        const distToLine2 = Math.abs(
-          (clickX - cx) * line2.dirY - (clickY - cy) * line2.dirX,
-        );
-        if (distToLine1 <= 18 || distToLine2 <= 18) {
-          isRotatingMprCrosshair = true;
-          mprRotationPlane = plane;
-          mprCrosshairScreenCenter = [cx, cy];
-          return;
-        }
-      }
-
-      isRotatingMprCrosshair = false;
       mprEngine.setCrosshairFromScreen(plane, clickX, clickY, viewW, viewH);
       const [nx, ny, nz] = mprEngine.crosshairNormalized;
       mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
@@ -2115,34 +2091,6 @@ export function initViewportInteraction(): void {
               break;
             }
 
-            if (isRotatingMprCrosshair) {
-              const [cx, cy] = mprCrosshairScreenCenter;
-              const vpRect =
-                activeVp.canvasElement.getBoundingClientRect?.() ?? {
-                  left: 0,
-                  top: 0,
-                };
-              const prevRelX = state.lastMouseX - dx - vpRect.left - cx;
-              const prevRelY = state.lastMouseY - dy - vpRect.top - cy;
-              const currRelX = state.lastMouseX - vpRect.left - cx;
-              const currRelY = state.lastMouseY - vpRect.top - cy;
-
-              const anglePrev = Math.atan2(prevRelY, prevRelX);
-              const angleCurr = Math.atan2(currRelY, currRelX);
-              let dAngle = angleCurr - anglePrev;
-              if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
-              if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
-
-              if (Math.abs(dAngle) > 1e-4) {
-                const cam = mprEngine.getCamera(mprRotationPlane);
-                mprCoordinator.rotateAroundAxis(cam.normal, -dAngle);
-                for (const vp of manager.getAllViewports()) {
-                  vp.render();
-                }
-              }
-              break;
-            }
-
             manager.dispatchMprCrosshair(
               crosshairOriginId,
               dx,
@@ -2199,20 +2147,15 @@ export function initViewportInteraction(): void {
         case "crosshair":
         default:
           if (mprEngine.volume && state.isMprMode) {
-            if (isRotatingMprCrosshair) {
-              const cam = mprEngine.getCamera(mprRotationPlane);
-              mprCoordinator.rotateAroundAxis(cam.normal, -dx * 0.01);
-            } else {
-              mprEngine.applyCrosshairDelta2D(
-                "axial",
-                dx,
-                dy,
-                container.clientWidth || 300,
-                container.clientHeight || 300,
-              );
-              const [nx, ny, nz] = mprEngine.crosshairNormalized;
-              mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
-            }
+            mprEngine.applyCrosshairDelta2D(
+              "axial",
+              dx,
+              dy,
+              container.clientWidth || 300,
+              container.clientHeight || 300,
+            );
+            const [nx, ny, nz] = mprEngine.crosshairNormalized;
+            mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
           }
           break;
       }
@@ -2423,7 +2366,6 @@ export function initViewportInteraction(): void {
     state.isDragging = false;
     activeMouseButton = 0;
     dragOriginViewportId = null;
-    isRotatingMprCrosshair = false;
   });
 
   container.addEventListener("dblclick", (e: MouseEvent) => {

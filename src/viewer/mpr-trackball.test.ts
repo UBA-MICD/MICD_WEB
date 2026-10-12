@@ -2,16 +2,30 @@ import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { installDom, uninstallDom } from "../../test/dom-setup.ts";
 import { createMprTrackball } from "./mpr-trackball.ts";
+import { mprCoordinator } from "./mpr-coordinator.ts";
 
-test.before(() => installDom());
+test.before(() => {
+  installDom();
+  if (!HTMLElement.prototype.setPointerCapture) {
+    HTMLElement.prototype.setPointerCapture = () => {};
+  }
+  if (!HTMLElement.prototype.releasePointerCapture) {
+    HTMLElement.prototype.releasePointerCapture = () => {};
+  }
+  if (!HTMLElement.prototype.hasPointerCapture) {
+    HTMLElement.prototype.hasPointerCapture = () => false;
+  }
+});
 test.after(() => uninstallDom());
 
 beforeEach(() => {
   document.body.innerHTML = "";
+  mprCoordinator.resetToOrthogonal();
 });
 
 afterEach(() => {
   document.body.innerHTML = "";
+  mprCoordinator.resetToOrthogonal();
 });
 
 test("createMprTrackball: returns root container with role='group' and aria-labelledby", () => {
@@ -104,4 +118,298 @@ test("createMprTrackball: destroy() executes cleanly without throwing", () => {
   const handle = createMprTrackball();
   assert.equal(typeof handle.destroy, "function");
   assert.doesNotThrow(() => handle.destroy());
+});
+
+test("mpr-trackball: pointerdown on sphere sets data-dragging only for primary button", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  // Non-primary click (e.g. right-click button = 2)
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointerdown", { button: 2, bubbles: true }),
+  );
+  assert.equal(handle.el.hasAttribute("data-dragging"), false);
+  assert.equal(handle.sphere.hasAttribute("data-dragging"), false);
+
+  // Primary click (button = 0)
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    }),
+  );
+  assert.equal(handle.el.getAttribute("data-dragging"), "true");
+  assert.equal(handle.sphere.getAttribute("data-dragging"), "true");
+
+  handle.destroy();
+});
+
+test("mpr-trackball: dragging sphere updates pitch, yaw, and readout", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  // Start drag at (100, 100)
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    }),
+  );
+
+  // Move right by 10px (dx = 10 -> yaw ~ 10°) and down by 5px (dy = 5 -> pitch ~ 5°)
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointermove", {
+      clientX: 110,
+      clientY: 105,
+      bubbles: true,
+    }),
+  );
+
+  const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
+  assert.ok(Math.abs(yaw - 10) < 0.5, `expected yaw ~10, got ${yaw}`);
+  assert.ok(handle.readout.textContent?.includes(`Pitch ${pitch.toFixed(1)}°`));
+  assert.ok(handle.readout.textContent?.includes(`Yaw ${yaw.toFixed(1)}°`));
+
+  // Release drag
+  handle.sphere.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  assert.equal(handle.el.hasAttribute("data-dragging"), false);
+  assert.equal(handle.sphere.hasAttribute("data-dragging"), false);
+
+  handle.destroy();
+});
+
+test("mpr-trackball: dragging with Shift key applies 0.1x fine sensitivity", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    }),
+  );
+
+  // Move right 10px with Shift held -> 10 * 0.1 = 1.0° yaw
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointermove", {
+      clientX: 110,
+      clientY: 100,
+      shiftKey: true,
+      bubbles: true,
+    }),
+  );
+
+  const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
+  assert.ok(Math.abs(yaw - 1.0) < 0.2, `expected fine yaw ~1.0, got ${yaw}`);
+  assert.ok(
+    Math.abs(pitch - 0.0) < 0.1,
+    `expected fine pitch ~0.0, got ${pitch}`,
+  );
+
+  handle.sphere.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  handle.destroy();
+});
+
+test("mpr-trackball: pointercancel ends dragging cleanly", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    }),
+  );
+  assert.equal(handle.sphere.getAttribute("data-dragging"), "true");
+
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointercancel", { bubbles: true }),
+  );
+  assert.equal(handle.sphere.hasAttribute("data-dragging"), false);
+
+  handle.destroy();
+});
+
+test("mpr-trackball: accessible slider input updates coordinator pitch and yaw", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.pitchInput.value = "25";
+  handle.pitchInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+  let degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.pitch - 25) < 0.5,
+    `expected pitch ~25, got ${degrees.pitch}`,
+  );
+
+  mprCoordinator.resetToOrthogonal();
+
+  handle.yawInput.value = "-40";
+  handle.yawInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+  degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.yaw - -40) < 0.5,
+    `expected yaw ~ -40, got ${degrees.yaw}`,
+  );
+
+  handle.destroy();
+});
+
+test("mpr-trackball: slider keyboard controls increment / decrement values", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  // ArrowUp on pitch slider -> +1 deg
+  handle.pitchInput.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "ArrowUp",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  let degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.pitch - 1) < 0.2,
+    `expected pitch ~1, got ${degrees.pitch}`,
+  );
+
+  // Shift+ArrowUp on pitch slider -> +10 deg
+  handle.pitchInput.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "ArrowUp",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.pitch - 11) < 0.3,
+    `expected pitch ~11, got ${degrees.pitch}`,
+  );
+
+  // PageDown on pitch slider -> -15 deg
+  handle.pitchInput.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "PageDown",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.pitch - -4) < 0.3,
+    `expected pitch ~ -4, got ${degrees.pitch}`,
+  );
+
+  // ArrowRight on yaw slider -> +1 deg
+  handle.yawInput.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.yaw - 1) < 0.2,
+    `expected yaw ~1, got ${degrees.yaw}`,
+  );
+
+  // Shift+ArrowLeft on yaw slider -> -10 deg
+  handle.yawInput.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "ArrowLeft",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.yaw - -9) < 0.3,
+    `expected yaw ~ -9, got ${degrees.yaw}`,
+  );
+
+  // PageUp on yaw slider -> +15 deg
+  handle.yawInput.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "PageUp",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  degrees = mprCoordinator.getPitchYawDegrees();
+  assert.ok(
+    Math.abs(degrees.yaw - 6) < 0.3,
+    `expected yaw ~6, got ${degrees.yaw}`,
+  );
+
+  handle.destroy();
+});
+
+test("mpr-trackball: reset button restores orthogonal axes and announces via live region", () => {
+  const announceEl = document.createElement("div");
+  announceEl.id = "measure-announce";
+  document.body.appendChild(announceEl);
+
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  // Rotate first
+  mprCoordinator.rotatePitchYaw(0.5, 0.5, "axial");
+  assert.notEqual(mprCoordinator.getPitchYawDegrees().pitch, 0);
+
+  // Click reset
+  handle.resetButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+  const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
+  assert.equal(pitch, 0);
+  assert.equal(yaw, 0);
+  assert.equal(handle.pitchInput.value, "0");
+  assert.equal(handle.yawInput.value, "0");
+  assert.ok(handle.readout.textContent?.includes("Pitch 0.0°"));
+  assert.ok(handle.readout.textContent?.includes("Yaw 0.0°"));
+  assert.ok(
+    announceEl.textContent?.includes("Planos restablecidos a ortogonales") ||
+      announceEl.textContent!.length > 0,
+  );
+
+  handle.destroy();
+});
+
+test("mpr-trackball: synchronizes reactively with external coordinator rotation changes", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  const DEG_TO_RAD = Math.PI / 180;
+  mprCoordinator.rotatePitchYaw(20 * DEG_TO_RAD, 0, "axial");
+
+  assert.equal(handle.pitchInput.value, "20");
+  assert.equal(handle.yawInput.value, "0");
+  assert.ok(handle.readout.textContent?.includes("Pitch 20.0°"));
+  assert.ok(handle.readout.textContent?.includes("Yaw 0.0°"));
+
+  handle.destroy();
+});
+
+test("mpr-trackball: destroy removes coordinator listener and DOM listeners", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.destroy();
+
+  const initialText = handle.readout.textContent;
+  mprCoordinator.rotatePitchYaw(0.3, 0.3, "axial");
+  assert.equal(handle.readout.textContent, initialText);
 });

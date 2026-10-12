@@ -21,15 +21,15 @@
 ## Phase 3 — UI y Accesibilidad (web)
 
 - [x] T030 i18n: claves `viewer.mpr.trackball.*` en `es.ts` y `en.ts`.
-- [ ] T031 `src/viewer/mpr-trackball.ts`: DOM, ARIA, sliders, Reset, readout, roving tabindex.
+- [x] T031 `src/viewer/mpr-trackball.ts`: DOM, ARIA, sliders, Reset, readout, roving tabindex.
 - [x] T032 `src/styles.css`: bloque `.mpr-trackball*`, foco, reduced-motion, forced-colors, contraste medido (≥ 3:1).
 
 ## Phase 4 — Eventos (web)
 
-- [ ] T040 `mpr-trackball.ts`: PointerEvents con captura, rAF, mapeo ΔX/ΔY→ángulos, Shift fino, clamp 15°.
+- [x] T040 `mpr-trackball.ts`: PointerEvents con captura, rAF, mapeo ΔX/ΔY→ángulos, Shift fino, clamp 15°.
 - [ ] T041 `src/viewer/interaction.ts`: montaje del trackball y flag `isTrackballDragging`.
-- [ ] T042 `src/viewer/interaction.ts`: retirar rotación por brazos (según T002).
-- [ ] T043 `mpr-trackball.test.ts` + `interaction.test.ts`: aislamiento del crosshair, teclado, anuncio único del Reset.
+- [x] T042 `src/viewer/interaction.ts`: retirar rotación por brazos (según T002).
+- [x] T043 `mpr-trackball.test.ts` + `interaction.test.ts`: aislamiento del crosshair, teclado, anuncio único del Reset.
 
 ## Phase 5 — Desktop parity
 

@@ -1192,16 +1192,35 @@ export function updateToolbarUI(): void {
     mprBtn.setAttribute("aria-pressed", String(Boolean(state.isMprMode)));
   }
 
-  const trackball = ensureMprTrackballMounted();
-  if (trackball) {
-    const manager = getViewportManager();
-    const isCombined3D = Boolean(
-      manager?.activeViewport &&
-      manager.isCombined3DViewport(manager.activeViewport.id),
-    );
-    const shouldShow = Boolean(state.isMprMode && !isCombined3D);
-    trackball.el.hidden = !shouldShow;
-    trackball.el.classList.toggle("hidden", !shouldShow);
+  try {
+    const trackball = ensureMprTrackballMounted();
+    if (trackball) {
+      let isCombined3D = false;
+      const manager = getViewportManager();
+      if (
+        manager &&
+        manager.activeViewport &&
+        typeof manager.isCombined3DViewport === "function"
+      ) {
+        try {
+          isCombined3D = Boolean(
+            manager.isCombined3DViewport(manager.activeViewport.id),
+          );
+        } catch {
+          isCombined3D = false;
+        }
+      }
+      const shouldShow = Boolean(
+        state.isMprMode && !state.is3DMode && !isCombined3D,
+      );
+      trackball.el.hidden = !shouldShow;
+      trackball.el.classList.toggle("hidden", !shouldShow);
+      if (!shouldShow && typeof trackball.closePopover === "function") {
+        trackball.closePopover();
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to update trackball visibility in toolbar:", err);
   }
 
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool

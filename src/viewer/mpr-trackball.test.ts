@@ -413,3 +413,60 @@ test("mpr-trackball: destroy removes coordinator listener and DOM listeners", ()
   mprCoordinator.rotatePitchYaw(0.3, 0.3, "axial");
   assert.equal(handle.readout.textContent, initialText);
 });
+
+test("mpr-trackball: toggleButton toggles popover panel visibility", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  assert.ok(handle.toggleButton, "toggleButton exists");
+  assert.ok(handle.popover, "popover exists");
+  assert.ok(
+    handle.popover.classList.contains("hidden"),
+    "popover starts hidden",
+  );
+  assert.equal(handle.toggleButton.getAttribute("aria-expanded"), "false");
+
+  // Click toggleButton to open
+  handle.toggleButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  assert.equal(handle.popover.classList.contains("hidden"), false);
+  assert.equal(handle.toggleButton.getAttribute("aria-expanded"), "true");
+  assert.ok(handle.toggleButton.classList.contains("active"));
+
+  // Click toggleButton to close
+  handle.toggleButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  assert.equal(handle.popover.classList.contains("hidden"), true);
+  assert.equal(handle.toggleButton.getAttribute("aria-expanded"), "false");
+  assert.equal(handle.toggleButton.classList.contains("active"), false);
+
+  handle.destroy();
+});
+
+test("mpr-trackball: Escape key closes the popover menu", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.openPopover();
+  assert.equal(handle.popover.classList.contains("hidden"), false);
+
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  assert.equal(handle.popover.classList.contains("hidden"), true);
+  assert.equal(handle.toggleButton.getAttribute("aria-expanded"), "false");
+
+  handle.destroy();
+});
+
+test("mpr-trackball: clicking outside closes the popover menu", () => {
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.openPopover();
+  assert.equal(handle.popover.classList.contains("hidden"), false);
+
+  // Click outside (document.body directly)
+  document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  assert.equal(handle.popover.classList.contains("hidden"), true);
+
+  handle.destroy();
+});

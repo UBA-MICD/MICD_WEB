@@ -4726,15 +4726,69 @@ body {
 .mpr-trackball {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px;
-  background: var(--bg-surface, #131619);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-md, 8px);
   position: relative;
+}
+
+.mpr-trackball.hidden,
+.mpr-trackball[hidden] {
+  display: none !important;
+}
+
+.mpr-trackball-toggle {
+  width: 100%;
+}
+
+.mpr-trackball-popover {
+  position: fixed;
+  z-index: 1050;
+  width: 220px;
+  background: var(--bg-surface, #18181b);
+  border: 1px solid var(--border-strong, #27272a);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   user-select: none;
+}
+
+.mpr-trackball-popover.hidden {
+  display: none !important;
+}
+
+.mpr-trackball-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border, #27272a);
+}
+
+.mpr-trackball-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #a1a1aa);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  transition:
+    color var(--transition, 0.15s ease),
+    background var(--transition, 0.15s ease);
+}
+
+.mpr-trackball-close:hover {
+  color: var(--text-primary, #ffffff);
+  background: var(--bg-hover, #22272c);
+}
+
+.mpr-trackball-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 #mpr-trackball-label {

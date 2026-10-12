@@ -20,6 +20,10 @@ export interface MprTrackballHandle {
   yawInput: HTMLInputElement;
   readout: HTMLOutputElement;
   resetButton: HTMLButtonElement;
+  toggleButton: HTMLButtonElement;
+  popover: HTMLElement;
+  openPopover: () => void;
+  closePopover: () => void;
   destroy: () => void;
 }
 
@@ -32,20 +36,109 @@ export function createMprTrackball(): MprTrackballHandle {
   root.setAttribute("role", "group");
   root.setAttribute("aria-labelledby", "mpr-trackball-label");
 
-  // Accessible group title
+  // Menu button with icon (matches .toolbar__tool style)
+  const toggleButton = document.createElement("button");
+  toggleButton.type = "button";
+  toggleButton.className = "toolbar__tool mpr-trackball-toggle";
+  toggleButton.id = "tool-trackball";
+  toggleButton.title =
+    t("viewer.mpr.trackball.toggleTitle") ||
+    "Rotación de planos MPR (Trackball)";
+  toggleButton.setAttribute(
+    "data-i18n-attr",
+    "title:viewer.mpr.trackball.toggleTitle; aria-label:viewer.mpr.trackball.toggleTitle",
+  );
+  toggleButton.setAttribute(
+    "aria-label",
+    t("viewer.mpr.trackball.toggleTitle") ||
+      "Rotación de planos MPR (Trackball)",
+  );
+  toggleButton.setAttribute("aria-haspopup", "dialog");
+  toggleButton.setAttribute("aria-expanded", "false");
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "20");
+  svg.setAttribute("height", "20");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  const circle = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "circle",
+  );
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "12");
+  circle.setAttribute("r", "9");
+  svg.appendChild(circle);
+
+  const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path1.setAttribute("d", "M3.6 9h16.8");
+  svg.appendChild(path1);
+
+  const path2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path2.setAttribute("d", "M3.6 15h16.8");
+  svg.appendChild(path2);
+
+  const path3 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path3.setAttribute("d", "M11.5 3a17 17 0 0 0 0 18");
+  svg.appendChild(path3);
+
+  const path4 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path4.setAttribute("d", "M12.5 3a17 17 0 0 1 0 18");
+  svg.appendChild(path4);
+
+  toggleButton.appendChild(svg);
+
+  const btnSpan = document.createElement("span");
+  btnSpan.setAttribute("data-i18n", "viewer.mpr.trackball.button");
+  btnSpan.textContent = t("viewer.mpr.trackball.button") || "Rotación";
+  toggleButton.appendChild(btnSpan);
+
+  root.appendChild(toggleButton);
+
+  // Dropdown Popover container
+  const popover = document.createElement("div");
+  popover.className = "toolbar-popover mpr-trackball-popover hidden";
+  popover.setAttribute("role", "dialog");
+  popover.setAttribute("aria-labelledby", "mpr-trackball-label");
+
+  // Popover header
+  const header = document.createElement("div");
+  header.className = "popover-header mpr-trackball-header";
+
   const labelSpan = document.createElement("span");
   labelSpan.id = "mpr-trackball-label";
   labelSpan.setAttribute("data-i18n", "viewer.mpr.trackball.label");
   labelSpan.textContent = t("viewer.mpr.trackball.label") || "Trackball MPR";
-  root.appendChild(labelSpan);
+  header.appendChild(labelSpan);
 
-  // Pointer-only virtual trackball sphere (aria-hidden)
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "popover-close-btn mpr-trackball-close";
+  closeButton.setAttribute(
+    "aria-label",
+    t("viewer.mpr.trackball.close") || "Cerrar",
+  );
+  closeButton.textContent = "×";
+  header.appendChild(closeButton);
+
+  popover.appendChild(header);
+
+  // Popover body
+  const body = document.createElement("div");
+  body.className = "popover-body mpr-trackball-body";
+
+  // Virtual sphere
   const sphere = document.createElement("div");
   sphere.className = "mpr-trackball-sphere";
   sphere.setAttribute("aria-hidden", "true");
   sphere.title =
     t("viewer.mpr.trackball.hint") || "Arrastrá para rotar · Shift = fino";
-  root.appendChild(sphere);
+  body.appendChild(sphere);
 
   // Pitch accessible slider (range [-90, 90])
   const pitchLabel = document.createElement("label");
@@ -62,7 +155,7 @@ export function createMprTrackball(): MprTrackballHandle {
   pitchInput.step = "1";
   pitchInput.value = "0";
   pitchLabel.appendChild(pitchInput);
-  root.appendChild(pitchLabel);
+  body.appendChild(pitchLabel);
 
   // Yaw accessible slider (range [-180, 180])
   const yawLabel = document.createElement("label");
@@ -79,13 +172,13 @@ export function createMprTrackball(): MprTrackballHandle {
   yawInput.step = "1";
   yawInput.value = "0";
   yawLabel.appendChild(yawInput);
-  root.appendChild(yawLabel);
+  body.appendChild(yawLabel);
 
   // Angle readout output
   const readout = document.createElement("output");
   readout.className = "mpr-trackball-readout";
   readout.setAttribute("aria-live", "off");
-  root.appendChild(readout);
+  body.appendChild(readout);
 
   // Reset button to return to canonical orthogonal axes
   const resetButton = document.createElement("button");
@@ -101,19 +194,75 @@ export function createMprTrackball(): MprTrackballHandle {
     "aria-label",
     t("viewer.mpr.trackball.reset") || "Restablecer",
   );
-  root.appendChild(resetButton);
+  body.appendChild(resetButton);
+
+  popover.appendChild(body);
+  root.appendChild(popover);
+
+  // ── Popover Visibility & Toggle ──────────────────────────────────────────
+
+  function openPopover(): void {
+    const rect = toggleButton.getBoundingClientRect();
+    const winH = typeof window !== "undefined" ? window.innerHeight : 600;
+    const top = Math.max(12, Math.min(rect.top, winH - 280));
+    const left = rect.right > 0 ? rect.right + 8 : 72;
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+    popover.classList.remove("hidden");
+    toggleButton.classList.add("active");
+    toggleButton.setAttribute("aria-expanded", "true");
+  }
+
+  function closePopover(): void {
+    popover.classList.add("hidden");
+    toggleButton.classList.remove("active");
+    toggleButton.setAttribute("aria-expanded", "false");
+  }
+
+  function togglePopover(): void {
+    if (popover.classList.contains("hidden")) {
+      openPopover();
+    } else {
+      closePopover();
+    }
+  }
+
+  toggleButton.addEventListener("click", togglePopover);
+  closeButton.addEventListener("click", closePopover);
+
+  const onDocClick = (e: MouseEvent): void => {
+    const target = e.target as Node | null;
+    if (target && !root.contains(target)) {
+      closePopover();
+    }
+  };
+  document.addEventListener("click", onDocClick);
+
+  const onDocKeydown = (e: KeyboardEvent): void => {
+    if (e.key === "Escape" && !popover.classList.contains("hidden")) {
+      closePopover();
+      toggleButton.focus();
+    }
+  };
+  document.addEventListener("keydown", onDocKeydown);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   function getActivePlane(): MPRPlane {
-    const manager = getViewportManager();
-    const activeVp = manager?.activeViewport;
-    if (
-      activeVp &&
-      activeVp.plane &&
-      !manager?.isCombined3DViewport(activeVp.id)
-    ) {
-      return activeVp.plane as MPRPlane;
+    try {
+      const manager = getViewportManager();
+      const activeVp = manager?.activeViewport;
+      if (
+        activeVp &&
+        activeVp.plane &&
+        manager &&
+        typeof manager.isCombined3DViewport === "function" &&
+        !manager.isCombined3DViewport(activeVp.id)
+      ) {
+        return activeVp.plane as MPRPlane;
+      }
+    } catch {
+      // Safe fallback
     }
     return "axial";
   }
@@ -341,6 +490,10 @@ export function createMprTrackball(): MprTrackballHandle {
   const destroy = (): void => {
     unsubRotation();
     unsubLocale();
+    document.removeEventListener("click", onDocClick);
+    document.removeEventListener("keydown", onDocKeydown);
+    toggleButton.removeEventListener("click", togglePopover);
+    closeButton.removeEventListener("click", closePopover);
     sphere.removeEventListener("pointerdown", onPointerDown);
     sphere.removeEventListener("pointermove", onPointerMove);
     sphere.removeEventListener("pointerup", stopDrag);
@@ -358,6 +511,10 @@ export function createMprTrackball(): MprTrackballHandle {
     yawInput,
     readout,
     resetButton,
+    toggleButton,
+    popover,
+    openPopover,
+    closePopover,
     destroy,
   };
 }

@@ -20,9 +20,9 @@
 
 ## Phase 3 — UI y Accesibilidad (web)
 
-- [ ] T030 i18n: claves `viewer.mpr.trackball.*` en `es.ts` y `en.ts`.
+- [x] T030 i18n: claves `viewer.mpr.trackball.*` en `es.ts` y `en.ts`.
 - [ ] T031 `src/viewer/mpr-trackball.ts`: DOM, ARIA, sliders, Reset, readout, roving tabindex.
-- [ ] T032 `src/styles.css`: bloque `.mpr-trackball*`, foco, reduced-motion, forced-colors, contraste medido (≥ 3:1).
+- [x] T032 `src/styles.css`: bloque `.mpr-trackball*`, foco, reduced-motion, forced-colors, contraste medido (≥ 3:1).
 
 ## Phase 4 — Eventos (web)
 

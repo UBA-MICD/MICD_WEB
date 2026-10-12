@@ -23,23 +23,19 @@ import {
 
 // ── Upload (Cargar tab) ──────────────────────────────────────────────────────
 //
-// Every file gets its own progress row (design screen 04). The previous
-// implementation moved a single bar by file index and, for folder uploads,
-// used a plain fetch with no progress events at all — so a 400 MB study looked
-// frozen. Everything goes through XHR now, which is the only way to observe
-// upload progress in the browser.
+// A study is often hundreds of files (one per slice), so the whole upload is
+// shown as ONE progress panel: a single byte-weighted percentage, the current
+// phase (anonymizing / uploading file i of N), bytes and an estimated time
+// left. Only the files that fail are listed, collapsed. Everything goes through
+// XHR, which is the only way to observe upload progress in the browser.
 //
 // Files are uploaded one at a time on purpose: a folder can hold hundreds of
 // instances, and firing them all at once would bury the API.
 
 type UploadOutcome = "ok" | "duplicate" | "error" | "aborted";
 
-interface UploadRow {
-  file: File;
-  bar: HTMLElement;
-  pct: HTMLElement;
-  wrap: HTMLElement;
-}
+/** The answer to "this file already exists", reused for the rest of the batch. */
+type DuplicatePolicy = "ask" | "replace" | "skip";
 
 /** In-flight requests, so "Cancelar" can actually stop them. */
 let activeXhr: XMLHttpRequest | null = null;
@@ -47,8 +43,11 @@ let cancelled = false;
 let uploading = false;
 /** Study ids returned by a successful upload in this session. */
 const uploadedStudyIds: string[] = [];
-/** Drives the aggregate percentage, which counts the file in flight too. */
-let queue = { done: 0, total: 0 };
+/** Byte-weighted progress of the running batch, including the file in flight. */
+let progress = { doneBytes: 0, totalBytes: 0, startedAt: 0 };
+let duplicatePolicy: DuplicatePolicy = "ask";
+/** Files that did not make it, with a short reason, for the collapsed list. */
+let failures: Array<{ name: string; reason: string }> = [];
 
 export function getLastUploadedStudyId(): string | null {
   return uploadedStudyIds[uploadedStudyIds.length - 1] ?? null;
@@ -350,11 +349,17 @@ async function startUpload(files: File[]): Promise<void> {
     uploading = false;
     return;
   }
-  queue = { done: 0, total: files.length };
+  progress = {
+    doneBytes: 0,
+    totalBytes: files.reduce((sum, f) => sum + f.size, 0),
+    startedAt: Date.now(),
+  };
+  duplicatePolicy = "ask";
+  failures = [];
   renderTransportNote();
-  const rows = renderRows(files);
+  showProgressPanel(files.length);
   setFinishEnabled(false);
-  setAggregatePercent(0);
+  showUploadStatus(t("upload.startedStatus", { count: files.length }), "");
 
   let ok = 0;
   let duplicates = 0;
@@ -363,19 +368,13 @@ async function startUpload(files: File[]): Promise<void> {
   try {
     for (let i = 0; i < files.length; i++) {
       if (cancelled) break;
-      // Only the file count is announced; the percentage lives in an
-      // aria-hidden span so progress doesn't spam the screen reader.
-      showUploadStatus(
-        t("upload.uploadingProgress", { current: i + 1, total: files.length }),
-        "",
-      );
-      const outcome = await uploadOne(files[i], rows[i]);
+      const outcome = await uploadOne(files[i], i, files.length);
       if (outcome === "aborted") break;
       if (outcome === "ok") ok++;
       else if (outcome === "duplicate") duplicates++;
       else errors++;
-      queue.done = i + 1;
-      setAggregatePercent((queue.done / queue.total) * 100);
+      progress.doneBytes += files[i].size;
+      renderProgress(progress.doneBytes);
     }
   } finally {
     uploading = false;
@@ -384,6 +383,7 @@ async function startUpload(files: File[]): Promise<void> {
   }
 
   if (cancelled) {
+    finishProgressPanel("cancelled");
     showUploadStatus(t("upload.cancelled"), "error");
     completeListener?.({
       ok,
@@ -401,7 +401,7 @@ async function startUpload(files: File[]): Promise<void> {
     parts.push(t("upload.summaryDuplicates", { count: duplicates }));
   if (errors > 0) parts.push(t("upload.summaryErrors", { count: errors }));
   showUploadStatus(parts.join(" · "), errors > 0 ? "error" : "ok");
-  setAggregatePercent(100);
+  finishProgressPanel(errors > 0 ? "errors" : "done");
 
   await loadStudyExplorer();
   completeListener?.({
@@ -456,23 +456,24 @@ function anonymizationErrorMessage(err: unknown, file: File): string {
 
 async function uploadOne(
   file: File,
-  row: UploadRow,
+  index: number,
+  total: number,
   force = false,
   isRetry = false,
 ): Promise<UploadOutcome> {
+  const current = index + 1;
   let fileToSend: File;
+  setPhase(t("upload.phaseAnonymizing", { current, total }));
   try {
     fileToSend = await anonymizeForUpload(file);
   } catch (err) {
     // Fail closed (US-16): a file we couldn't anonymize is never sent.
     console.error("Anonymization failed, upload cancelled:", err);
-    setRowState(row, "error");
-    // The row keeps saying why after the end-of-queue summary replaces the
-    // status line.
-    row.pct.textContent = t("upload.stateNotAnonymized");
+    addFailure(file, t("upload.stateNotAnonymized"));
     showUploadStatus(anonymizationErrorMessage(err, file), "error");
     return "error";
   }
+  setPhase(t("upload.phaseUploading", { current, total }));
 
   return new Promise((resolve) => {
     const formData = new FormData();
@@ -492,30 +493,21 @@ async function uploadOne(
 
     xhr.upload.addEventListener("progress", (e) => {
       if (!e.lengthComputable) return;
-      const fraction = e.loaded / e.total;
-      setRowProgress(row, fraction * 100);
-      // The aggregate counts the file in flight, so the number moves during a
-      // single large upload instead of jumping only between files.
-      if (queue.total > 0) {
-        setAggregatePercent(((queue.done + fraction) / queue.total) * 100);
-      }
+      // Counts the file in flight, so the bar moves during one large file
+      // instead of jumping only between files.
+      renderProgress(progress.doneBytes + (e.loaded / e.total) * file.size);
     });
 
-    xhr.addEventListener("abort", () => {
-      setRowState(row, "aborted");
-      resolve("aborted");
-    });
+    xhr.addEventListener("abort", () => resolve("aborted"));
 
     xhr.addEventListener("error", () => {
-      setRowState(row, "error");
+      addFailure(file, t("upload.networkError"));
       showUploadStatus(t("upload.networkError"), "error");
       resolve("error");
     });
 
     xhr.addEventListener("load", () => {
       if (xhr.status === 201) {
-        setRowProgress(row, 100);
-        setRowState(row, "ok");
         rememberUploadedStudy(xhr.responseText);
         // TK-11: stored, but the backend's PHI check may have flagged it for
         // review (warn mode, or a burned-in-annotation warning). Tell the user,
@@ -534,59 +526,70 @@ async function uploadOne(
           const recovered =
             (await refreshAccessToken()) || (await ensureAuthenticated());
           if (!recovered) {
-            setRowState(row, "error");
+            addFailure(file, t("upload.sessionExpiredRetry"));
             showUploadStatus(t("upload.sessionExpiredRetry"), "error");
             resolve("error");
             return;
           }
-          resolve(await uploadOne(file, row, force, true));
+          resolve(await uploadOne(file, index, total, force, true));
         })();
         return;
       }
 
       if (xhr.status === 401) {
-        setRowState(row, "error");
+        addFailure(file, t("upload.unauthorizedRetry"));
         showUploadStatus(t("upload.unauthorizedRetry"), "error");
         resolve("error");
         return;
       }
 
       if (xhr.status === 409) {
-        setRowState(row, "duplicate");
+        // A study's slices are usually all duplicates at once, so the first
+        // answer applies to the rest of this batch instead of asking per file.
+        const decide = async (replace: boolean): Promise<void> => {
+          resolve(
+            replace
+              ? await uploadOne(file, index, total, true)
+              : "duplicate",
+          );
+        };
+        if (duplicatePolicy !== "ask") {
+          void decide(duplicatePolicy === "replace");
+          return;
+        }
         showDuplicateDialog(
           file,
           safeMessage(xhr.responseText),
+          total > 1,
           async (replace, cancelAll) => {
             if (cancelAll) {
               cancelled = true;
-              setRowState(row, "aborted");
               resolve("aborted");
               return;
             }
-            resolve(replace ? await uploadOne(file, row, true) : "duplicate");
+            duplicatePolicy = replace ? "replace" : "skip";
+            await decide(replace);
           },
         );
         return;
       }
 
-      setRowState(row, "error");
       if (xhr.status === 413) {
+        addFailure(file, t("upload.fileTooLarge"));
         showUploadStatus(t("upload.fileTooLarge"), "error");
       } else if (xhr.status === 422 && isNotAnonymized(xhr.responseText)) {
         // TK-11 strict mode: the backend refused to store a study that still
         // carries identifying tags, and tells us which (names only).
-        row.pct.textContent = t("upload.stateNotAnonymized");
-        showUploadStatus(
-          t("upload.notAnonymized", {
-            tags: reviewTagNames(xhr.responseText) || "—",
-          }),
-          "error",
-        );
+        // The tag names go in the failure entry too: the status line is
+        // replaced by the batch summary when the upload ends.
+        const tags = reviewTagNames(xhr.responseText) || "—";
+        addFailure(file, `${t("upload.stateNotAnonymized")} (${tags})`);
+        showUploadStatus(t("upload.notAnonymized", { tags }), "error");
       } else {
-        showUploadStatus(
-          safeMessage(xhr.responseText) || t("upload.genericError"),
-          "error",
-        );
+        const message =
+          safeMessage(xhr.responseText) || t("upload.genericError");
+        addFailure(file, message);
+        showUploadStatus(message, "error");
       }
       resolve("error");
     });
@@ -650,63 +653,88 @@ function reviewTagNames(responseText: string): string {
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
-function renderRows(files: File[]): UploadRow[] {
-  const list = $("upload-rows");
-  list.innerHTML = files
-    .map(
-      (f, i) => `
-      <li class="upload-row" id="upload-row-${i}">
-        <span class="upload-row__name">${escapeHtml(f.name)}</span>
-        <span class="upload-row__track" role="progressbar"
-              aria-label="${escapeHtml(t("upload.rowLabel", { name: f.name }))}"
-              aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <span class="upload-row__bar"></span>
-        </span>
-        <span class="upload-row__pct">0%</span>
-      </li>`,
-    )
-    .join("");
-
-  return files.map((file, i) => {
-    const wrap = $(`upload-row-${i}`);
-    return {
-      file,
-      wrap,
-      bar: wrap.querySelector<HTMLElement>(".upload-row__bar")!,
-      pct: wrap.querySelector<HTMLElement>(".upload-row__pct")!,
-    };
-  });
-}
-
-function setRowProgress(row: UploadRow, percent: number): void {
-  const value = Math.max(0, Math.min(100, Math.round(percent)));
-  row.bar.style.width = `${value}%`;
-  row.pct.textContent = `${value}%`;
-  row.wrap
-    .querySelector(".upload-row__track")
-    ?.setAttribute("aria-valuenow", String(value));
-}
-
-function setRowState(row: UploadRow, state: UploadOutcome): void {
-  row.wrap.classList.remove(
-    "upload-row--ok",
-    "upload-row--error",
-    "upload-row--duplicate",
+function showProgressPanel(fileCount: number): void {
+  $("upload-progress").classList.remove("hidden");
+  $("upload-progress").classList.remove(
+    "upload-progress--done",
+    "upload-progress--error",
   );
-  if (state === "ok") row.wrap.classList.add("upload-row--ok");
-  else if (state === "duplicate")
-    row.wrap.classList.add("upload-row--duplicate");
-  else if (state === "error") row.wrap.classList.add("upload-row--error");
-
-  // The percentage cell doubles as the per-file outcome, so the result is
-  // legible without colour alone carrying it (WCAG 1.4.1).
-  if (state === "duplicate") row.pct.textContent = t("upload.stateDuplicate");
-  else if (state === "error") row.pct.textContent = t("common.error");
-  else if (state === "aborted") row.pct.textContent = t("upload.stateAborted");
+  $("upload-progress-title").textContent =
+    fileCount === 1
+      ? t("upload.progressTitleOne")
+      : t("upload.progressTitleMany", { count: fileCount });
+  $("upload-errors").classList.add("hidden");
+  $("upload-error-list").innerHTML = "";
+  setPhase("");
+  renderProgress(0);
 }
 
-function setAggregatePercent(percent: number): void {
-  $("upload-percent").textContent = ` · ${Math.round(percent)}%`;
+function setPhase(text: string): void {
+  $("upload-phase").textContent = text;
+}
+
+/** Repaints bar, percentage, bytes and the time-left estimate. */
+function renderProgress(doneBytes: number): void {
+  const { totalBytes, startedAt } = progress;
+  const fraction = totalBytes > 0 ? Math.min(1, doneBytes / totalBytes) : 0;
+  const pct = Math.round(fraction * 100);
+  $("upload-bar").style.width = `${pct}%`;
+  $("upload-track").setAttribute("aria-valuenow", String(pct));
+  $("upload-percent").textContent = `${pct}%`;
+
+  const bytes = t("upload.bytesProgress", {
+    done: formatBytes(doneBytes),
+    total: formatBytes(totalBytes),
+  });
+  const eta = estimateRemaining(fraction, Date.now() - startedAt);
+  $("upload-bytes").textContent = eta ? `${bytes} · ${eta}` : bytes;
+}
+
+/**
+ * Remaining-time estimate from the average rate so far. Hidden for the first
+ * few seconds and first few percent, where a rate would be mostly noise.
+ */
+export function estimateRemaining(
+  fraction: number,
+  elapsedMs: number,
+): string {
+  if (fraction < 0.02 || fraction >= 1 || elapsedMs < 3000) return "";
+  const remainingMs = (elapsedMs * (1 - fraction)) / fraction;
+  const minutes = Math.round(remainingMs / 60000);
+  return minutes < 1
+    ? t("upload.etaUnderMinute")
+    : t("upload.etaMinutes", { minutes });
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${Math.max(0, Math.round(bytes / 1024))} KB`;
+}
+
+function addFailure(file: File, reason: string): void {
+  failures.push({ name: file.name, reason });
+  $("upload-errors").classList.remove("hidden");
+  $("upload-errors-summary").textContent = t("upload.errorsSummary", {
+    count: failures.length,
+  });
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="upload-errors__name">${escapeHtml(file.name)}</span> <span class="upload-errors__reason">${escapeHtml(reason)}</span>`;
+  $("upload-error-list").appendChild(li);
+}
+
+function finishProgressPanel(result: "done" | "errors" | "cancelled"): void {
+  const panel = $("upload-progress");
+  panel.classList.toggle("upload-progress--done", result === "done");
+  panel.classList.toggle("upload-progress--error", result !== "done");
+  $("upload-progress-title").textContent =
+    result === "done"
+      ? t("upload.progressDone")
+      : result === "errors"
+        ? t("upload.progressDoneWithErrors")
+        : t("upload.progressCancelled");
+  setPhase("");
+  if (result !== "cancelled") renderProgress(progress.totalBytes);
 }
 
 function setFinishEnabled(enabled: boolean): void {
@@ -917,11 +945,14 @@ async function confirmClassification(count: number): Promise<boolean> {
 function showDuplicateDialog(
   file: File,
   message: string,
+  appliesToAll: boolean,
   done: (replace: boolean, cancelAll?: boolean) => void,
 ): void {
   const dialog = $("duplicate-dialog");
-  $("duplicate-msg").textContent =
-    message || t("upload.duplicateMessage", { name: file.name });
+  const base = message || t("upload.duplicateMessage", { name: file.name });
+  $("duplicate-msg").textContent = appliesToAll
+    ? `${base} ${t("upload.duplicateAppliesToAll")}`
+    : base;
 
   let settled = false;
   const finish = (replace: boolean, cancelAll = false): void => {

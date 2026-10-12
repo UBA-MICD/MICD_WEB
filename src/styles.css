@@ -447,71 +447,86 @@ body {
   flex-wrap: wrap;
   justify-content: center;
 }
-/* One row per file: name, its own track, and its own outcome. */
-.upload-rows {
-  list-style: none;
+/* One panel for the whole upload: title + %, a single bar, phase and bytes,
+   and a collapsed list of only the files that failed. */
+.upload-progress {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.upload-rows:empty {
-  display: none;
-}
-.upload-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 16px 18px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  font-size: 13px;
 }
-.upload-row__name {
-  flex: 0 0 200px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.upload-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.upload-progress__title {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
 }
-.upload-row__track {
-  flex: 1;
-  height: 8px;
+.upload-progress__pct {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.upload-progress__track {
+  height: 10px;
   border-radius: 999px;
   background: var(--bg-base);
   overflow: hidden;
 }
-.upload-row__bar {
+.upload-progress__bar {
   display: block;
   height: 100%;
   width: 0%;
   border-radius: 999px;
   background: var(--accent);
-  transition: width 0.1s linear;
+  transition: width 0.2s linear;
 }
-/* The outcome is in this cell as text, so colour is never the only carrier
-   of the result (WCAG 1.4.1). */
-.upload-row__pct {
-  flex: 0 0 90px;
-  text-align: right;
+.upload-progress--error .upload-progress__bar {
+  background: var(--danger);
+}
+.upload-progress--done .upload-progress__title {
+  color: var(--accent);
+}
+.upload-progress--error .upload-progress__title {
+  color: var(--danger);
+}
+.upload-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
-.upload-row--ok .upload-row__pct {
-  color: var(--accent);
-}
-.upload-row--duplicate .upload-row__pct {
-  color: var(--amber);
-}
-.upload-row--duplicate .upload-row__bar {
-  background: var(--amber);
-}
-.upload-row--error .upload-row__pct {
+.upload-errors summary {
+  cursor: pointer;
+  font-size: 12px;
   color: var(--danger);
 }
-.upload-row--error .upload-row__bar {
-  background: var(--danger);
+.upload-errors__list {
+  list-style: none;
+  margin-top: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.upload-errors__name {
+  color: var(--text-primary);
+}
+.upload-errors__reason {
+  color: var(--text-muted);
 }
 
 .upload-summary {
@@ -520,9 +535,14 @@ body {
   align-items: baseline;
   font-size: 13px;
 }
-.upload-percent {
+
+.server-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 12px;
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 .upload-note {

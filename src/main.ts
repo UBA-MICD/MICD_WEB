@@ -3,6 +3,7 @@ import {
   refreshAccessToken,
   setLoginPrompt,
   onAuthChange,
+  isInformatico,
 } from "./auth/auth.js";
 import { updateAuthUI, initActivityHistory } from "./auth/session-ui.js";
 import {
@@ -104,6 +105,7 @@ async function initApp(): Promise<void> {
   setLoginPrompt(promptLoginOnServerScreen);
   onAuthChange(() => updateAuthUI());
   $("btn-logout").addEventListener("click", () => void onLogout());
+  $("btn-server-logout").addEventListener("click", () => void onLogout());
   $("btn-login").addEventListener("click", (e) =>
     openServerScreen("buscar", e.currentTarget as HTMLElement),
   );
@@ -157,7 +159,8 @@ function startApp(): void {
   initStudyExplorer();
   initServerScreen();
   const onInviteAccepted = (): void => {
-    showScreen("viewer");
+    // informatico's app is the server screen alone (its auth listener opens it).
+    if (!isInformatico()) showScreen("viewer");
     updateAuthUI();
     void loadStudyExplorer();
   };

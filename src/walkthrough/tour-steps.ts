@@ -6,7 +6,8 @@
 //
 // Ordering is the order the user is walked through. The common viewer core is
 // shown to every role — and therefore to a guest too, since local viewing needs
-// no session. The role-specific branches (investigador / medico / admin) append
+// no session. The role-specific branches (investigador / informatico / medico /
+// admin) append
 // after this core in later steps.
 
 import type { Role } from "../auth/auth.js";
@@ -208,6 +209,47 @@ const investigadorSteps: TourStep[] = [
   },
 ];
 
+// ── B2. informatico — clinic IT: upload and download only ──────────────────────
+//
+// No viewer core: the role can't use the viewer, so its whole tour is
+// uploading, then downloading.
+
+const informaticoSteps: TourStep[] = [
+  {
+    id: "inf.upload",
+    roles: ["informatico"],
+    target: "#upload-drop",
+    screen: "server",
+    tab: "cargar",
+    titleKey: "tour.informatico.upload.title",
+    bodyKey: "tour.informatico.upload.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inf.download",
+    roles: ["informatico"],
+    target: "#btn-open-selected",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.informatico.download.title",
+    bodyKey: "tour.informatico.download.body",
+    placement: "top",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "inf.done",
+    roles: ["informatico"],
+    target: "center",
+    titleKey: "tour.informatico.done.title",
+    bodyKey: "tour.informatico.done.body",
+    placement: "center",
+    advance: { on: "next" },
+  },
+];
+
 // ── C. Staff — medico & admin (write access, full PHI) ──────────────────────────
 //
 // Clinical staff see the same search/view/export as a researcher but with full
@@ -303,7 +345,7 @@ const staffSteps: TourStep[] = [
   {
     id: "staff.uploadStatus",
     roles: ["medico", "admin"],
-    target: "#upload-rows",
+    target: "#upload-progress",
     screen: "server",
     tab: "cargar",
     titleKey: "tour.staff.uploadStatus.title",
@@ -447,6 +489,7 @@ const adminSteps: TourStep[] = [
 export const tourSteps: TourStep[] = [
   ...coreSteps,
   ...investigadorSteps,
+  ...informaticoSteps,
   ...staffSteps,
   ...adminSteps,
 ];

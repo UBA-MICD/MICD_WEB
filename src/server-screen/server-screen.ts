@@ -13,8 +13,12 @@ import {
   isAuthenticated,
   isAdmin,
   isStaff,
+  isUploader,
+  isInformatico,
+  getCurrentUser,
   onAuthChange,
 } from "../auth/auth.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
 import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
@@ -60,10 +64,12 @@ const TABS: ServerTab[] = [
 ];
 
 /** Can the current session use a tab? "usuarios" and "sistema" are admin-only;
- *  "cargar" (upload) and "validaciones" are staff-only (medico + admin). */
+ *  "validaciones" is staff-only (medico + admin); "cargar" (upload) also admits
+ *  informatico. */
 function canUseTab(tab: ServerTab): boolean {
   if (tab === "usuarios" || tab === "sistema") return isAdmin();
-  if (tab === "cargar" || tab === "validaciones") return isStaff();
+  if (tab === "validaciones") return isStaff();
+  if (tab === "cargar") return isUploader();
   return true;
 }
 
@@ -117,6 +123,22 @@ function renderForSession(): void {
     .getElementById("btn-server-settings")
     ?.classList.toggle("hidden", !isAdmin());
 
+  // informatico has no viewer: this screen is the whole app, so there is no
+  // way back, no "cancel" that would leave it, and the session lives here.
+  const serverOnly = authed && isInformatico();
+  $("btn-server-back").classList.toggle("hidden", serverOnly);
+  document
+    .getElementById("btn-buscar-cancel")
+    ?.classList.toggle("hidden", serverOnly);
+  document
+    .getElementById("btn-upload-finish")
+    ?.classList.toggle("hidden", serverOnly);
+  document
+    .getElementById("server-session")
+    ?.classList.toggle("hidden", !serverOnly);
+  const emailEl = document.getElementById("server-session-email");
+  if (emailEl) emailEl.textContent = serverOnly ? getCurrentUser()!.email : "";
+
   if (!authed) {
     TABS.forEach((name) => tabPanel(name).classList.add("hidden"));
     loginForm?.reset();
@@ -129,6 +151,15 @@ function renderForSession(): void {
   TABS.forEach((tab) =>
     tabButton(tab).classList.toggle("hidden", !canUseTab(tab)),
   );
+  // informatico has no viewer access: the Buscar primary action downloads.
+  const primaryKey = isInformatico()
+    ? "explorer.downloadSelected"
+    : "explorer.openSelected";
+  const openSelected = document.getElementById("btn-open-selected");
+  if (openSelected) {
+    openSelected.dataset.i18n = primaryKey;
+    openSelected.textContent = t(primaryKey);
+  }
   if (!canUseTab(activeTab)) activeTab = "buscar";
   showTab(activeTab);
 }
@@ -158,6 +189,8 @@ export function closeServerScreen(): void {
   // A gate that sent us here and is still waiting gets its answer: the user
   // backed out, so the caller sees a plain "not authenticated".
   settleGate(isAuthenticated());
+  // informatico never leaves: the viewer is not part of its app.
+  if (isAuthenticated() && isInformatico()) return;
   clearSelection();
   showScreen("viewer");
 }
@@ -210,9 +243,15 @@ export function initServerScreen(): void {
   );
 
   // A role change (e.g. surfaced on the next token refresh) must re-evaluate the
-  // admin tab's visibility while the screen is already open.
+  // admin tab's visibility while the screen is already open. An informatico
+  // session is moved here from anywhere, since this screen is its whole app;
+  // a logout repaints the screen back to its login card.
   onAuthChange(() => {
-    if (isAuthenticated()) renderForSession();
+    if (isAuthenticated() && isInformatico() && currentScreen() !== "server") {
+      openServerScreen("buscar");
+    } else if (currentScreen() === "server") {
+      renderForSession();
+    }
   });
 
   $("btn-server-back").addEventListener("click", () => closeServerScreen());
@@ -251,6 +290,11 @@ export function initServerScreen(): void {
 
   const openSelectedStudy = async (studyId: string): Promise<void> => {
     openSelected.disabled = true;
+    if (isInformatico()) {
+      await exportStudyByIdAsZip(studyId, undefined, { anonymize: false });
+      openSelected.disabled = false;
+      return;
+    }
     await openStudy(studyId);
     closeServerScreen();
     showBanner(t("server.studyLoadedBanner"));
@@ -285,6 +329,11 @@ export function initServerScreen(): void {
       summary.duplicates === 0 &&
       summary.ok > 0;
     if (!clean) return;
+    // informatico stays on the upload screen: it has no viewer access.
+    if (isInformatico()) {
+      showBanner(t("upload.uploadedBanner", { count: summary.ok }), "success");
+      return;
+    }
     if (summary.studyId) await openStudy(summary.studyId);
     closeServerScreen();
     showBanner(

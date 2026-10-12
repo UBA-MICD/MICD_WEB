@@ -2525,11 +2525,12 @@ test("initToolbar: mounts MPR trackball into DOM and toggles visibility with isM
   assert.equal(trackball.el.hidden, false);
   assert.equal(trackball.el.classList.contains("hidden"), false);
 
-  // In 3D mode -> trackball must be safely hidden without crash
+  // In 3D mode -> trackball must be visible without crash
+  state.isMprMode = false;
   state.is3DMode = true;
   assert.doesNotThrow(() => updateToolbarUI());
-  assert.equal(trackball.el.hidden, true);
-  assert.ok(trackball.el.classList.contains("hidden"));
+  assert.equal(trackball.el.hidden, false);
+  assert.equal(trackball.el.classList.contains("hidden"), false);
 
   // Restore state
   state.is3DMode = false;

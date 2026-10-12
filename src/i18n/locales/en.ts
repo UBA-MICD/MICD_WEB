@@ -195,6 +195,7 @@ export const en: Record<string, string> = {
   "viewer.view3d.axialCutAria": "Axial cut",
   "viewer.view3d.coronalCutAria": "Coronal cut",
   "viewer.view3d.sagittalCutAria": "Sagittal cut",
+  "viewer.view3d.resetAnnounce": "3D camera reset",
   "viewer.mpr.layout2x2": "2x2 Grid",
   "viewer.mpr.3d": "3D Volume",
   "viewer.mpr.trackball.label": "Plane rotation (Trackball)",

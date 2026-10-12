@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { installDom, uninstallDom } from "../../test/dom-setup.ts";
 import { createMprTrackball } from "./mpr-trackball.ts";
 import { mprCoordinator } from "./mpr-coordinator.ts";
+import { view3DViewer } from "./view-3d.ts";
+import { state } from "./state.ts";
 
 test.before(() => {
   installDom();
@@ -20,12 +22,16 @@ test.after(() => uninstallDom());
 
 beforeEach(() => {
   document.body.innerHTML = "";
+  state.is3DMode = false;
   mprCoordinator.resetToOrthogonal();
+  view3DViewer.resetCamera();
 });
 
 afterEach(() => {
   document.body.innerHTML = "";
+  state.is3DMode = false;
   mprCoordinator.resetToOrthogonal();
+  view3DViewer.resetCamera();
 });
 
 test("createMprTrackball: returns root container with role='group' and aria-labelledby", () => {
@@ -469,4 +475,74 @@ test("mpr-trackball: clicking outside closes the popover menu", () => {
   assert.equal(handle.popover.classList.contains("hidden"), true);
 
   handle.destroy();
+});
+
+test("mpr-trackball: routes dragging to view3DViewer when is3DMode is active", () => {
+  state.is3DMode = true;
+  view3DViewer.resetCamera();
+  const initTheta = view3DViewer.camera.theta;
+  const initPhi = view3DViewer.camera.phi;
+
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  // Drag sphere right 10px, down 5px
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointerdown", {
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    }),
+  );
+  handle.sphere.dispatchEvent(
+    new PointerEvent("pointermove", {
+      clientX: 110,
+      clientY: 105,
+      bubbles: true,
+    }),
+  );
+
+  assert.notEqual(view3DViewer.camera.phi, initPhi);
+  assert.notEqual(view3DViewer.camera.theta, initTheta);
+
+  const { pitch, yaw } = view3DViewer.getPitchYawDegrees();
+  assert.ok(handle.readout.textContent?.includes(`Pitch ${pitch.toFixed(1)}°`));
+  assert.ok(handle.readout.textContent?.includes(`Yaw ${yaw.toFixed(1)}°`));
+
+  handle.destroy();
+  state.is3DMode = false;
+});
+
+test("mpr-trackball: slider input updates view3DViewer camera in 3D mode", () => {
+  state.is3DMode = true;
+  view3DViewer.resetCamera();
+
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.pitchInput.value = "20";
+  handle.pitchInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+  const { pitch } = view3DViewer.getPitchYawDegrees();
+  assert.ok(Math.abs(pitch - 20) < 1, `expected pitch ~20, got ${pitch}`);
+
+  handle.destroy();
+  state.is3DMode = false;
+});
+
+test("mpr-trackball: reset button resets view3DViewer camera in 3D mode", () => {
+  state.is3DMode = true;
+  view3DViewer.rotatePitchYaw(0.4, 0.5);
+
+  const handle = createMprTrackball();
+  document.body.appendChild(handle.el);
+
+  handle.resetButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+  assert.equal(view3DViewer.camera.theta, 0.3);
+  assert.equal(view3DViewer.camera.phi, 0.8);
+
+  handle.destroy();
+  state.is3DMode = false;
 });

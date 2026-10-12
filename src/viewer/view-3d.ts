@@ -192,6 +192,24 @@ export class View3DViewer {
 
   public resetCamera(): void {
     this.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
+    this.renderEpoch++;
+  }
+
+  public rotatePitchYaw(deltaTheta: number, deltaPhi: number): void {
+    this.camera.phi += deltaPhi;
+    this.camera.theta = Math.max(
+      -Math.PI / 2 + 0.1,
+      Math.min(Math.PI / 2 - 0.1, this.camera.theta + deltaTheta),
+    );
+    this.renderEpoch++;
+  }
+
+  public getPitchYawDegrees(): { pitch: number; yaw: number } {
+    const pitch = this.camera.theta * (180 / Math.PI);
+    let yaw = (this.camera.phi * (180 / Math.PI)) % 360;
+    if (yaw > 180) yaw -= 360;
+    if (yaw < -180) yaw += 360;
+    return { pitch, yaw };
   }
 
   public setVolume(vol: VoxelVolume): void {

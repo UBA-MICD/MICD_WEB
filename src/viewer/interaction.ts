@@ -1195,27 +1195,12 @@ export function updateToolbarUI(): void {
   try {
     const trackball = ensureMprTrackballMounted();
     if (trackball) {
-      let isCombined3D = false;
-      const manager = getViewportManager();
-      if (
-        manager &&
-        manager.activeViewport &&
-        typeof manager.isCombined3DViewport === "function"
-      ) {
-        try {
-          isCombined3D = Boolean(
-            manager.isCombined3DViewport(manager.activeViewport.id),
-          );
-        } catch {
-          isCombined3D = false;
-        }
-      }
-      const shouldShow = Boolean(
-        state.isMprMode && !state.is3DMode && !isCombined3D,
-      );
+      const shouldShow = Boolean(state.isMprMode || state.is3DMode);
       trackball.el.hidden = !shouldShow;
       trackball.el.classList.toggle("hidden", !shouldShow);
-      if (!shouldShow && typeof trackball.closePopover === "function") {
+      if (shouldShow && typeof trackball.update === "function") {
+        trackball.update();
+      } else if (!shouldShow && typeof trackball.closePopover === "function") {
         trackball.closePopover();
       }
     }

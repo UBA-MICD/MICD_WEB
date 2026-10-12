@@ -198,6 +198,7 @@ export const es: Record<string, string> = {
   "viewer.view3d.axialCutAria": "Corte Axial",
   "viewer.view3d.coronalCutAria": "Corte Coronal",
   "viewer.view3d.sagittalCutAria": "Corte Sagital",
+  "viewer.view3d.resetAnnounce": "Cámara 3D restablecida",
   "viewer.mpr.layout2x2": "Grilla 2x2",
   "viewer.mpr.3d": "3D Volumen",
   "viewer.mpr.trackball.label": "Rotación de planos (Trackball)",

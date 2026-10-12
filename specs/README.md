@@ -51,6 +51,7 @@ Folders are numbered sequentially (`001-…`, `002-…`); numbers are never reus
 | [002](002-measurement-tools/spec.md)      | Herramientas de medición (longitud y área)     | Draft  | TK-26  |
 | [003](003-manual-marking/spec.md)         | Marcado manual ad hoc (regiones poligonales)   | Draft  | US-48  |
 | [004](004-study-loading/spec.md)          | Pipeline de carga unificado y orientación RLPA | Draft  | US-49  |
+| [007](007-mpr-trackball/spec.md)          | Control trackball MPR (Pitch/Yaw)              | Draft  | TK-30  |
 
 ## How this relates to ADRs and `.feature` files
 

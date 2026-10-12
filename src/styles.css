@@ -4745,7 +4745,9 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* 3D Virtual Trackball Sphere (>= 64x64px per WCAG 2.5.8 / spec 007) */
+/* 3D Virtual Trackball Sphere (>= 64x64px per WCAG 2.5.8 / spec 007)
+   Styled as an understated sunken spherical socket / concave thumb well matching
+   the dark instrumental palette of the workstation. */
 .mpr-trackball-sphere {
   position: relative;
   width: 64px;
@@ -4754,24 +4756,25 @@ body {
   min-height: 64px;
   border-radius: 50%;
   background: radial-gradient(
-    circle at 35% 30%,
-    #526071 0%,
-    #2a3441 45%,
-    #161e27 80%,
-    #0d1217 100%
+    circle at 45% 40%,
+    var(--bg-surface, #131619) 0%,
+    var(--bg-base, #0d0f11) 68%,
+    #080a0c 100%
   );
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  border: 1px solid var(--border-strong, #626c73);
   box-shadow:
-    inset 0 -4px 8px rgba(0, 0, 0, 0.6),
-    0 3px 10px rgba(0, 0, 0, 0.4);
+    inset 0 3px 6px rgba(0, 0, 0, 0.75),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.35);
   cursor: grab;
   touch-action: none;
   transition:
     transform var(--transition, 0.15s ease),
-    box-shadow var(--transition, 0.15s ease);
+    box-shadow var(--transition, 0.15s ease),
+    border-color var(--transition, 0.15s ease);
 }
 
-/* Equator and meridian guides */
+/* Subtle equator and meridian orientation hairline guides */
 .mpr-trackball-sphere::before {
   content: "";
   position: absolute;
@@ -4780,7 +4783,7 @@ body {
   right: 0;
   height: 20px;
   transform: translateY(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -4793,23 +4796,28 @@ body {
   bottom: 0;
   width: 20px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 50%;
   pointer-events: none;
 }
 
 .mpr-trackball-sphere:hover {
-  border-color: rgba(255, 255, 255, 0.65);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.8),
+    inset 0 0 8px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* Dragging state */
 .mpr-trackball-sphere[data-dragging="true"],
 .mpr-trackball[data-dragging="true"] .mpr-trackball-sphere {
   cursor: grabbing;
-  border-color: var(--accent, #00b4d8);
+  border-color: var(--accent, #2ee6a8);
   box-shadow:
-    inset 0 -4px 8px rgba(0, 0, 0, 0.6),
-    0 0 14px rgba(0, 180, 216, 0.45);
+    inset 0 3px 6px rgba(0, 0, 0, 0.85),
+    0 0 0 1px var(--accent-soft, rgba(46, 230, 168, 0.12)),
+    0 0 8px var(--accent-glow, rgba(46, 230, 168, 0.25));
 }
 
 /* Visually hidden accessible native sliders (WCAG 2.5.7) */
@@ -4840,7 +4848,7 @@ body {
 /* Focus indicators (2px outline) */
 .mpr-trackball:focus-within .mpr-trackball-sphere,
 .mpr-trackball-sphere:focus-visible {
-  outline: 2px solid var(--accent, #00b4d8);
+  outline: 2px solid var(--accent, #2ee6a8);
   outline-offset: 3px;
 }
 
@@ -4882,7 +4890,7 @@ body {
 }
 
 .mpr-trackball-reset:focus-visible {
-  outline: 2px solid var(--accent, #00b4d8);
+  outline: 2px solid var(--accent, #2ee6a8);
   outline-offset: 2px;
 }
 

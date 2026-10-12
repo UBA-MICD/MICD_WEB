@@ -741,6 +741,25 @@ export class MPRCamera {
   }
 
   /**
+   * Computes the effective physical dimensions of the volume projected along the camera's uAxis and vAxis.
+   * In canonical orthogonal orientations, this matches the exact slice dimensions (e.g. sx, sy for axial).
+   * In oblique orientations (Pitch/Yaw), it adapts dynamically to the rotated volume bounding box,
+   * avoiding aspect-ratio collapse, empty borders, and harsh diagonal clipping.
+   */
+  public getBaseDimensions(volume: MPRVolume): [number, number] {
+    const [sx, sy, sz] = volume.physicalSize || [1, 1, 1];
+    const baseW =
+      Math.abs(this.uAxis[0]) * sx +
+      Math.abs(this.uAxis[1]) * sy +
+      Math.abs(this.uAxis[2]) * sz;
+    const baseH =
+      Math.abs(this.vAxis[0]) * sx +
+      Math.abs(this.vAxis[1]) * sy +
+      Math.abs(this.vAxis[2]) * sz;
+    return [baseW || 1, baseH || 1];
+  }
+
+  /**
    * Constructs the M_screenToTex matrix for this camera view:
    * M_screenToTex = M_worldToTex * M_screenToWorld.
    */
@@ -749,17 +768,7 @@ export class MPRCamera {
     viewportWidth: number,
     viewportHeight: number,
   ): Float32Array {
-    const [sx, sy, sz] = volume.physicalSize;
-    let baseW = sx;
-    let baseH = sy;
-
-    if (this.plane === "coronal") {
-      baseW = sx;
-      baseH = sz;
-    } else if (this.plane === "sagittal") {
-      baseW = sy;
-      baseH = sz;
-    }
+    const [baseW, baseH] = this.getBaseDimensions(volume);
 
     const screenToWorld = this.getScreenToWorldMatrix(
       viewportWidth,
@@ -800,10 +809,12 @@ uniform float u_windowCenter;
 uniform float u_windowWidth;
 
 void main() {
-    // Voxel volume bounding box clipping [0, 1]^3
-    if (v_texCoord.x < 0.0 || v_texCoord.x > 1.0 ||
-        v_texCoord.y < 0.0 || v_texCoord.y > 1.0 ||
-        v_texCoord.z < 0.0 || v_texCoord.z > 1.0) {
+    // Voxel volume bounding box clipping [0, 1]^3 with smooth boundary feathering
+    vec3 d0 = v_texCoord;
+    vec3 d1 = vec3(1.0) - v_texCoord;
+    float edgeDist = min(min(min(d0.x, d1.x), min(d0.y, d1.y)), min(d0.z, d1.z));
+
+    if (edgeDist < 0.0) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
@@ -815,7 +826,9 @@ void main() {
     float minW = u_windowCenter - u_windowWidth * 0.5;
     float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
 
-    fragColor = vec4(vec3(intensity), 1.0);
+    // Smooth boundary feathering across margin to eliminate harsh straight diagonal cut lines
+    float edgeFade = smoothstep(0.0, 0.015, edgeDist);
+    fragColor = vec4(vec3(intensity * edgeFade), 1.0);
 }
 `;
 
@@ -1207,17 +1220,7 @@ export class MPREngine {
   ): [number, number, number] {
     if (!this.volume) return [0, 0, 0];
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
-    let baseW = sx;
-    let baseH = sy;
-
-    if (plane === "coronal") {
-      baseW = sx;
-      baseH = sz;
-    } else if (plane === "sagittal") {
-      baseW = sy;
-      baseH = sz;
-    }
+    const [baseW, baseH] = camera.getBaseDimensions(this.volume);
 
     const vpAspect = (viewportWidth || 1) / (viewportHeight || 1);
     const sliceAspect = (baseW || 1) / (baseH || 1);
@@ -1375,17 +1378,7 @@ export class MPREngine {
   ): void {
     if (!this.volume) return;
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
-    let baseW = sx;
-    let baseH = sy;
-
-    if (plane === "coronal") {
-      baseW = sx;
-      baseH = sz;
-    } else if (plane === "sagittal") {
-      baseW = sy;
-      baseH = sz;
-    }
+    const [baseW, baseH] = camera.getBaseDimensions(this.volume);
 
     const screenToWorld = camera.getScreenToWorldMatrix(
       viewportWidth,
@@ -1411,17 +1404,7 @@ export class MPREngine {
   ): [number, number] {
     if (!this.volume) return [viewportWidth / 2, viewportHeight / 2];
     const camera = this.getCamera(plane);
-    const [sx, sy, sz] = this.volume.physicalSize || [1, 1, 1];
-    let baseW = sx;
-    let baseH = sy;
-
-    if (plane === "coronal") {
-      baseW = sx;
-      baseH = sz;
-    } else if (plane === "sagittal") {
-      baseW = sy;
-      baseH = sz;
-    }
+    const [baseW, baseH] = camera.getBaseDimensions(this.volume);
 
     const screenToWorld = camera.getScreenToWorldMatrix(
       viewportWidth,

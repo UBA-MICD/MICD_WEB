@@ -2537,3 +2537,66 @@ test("initToolbar: mounts MPR trackball into DOM and toggles visibility with isM
   state.isMprMode = false;
   updateToolbarUI();
 });
+
+test("toggle3DMode and toggleMprMode debounce / early-return when isLayoutTransitioning is true", async () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  state.isLayoutTransitioning = true;
+  const res3D = await toggle3DMode();
+  assert.equal(
+    res3D,
+    false,
+    "toggle3DMode must return false when transitioning",
+  );
+
+  const resMpr = await toggleMprMode();
+  assert.equal(
+    resMpr,
+    false,
+    "toggleMprMode must return false when transitioning",
+  );
+
+  state.isLayoutTransitioning = false;
+});
+
+test("rapid toggling stress test between MPR and 3D mode does not throw or crash WebGL state", async () => {
+  setBody(viewerFixtureHtml());
+  const container = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(container);
+  initToolbar();
+
+  // Provide mock volume
+  const mockVol: any = {
+    depth: 4,
+    rows: 4,
+    cols: 4,
+    data: new Int16Array(64),
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    rescaleSlope: 1,
+    rescaleIntercept: 0,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+  view3DViewer.volume = mockVol;
+  mprEngine.volume = mockVol;
+
+  // Simulate rapid click spam
+  for (let i = 0; i < 5; i++) {
+    const p3D = toggle3DMode();
+    const pMpr = toggleMprMode();
+    const [r3D, rMpr] = await Promise.all([p3D, pMpr]);
+    // One must have run while the other was debounced / locked out
+    assert.ok(typeof r3D === "boolean");
+    assert.ok(typeof rMpr === "boolean");
+  }
+
+  // Final cleanup
+  state.isLayoutTransitioning = false;
+  state.is3DMode = false;
+  state.isMprMode = false;
+  view3DViewer.volume = null;
+  mprEngine.volume = null;
+  manager.destroy();
+});

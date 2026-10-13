@@ -217,7 +217,18 @@ export function createMprTrackball(): MprTrackballHandle {
     toggleButton.setAttribute("aria-expanded", "true");
   }
 
+  let combinedRenderRafId: number | null = null;
+  function cancelCombinedRenderRaf(): void {
+    if (combinedRenderRafId !== null) {
+      if (typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(combinedRenderRafId);
+      }
+      combinedRenderRafId = null;
+    }
+  }
+
   function closePopover(): void {
+    cancelCombinedRenderRaf();
     popover.classList.add("hidden");
     toggleButton.classList.remove("active");
     toggleButton.setAttribute("aria-expanded", "false");
@@ -324,11 +335,12 @@ export function createMprTrackball(): MprTrackballHandle {
       try {
         if (typeof view3DViewer?.rotatePitchYaw === "function") {
           view3DViewer.rotatePitchYaw(dPitch, dYaw);
-          // In 2x2 MPR mode with combined 3D viewport active, request an async frame update
+          cancelCombinedRenderRaf();
           if (!state.is3DMode && typeof requestAnimationFrame !== "undefined") {
-            requestAnimationFrame(() => {
+            combinedRenderRafId = requestAnimationFrame(() => {
+              combinedRenderRafId = null;
               try {
-                if (state.isLayoutTransitioning) return;
+                if (state.isLayoutTransitioning || state.is3DMode) return;
                 const manager = getViewportManager();
                 const activeVp = manager?.activeViewport;
                 if (activeVp && manager?.isCombined3DViewport(activeVp.id)) {
@@ -603,10 +615,12 @@ export function createMprTrackball(): MprTrackballHandle {
         view3DViewer.resetCamera();
         lastKnownPitch = 0;
         lastKnownYaw = 0;
+        cancelCombinedRenderRaf();
         if (!state.is3DMode && typeof requestAnimationFrame !== "undefined") {
-          requestAnimationFrame(() => {
+          combinedRenderRafId = requestAnimationFrame(() => {
+            combinedRenderRafId = null;
             try {
-              if (state.isLayoutTransitioning) return;
+              if (state.isLayoutTransitioning || state.is3DMode) return;
               const manager = getViewportManager();
               const activeVp = manager?.activeViewport;
               if (activeVp && manager?.isCombined3DViewport(activeVp.id)) {
@@ -653,6 +667,7 @@ export function createMprTrackball(): MprTrackballHandle {
   const unsubLocale = onLocaleChange(updateReadoutAndSliders);
 
   const destroy = (): void => {
+    cancelCombinedRenderRaf();
     unsubRotation();
     unsubLocale();
     document.removeEventListener("click", onDocClick);

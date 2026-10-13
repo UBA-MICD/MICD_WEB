@@ -312,8 +312,14 @@ export function initToolbar(): void {
     }
   });
 
-  $("tool-view-3d")?.addEventListener("click", () => void toggle3DMode());
-  $("tool-mpr")?.addEventListener("click", () => void toggleMprMode());
+  $("tool-view-3d")?.addEventListener("click", () => {
+    if (state.isLayoutTransitioning) return;
+    void toggle3DMode();
+  });
+  $("tool-mpr")?.addEventListener("click", () => {
+    if (state.isLayoutTransitioning) return;
+    void toggleMprMode();
+  });
 
   $("btn-open").addEventListener("click", openFiles);
 
@@ -1001,6 +1007,8 @@ function onMeasurePathologyChange(): void {
 }
 
 export async function toggle3DMode(): Promise<boolean> {
+  if (state.isLayoutTransitioning) return false;
+
   const btn = ($("tool-view-3d") || $("tool-mpr")) as HTMLButtonElement | null;
   if (btn?.disabled) return false;
 
@@ -1018,9 +1026,9 @@ export async function toggle3DMode(): Promise<boolean> {
   const trackball = getMprTrackball();
   trackball?.closePopover();
 
-  if (state.is3DMode) {
-    state.isLayoutTransitioning = true;
-    try {
+  state.isLayoutTransitioning = true;
+  try {
+    if (state.is3DMode) {
       state.is3DMode = false;
       view3DViewer.isActive = false;
       view3DViewer.stopRenderLoop();
@@ -1029,22 +1037,19 @@ export async function toggle3DMode(): Promise<boolean> {
       hide3DControls();
       render();
       return false;
-    } finally {
-      state.isLayoutTransitioning = false;
-      updateToolbarUI();
     }
-  }
 
-  state.isLayoutTransitioning = true;
-  if (state.isMprMode) {
-    state.isMprMode = false;
-    $("viewport-container")?.classList.remove("mode-mpr");
-    const manager = getViewportManager();
-    manager?.setLayout("1x1");
-  }
+    // Stop any running render loop before switching layout
+    view3DViewer.stopRenderLoop();
 
-  showLoading(true);
-  try {
+    if (state.isMprMode) {
+      state.isMprMode = false;
+      $("viewport-container")?.classList.remove("mode-mpr");
+      const manager = getViewportManager();
+      manager?.setLayout("1x1");
+    }
+
+    showLoading(true);
     if (!view3DViewer.volume) {
       await loadVolumeIntoEngines();
     }
@@ -1081,6 +1086,8 @@ export async function toggle3DMode(): Promise<boolean> {
 }
 
 export async function toggleMprMode(): Promise<boolean> {
+  if (state.isLayoutTransitioning) return false;
+
   const btn = $("tool-mpr") as HTMLButtonElement | null;
   if (btn?.disabled) return false;
 
@@ -1097,40 +1104,29 @@ export async function toggleMprMode(): Promise<boolean> {
   const trackball = getMprTrackball();
   trackball?.closePopover();
 
-  // Deactivate 3D mode if active
-  if (state.is3DMode) {
-    state.isLayoutTransitioning = true;
-    try {
+  state.isLayoutTransitioning = true;
+  try {
+    // Deactivate 3D mode if active
+    if (state.is3DMode) {
       state.is3DMode = false;
       view3DViewer.isActive = false;
       view3DViewer.stopRenderLoop();
       $("view-3d-container")?.classList.add("hidden");
       $("viewport-container")?.classList.remove("mode-3d");
       hide3DControls();
-    } finally {
-      state.isLayoutTransitioning = false;
     }
-  }
 
-  const manager = getViewportManager();
-  if (state.isMprMode) {
-    state.isLayoutTransitioning = true;
-    try {
+    const manager = getViewportManager();
+    if (state.isMprMode) {
       state.isMprMode = false;
       $("viewport-container")?.classList.remove("mode-mpr");
       manager?.setLayout("1x1");
       hide3DControls();
       render();
       return false;
-    } finally {
-      state.isLayoutTransitioning = false;
-      updateToolbarUI();
     }
-  }
 
-  state.isLayoutTransitioning = true;
-  showLoading(true);
-  try {
+    showLoading(true);
     if (!mprEngine.volume) {
       await loadVolumeIntoEngines();
     }

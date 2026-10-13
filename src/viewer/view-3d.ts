@@ -303,12 +303,15 @@ export class View3DViewer {
     // view does no GPU work while a drag or the camera animation (which mutate
     // the signature every frame) still animate smoothly.
     const loop = () => {
-      if (!this.isActive) {
+      if (!this.isActive || state.isLayoutTransitioning) {
         this.animationFrameId = null;
         return;
       }
       const target = getTargetCanvas();
-      if (target) {
+      if (
+        target &&
+        (typeof target.isConnected !== "boolean" || target.isConnected)
+      ) {
         const sig = this.renderSignature(target);
         if (sig !== this.lastRenderSig) {
           this.render(target);
@@ -331,6 +334,36 @@ export class View3DViewer {
         cancelAnimationFrame(this.animationFrameId);
       }
       this.animationFrameId = null;
+    }
+    if (this.cameraAnimFrameId !== null) {
+      if (typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(this.cameraAnimFrameId);
+      }
+      this.cameraAnimFrameId = null;
+    }
+  }
+
+  public releaseContext(): void {
+    this.stopRenderLoop();
+    if (this.gl) {
+      try {
+        const loseContext =
+          typeof this.gl.getExtension === "function"
+            ? this.gl.getExtension("WEBGL_lose_context")
+            : null;
+        if (loseContext) {
+          loseContext.loseContext();
+        }
+      } catch {
+        // Safe context release
+      }
+      this.gl = null;
+      this.program = null;
+      this.volumeTexture = null;
+      this.vao = null;
+      this.vbo = null;
+      this.uniformLocations = {};
+      this.lastRenderSig = "";
     }
   }
 
@@ -1207,6 +1240,7 @@ void main() {
   /** Render WebGL2 3D Volume Ray Marching. */
   public render(canvas: HTMLCanvasElement): void {
     if (!canvas) return;
+    if (typeof canvas.isConnected === "boolean" && !canvas.isConnected) return;
 
     if (!this.gl || this.gl.canvas !== canvas) {
       if (this.gl) {
@@ -1829,6 +1863,10 @@ void main() {
       typeof performance !== "undefined" ? performance.now() : Date.now();
 
     const step = (now: number) => {
+      if (state.isLayoutTransitioning) {
+        this.cameraAnimFrameId = null;
+        return;
+      }
       const elapsed = now - startTime;
       const progress = Math.min(1.0, elapsed / durationMs);
       const ease = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
@@ -1836,7 +1874,11 @@ void main() {
       this.camera.theta = startTheta + (targetTheta - startTheta) * ease;
       this.camera.phi = startPhi + (finalPhi - startPhi) * ease;
 
-      if (renderCanvas) {
+      if (
+        renderCanvas &&
+        (typeof renderCanvas.isConnected !== "boolean" ||
+          renderCanvas.isConnected)
+      ) {
         this.render(renderCanvas);
       }
 
@@ -1848,7 +1890,11 @@ void main() {
         this.camera.theta = targetTheta;
         this.camera.phi = targetPhi;
         this.cameraAnimFrameId = null;
-        if (renderCanvas) {
+        if (
+          renderCanvas &&
+          (typeof renderCanvas.isConnected !== "boolean" ||
+            renderCanvas.isConnected)
+        ) {
           this.render(renderCanvas);
         }
       }

@@ -21,6 +21,7 @@ import {
 } from "./state.js";
 import {
   render,
+  ensure3DRendered,
   updateSeriesNav,
   updateWlControlsUI,
   hide3DControls,
@@ -1085,14 +1086,7 @@ export async function toggle3DMode(): Promise<boolean> {
     const canvas =
       (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
       (document.getElementById("dicom-canvas") as HTMLCanvasElement);
-    if (canvas) {
-      schedulePostReflow(() => {
-        if (!state.is3DMode) return;
-        view3DViewer.resize(canvas);
-        view3DViewer.render(canvas);
-        view3DViewer.startRenderLoop(canvas);
-      });
-    }
+    ensure3DRendered(canvas ?? undefined);
     return true;
   } catch (err: any) {
     showError(err.message || String(err));
@@ -2990,7 +2984,11 @@ export function initKeyboardShortcuts(): void {
 export function initResizeObserver(): void {
   const container = $("viewport-container");
   const observer = new ResizeObserver(() => {
-    if (state.parsed) render();
+    if (state.is3DMode) {
+      ensure3DRendered();
+    } else if (state.parsed) {
+      render();
+    }
   });
   observer.observe(container);
 }
@@ -3009,6 +3007,9 @@ export function initGridLayoutControls(): void {
       getViewportManager()?.setLayout(layout);
       updateGridLayoutUI(layout);
       updateToolbarUI();
+      if (state.is3DMode) {
+        ensure3DRendered();
+      }
     });
   });
 

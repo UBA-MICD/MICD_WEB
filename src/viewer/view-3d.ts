@@ -620,6 +620,7 @@ export class View3DViewer {
 
   public startRenderLoop(canvas?: HTMLCanvasElement): void {
     this.stopRenderLoop();
+    this.isActive = true;
     // Force the first frame after (re)starting to draw, whatever the scene is.
     this.lastRenderSig = "";
     const getTargetCanvas = (): HTMLCanvasElement | null =>
@@ -639,8 +640,15 @@ export class View3DViewer {
     // view does no GPU work while a drag or the camera animation (which mutate
     // the signature every frame) still animate smoothly.
     const loop = () => {
-      if (!this.isActive || state.isLayoutTransitioning) {
+      if (!this.isActive) {
         this.animationFrameId = null;
+        return;
+      }
+      if (state.isLayoutTransitioning) {
+        // Keep the loop active across transitions, deferring draw until layout stabilizes
+        if (typeof requestAnimationFrame !== "undefined") {
+          this.animationFrameId = requestAnimationFrame(loop);
+        }
         return;
       }
       const target = getTargetCanvas();
@@ -650,8 +658,10 @@ export class View3DViewer {
       ) {
         const sig = this.renderSignature(target);
         if (sig !== this.lastRenderSig) {
-          this.render(target);
-          this.lastRenderSig = sig;
+          const drawn = this.render(target);
+          if (drawn !== false) {
+            this.lastRenderSig = sig;
+          }
         }
       }
       if (typeof requestAnimationFrame !== "undefined") {
@@ -1300,10 +1310,11 @@ export class View3DViewer {
     }
   }
 
-  /** Render WebGL2 3D Volume Ray Marching. */
-  public render(canvas: HTMLCanvasElement): void {
-    if (!canvas) return;
-    if (typeof canvas.isConnected === "boolean" && !canvas.isConnected) return;
+  /** Render WebGL2 3D Volume Ray Marching. Returns true if frame was drawn. */
+  public render(canvas: HTMLCanvasElement): boolean {
+    if (!canvas) return false;
+    if (typeof canvas.isConnected === "boolean" && !canvas.isConnected)
+      return false;
 
     if (!this.gl || this.gl.canvas !== canvas) {
       if (this.gl) {
@@ -1323,11 +1334,37 @@ export class View3DViewer {
       }
     }
     const gl = this.gl;
-    if (!gl) return;
+    if (!gl) return false;
+
+    const isJsdom =
+      typeof navigator !== "undefined" &&
+      Boolean(navigator.userAgent && navigator.userAgent.includes("jsdom"));
+
+    // In a real browser, if connected canvas has not completed DOM reflow, reschedule retry
+    if (
+      !isJsdom &&
+      typeof canvas.isConnected === "boolean" &&
+      canvas.isConnected &&
+      (canvas.clientWidth <= 0 || canvas.clientHeight <= 0)
+    ) {
+      if (this.isActive && typeof requestAnimationFrame !== "undefined") {
+        requestAnimationFrame(() => {
+          if (this.isActive) this.render(canvas);
+        });
+      }
+      return false;
+    }
 
     const width = canvas.clientWidth || canvas.width || 512;
     const height = canvas.clientHeight || canvas.height || 512;
-    if (width <= 0 || height <= 0) return;
+    if (width <= 0 || height <= 0) {
+      if (this.isActive && typeof requestAnimationFrame !== "undefined") {
+        requestAnimationFrame(() => {
+          if (this.isActive) this.render(canvas);
+        });
+      }
+      return false;
+    }
 
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
@@ -1365,7 +1402,7 @@ export class View3DViewer {
       (this.textureContextId !== null && this.textureContextId !== this.gl) ||
       !this.vao
     )
-      return;
+      return false;
 
     // WebGL pipeline state: Disable culling so orbiting close or inside proxy geometry
     // never discards back-face fragments; disable depth test for alpha blending pass.
@@ -1560,6 +1597,7 @@ export class View3DViewer {
     // Draw Volume Bounding Box Cube Geometry
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 36);
+    return true;
   }
 
   /** Render 3D Anatomical Reference Cube (delegates to renderGizmo). */

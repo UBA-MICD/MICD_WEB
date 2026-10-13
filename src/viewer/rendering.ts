@@ -12,18 +12,72 @@ import { getActiveSopInstanceUid } from "./measurements/annotation-state.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
+/**
+ * Centralized, idempotent orchestrator for the 3D rendering pipeline.
+ * Guarantees that the canvas, WebGL context, controls, and on-demand render loop
+ * are properly initialized and rendered across all entry paths.
+ */
+export function ensure3DRendered(canvasElement?: HTMLCanvasElement): void {
+  if (!state.is3DMode && !view3DViewer.isActive) return;
+
+  const canvas =
+    canvasElement ||
+    (typeof document !== "undefined"
+      ? (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
+        ($("dicom-canvas") as HTMLCanvasElement)
+      : null);
+
+  if (!canvas) return;
+
+  view3DViewer.isActive = true;
+  state.is3DMode = true;
+
+  if (typeof document !== "undefined") {
+    const container = document.getElementById("view-3d-container");
+    container?.classList.remove("hidden");
+    const vpContainer = document.getElementById("viewport-container");
+    vpContainer?.classList.add("mode-3d");
+  }
+
+  const isJsdom =
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.userAgent && navigator.userAgent.includes("jsdom"));
+
+  // In a real browser, if canvas has not finished DOM reflow (clientWidth is 0), reschedule retry
+  if (
+    !isJsdom &&
+    (canvas.clientWidth <= 0 ||
+      canvas.clientHeight <= 0 ||
+      (typeof canvas.isConnected === "boolean" && !canvas.isConnected))
+  ) {
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() => {
+        if (state.is3DMode) ensure3DRendered(canvas);
+      });
+    } else {
+      setTimeout(() => {
+        if (state.is3DMode) ensure3DRendered(canvas);
+      }, 50);
+    }
+    return;
+  }
+
+  view3DViewer.resize(canvas);
+  view3DViewer.render(canvas);
+  view3DViewer.startRenderLoop(canvas);
+
+  update3DControls();
+  update3DSlidersUI();
+  updateOrientationLabels();
+  updateWlControlsUI();
+}
+
 export function render(): void {
   const canvas = (document.getElementById("view-3d-canvas") ||
     $("dicom-canvas")) as HTMLCanvasElement;
 
-  if (state.is3DMode && view3DViewer.isActive) {
-    // 3D Unified Viewport rendering
-    view3DViewer.render(canvas);
-
-    // Show and update depth slider and orientation widget
-    update3DControls();
-    updateOrientationLabels();
-    updateWlControlsUI();
+  if (state.is3DMode) {
+    ensure3DRendered(canvas);
     return;
   }
 

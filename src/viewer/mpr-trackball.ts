@@ -9,6 +9,8 @@
  */
 
 import { mprCoordinator } from "./mpr-coordinator.js";
+import { view3DViewer } from "./view-3d.js";
+import { state } from "./state.js";
 import { getViewportManager } from "./viewport-registry.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import type { MPRPlane } from "./mpr-engine.js";
@@ -203,6 +205,7 @@ export function createMprTrackball(): MprTrackballHandle {
   // ── Popover Visibility & Toggle ──────────────────────────────────────────
 
   function openPopover(): void {
+    updateReadoutAndSliders();
     const rect = toggleButton.getBoundingClientRect();
     const winH = typeof window !== "undefined" ? window.innerHeight : 600;
     const top = Math.max(12, Math.min(rect.top, winH - 280));
@@ -249,6 +252,27 @@ export function createMprTrackball(): MprTrackballHandle {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  function is3DTargetActive(): boolean {
+    if (state.is3DMode) {
+      return Boolean(view3DViewer && view3DViewer.camera);
+    }
+    try {
+      const manager = getViewportManager();
+      const activeVp = manager?.activeViewport;
+      if (
+        activeVp &&
+        manager &&
+        typeof manager.isCombined3DViewport === "function" &&
+        manager.isCombined3DViewport(activeVp.id)
+      ) {
+        return Boolean(view3DViewer && view3DViewer.camera);
+      }
+    } catch {
+      // Safe fallback
+    }
+    return false;
+  }
+
   function renderMprViewports(): void {
     const manager = getViewportManager();
     if (manager) {
@@ -282,8 +306,62 @@ export function createMprTrackball(): MprTrackballHandle {
     return "axial";
   }
 
+  function applyRotation(dPitch: number, dYaw: number): void {
+    if (is3DTargetActive()) {
+      try {
+        if (typeof view3DViewer?.rotatePitchYaw === "function") {
+          view3DViewer.rotatePitchYaw(dPitch, dYaw);
+          // In 2x2 MPR mode with combined 3D viewport active, request an async frame update
+          if (!state.is3DMode && typeof requestAnimationFrame !== "undefined") {
+            requestAnimationFrame(() => {
+              try {
+                const manager = getViewportManager();
+                const activeVp = manager?.activeViewport;
+                if (activeVp && manager?.isCombined3DViewport(activeVp.id)) {
+                  activeVp.render();
+                }
+              } catch {
+                // Defensive catch
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to rotate 3D camera:", err);
+      }
+    } else {
+      const plane = getActivePlane();
+      mprCoordinator.rotatePitchYaw(dPitch, dYaw, plane);
+      renderMprViewports();
+    }
+    updateReadoutAndSliders();
+  }
+
   function updateReadoutAndSliders(): void {
-    const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
+    let pitch = 0;
+    let yaw = 0;
+
+    if (is3DTargetActive()) {
+      try {
+        if (typeof view3DViewer?.getPitchYawDegrees === "function") {
+          const deg = view3DViewer.getPitchYawDegrees();
+          pitch = deg.pitch;
+          yaw = deg.yaw;
+        }
+      } catch {
+        pitch = 0;
+        yaw = 0;
+      }
+    } else {
+      try {
+        const deg = mprCoordinator.getPitchYawDegrees();
+        pitch = deg.pitch;
+        yaw = deg.yaw;
+      } catch {
+        pitch = 0;
+        yaw = 0;
+      }
+    }
 
     pitchInput.value = String(Math.round(pitch));
     yawInput.value = String(Math.round(yaw));
@@ -363,11 +441,7 @@ export function createMprTrackball(): MprTrackballHandle {
       Math.min(MAX_RAD, dy * sensitivity * DEG_TO_RAD),
     );
 
-    const plane = getActivePlane();
-    mprCoordinator.rotatePitchYaw(dPitch, dYaw, plane);
-
-    renderMprViewports();
-    updateReadoutAndSliders();
+    applyRotation(dPitch, dYaw);
   };
 
   const stopDrag = (e: PointerEvent): void => {
@@ -399,27 +473,47 @@ export function createMprTrackball(): MprTrackballHandle {
 
   const onPitchInput = (): void => {
     const targetPitch = Number(pitchInput.value);
-    const current = mprCoordinator.getPitchYawDegrees().pitch;
-    const deltaDeg = targetPitch - current;
-    if (Math.abs(deltaDeg) > 1e-4) {
-      const plane = getActivePlane();
-      mprCoordinator.rotatePitchYaw(deltaDeg * (Math.PI / 180), 0, plane);
-      renderMprViewports();
-      updateReadoutAndSliders();
+    if (is3DTargetActive()) {
+      try {
+        const current = view3DViewer.getPitchYawDegrees().pitch;
+        const deltaDeg = targetPitch - current;
+        if (Math.abs(deltaDeg) > 1e-4) {
+          applyRotation(deltaDeg * (Math.PI / 180), 0);
+        }
+      } catch (err) {
+        console.warn("Failed to update 3D pitch slider:", err);
+      }
+    } else {
+      const current = mprCoordinator.getPitchYawDegrees().pitch;
+      const deltaDeg = targetPitch - current;
+      if (Math.abs(deltaDeg) > 1e-4) {
+        applyRotation(deltaDeg * (Math.PI / 180), 0);
+      }
     }
   };
 
   const onYawInput = (): void => {
     const targetYaw = Number(yawInput.value);
-    const current = mprCoordinator.getPitchYawDegrees().yaw;
-    let deltaDeg = targetYaw - current;
-    if (deltaDeg > 180) deltaDeg -= 360;
-    if (deltaDeg < -180) deltaDeg += 360;
-    if (Math.abs(deltaDeg) > 1e-4) {
-      const plane = getActivePlane();
-      mprCoordinator.rotatePitchYaw(0, deltaDeg * (Math.PI / 180), plane);
-      renderMprViewports();
-      updateReadoutAndSliders();
+    if (is3DTargetActive()) {
+      try {
+        const current = view3DViewer.getPitchYawDegrees().yaw;
+        let deltaDeg = targetYaw - current;
+        if (deltaDeg > 180) deltaDeg -= 360;
+        if (deltaDeg < -180) deltaDeg += 360;
+        if (Math.abs(deltaDeg) > 1e-4) {
+          applyRotation(0, deltaDeg * (Math.PI / 180));
+        }
+      } catch (err) {
+        console.warn("Failed to update 3D yaw slider:", err);
+      }
+    } else {
+      const current = mprCoordinator.getPitchYawDegrees().yaw;
+      let deltaDeg = targetYaw - current;
+      if (deltaDeg > 180) deltaDeg -= 360;
+      if (deltaDeg < -180) deltaDeg += 360;
+      if (Math.abs(deltaDeg) > 1e-4) {
+        applyRotation(0, deltaDeg * (Math.PI / 180));
+      }
     }
   };
 
@@ -440,12 +534,9 @@ export function createMprTrackball(): MprTrackballHandle {
 
     if (delta !== 0) {
       e.preventDefault();
-      const plane = getActivePlane();
       const dPitchRad = axis === "pitch" ? delta * (Math.PI / 180) : 0;
       const dYawRad = axis === "yaw" ? delta * (Math.PI / 180) : 0;
-      mprCoordinator.rotatePitchYaw(dPitchRad, dYawRad, plane);
-      renderMprViewports();
-      updateReadoutAndSliders();
+      applyRotation(dPitchRad, dYawRad);
     }
   };
 
@@ -460,17 +551,40 @@ export function createMprTrackball(): MprTrackballHandle {
 
   const onResetClick = (e: MouseEvent): void => {
     e.preventDefault();
-    mprCoordinator.resetToOrthogonal();
-    renderMprViewports();
+    const is3d = is3DTargetActive();
+    if (is3d) {
+      try {
+        view3DViewer.resetCamera();
+        if (!state.is3DMode && typeof requestAnimationFrame !== "undefined") {
+          requestAnimationFrame(() => {
+            try {
+              const manager = getViewportManager();
+              const activeVp = manager?.activeViewport;
+              if (activeVp && manager?.isCombined3DViewport(activeVp.id)) {
+                activeVp.render();
+              }
+            } catch {
+              // Defensive catch
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to reset 3D camera:", err);
+      }
+    } else {
+      mprCoordinator.resetToOrthogonal();
+      renderMprViewports();
+    }
     updateReadoutAndSliders();
 
     const announceEl =
       document.getElementById("measure-announce") ||
       document.getElementById("session-announce");
     if (announceEl) {
-      announceEl.textContent =
-        t("viewer.mpr.trackball.resetAnnounce") ||
-        "Planos restablecidos a ortogonales";
+      announceEl.textContent = is3d
+        ? t("viewer.view3d.resetAnnounce") || "Cámara 3D restablecida"
+        : t("viewer.mpr.trackball.resetAnnounce") ||
+          "Planos restablecidos a ortogonales";
     }
   };
   resetButton.addEventListener("click", onResetClick);

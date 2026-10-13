@@ -541,10 +541,11 @@ export class View3DViewer {
 
   public setVolume(vol: VoxelVolume): void {
     if (this.volume !== vol) {
-      if (this.volumeTexture && this.gl) {
+      if (this.volumeTexture && this.gl && this.textureContextId === this.gl) {
         this.gl.deleteTexture(this.volumeTexture);
       }
       this.volumeTexture = null;
+      this.textureContextId = null;
     }
     this.volume = vol;
     this.renderEpoch++;
@@ -575,6 +576,7 @@ export class View3DViewer {
   private gl: WebGL2RenderingContext | null = null;
   private program: WebGLProgram | null = null;
   private volumeTexture: WebGLTexture | null = null;
+  private textureContextId: WebGL2RenderingContext | null = null;
   private isUploadingTexture: boolean = false;
   private vao: WebGLVertexArrayObject | null = null;
   private vbo: WebGLBuffer | null = null;
@@ -694,6 +696,7 @@ export class View3DViewer {
       this.gl = null;
       this.program = null;
       this.volumeTexture = null;
+      this.textureContextId = null;
       this.isUploadingTexture = false;
       this.vao = null;
       this.vbo = null;
@@ -1073,8 +1076,8 @@ export class View3DViewer {
       return;
     }
 
-    // Reuse existing 3D texture if already uploaded for this context
-    if (this.volumeTexture) {
+    // Reuse existing 3D texture only if already uploaded for this exact native context
+    if (this.volumeTexture !== null && this.textureContextId === this.gl) {
       return;
     }
 
@@ -1158,6 +1161,13 @@ export class View3DViewer {
         }
       }
 
+      // If an old texture existed on THIS context, release it before allocating a new one
+      if (this.volumeTexture && this.textureContextId === gl) {
+        gl.deleteTexture(this.volumeTexture);
+      }
+      this.volumeTexture = null;
+      this.textureContextId = null;
+
       const tex = gl.createTexture();
       if (!tex) {
         console.error("[View3D] Failed to create WebGL3D texture");
@@ -1193,6 +1203,7 @@ export class View3DViewer {
       gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
       this.volumeTexture = tex;
+      this.textureContextId = gl;
     } finally {
       this.isUploadingTexture = false;
     }
@@ -1304,6 +1315,7 @@ export class View3DViewer {
           loseContext.loseContext();
         }
         this.volumeTexture = null;
+        this.textureContextId = null;
       }
       this.initGL(canvas);
       if (this.volume) {
@@ -1338,11 +1350,21 @@ export class View3DViewer {
       this.renderGizmo(gizmoCanvas);
     }
 
-    if (this.volume && !this.volumeTexture) {
+    if (
+      this.volume &&
+      (!this.volumeTexture ||
+        (this.textureContextId !== null && this.textureContextId !== this.gl))
+    ) {
       this.uploadVolumeTexture();
     }
 
-    if (!this.volume || !this.program || !this.volumeTexture || !this.vao)
+    if (
+      !this.volume ||
+      !this.program ||
+      !this.volumeTexture ||
+      (this.textureContextId !== null && this.textureContextId !== this.gl) ||
+      !this.vao
+    )
       return;
 
     // WebGL pipeline state: Disable culling so orbiting close or inside proxy geometry

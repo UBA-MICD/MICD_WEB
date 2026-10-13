@@ -721,3 +721,60 @@ test("View3DViewer.buildVolume strictly types imageOrientationPatient as 6-tuple
   const volInvalid = viewer.buildVolume(invalidSlice);
   assert.equal(volInvalid.imageOrientationPatient, undefined);
 });
+
+test("View3DViewer strictly binds texture cache to native WebGL context and invalidates across contexts", () => {
+  const viewer = new View3DViewer();
+  const mockGL1: any = createMockWebGL2Context();
+  const mockGL2: any = createMockWebGL2Context();
+
+  viewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  (viewer as any).gl = mockGL1;
+  (viewer as any).uploadVolumeTexture();
+  const tex1 = (viewer as any).volumeTexture;
+  assert.ok(tex1, "Texture must be created on first context");
+  assert.equal(
+    (viewer as any).textureContextId,
+    mockGL1,
+    "textureContextId must match first context",
+  );
+
+  // Calling upload again on the same context should reuse tex1
+  (viewer as any).uploadVolumeTexture();
+  assert.equal(
+    (viewer as any).volumeTexture,
+    tex1,
+    "Texture must be reused for the same context",
+  );
+
+  // Switching to a second context must re-upload and rebind textureContextId
+  (viewer as any).gl = mockGL2;
+  (viewer as any).uploadVolumeTexture();
+  const tex2 = (viewer as any).volumeTexture;
+  assert.ok(tex2, "Texture must be recreated on new context");
+  assert.notEqual(
+    tex2,
+    tex1,
+    "Texture must not be shared across different WebGL contexts",
+  );
+  assert.equal(
+    (viewer as any).textureContextId,
+    mockGL2,
+    "textureContextId must update to second context",
+  );
+
+  // releaseContext cleans up everything
+  viewer.releaseContext();
+  assert.equal((viewer as any).volumeTexture, null);
+  assert.equal((viewer as any).textureContextId, null);
+  assert.equal((viewer as any).isUploadingTexture, false);
+});

@@ -173,6 +173,333 @@ export class Matrix4 {
   }
 }
 
+// ── WebGL2 3D View Static Shader Sources ─────────────────────────────────────
+
+export const VIEW_3D_VERTEX_SHADER = `#version 300 es
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_texCoord;
+
+uniform mat4 u_mvp;
+uniform vec3 u_boxMin;
+uniform vec3 u_boxMax;
+
+out vec3 v_texCoord;
+out vec3 v_position;
+
+void main() {
+    v_texCoord = a_texCoord;
+    vec3 scaledPos = mix(u_boxMin, u_boxMax, a_position + vec3(0.5));
+    v_position = scaledPos;
+    gl_Position = u_mvp * vec4(scaledPos, 1.0);
+}
+`;
+
+export const VIEW_3D_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+precision highp sampler3D;
+
+in vec3 v_texCoord;
+in vec3 v_position;
+
+uniform sampler3D u_volume;
+uniform vec3 u_cameraPos;       // Camera position in object space
+uniform vec3 u_boxMin;         // Bounding box min (-scale/2)
+uniform vec3 u_boxMax;         // Bounding box max (+scale/2)
+uniform float u_windowCenter;  // Window center normalized [0, 1]
+uniform float u_windowWidth;   // Window width normalized (0, 1]
+uniform vec3 u_crosshair;      // Normalized crosshair position [0, 1]^3
+uniform int u_activeView;      // 0: Axial, 1: Coronal, 2: Sagittal, 3: Full 3D Volume
+uniform float u_clipPlane;     // Clipping plane ratio [0..1]
+uniform int u_debugAABB;       // Debug flag: 1 = flat red debug color
+uniform bool u_flipY;          // IOP canonical flip Y flag
+uniform int u_presetMode;      // 0: Linear W/L, 1: Bone, 2: Soft Tissue, 3: MIP
+uniform vec3 u_voxelStep;      // 1.0 / volumeDimensions in texture space
+
+out vec4 fragColor;
+
+// Safe Slab Method Ray-Box Intersection (avoids division by zero / NaNs)
+bool intersectBox(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax, out float tNear, out float tFar) {
+    vec3 s = sign(rayDir);
+    vec3 dirSign = mix(s, vec3(1.0), equal(s, vec3(0.0)));
+    vec3 safeDir = dirSign * max(abs(rayDir), vec3(1e-6));
+    vec3 invDir = 1.0 / safeDir;
+    vec3 tMin = (boxMin - rayOrigin) * invDir;
+    vec3 tMax = (boxMax - rayOrigin) * invDir;
+    vec3 t1 = min(tMin, tMax);
+    vec3 t2 = max(tMin, tMax);
+    tNear = max(max(t1.x, t1.y), t1.z);
+    tFar = min(min(t2.x, t2.y), t2.z);
+    return tFar >= max(tNear, 0.0);
+}
+
+vec3 getTexCoord(vec3 p) {
+    vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
+    if (!u_flipY) {
+        tc.y = 1.0 - tc.y;
+    }
+    return tc;
+}
+
+// Finite differences gradient computation (6 neighbor samples)
+vec3 computeGradient(sampler3D vol, vec3 tc, vec3 step) {
+    float dx = texture(vol, tc + vec3(step.x, 0.0, 0.0)).r - texture(vol, tc - vec3(step.x, 0.0, 0.0)).r;
+    float dy = texture(vol, tc + vec3(0.0, step.y, 0.0)).r - texture(vol, tc - vec3(0.0, step.y, 0.0)).r;
+    float dz = texture(vol, tc + vec3(0.0, 0.0, step.z)).r - texture(vol, tc - vec3(0.0, 0.0, step.z)).r;
+    return vec3(dx, dy, dz) * 0.5;
+}
+
+// Blinn-Phong diffuse and specular shading based on density gradient
+vec3 applyLighting(vec3 baseCol, vec3 tc, vec3 rayDir) {
+    vec3 grad = computeGradient(u_volume, tc, u_voxelStep);
+    float gradLen = length(grad);
+    if (gradLen > 0.005) {
+        vec3 N = -normalize(grad);
+        vec3 L = normalize(-rayDir + vec3(0.2, 0.3, 0.1));
+        vec3 V = -rayDir;
+        vec3 H = normalize(L + V);
+        float diff = max(dot(N, L), 0.0);
+        float spec = pow(max(dot(N, H), 0.0), 32.0);
+        return baseCol * (0.35 + 0.65 * diff) + vec3(0.35) * spec;
+    }
+    return baseCol;
+}
+
+void samplePreset(float d, float minW, out vec3 col, out float alpha) {
+    if (u_presetMode == 1) {
+        // Preset 1: Bone (Dense structures: cortical/trabecular bone, teeth)
+        float t = clamp((d - 0.28) / 0.32, 0.0, 1.0);
+        col = mix(vec3(0.92, 0.85, 0.72), vec3(1.0, 0.98, 0.92), t);
+        alpha = t * t * 0.22;
+    } else if (u_presetMode == 2) {
+        // Preset 2: Soft Tissue (Organs, muscle, brain: ~ -50 to 150 HU)
+        float t = clamp((d - 0.21) / 0.14, 0.0, 1.0);
+        col = mix(vec3(0.82, 0.38, 0.32), vec3(0.96, 0.76, 0.65), t);
+        alpha = t * 0.12;
+    } else {
+        // Preset 0: Linear Window/Level
+        float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+        col = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
+        alpha = (val > 0.08) ? (val - 0.08) * 0.09 : 0.0;
+    }
+}
+
+void main() {
+    vec3 rayDir = normalize(v_position - u_cameraPos);
+    float tNear, tFar;
+    if (!intersectBox(u_cameraPos, rayDir, u_boxMin, u_boxMax, tNear, tFar)) {
+        discard;
+    }
+
+    // Flat red visual debug when requested
+    if (u_debugAABB == 1) {
+        fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
+    tNear = max(tNear, 0.0);
+    float minW = u_windowCenter - u_windowWidth * 0.5;
+
+    // 2D Slice Plane Views (Axial, Coronal, Sagittal)
+    if (u_activeView == 0) {
+        float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
+        if (abs(rayDir.z) < 1e-6) discard;
+        float t = (planeZ - u_cameraPos.z) / rayDir.z;
+        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
+        vec3 p = u_cameraPos + rayDir * t;
+        vec3 texCoord = getTexCoord(p);
+        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
+        float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
+        fragColor = vec4(vec3(intensity), 1.0);
+        return;
+    } else if (u_activeView == 1) {
+        float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
+        if (abs(rayDir.y) < 1e-6) discard;
+        float t = (planeY - u_cameraPos.y) / rayDir.y;
+        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
+        vec3 p = u_cameraPos + rayDir * t;
+        vec3 texCoord = getTexCoord(p);
+        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
+        float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
+        fragColor = vec4(vec3(intensity), 1.0);
+        return;
+    } else if (u_activeView == 2) {
+        float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
+        if (abs(rayDir.x) < 1e-6) discard;
+        float t = (planeX - u_cameraPos.x) / rayDir.x;
+        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
+        vec3 p = u_cameraPos + rayDir * t;
+        vec3 texCoord = getTexCoord(p);
+        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
+        float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
+        fragColor = vec4(vec3(intensity), 1.0);
+        return;
+    }
+
+    // ── Mode 3: 3D Volumetric Ray Marching & Presets ──
+    vec4 accumColor = vec4(0.0);
+
+    // Preset 3: Maximum Intensity Projection (MIP)
+    if (u_presetMode == 3) {
+        const int MIP_STEPS = 120;
+        float stepSize = (tFar - tNear) / float(MIP_STEPS);
+        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
+        vec3 stepVec = rayDir * stepSize;
+        float maxVal = 0.0;
+        for (int i = 0; i < MIP_STEPS; i++) {
+            vec3 tc = getTexCoord(rayPos);
+            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+                float d = texture(u_volume, tc).r;
+                if (d > maxVal) maxVal = d;
+            }
+            rayPos += stepVec;
+        }
+        float intensity = clamp((maxVal - minW) / u_windowWidth, 0.0, 1.0);
+        fragColor = vec4(vec3(intensity), 1.0);
+        return;
+    }
+
+    // Preset 1 (Bone) or Preset 2 (Soft Tissue): Full Volume Ray Marching with Blinn-Phong
+    if (u_presetMode == 1 || u_presetMode == 2) {
+        const int VOL_STEPS = 100;
+        float stepSize = (tFar - tNear) / float(VOL_STEPS);
+        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
+        vec3 stepVec = rayDir * stepSize;
+        for (int i = 0; i < VOL_STEPS; i++) {
+            vec3 tc = getTexCoord(rayPos);
+            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+                float d = texture(u_volume, tc).r;
+                vec3 col;
+                float a;
+                samplePreset(d, minW, col, a);
+                if (a > 0.005) {
+                    vec3 litCol = applyLighting(col, tc, rayDir);
+                    accumColor.rgb += (1.0 - accumColor.a) * litCol * a;
+                    accumColor.a += (1.0 - accumColor.a) * a;
+                    if (accumColor.a >= 0.95) break;
+                }
+            }
+            rayPos += stepVec;
+        }
+        if (accumColor.a < 0.01) discard;
+        fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), min(accumColor.a, 1.0));
+        return;
+    }
+
+    // Preset 0 (Linear W/L): Triplanar Intersecting Orthogonal Planes + Volume Fallback
+    // Analytical plane intersections for the 3 orthogonal planes
+    float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
+    float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
+    float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
+
+    float tX = abs(rayDir.x) > 1e-6 ? (planeX - u_cameraPos.x) / rayDir.x : -1.0;
+    float tY = abs(rayDir.y) > 1e-6 ? (planeY - u_cameraPos.y) / rayDir.y : -1.0;
+    float tZ = abs(rayDir.z) > 1e-6 ? (planeZ - u_cameraPos.z) / rayDir.z : -1.0;
+
+    float hitT[3];
+    vec4 hitColor[3];
+    int hitCount = 0;
+
+    // Sagittal Plane (X cut)
+    if (tX >= tNear - 1e-3 && tX <= tFar + 1e-3) {
+        vec3 p = u_cameraPos + rayDir * tX;
+        vec3 tc = getTexCoord(p);
+        if (tc.y >= -1e-3 && tc.y <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
+            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
+            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+            bool isBorder = (tc.y < 0.015 || tc.y > 0.985 || tc.z < 0.015 || tc.z > 0.985);
+            vec3 col = isBorder ? vec3(0.95, 0.35, 0.35) : vec3(val * 1.0, val * 0.8, val * 0.8);
+            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
+            hitT[hitCount] = tX;
+            hitColor[hitCount] = vec4(col, a);
+            hitCount++;
+        }
+    }
+
+    // Coronal Plane (Y cut)
+    if (tY >= tNear - 1e-3 && tY <= tFar + 1e-3) {
+        vec3 p = u_cameraPos + rayDir * tY;
+        vec3 tc = getTexCoord(p);
+        if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
+            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
+            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+            bool isBorder = (tc.x < 0.015 || tc.x > 0.985 || tc.z < 0.015 || tc.z > 0.985);
+            vec3 col = isBorder ? vec3(0.35, 0.95, 0.5) : vec3(val * 0.8, val * 1.0, val * 0.8);
+            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
+            hitT[hitCount] = tY;
+            hitColor[hitCount] = vec4(col, a);
+            hitCount++;
+        }
+    }
+
+    // Axial Plane (Z cut)
+    if (tZ >= tNear - 1e-3 && tZ <= tFar + 1e-3) {
+        vec3 p = u_cameraPos + rayDir * tZ;
+        vec3 tc = getTexCoord(p);
+        if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.y >= -1e-3 && tc.y <= 1.001) {
+            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
+            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+            bool isBorder = (tc.x < 0.015 || tc.x > 0.985 || tc.y < 0.015 || tc.y > 0.985);
+            vec3 col = isBorder ? vec3(0.35, 0.65, 1.0) : vec3(val * 0.8, val * 0.85, val * 1.0);
+            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
+            hitT[hitCount] = tZ;
+            hitColor[hitCount] = vec4(col, a);
+            hitCount++;
+        }
+    }
+
+    // Sort hits front-to-back
+    for (int i = 0; i < 2; i++) {
+        for (int j = i + 1; j < 3; j++) {
+            if (j < hitCount && hitT[j] < hitT[i]) {
+                float tmpT = hitT[i];
+                hitT[i] = hitT[j];
+                hitT[j] = tmpT;
+                vec4 tmpCol = hitColor[i];
+                hitColor[i] = hitColor[j];
+                hitColor[j] = tmpCol;
+            }
+        }
+    }
+
+    // Composite orthogonal plane cuts
+    for (int i = 0; i < 3; i++) {
+        if (i >= hitCount) break;
+        vec3 rgb = hitColor[i].rgb;
+        float alpha = hitColor[i].a;
+        accumColor.rgb += (1.0 - accumColor.a) * rgb * alpha;
+        accumColor.a += (1.0 - accumColor.a) * alpha;
+        if (accumColor.a >= 0.98) break;
+    }
+
+    // Fallback volume ray march if planes don't fully occlude ray
+    if (accumColor.a < 0.95) {
+        const int STEPS = 80;
+        float stepSize = (tFar - tNear) / float(STEPS);
+        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
+        vec3 stepVec = rayDir * stepSize;
+        for (int i = 0; i < STEPS; i++) {
+            vec3 tc = getTexCoord(rayPos);
+            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
+                float d = texture(u_volume, tc).r;
+                float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
+                if (val > 0.1) {
+                    float a = (val - 0.1) * 0.08;
+                    vec3 sampleColor = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
+                    vec3 litColor = applyLighting(sampleColor, tc, rayDir);
+                    accumColor.rgb += (1.0 - accumColor.a) * litColor * a;
+                    accumColor.a += (1.0 - accumColor.a) * a;
+                    if (accumColor.a >= 0.95) break;
+                }
+            }
+            rayPos += stepVec;
+        }
+    }
+
+    if (accumColor.a < 0.01) discard;
+    fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), min(accumColor.a, 1.0));
+}
+`;
+
 // ── WebGL2 3D View Viewer Class ──────────────────────────────────────────────
 
 export class View3DViewer {
@@ -573,334 +900,11 @@ export class View3DViewer {
     }
     this.gl = gl;
 
-    // GLSL ES 3.00 Vertex Shader — 3D Cube Bounding Box Proxy Geometry
-    const vsSource = `#version 300 es
-layout(location = 0) in vec3 a_position;
-layout(location = 1) in vec3 a_texCoord;
-
-uniform mat4 u_mvp;
-uniform vec3 u_boxMin;
-uniform vec3 u_boxMax;
-
-out vec3 v_texCoord;
-out vec3 v_position;
-
-void main() {
-    v_texCoord = a_texCoord;
-    vec3 scaledPos = mix(u_boxMin, u_boxMax, a_position + vec3(0.5));
-    v_position = scaledPos;
-    gl_Position = u_mvp * vec4(scaledPos, 1.0);
-}
-`;
-
-    // GLSL ES 3.00 Fragment Shader — Volume Ray Marching, Phong Lighting & Presets
-    const fsSource = `#version 300 es
-precision highp float;
-precision highp sampler3D;
-
-in vec3 v_texCoord;
-in vec3 v_position;
-
-uniform sampler3D u_volume;
-uniform vec3 u_cameraPos;       // Camera position in object space
-uniform vec3 u_boxMin;         // Bounding box min (-scale/2)
-uniform vec3 u_boxMax;         // Bounding box max (+scale/2)
-uniform float u_windowCenter;  // Window center normalized [0, 1]
-uniform float u_windowWidth;   // Window width normalized (0, 1]
-uniform vec3 u_crosshair;      // Normalized crosshair position [0, 1]^3
-uniform int u_activeView;      // 0: Axial, 1: Coronal, 2: Sagittal, 3: Full 3D Volume
-uniform float u_clipPlane;     // Clipping plane ratio [0..1]
-uniform int u_debugAABB;       // Debug flag: 1 = flat red debug color
-uniform bool u_flipY;          // IOP canonical flip Y flag
-uniform int u_presetMode;      // 0: Linear W/L, 1: Bone, 2: Soft Tissue, 3: MIP
-uniform vec3 u_voxelStep;      // 1.0 / volumeDimensions in texture space
-
-out vec4 fragColor;
-
-// Safe Slab Method Ray-Box Intersection (avoids division by zero / NaNs)
-bool intersectBox(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax, out float tNear, out float tFar) {
-    vec3 s = sign(rayDir);
-    vec3 dirSign = mix(s, vec3(1.0), equal(s, vec3(0.0)));
-    vec3 safeDir = dirSign * max(abs(rayDir), vec3(1e-6));
-    vec3 invDir = 1.0 / safeDir;
-    vec3 tMin = (boxMin - rayOrigin) * invDir;
-    vec3 tMax = (boxMax - rayOrigin) * invDir;
-    vec3 t1 = min(tMin, tMax);
-    vec3 t2 = max(tMin, tMax);
-    tNear = max(max(t1.x, t1.y), t1.z);
-    tFar = min(min(t2.x, t2.y), t2.z);
-    return tFar >= max(tNear, 0.0);
-}
-
-vec3 getTexCoord(vec3 p) {
-    vec3 tc = (p - u_boxMin) / (u_boxMax - u_boxMin);
-    if (!u_flipY) {
-        tc.y = 1.0 - tc.y;
-    }
-    return tc;
-}
-
-// Finite differences gradient computation (6 neighbor samples)
-vec3 computeGradient(sampler3D vol, vec3 tc, vec3 step) {
-    float dx = texture(vol, tc + vec3(step.x, 0.0, 0.0)).r - texture(vol, tc - vec3(step.x, 0.0, 0.0)).r;
-    float dy = texture(vol, tc + vec3(0.0, step.y, 0.0)).r - texture(vol, tc - vec3(0.0, step.y, 0.0)).r;
-    float dz = texture(vol, tc + vec3(0.0, 0.0, step.z)).r - texture(vol, tc - vec3(0.0, 0.0, step.z)).r;
-    return vec3(dx, dy, dz) * 0.5;
-}
-
-// Blinn-Phong diffuse and specular shading based on density gradient
-vec3 applyLighting(vec3 baseCol, vec3 tc, vec3 rayDir) {
-    vec3 grad = computeGradient(u_volume, tc, u_voxelStep);
-    float gradLen = length(grad);
-    if (gradLen > 0.005) {
-        vec3 N = -normalize(grad);
-        vec3 L = normalize(-rayDir + vec3(0.2, 0.3, 0.1));
-        vec3 V = -rayDir;
-        vec3 H = normalize(L + V);
-        float diff = max(dot(N, L), 0.0);
-        float spec = pow(max(dot(N, H), 0.0), 32.0);
-        return baseCol * (0.35 + 0.65 * diff) + vec3(0.35) * spec;
-    }
-    return baseCol;
-}
-
-void samplePreset(float d, float minW, out vec3 col, out float alpha) {
-    if (u_presetMode == 1) {
-        // Preset 1: Bone (Dense structures: cortical/trabecular bone, teeth)
-        float t = clamp((d - 0.28) / 0.32, 0.0, 1.0);
-        col = mix(vec3(0.92, 0.85, 0.72), vec3(1.0, 0.98, 0.92), t);
-        alpha = t * t * 0.22;
-    } else if (u_presetMode == 2) {
-        // Preset 2: Soft Tissue (Organs, muscle, brain: ~ -50 to 150 HU)
-        float t = clamp((d - 0.21) / 0.14, 0.0, 1.0);
-        col = mix(vec3(0.82, 0.38, 0.32), vec3(0.96, 0.76, 0.65), t);
-        alpha = t * 0.12;
-    } else {
-        // Preset 0: Linear Window/Level
-        float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-        col = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
-        alpha = (val > 0.08) ? (val - 0.08) * 0.09 : 0.0;
-    }
-}
-
-void main() {
-    vec3 rayDir = normalize(v_position - u_cameraPos);
-    float tNear, tFar;
-    if (!intersectBox(u_cameraPos, rayDir, u_boxMin, u_boxMax, tNear, tFar)) {
-        discard;
-    }
-
-    // Flat red visual debug when requested
-    if (u_debugAABB == 1) {
-        fragColor = vec4(1.0, 0.0, 0.0, 1.0);
-        return;
-    }
-
-    tNear = max(tNear, 0.0);
-    float minW = u_windowCenter - u_windowWidth * 0.5;
-
-    // 2D Slice Plane Views (Axial, Coronal, Sagittal)
-    if (u_activeView == 0) {
-        float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
-        if (abs(rayDir.z) < 1e-6) discard;
-        float t = (planeZ - u_cameraPos.z) / rayDir.z;
-        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
-        vec3 p = u_cameraPos + rayDir * t;
-        vec3 texCoord = getTexCoord(p);
-        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
-        float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
-        fragColor = vec4(vec3(intensity), 1.0);
-        return;
-    } else if (u_activeView == 1) {
-        float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
-        if (abs(rayDir.y) < 1e-6) discard;
-        float t = (planeY - u_cameraPos.y) / rayDir.y;
-        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
-        vec3 p = u_cameraPos + rayDir * t;
-        vec3 texCoord = getTexCoord(p);
-        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
-        float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
-        fragColor = vec4(vec3(intensity), 1.0);
-        return;
-    } else if (u_activeView == 2) {
-        float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
-        if (abs(rayDir.x) < 1e-6) discard;
-        float t = (planeX - u_cameraPos.x) / rayDir.x;
-        if (t < tNear - 1e-3 || t > tFar + 1e-3) discard;
-        vec3 p = u_cameraPos + rayDir * t;
-        vec3 texCoord = getTexCoord(p);
-        float density = texture(u_volume, clamp(texCoord, 0.0, 1.0)).r;
-        float intensity = clamp((density - minW) / u_windowWidth, 0.0, 1.0);
-        fragColor = vec4(vec3(intensity), 1.0);
-        return;
-    }
-
-    // ── Mode 3: 3D Volumetric Ray Marching & Presets ──
-    vec4 accumColor = vec4(0.0);
-
-    // Preset 3: Maximum Intensity Projection (MIP)
-    if (u_presetMode == 3) {
-        const int MIP_STEPS = 120;
-        float stepSize = (tFar - tNear) / float(MIP_STEPS);
-        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
-        vec3 stepVec = rayDir * stepSize;
-        float maxVal = 0.0;
-        for (int i = 0; i < MIP_STEPS; i++) {
-            vec3 tc = getTexCoord(rayPos);
-            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
-                float d = texture(u_volume, tc).r;
-                if (d > maxVal) maxVal = d;
-            }
-            rayPos += stepVec;
-        }
-        float intensity = clamp((maxVal - minW) / u_windowWidth, 0.0, 1.0);
-        fragColor = vec4(vec3(intensity), 1.0);
-        return;
-    }
-
-    // Preset 1 (Bone) or Preset 2 (Soft Tissue): Full Volume Ray Marching with Blinn-Phong
-    if (u_presetMode == 1 || u_presetMode == 2) {
-        const int VOL_STEPS = 100;
-        float stepSize = (tFar - tNear) / float(VOL_STEPS);
-        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
-        vec3 stepVec = rayDir * stepSize;
-        for (int i = 0; i < VOL_STEPS; i++) {
-            vec3 tc = getTexCoord(rayPos);
-            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
-                float d = texture(u_volume, tc).r;
-                vec3 col;
-                float a;
-                samplePreset(d, minW, col, a);
-                if (a > 0.005) {
-                    vec3 litCol = applyLighting(col, tc, rayDir);
-                    accumColor.rgb += (1.0 - accumColor.a) * litCol * a;
-                    accumColor.a += (1.0 - accumColor.a) * a;
-                    if (accumColor.a >= 0.95) break;
-                }
-            }
-            rayPos += stepVec;
-        }
-        if (accumColor.a < 0.01) discard;
-        fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), min(accumColor.a, 1.0));
-        return;
-    }
-
-    // Preset 0 (Linear W/L): Triplanar Intersecting Orthogonal Planes + Volume Fallback
-    // Analytical plane intersections for the 3 orthogonal planes
-    float planeX = mix(u_boxMin.x, u_boxMax.x, u_crosshair.x);
-    float planeY = mix(u_boxMin.y, u_boxMax.y, u_crosshair.y);
-    float planeZ = mix(u_boxMin.z, u_boxMax.z, u_crosshair.z);
-
-    float tX = abs(rayDir.x) > 1e-6 ? (planeX - u_cameraPos.x) / rayDir.x : -1.0;
-    float tY = abs(rayDir.y) > 1e-6 ? (planeY - u_cameraPos.y) / rayDir.y : -1.0;
-    float tZ = abs(rayDir.z) > 1e-6 ? (planeZ - u_cameraPos.z) / rayDir.z : -1.0;
-
-    float hitT[3];
-    vec4 hitColor[3];
-    int hitCount = 0;
-
-    // Sagittal Plane (X cut)
-    if (tX >= tNear - 1e-3 && tX <= tFar + 1e-3) {
-        vec3 p = u_cameraPos + rayDir * tX;
-        vec3 tc = getTexCoord(p);
-        if (tc.y >= -1e-3 && tc.y <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
-            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
-            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-            bool isBorder = (tc.y < 0.015 || tc.y > 0.985 || tc.z < 0.015 || tc.z > 0.985);
-            vec3 col = isBorder ? vec3(0.95, 0.35, 0.35) : vec3(val * 1.0, val * 0.8, val * 0.8);
-            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
-            hitT[hitCount] = tX;
-            hitColor[hitCount] = vec4(col, a);
-            hitCount++;
-        }
-    }
-
-    // Coronal Plane (Y cut)
-    if (tY >= tNear - 1e-3 && tY <= tFar + 1e-3) {
-        vec3 p = u_cameraPos + rayDir * tY;
-        vec3 tc = getTexCoord(p);
-        if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.z >= -1e-3 && tc.z <= 1.001) {
-            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
-            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-            bool isBorder = (tc.x < 0.015 || tc.x > 0.985 || tc.z < 0.015 || tc.z > 0.985);
-            vec3 col = isBorder ? vec3(0.35, 0.95, 0.5) : vec3(val * 0.8, val * 1.0, val * 0.8);
-            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
-            hitT[hitCount] = tY;
-            hitColor[hitCount] = vec4(col, a);
-            hitCount++;
-        }
-    }
-
-    // Axial Plane (Z cut)
-    if (tZ >= tNear - 1e-3 && tZ <= tFar + 1e-3) {
-        vec3 p = u_cameraPos + rayDir * tZ;
-        vec3 tc = getTexCoord(p);
-        if (tc.x >= -1e-3 && tc.x <= 1.001 && tc.y >= -1e-3 && tc.y <= 1.001) {
-            float d = texture(u_volume, clamp(tc, 0.0, 1.0)).r;
-            float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-            bool isBorder = (tc.x < 0.015 || tc.x > 0.985 || tc.y < 0.015 || tc.y > 0.985);
-            vec3 col = isBorder ? vec3(0.35, 0.65, 1.0) : vec3(val * 0.8, val * 0.85, val * 1.0);
-            float a = isBorder ? 0.95 : mix(0.12, 0.85, val);
-            hitT[hitCount] = tZ;
-            hitColor[hitCount] = vec4(col, a);
-            hitCount++;
-        }
-    }
-
-    // Sort hits front-to-back
-    for (int i = 0; i < 2; i++) {
-        for (int j = i + 1; j < 3; j++) {
-            if (j < hitCount && hitT[j] < hitT[i]) {
-                float tmpT = hitT[i];
-                hitT[i] = hitT[j];
-                hitT[j] = tmpT;
-                vec4 tmpCol = hitColor[i];
-                hitColor[i] = hitColor[j];
-                hitColor[j] = tmpCol;
-            }
-        }
-    }
-
-    // Composite orthogonal plane cuts
-    for (int i = 0; i < 3; i++) {
-        if (i >= hitCount) break;
-        vec3 rgb = hitColor[i].rgb;
-        float alpha = hitColor[i].a;
-        accumColor.rgb += (1.0 - accumColor.a) * rgb * alpha;
-        accumColor.a += (1.0 - accumColor.a) * alpha;
-        if (accumColor.a >= 0.98) break;
-    }
-
-    // Fallback volume ray march if planes don't fully occlude ray
-    if (accumColor.a < 0.95) {
-        const int STEPS = 80;
-        float stepSize = (tFar - tNear) / float(STEPS);
-        vec3 rayPos = u_cameraPos + rayDir * (tNear + stepSize * 0.5);
-        vec3 stepVec = rayDir * stepSize;
-        for (int i = 0; i < STEPS; i++) {
-            vec3 tc = getTexCoord(rayPos);
-            if (tc.x >= 0.0 && tc.x <= 1.0 && tc.y >= 0.0 && tc.y <= 1.0 && tc.z >= 0.0 && tc.z <= 1.0) {
-                float d = texture(u_volume, tc).r;
-                float val = clamp((d - minW) / u_windowWidth, 0.0, 1.0);
-                if (val > 0.1) {
-                    float a = (val - 0.1) * 0.08;
-                    vec3 sampleColor = mix(vec3(0.85, 0.55, 0.35), vec3(1.0, 0.98, 0.92), smoothstep(0.25, 0.75, val)) * val;
-                    vec3 litColor = applyLighting(sampleColor, tc, rayDir);
-                    accumColor.rgb += (1.0 - accumColor.a) * litColor * a;
-                    accumColor.a += (1.0 - accumColor.a) * a;
-                    if (accumColor.a >= 0.95) break;
-                }
-            }
-            rayPos += stepVec;
-        }
-    }
-
-    if (accumColor.a < 0.01) discard;
-    fragColor = vec4(accumColor.rgb / max(accumColor.a, 0.0001), min(accumColor.a, 1.0));
-}
-`;
-
-    const program = this.createProgram(gl, vsSource, fsSource);
+    const program = this.createProgram(
+      gl,
+      VIEW_3D_VERTEX_SHADER,
+      VIEW_3D_FRAGMENT_SHADER,
+    );
     if (!program) return false;
     this.program = program;
 
@@ -930,13 +934,27 @@ void main() {
     return true;
   }
 
-  private createProgram(
+  public createProgram(
     gl: WebGL2RenderingContext,
-    vsSource: string,
-    fsSource: string,
+    vsSource: string = VIEW_3D_VERTEX_SHADER,
+    fsSource: string = VIEW_3D_FRAGMENT_SHADER,
   ): WebGLProgram | null {
-    const vs = gl.createShader(gl.VERTEX_SHADER)!;
-    gl.shaderSource(vs, vsSource);
+    if (typeof gl.isContextLost === "function" && gl.isContextLost()) {
+      console.warn(
+        "[View3D] WebGL context is lost; aborting shader compilation.",
+      );
+      return null;
+    }
+
+    const sourceVS = vsSource || VIEW_3D_VERTEX_SHADER;
+    const sourceFS = fsSource || VIEW_3D_FRAGMENT_SHADER;
+
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    if (!vs) {
+      console.error("[View3D] gl.createShader(VERTEX_SHADER) failed.");
+      return null;
+    }
+    gl.shaderSource(vs, sourceVS);
     gl.compileShader(vs);
     if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
       const vsLog = gl.getShaderInfoLog(vs);
@@ -945,8 +963,13 @@ void main() {
       return null;
     }
 
-    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
-    gl.shaderSource(fs, fsSource);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    if (!fs) {
+      console.error("[View3D] gl.createShader(FRAGMENT_SHADER) failed.");
+      gl.deleteShader(vs);
+      return null;
+    }
+    gl.shaderSource(fs, sourceFS);
     gl.compileShader(fs);
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
       const fsLog = gl.getShaderInfoLog(fs);
@@ -956,7 +979,13 @@ void main() {
       return null;
     }
 
-    const prog = gl.createProgram()!;
+    const prog = gl.createProgram();
+    if (!prog) {
+      console.error("[View3D] gl.createProgram() failed.");
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      return null;
+    }
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);

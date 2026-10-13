@@ -1086,6 +1086,11 @@ export class View3DViewer {
       return;
     }
 
+    // Invalidate and force re-upload if context changed across viewports/canvases
+    if (this.volumeTexture && this.textureContextId !== this.gl) {
+      this.volumeTexture = null;
+    }
+
     // Reuse existing 3D texture only if already uploaded for this exact native context
     if (this.volumeTexture !== null && this.textureContextId === this.gl) {
       return;
@@ -1318,15 +1323,7 @@ export class View3DViewer {
 
     if (!this.gl || this.gl.canvas !== canvas) {
       if (this.gl) {
-        const loseContext =
-          typeof this.gl.getExtension === "function"
-            ? this.gl.getExtension("WEBGL_lose_context")
-            : null;
-        if (loseContext) {
-          loseContext.loseContext();
-        }
-        this.volumeTexture = null;
-        this.textureContextId = null;
+        this.releaseContext();
       }
       this.initGL(canvas);
       if (this.volume) {
@@ -1340,29 +1337,19 @@ export class View3DViewer {
       typeof navigator !== "undefined" &&
       Boolean(navigator.userAgent && navigator.userAgent.includes("jsdom"));
 
-    // In a real browser, if connected canvas has not completed DOM reflow, reschedule retry
+    // In a real browser, if connected canvas has not completed DOM reflow, wait for layout
     if (
       !isJsdom &&
       typeof canvas.isConnected === "boolean" &&
       canvas.isConnected &&
       (canvas.clientWidth <= 0 || canvas.clientHeight <= 0)
     ) {
-      if (this.isActive && typeof requestAnimationFrame !== "undefined") {
-        requestAnimationFrame(() => {
-          if (this.isActive) this.render(canvas);
-        });
-      }
       return false;
     }
 
     const width = canvas.clientWidth || canvas.width || 512;
     const height = canvas.clientHeight || canvas.height || 512;
     if (width <= 0 || height <= 0) {
-      if (this.isActive && typeof requestAnimationFrame !== "undefined") {
-        requestAnimationFrame(() => {
-          if (this.isActive) this.render(canvas);
-        });
-      }
       return false;
     }
 

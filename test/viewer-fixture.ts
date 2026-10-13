@@ -42,17 +42,20 @@ export function viewerFixtureHtml(): string {
         <input type="range" id="view-3d-depth-slider" min="0" max="0" value="0" />
       </div>
       <div class="view-3d-orientation-widget hidden" id="view-3d-orientation-widget">
-        <button class="btn-orient active" id="btn-view-3d-axial">Axial</button>
-        <button class="btn-orient" id="btn-view-3d-sagittal">Sagittal</button>
-        <button class="btn-orient" id="btn-view-3d-coronal">Coronal</button>
-        <button class="btn-orient" id="btn-view-3d-3d">3D</button>
+        <button class="btn-orient active" id="btn-view-3d-axial" data-i18n="viewer.view3d.axial">Axial</button>
+        <button class="btn-orient" id="btn-view-3d-sagittal" data-i18n="viewer.view3d.sagittal">Sagittal</button>
+        <button class="btn-orient" id="btn-view-3d-coronal" data-i18n="viewer.view3d.coronal">Coronal</button>
+        <button class="btn-orient" id="btn-view-3d-3d" data-i18n="viewer.view3d.volumetricView">3D</button>
       </div>
       <canvas id="view-3d-reference-cube"></canvas>
       <div class="view-3d-sliders-panel" id="view-3d-sliders-panel">
+        <label for="view-3d-scroll-axial" data-i18n="viewer.view3d.axial">Axial</label>
         <input type="range" id="view-3d-scroll-axial" min="0" max="0" value="0" />
         <span id="view-3d-val-axial">0</span>
+        <label for="view-3d-scroll-sagittal" data-i18n="viewer.view3d.sagittal">Sagittal</label>
         <input type="range" id="view-3d-scroll-sagittal" min="0" max="0" value="0" />
         <span id="view-3d-val-sagittal">0</span>
+        <label for="view-3d-scroll-coronal" data-i18n="viewer.view3d.coronal">Coronal</label>
         <input type="range" id="view-3d-scroll-coronal" min="0" max="0" value="0" />
         <span id="view-3d-val-coronal">0</span>
       </div>
@@ -63,10 +66,10 @@ export function viewerFixtureHtml(): string {
       <input type="range" id="mpr-depth-slider" min="0" max="0" value="0" />
     </div>
     <div class="mpr-orientation-widget hidden" id="mpr-orientation-widget">
-      <button class="btn-orient active" id="btn-view-axial">Axial</button>
-      <button class="btn-orient" id="btn-view-sagittal">Sagittal</button>
-      <button class="btn-orient" id="btn-view-coronal">Coronal</button>
-      <button class="btn-orient" id="btn-view-3d">3D</button>
+      <button class="btn-orient active" id="btn-view-axial" data-i18n="viewer.view3d.axial">Axial</button>
+      <button class="btn-orient" id="btn-view-sagittal" data-i18n="viewer.view3d.sagittal">Sagittal</button>
+      <button class="btn-orient" id="btn-view-coronal" data-i18n="viewer.view3d.coronal">Coronal</button>
+      <button class="btn-orient" id="btn-view-3d" data-i18n="viewer.view3d.volumetricView">3D</button>
     </div>
 
     <div class="viewport-container cursor-wl" id="viewport-container">

@@ -473,3 +473,110 @@ test("MPR to 3D View Handoff Stress Test: Context handoff, WebGL drawing, and te
     uninstallDom();
   }
 });
+
+test("Destructive lifecycle test: Normal -> 3D (1x1) -> MPR (2x2) -> 3D (1x1) verifying camera coords, canvas dimensions, and gl.isContextLost() state", async () => {
+  installDom();
+  setBody(viewerFixtureHtml());
+  const restoreGetContext = installCanvasContextInterceptor();
+
+  const container = document.getElementById("viewport-container")!;
+  const manager = initViewportManager(container);
+  initToolbar();
+
+  // 1. Setup Volumen
+  const sphereVolume = createSyntheticSphereVolume();
+  view3DViewer.setVolume(sphereVolume);
+  mprEngine.loadVolume(sphereVolume);
+  state.files = [
+    new File(["a"], "slice0.dcm"),
+    new File(["b"], "slice1.dcm"),
+    new File(["c"], "slice2.dcm"),
+  ];
+
+  const mprBtn = document.getElementById("tool-mpr") as HTMLButtonElement;
+  const view3DBtn = document.getElementById(
+    "tool-view-3d",
+  ) as HTMLButtonElement;
+  mprBtn.disabled = false;
+  view3DBtn.disabled = false;
+
+  try {
+    // 2. Toggle 3D (1x1)
+    const entered3DFirst = await toggle3DMode();
+    assert.equal(entered3DFirst, true, "First entry to 3D mode must succeed");
+    await flushFrames();
+    assert.equal(state.is3DMode, true);
+    assert.equal(manager.getLayout(), "1x1");
+
+    // 3. Toggle MPR (2x2)
+    mprBtn.disabled = false;
+    const enteredMPR = await toggleMprMode();
+    assert.equal(enteredMPR, true, "Entry to MPR mode must succeed");
+    await flushFrames();
+    assert.equal(state.isMprMode, true);
+    assert.equal(state.is3DMode, false);
+    assert.equal(manager.getLayout(), "2x2");
+
+    // 4. Toggle 3D (1x1) - Destructive return to 3D
+    view3DBtn.disabled = false;
+    const entered3DSecond = await toggle3DMode();
+    assert.equal(entered3DSecond, true, "Second entry to 3D mode must succeed");
+    await flushFrames();
+    assert.equal(state.is3DMode, true);
+    assert.equal(state.isMprMode, false);
+    assert.equal(manager.getLayout(), "1x1");
+
+    // 5. Verification:
+    // a) Verify camera maintains valid coordinates (not NaN)
+    const camera = view3DViewer.camera;
+    assert.ok(!isNaN(camera.theta), "camera.theta must not be NaN");
+    assert.ok(!isNaN(camera.phi), "camera.phi must not be NaN");
+    assert.ok(!isNaN(camera.zoom), "camera.zoom must not be NaN");
+    assert.ok(!isNaN(camera.panX), "camera.panX must not be NaN");
+    assert.ok(!isNaN(camera.panY), "camera.panY must not be NaN");
+    assert.ok(camera.zoom > 0, "camera.zoom must be strictly positive");
+
+    // b) Verify destination canvas has dimensions
+    const targetCanvas =
+      (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
+      (document.getElementById("dicom-canvas") as HTMLCanvasElement);
+    assert.ok(targetCanvas, "Target canvas must exist in DOM");
+    assert.ok(
+      targetCanvas.width > 0,
+      "Target canvas width must be greater than 0",
+    );
+    assert.ok(
+      targetCanvas.height > 0,
+      "Target canvas height must be greater than 0",
+    );
+
+    // c) Verify gl context and isContextLost state
+    const gl = (view3DViewer as any).gl;
+    assert.ok(gl, "view3DViewer.gl context must be present and bound");
+    const isLost =
+      typeof gl.isContextLost === "function" ? gl.isContextLost() : false;
+    // Check whether context is marked lost
+    assert.equal(
+      isLost,
+      false,
+      "Target WebGL context must not be in a lost state after destructive transition",
+    );
+
+    // Verify drawing executed on destination canvas
+    const targetCtx = targetCanvas.getContext("webgl2") as any;
+    assert.ok(
+      targetCtx.drawArraysCount > 0,
+      "drawArrays must have executed on destination canvas",
+    );
+  } finally {
+    restoreGetContext();
+    manager.destroy();
+    view3DViewer.releaseContext();
+    view3DViewer.volume = null;
+    mprEngine.volume = null;
+    state.isLayoutTransitioning = false;
+    state.is3DMode = false;
+    state.isMprMode = false;
+    uninstallDom();
+  }
+});

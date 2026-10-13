@@ -2631,6 +2631,7 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
+      console.warn("[DEBUG-SLIDERS] Slider movido a:", idx, { axis: "axial" });
       mprCoordinator.updateCrosshairAxis("axial", idx);
       syncAndRenderAfterSlider();
     }
@@ -2640,6 +2641,9 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
+      console.warn("[DEBUG-SLIDERS] Slider movido a:", idx, {
+        axis: "coronal",
+      });
       mprCoordinator.updateCrosshairAxis("coronal", idx);
       syncAndRenderAfterSlider();
     }
@@ -2649,6 +2653,9 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
+      console.warn("[DEBUG-SLIDERS] Slider movido a:", idx, {
+        axis: "sagittal",
+      });
       mprCoordinator.updateCrosshairAxis("sagittal", idx);
       syncAndRenderAfterSlider();
     }
@@ -2711,6 +2718,29 @@ function init3DControlsInteraction(): void {
 
   // Quick view orientation buttons
   const setView = (view: "axial" | "coronal" | "sagittal" | "3d") => {
+    const canvas =
+      (document.getElementById("view-3d-canvas") as HTMLCanvasElement | null) ||
+      (document.getElementById("dicom-canvas") as HTMLCanvasElement | null);
+    const btnName =
+      view === "axial"
+        ? "Axial"
+        : view === "coronal"
+          ? "Coronal"
+          : view === "sagittal"
+            ? "Sagital"
+            : "Volumetric View";
+    console.warn(`[DEBUG-CONTROLS] Click en botón ${btnName}`, {
+      camera: { ...view3DViewer.camera },
+      canvasDimensions: {
+        clientWidth: canvas?.clientWidth ?? 0,
+        clientHeight: canvas?.clientHeight ?? 0,
+        width: canvas?.width ?? 0,
+        height: canvas?.height ?? 0,
+        isConnected: canvas?.isConnected ?? false,
+      },
+      windowWidth: view3DViewer.windowWidth,
+      windowCenter: view3DViewer.windowCenter,
+    });
     view3DViewer.setOrientation(view);
     updateOrientationButtonsUI(view);
     render();

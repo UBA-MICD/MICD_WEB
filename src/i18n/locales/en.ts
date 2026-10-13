@@ -184,6 +184,10 @@ export const en: Record<string, string> = {
   "viewer.view3d.volumeLoadError": "Error loading the 3D volume: {{message}}",
   "viewer.view3d.webglUnavailable":
     "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "view.axial": "Axial",
+  "view.coronal": "Coronal",
+  "view.sagittal": "Sagittal",
+  "view.volumetricView": "Volumetric View",
   "viewer.view3d.axial": "Axial",
   "viewer.view3d.coronal": "Coronal",
   "viewer.view3d.sagittal": "Sagittal",

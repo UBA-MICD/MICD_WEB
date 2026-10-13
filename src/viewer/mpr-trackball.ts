@@ -252,7 +252,14 @@ export function createMprTrackball(): MprTrackballHandle {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  // Local cache of last known valid pitch and yaw to prevent flashes during layout transitions
+  let lastKnownPitch = 0;
+  let lastKnownYaw = 0;
+
   function is3DTargetActive(): boolean {
+    if (state.isLayoutTransitioning) {
+      return false;
+    }
     if (state.is3DMode) {
       return Boolean(view3DViewer && view3DViewer.camera);
     }
@@ -274,16 +281,21 @@ export function createMprTrackball(): MprTrackballHandle {
   }
 
   function renderMprViewports(): void {
-    const manager = getViewportManager();
-    if (manager) {
-      for (const vp of manager.getAllViewports()) {
-        if (
-          typeof manager.isCombined3DViewport !== "function" ||
-          !manager.isCombined3DViewport(vp.id)
-        ) {
-          vp.render();
+    if (state.isLayoutTransitioning) return;
+    try {
+      const manager = getViewportManager();
+      if (manager) {
+        for (const vp of manager.getAllViewports()) {
+          if (
+            typeof manager.isCombined3DViewport !== "function" ||
+            !manager.isCombined3DViewport(vp.id)
+          ) {
+            vp.render();
+          }
         }
       }
+    } catch {
+      // Defensive fallback
     }
   }
 
@@ -307,6 +319,7 @@ export function createMprTrackball(): MprTrackballHandle {
   }
 
   function applyRotation(dPitch: number, dYaw: number): void {
+    if (state.isLayoutTransitioning) return;
     if (is3DTargetActive()) {
       try {
         if (typeof view3DViewer?.rotatePitchYaw === "function") {
@@ -315,6 +328,7 @@ export function createMprTrackball(): MprTrackballHandle {
           if (!state.is3DMode && typeof requestAnimationFrame !== "undefined") {
             requestAnimationFrame(() => {
               try {
+                if (state.isLayoutTransitioning) return;
                 const manager = getViewportManager();
                 const activeVp = manager?.activeViewport;
                 if (activeVp && manager?.isCombined3DViewport(activeVp.id)) {
@@ -330,36 +344,54 @@ export function createMprTrackball(): MprTrackballHandle {
         console.warn("Failed to rotate 3D camera:", err);
       }
     } else {
-      const plane = getActivePlane();
-      mprCoordinator.rotatePitchYaw(dPitch, dYaw, plane);
-      renderMprViewports();
+      try {
+        const plane = getActivePlane();
+        mprCoordinator.rotatePitchYaw(dPitch, dYaw, plane);
+        renderMprViewports();
+      } catch (err) {
+        console.warn("Failed to rotate MPR planes:", err);
+      }
     }
     updateReadoutAndSliders();
   }
 
   function updateReadoutAndSliders(): void {
-    let pitch = 0;
-    let yaw = 0;
+    if (state.isLayoutTransitioning) {
+      pitchInput.value = String(Math.round(lastKnownPitch));
+      yawInput.value = String(Math.round(lastKnownYaw));
+      return;
+    }
+
+    let pitch = lastKnownPitch;
+    let yaw = lastKnownYaw;
 
     if (is3DTargetActive()) {
       try {
         if (typeof view3DViewer?.getPitchYawDegrees === "function") {
           const deg = view3DViewer.getPitchYawDegrees();
-          pitch = deg.pitch;
-          yaw = deg.yaw;
+          if (deg && Number.isFinite(deg.pitch) && Number.isFinite(deg.yaw)) {
+            pitch = deg.pitch;
+            yaw = deg.yaw;
+            lastKnownPitch = pitch;
+            lastKnownYaw = yaw;
+          }
         }
       } catch {
-        pitch = 0;
-        yaw = 0;
+        pitch = lastKnownPitch;
+        yaw = lastKnownYaw;
       }
     } else {
       try {
         const deg = mprCoordinator.getPitchYawDegrees();
-        pitch = deg.pitch;
-        yaw = deg.yaw;
+        if (deg && Number.isFinite(deg.pitch) && Number.isFinite(deg.yaw)) {
+          pitch = deg.pitch;
+          yaw = deg.yaw;
+          lastKnownPitch = pitch;
+          lastKnownYaw = yaw;
+        }
       } catch {
-        pitch = 0;
-        yaw = 0;
+        pitch = lastKnownPitch;
+        yaw = lastKnownYaw;
       }
     }
 
@@ -393,6 +425,7 @@ export function createMprTrackball(): MprTrackballHandle {
   let activePointerId: number | null = null;
 
   const onPointerDown = (e: PointerEvent): void => {
+    if (state.isLayoutTransitioning) return;
     if (e.button !== 0) return;
     if (e.isPrimary === false && e.pointerType === "touch") return;
     e.preventDefault();
@@ -414,6 +447,7 @@ export function createMprTrackball(): MprTrackballHandle {
   };
 
   const onPointerMove = (e: PointerEvent): void => {
+    if (state.isLayoutTransitioning) return;
     if (!isDragging) return;
     if (activePointerId !== null && e.pointerId !== activePointerId) return;
     e.preventDefault();
@@ -472,6 +506,7 @@ export function createMprTrackball(): MprTrackballHandle {
   // ── Accessible Sliders & Keyboard Events ───────────────────────────────────
 
   const onPitchInput = (): void => {
+    if (state.isLayoutTransitioning) return;
     const targetPitch = Number(pitchInput.value);
     if (is3DTargetActive()) {
       try {
@@ -484,15 +519,20 @@ export function createMprTrackball(): MprTrackballHandle {
         console.warn("Failed to update 3D pitch slider:", err);
       }
     } else {
-      const current = mprCoordinator.getPitchYawDegrees().pitch;
-      const deltaDeg = targetPitch - current;
-      if (Math.abs(deltaDeg) > 1e-4) {
-        applyRotation(deltaDeg * (Math.PI / 180), 0);
+      try {
+        const current = mprCoordinator.getPitchYawDegrees().pitch;
+        const deltaDeg = targetPitch - current;
+        if (Math.abs(deltaDeg) > 1e-4) {
+          applyRotation(deltaDeg * (Math.PI / 180), 0);
+        }
+      } catch (err) {
+        console.warn("Failed to update MPR pitch slider:", err);
       }
     }
   };
 
   const onYawInput = (): void => {
+    if (state.isLayoutTransitioning) return;
     const targetYaw = Number(yawInput.value);
     if (is3DTargetActive()) {
       try {
@@ -507,12 +547,16 @@ export function createMprTrackball(): MprTrackballHandle {
         console.warn("Failed to update 3D yaw slider:", err);
       }
     } else {
-      const current = mprCoordinator.getPitchYawDegrees().yaw;
-      let deltaDeg = targetYaw - current;
-      if (deltaDeg > 180) deltaDeg -= 360;
-      if (deltaDeg < -180) deltaDeg += 360;
-      if (Math.abs(deltaDeg) > 1e-4) {
-        applyRotation(0, deltaDeg * (Math.PI / 180));
+      try {
+        const current = mprCoordinator.getPitchYawDegrees().yaw;
+        let deltaDeg = targetYaw - current;
+        if (deltaDeg > 180) deltaDeg -= 360;
+        if (deltaDeg < -180) deltaDeg += 360;
+        if (Math.abs(deltaDeg) > 1e-4) {
+          applyRotation(0, deltaDeg * (Math.PI / 180));
+        }
+      } catch (err) {
+        console.warn("Failed to update MPR yaw slider:", err);
       }
     }
   };
@@ -521,6 +565,7 @@ export function createMprTrackball(): MprTrackballHandle {
     e: KeyboardEvent,
     axis: "pitch" | "yaw",
   ): void => {
+    if (state.isLayoutTransitioning) return;
     let delta = 0;
     if (e.key === "ArrowUp" || e.key === "ArrowRight") {
       delta = e.shiftKey ? 10 : 1;
@@ -551,13 +596,17 @@ export function createMprTrackball(): MprTrackballHandle {
 
   const onResetClick = (e: MouseEvent): void => {
     e.preventDefault();
+    if (state.isLayoutTransitioning) return;
     const is3d = is3DTargetActive();
     if (is3d) {
       try {
         view3DViewer.resetCamera();
+        lastKnownPitch = 0;
+        lastKnownYaw = 0;
         if (!state.is3DMode && typeof requestAnimationFrame !== "undefined") {
           requestAnimationFrame(() => {
             try {
+              if (state.isLayoutTransitioning) return;
               const manager = getViewportManager();
               const activeVp = manager?.activeViewport;
               if (activeVp && manager?.isCombined3DViewport(activeVp.id)) {
@@ -572,8 +621,14 @@ export function createMprTrackball(): MprTrackballHandle {
         console.warn("Failed to reset 3D camera:", err);
       }
     } else {
-      mprCoordinator.resetToOrthogonal();
-      renderMprViewports();
+      try {
+        mprCoordinator.resetToOrthogonal();
+        lastKnownPitch = 0;
+        lastKnownYaw = 0;
+        renderMprViewports();
+      } catch (err) {
+        console.warn("Failed to reset MPR planes:", err);
+      }
     }
     updateReadoutAndSliders();
 

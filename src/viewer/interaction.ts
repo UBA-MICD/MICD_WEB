@@ -1014,18 +1014,28 @@ export async function toggle3DMode(): Promise<boolean> {
     return false;
   }
 
+  // Force close/hide trackball popover during transition to avoid stale camera reads
+  const trackball = getMprTrackball();
+  trackball?.closePopover();
+
   if (state.is3DMode) {
-    state.is3DMode = false;
-    view3DViewer.isActive = false;
-    view3DViewer.stopRenderLoop();
-    $("view-3d-container")?.classList.add("hidden");
-    $("viewport-container")?.classList.remove("mode-3d");
-    hide3DControls();
-    updateToolbarUI();
-    render();
-    return false;
+    state.isLayoutTransitioning = true;
+    try {
+      state.is3DMode = false;
+      view3DViewer.isActive = false;
+      view3DViewer.stopRenderLoop();
+      $("view-3d-container")?.classList.add("hidden");
+      $("viewport-container")?.classList.remove("mode-3d");
+      hide3DControls();
+      render();
+      return false;
+    } finally {
+      state.isLayoutTransitioning = false;
+      updateToolbarUI();
+    }
   }
 
+  state.isLayoutTransitioning = true;
   if (state.isMprMode) {
     state.isMprMode = false;
     $("viewport-container")?.classList.remove("mode-mpr");
@@ -1050,7 +1060,6 @@ export async function toggle3DMode(): Promise<boolean> {
     $("view-3d-container")?.classList.remove("hidden");
     update3DControls();
     update3DSlidersUI();
-    updateToolbarUI();
 
     const canvas =
       (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
@@ -1065,6 +1074,8 @@ export async function toggle3DMode(): Promise<boolean> {
     showError(err.message || String(err));
     return false;
   } finally {
+    state.isLayoutTransitioning = false;
+    updateToolbarUI();
     showLoading(false);
   }
 }
@@ -1082,27 +1093,42 @@ export async function toggleMprMode(): Promise<boolean> {
     return false;
   }
 
+  // Force close/hide trackball popover during transition to avoid stale camera reads
+  const trackball = getMprTrackball();
+  trackball?.closePopover();
+
   // Deactivate 3D mode if active
   if (state.is3DMode) {
-    state.is3DMode = false;
-    view3DViewer.isActive = false;
-    view3DViewer.stopRenderLoop();
-    $("view-3d-container")?.classList.add("hidden");
-    $("viewport-container")?.classList.remove("mode-3d");
-    hide3DControls();
+    state.isLayoutTransitioning = true;
+    try {
+      state.is3DMode = false;
+      view3DViewer.isActive = false;
+      view3DViewer.stopRenderLoop();
+      $("view-3d-container")?.classList.add("hidden");
+      $("viewport-container")?.classList.remove("mode-3d");
+      hide3DControls();
+    } finally {
+      state.isLayoutTransitioning = false;
+    }
   }
 
   const manager = getViewportManager();
   if (state.isMprMode) {
-    state.isMprMode = false;
-    $("viewport-container")?.classList.remove("mode-mpr");
-    manager?.setLayout("1x1");
-    hide3DControls();
-    updateToolbarUI();
-    render();
-    return false;
+    state.isLayoutTransitioning = true;
+    try {
+      state.isMprMode = false;
+      $("viewport-container")?.classList.remove("mode-mpr");
+      manager?.setLayout("1x1");
+      hide3DControls();
+      render();
+      return false;
+    } finally {
+      state.isLayoutTransitioning = false;
+      updateToolbarUI();
+    }
   }
 
+  state.isLayoutTransitioning = true;
   showLoading(true);
   try {
     if (!mprEngine.volume) {
@@ -1123,12 +1149,13 @@ export async function toggleMprMode(): Promise<boolean> {
     $("view-3d-sliders-panel")?.classList.remove("hidden");
     $("mpr-sliders-panel")?.classList.remove("hidden");
     update3DSlidersUI();
-    updateToolbarUI();
     return true;
   } catch (err: any) {
     showError(err.message || String(err));
     return false;
   } finally {
+    state.isLayoutTransitioning = false;
+    updateToolbarUI();
     showLoading(false);
   }
 }
@@ -1204,7 +1231,11 @@ export function updateToolbarUI(): void {
       const shouldShow = Boolean(state.isMprMode || state.is3DMode);
       trackball.el.hidden = !shouldShow;
       trackball.el.classList.toggle("hidden", !shouldShow);
-      if (shouldShow && typeof trackball.update === "function") {
+      if (
+        shouldShow &&
+        !state.isLayoutTransitioning &&
+        typeof trackball.update === "function"
+      ) {
         trackball.update();
       } else if (!shouldShow && typeof trackball.closePopover === "function") {
         trackball.closePopover();
@@ -2956,8 +2987,10 @@ export function initGridLayoutControls(): void {
     if (!btn) return;
 
     btn.addEventListener("click", () => {
+      getMprTrackball()?.closePopover();
       getViewportManager()?.setLayout(layout);
       updateGridLayoutUI(layout);
+      updateToolbarUI();
     });
   });
 

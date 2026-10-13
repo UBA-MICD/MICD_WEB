@@ -1010,6 +1010,18 @@ function onMeasurePathologyChange(): void {
   renderActiveMeasurementOverlays();
 }
 
+function schedulePostReflow(action: () => void): void {
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        action();
+      });
+    });
+  } else {
+    setTimeout(action, 50);
+  }
+}
+
 export async function toggle3DMode(): Promise<boolean> {
   if (state.isLayoutTransitioning) return false;
 
@@ -1074,9 +1086,12 @@ export async function toggle3DMode(): Promise<boolean> {
       (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
       (document.getElementById("dicom-canvas") as HTMLCanvasElement);
     if (canvas) {
-      view3DViewer.resize(canvas);
-      view3DViewer.render(canvas);
-      view3DViewer.startRenderLoop(canvas);
+      schedulePostReflow(() => {
+        if (!state.is3DMode) return;
+        view3DViewer.resize(canvas);
+        view3DViewer.render(canvas);
+        view3DViewer.startRenderLoop(canvas);
+      });
     }
     return true;
   } catch (err: any) {
@@ -1144,7 +1159,10 @@ export async function toggleMprMode(): Promise<boolean> {
 
     // Set 2x2 triplanar layout
     manager?.setLayout("2x2");
-    manager?.getAllViewports().forEach((vp) => vp.render());
+    schedulePostReflow(() => {
+      if (!state.isMprMode) return;
+      manager?.getAllViewports().forEach((vp) => vp.render());
+    });
 
     $("view-3d-sliders-panel")?.classList.remove("hidden");
     $("mpr-sliders-panel")?.classList.remove("hidden");

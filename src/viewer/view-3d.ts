@@ -540,6 +540,12 @@ export class View3DViewer {
   }
 
   public setVolume(vol: VoxelVolume): void {
+    if (this.volume !== vol) {
+      if (this.volumeTexture && this.gl) {
+        this.gl.deleteTexture(this.volumeTexture);
+      }
+      this.volumeTexture = null;
+    }
     this.volume = vol;
     this.renderEpoch++;
     this.windowCenter =
@@ -569,6 +575,7 @@ export class View3DViewer {
   private gl: WebGL2RenderingContext | null = null;
   private program: WebGLProgram | null = null;
   private volumeTexture: WebGLTexture | null = null;
+  private isUploadingTexture: boolean = false;
   private vao: WebGLVertexArrayObject | null = null;
   private vbo: WebGLBuffer | null = null;
   private animationFrameId: number | null = null;
@@ -687,6 +694,7 @@ export class View3DViewer {
       this.gl = null;
       this.program = null;
       this.volumeTexture = null;
+      this.isUploadingTexture = false;
       this.vao = null;
       this.vbo = null;
       this.uniformLocations = {};
@@ -1060,116 +1068,134 @@ export class View3DViewer {
       );
       return;
     }
-    const gl = this.gl;
-    const { depth, rows, cols, data, rescaleSlope, rescaleIntercept } =
-      this.volume;
 
-    const totalVoxels = depth * rows * cols;
-    if (!data || data.length === 0) {
-      console.error(
-        "[View3D] uploadVolumeTexture error: volume data is null or empty!",
-        {
-          depth,
-          rows,
-          cols,
-          totalVoxels,
-          dataLength: data ? data.length : 0,
-        },
-      );
+    if (this.isUploadingTexture) {
       return;
     }
 
-    // Diagnostic statistical audit across volume voxels
-    let minVal = Infinity;
-    let maxVal = -Infinity;
-    let nonZeroCount = 0;
-    const sampleStep = Math.max(1, Math.floor(data.length / 500));
-    let sampledCount = 0;
-    for (let i = 0; i < data.length; i += sampleStep) {
-      const v = data[i];
-      sampledCount++;
-      if (v !== 0) nonZeroCount++;
-      if (v < minVal) minVal = v;
-      if (v > maxVal) maxVal = v;
-    }
-
-    console.log("[View3D] Uploading 3D Texture Audit:", {
-      dimensions: `${cols}x${rows}x${depth}`,
-      totalVoxels,
-      dataLength: data.length,
-      dataType: data.constructor?.name,
-      sampleMin: minVal,
-      sampleMax: maxVal,
-      nonZeroRatio:
-        sampledCount > 0 ? (nonZeroCount / sampledCount).toFixed(3) : "0",
-      rescaleSlope: rescaleSlope ?? 1,
-      rescaleIntercept: rescaleIntercept ?? 0,
-      windowCenter: this.windowCenter,
-      windowWidth: this.windowWidth,
-    });
-
-    const normalizedData = new Uint8Array(totalVoxels);
-    const slope = rescaleSlope ?? 1;
-    const intercept = rescaleIntercept ?? 0;
-    const limit = Math.min(totalVoxels, data.length);
-
-    for (let i = 0; i < limit; i++) {
-      const raw = data[i];
-      const hu = raw * slope + intercept;
-      // Map HU [-1024..3071] into [0..255]
-      const norm = Math.max(
-        0,
-        Math.min(255, Math.round(((hu + 1024) / 4095) * 255)),
-      );
-      normalizedData[i] = norm;
-    }
-
-    if (typeof gl.getError === "function") {
-      const errBefore = gl.getError();
-      if (errBefore !== 0) {
-        console.warn("[View3D] WebGL error before texture upload:", errBefore);
-      }
-    }
-
+    // Reuse existing 3D texture if already uploaded for this context
     if (this.volumeTexture) {
-      gl.deleteTexture(this.volumeTexture);
-    }
-
-    const tex = gl.createTexture();
-    if (!tex) {
-      console.error("[View3D] Failed to create WebGL3D texture");
       return;
     }
 
-    gl.bindTexture(gl.TEXTURE_3D, tex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage3D(
-      gl.TEXTURE_3D,
-      0,
-      gl.R8,
-      cols,
-      rows,
-      depth,
-      0,
-      gl.RED,
-      gl.UNSIGNED_BYTE,
-      normalizedData,
-    );
-
-    if (typeof gl.getError === "function") {
-      const errAfter = gl.getError();
-      if (errAfter !== 0) {
-        console.error("[View3D] WebGL error during texImage3D:", errAfter);
-      }
+    const gl = this.gl;
+    if (typeof gl.isContextLost === "function" && gl.isContextLost()) {
+      return;
     }
 
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    this.isUploadingTexture = true;
+    try {
+      const { depth, rows, cols, data, rescaleSlope, rescaleIntercept } =
+        this.volume;
 
-    this.volumeTexture = tex;
+      const totalVoxels = depth * rows * cols;
+      if (!data || data.length === 0) {
+        console.error(
+          "[View3D] uploadVolumeTexture error: volume data is null or empty!",
+          {
+            depth,
+            rows,
+            cols,
+            totalVoxels,
+            dataLength: data ? data.length : 0,
+          },
+        );
+        return;
+      }
+
+      // Diagnostic statistical audit across volume voxels
+      let minVal = Infinity;
+      let maxVal = -Infinity;
+      let nonZeroCount = 0;
+      const sampleStep = Math.max(1, Math.floor(data.length / 500));
+      let sampledCount = 0;
+      for (let i = 0; i < data.length; i += sampleStep) {
+        const v = data[i];
+        sampledCount++;
+        if (v !== 0) nonZeroCount++;
+        if (v < minVal) minVal = v;
+        if (v > maxVal) maxVal = v;
+      }
+
+      console.log("[View3D] Uploading 3D Texture Audit:", {
+        dimensions: `${cols}x${rows}x${depth}`,
+        totalVoxels,
+        dataLength: data.length,
+        dataType: data.constructor?.name,
+        sampleMin: minVal,
+        sampleMax: maxVal,
+        nonZeroRatio:
+          sampledCount > 0 ? (nonZeroCount / sampledCount).toFixed(3) : "0",
+        rescaleSlope: rescaleSlope ?? 1,
+        rescaleIntercept: rescaleIntercept ?? 0,
+        windowCenter: this.windowCenter,
+        windowWidth: this.windowWidth,
+      });
+
+      const normalizedData = new Uint8Array(totalVoxels);
+      const slope = rescaleSlope ?? 1;
+      const intercept = rescaleIntercept ?? 0;
+      const limit = Math.min(totalVoxels, data.length);
+
+      for (let i = 0; i < limit; i++) {
+        const raw = data[i];
+        const hu = raw * slope + intercept;
+        // Map HU [-1024..3071] into [0..255]
+        const norm = Math.max(
+          0,
+          Math.min(255, Math.round(((hu + 1024) / 4095) * 255)),
+        );
+        normalizedData[i] = norm;
+      }
+
+      if (typeof gl.getError === "function") {
+        const errBefore = gl.getError();
+        if (errBefore !== 0) {
+          console.warn(
+            "[View3D] WebGL error before texture upload:",
+            errBefore,
+          );
+        }
+      }
+
+      const tex = gl.createTexture();
+      if (!tex) {
+        console.error("[View3D] Failed to create WebGL3D texture");
+        return;
+      }
+
+      gl.bindTexture(gl.TEXTURE_3D, tex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage3D(
+        gl.TEXTURE_3D,
+        0,
+        gl.R8,
+        cols,
+        rows,
+        depth,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        normalizedData,
+      );
+
+      if (typeof gl.getError === "function") {
+        const errAfter = gl.getError();
+        if (errAfter !== 0) {
+          console.error("[View3D] WebGL error during texImage3D:", errAfter);
+        }
+      }
+
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+
+      this.volumeTexture = tex;
+    } finally {
+      this.isUploadingTexture = false;
+    }
   }
 
   /** Set quick view orientation: Axial, Coronal, Sagittal, 3D. */

@@ -176,6 +176,40 @@ export function ensureMprTrackballMounted(): MprTrackballHandle | null {
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
+/**
+ * Event delegation for view mode toggles (#tool-view-3d and #tool-mpr).
+ * Bound to document.body so buttons survive dynamic DOM re-renders.
+ */
+function initViewModeDelegation(): void {
+  if (typeof document === "undefined" || !document.body) return;
+  const body = document.body as HTMLElement & {
+    __viewModeDelegationInitialized?: boolean;
+  };
+  if (body.__viewModeDelegationInitialized) return;
+  body.__viewModeDelegationInitialized = true;
+
+  document.body.addEventListener("click", (event: MouseEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (!target || typeof target.closest !== "function") return;
+
+    // Delegación para Vista 3D
+    const btn3D = target.closest("#tool-view-3d") as HTMLButtonElement | null;
+    if (btn3D) {
+      if (btn3D.disabled || state.isLayoutTransitioning) return;
+      void toggle3DMode();
+      return;
+    }
+
+    // Delegación para botón MPR
+    const btnMpr = target.closest("#tool-mpr") as HTMLButtonElement | null;
+    if (btnMpr) {
+      if (btnMpr.disabled || state.isLayoutTransitioning) return;
+      void toggleMprMode();
+      return;
+    }
+  });
+}
+
 export function initToolbar(): void {
   ensureMprTrackballMounted();
   const tools = [
@@ -317,14 +351,7 @@ export function initToolbar(): void {
     }
   });
 
-  $("tool-view-3d")?.addEventListener("click", () => {
-    if (state.isLayoutTransitioning) return;
-    void toggle3DMode();
-  });
-  $("tool-mpr")?.addEventListener("click", () => {
-    if (state.isLayoutTransitioning) return;
-    void toggleMprMode();
-  });
+  initViewModeDelegation();
 
   $("btn-open").addEventListener("click", openFiles);
 

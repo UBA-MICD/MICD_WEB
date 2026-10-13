@@ -409,7 +409,7 @@ test("initToolbar: tool-mpr is a no-op when disabled", async () => {
   initToolbar();
   const btn = document.getElementById("tool-mpr") as HTMLButtonElement;
   btn.disabled = true;
-  btn.dispatchEvent(new MouseEvent("click"));
+  btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(mpr3DViewer.isActive, false);
 });
@@ -2599,4 +2599,90 @@ test("rapid toggling stress test between MPR and 3D mode does not throw or crash
   view3DViewer.volume = null;
   mprEngine.volume = null;
   manager.destroy();
+});
+
+test("initToolbar: event delegation survives DOM re-rendering for 3D and MPR buttons", async () => {
+  setBody(viewerFixtureHtml());
+  initToolbar();
+
+  const mockVol: any = {
+    depth: 4,
+    rows: 4,
+    cols: 4,
+    data: new Int16Array(64),
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    rescaleSlope: 1,
+    rescaleIntercept: 0,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+  view3DViewer.volume = mockVol;
+  mprEngine.volume = mockVol;
+  state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
+  state.parsed = {
+    metadata: {
+      sopInstanceUid: "sop-1",
+      seriesInstanceUid: "series-1",
+      windowWidth: 400,
+      windowCenter: 40,
+      columns: 512,
+      rows: 512,
+      rescaleSlope: 1,
+      rescaleIntercept: 0,
+      pixelSpacing: [0.5, 0.5] as [number, number],
+      imagePositionPatient: [0, 0, 0] as [number, number, number],
+    },
+    pixelData: null,
+    rawDataSet: {},
+  } as any;
+
+  // Re-render the toolbar buttons into the DOM (turning them into fresh DOM elements without direct listeners)
+  const container = document.querySelector(".sidebar__tools") || document.body;
+  const oldBtn3D = document.getElementById("tool-view-3d");
+  const oldBtnMpr = document.getElementById("tool-mpr");
+  oldBtn3D?.remove();
+  oldBtnMpr?.remove();
+
+  const newBtn3D = document.createElement("button");
+  newBtn3D.id = "tool-view-3d";
+  const newBtnMpr = document.createElement("button");
+  newBtnMpr.id = "tool-mpr";
+  container.appendChild(newBtn3D);
+  container.appendChild(newBtnMpr);
+
+  // Click on newBtn3D (bubbles to body)
+  state.is3DMode = false;
+  state.isMprMode = false;
+  state.isLayoutTransitioning = false;
+
+  newBtn3D.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    state.is3DMode,
+    true,
+    "Click on re-rendered 3D button should activate 3D mode via delegation",
+  );
+
+  // Click on newBtnMpr (bubbles to body)
+  state.isLayoutTransitioning = false;
+  newBtnMpr.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    state.isMprMode,
+    true,
+    "Click on re-rendered MPR button should activate MPR mode via delegation",
+  );
+  assert.equal(
+    state.is3DMode,
+    false,
+    "Activating MPR mode should deactivate 3D mode",
+  );
+
+  // Cleanup
+  state.is3DMode = false;
+  state.isMprMode = false;
+  state.isLayoutTransitioning = false;
+  view3DViewer.volume = null;
+  mprEngine.volume = null;
 });

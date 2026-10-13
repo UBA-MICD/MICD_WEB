@@ -144,7 +144,11 @@ export function ensureMprTrackballMounted(): MprTrackballHandle | null {
     $("tool-mpr")?.parentElement;
   if (!toolbar) return null;
 
-  if (!mprTrackballInstance || !mprTrackballInstance.el.isConnected) {
+  if (
+    !mprTrackballInstance ||
+    !mprTrackballInstance.el.isConnected ||
+    !document.contains(mprTrackballInstance.el)
+  ) {
     if (mprTrackballInstance) {
       try {
         mprTrackballInstance.destroy();

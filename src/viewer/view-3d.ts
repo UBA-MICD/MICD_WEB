@@ -869,16 +869,13 @@ export class View3DViewer {
 
   /** Initialize WebGL2 context, Shaders and 3D Bounding Box Geometry. */
   public initGL(canvas: HTMLCanvasElement): boolean {
-    // preserveDrawingBuffer:false — nothing in the app reads this canvas back
-    // (no toBlob/toDataURL/drawImage/texImage2D/readPixels over view-3d-canvas
-    // or the grid's glCanvasElement; PNG export captures the 2D dicom-canvas),
-    // so preserving the buffer bought nothing and forced a GPU readback on every
-    // drawn frame — the "GPU stall due to ReadPixels" that made entering and
-    // dragging the 3D view jank even after the render loop became on-demand.
+    // Context attributes configured for stability during rapid transitions and buffer retention:
+    // alpha: false, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true
     let gl = canvas.getContext("webgl2", {
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: false,
+      alpha: false,
+      premultipliedAlpha: false,
+      antialias: false,
+      preserveDrawingBuffer: true,
     }) as WebGL2RenderingContext | null;
 
     if (!gl) {

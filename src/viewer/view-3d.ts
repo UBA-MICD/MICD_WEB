@@ -692,16 +692,22 @@ export class View3DViewer {
   public releaseContext(): void {
     this.stopRenderLoop();
     if (this.gl) {
+      const gl = this.gl;
       try {
-        const loseContext =
-          typeof this.gl.getExtension === "function"
-            ? this.gl.getExtension("WEBGL_lose_context")
-            : null;
-        if (loseContext) {
-          loseContext.loseContext();
+        if (this.volumeTexture && typeof gl.deleteTexture === "function") {
+          gl.deleteTexture(this.volumeTexture);
+        }
+        if (this.vbo && typeof gl.deleteBuffer === "function") {
+          gl.deleteBuffer(this.vbo);
+        }
+        if (this.vao && typeof gl.deleteVertexArray === "function") {
+          gl.deleteVertexArray(this.vao);
+        }
+        if (this.program && typeof gl.deleteProgram === "function") {
+          gl.deleteProgram(this.program);
         }
       } catch {
-        // Safe context release
+        // Safe context resource cleanup
       }
       this.gl = null;
       this.program = null;

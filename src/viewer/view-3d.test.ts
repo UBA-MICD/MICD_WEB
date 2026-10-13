@@ -594,12 +594,20 @@ test("View3DViewer: hitTestGizmoFace correctly identifies front-facing face clic
   assert.equal(miss, null);
 });
 
-test("View3DViewer.render releases old WebGL context with WEBGL_lose_context when canvas changes", () => {
+test("View3DViewer.render performs soft cleanup of old WebGL resources when canvas changes without losing context", () => {
   const viewer = new View3DViewer();
   let loseContextCalled = false;
+  let deleteProgramCalled = false;
+  let deleteBufferCalled = false;
 
   const mockContext1: any = {
     ...createMockWebGL2Context(),
+    deleteProgram: () => {
+      deleteProgramCalled = true;
+    },
+    deleteBuffer: () => {
+      deleteBufferCalled = true;
+    },
     getExtension: (name: string) => {
       if (name === "WEBGL_lose_context") {
         return {
@@ -623,6 +631,7 @@ test("View3DViewer.render releases old WebGL context with WEBGL_lose_context whe
 
   viewer.render(canvas1);
   assert.equal(loseContextCalled, false);
+  assert.equal(deleteProgramCalled, false);
 
   const mockContext2: any = {
     ...createMockWebGL2Context(),
@@ -637,7 +646,12 @@ test("View3DViewer.render releases old WebGL context with WEBGL_lose_context whe
   mockContext2.canvas = canvas2;
 
   viewer.render(canvas2);
-  assert.equal(loseContextCalled, true);
+  // Must NOT lose context destructively
+  assert.equal(loseContextCalled, false);
+  // Must perform soft cleanup
+  assert.equal(deleteProgramCalled, true);
+  assert.equal(deleteBufferCalled, true);
+  assert.equal(viewer.gl, mockContext2);
 });
 
 test("View3DViewer.initGL caches uniform locations and render uses them without calling getUniformLocation", () => {

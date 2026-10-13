@@ -477,7 +477,7 @@ test("mpr-trackball: clicking outside closes the popover menu", () => {
   handle.destroy();
 });
 
-test("mpr-trackball: routes dragging to view3DViewer when is3DMode is active", () => {
+test("mpr-trackball: operates cleanly and updates mprCoordinator even if is3DMode is active (without touching view3DViewer)", () => {
   state.is3DMode = true;
   view3DViewer.resetCamera();
   const initTheta = view3DViewer.camera.theta;
@@ -503,10 +503,11 @@ test("mpr-trackball: routes dragging to view3DViewer when is3DMode is active", (
     }),
   );
 
-  assert.notEqual(view3DViewer.camera.phi, initPhi);
-  assert.notEqual(view3DViewer.camera.theta, initTheta);
+  // view3DViewer camera must remain untouched (decoupled from direct trackball routing to avoid WebGL context thrashing)
+  assert.equal(view3DViewer.camera.phi, initPhi);
+  assert.equal(view3DViewer.camera.theta, initTheta);
 
-  const { pitch, yaw } = view3DViewer.getPitchYawDegrees();
+  const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
   assert.ok(handle.readout.textContent?.includes(`Pitch ${pitch.toFixed(1)}°`));
   assert.ok(handle.readout.textContent?.includes(`Yaw ${yaw.toFixed(1)}°`));
 
@@ -514,9 +515,10 @@ test("mpr-trackball: routes dragging to view3DViewer when is3DMode is active", (
   state.is3DMode = false;
 });
 
-test("mpr-trackball: slider input updates view3DViewer camera in 3D mode", () => {
+test("mpr-trackball: slider input updates mprCoordinator safely without mutating view3DViewer in 3D mode", () => {
   state.is3DMode = true;
   view3DViewer.resetCamera();
+  const initTheta = view3DViewer.camera.theta;
 
   const handle = createMprTrackball();
   document.body.appendChild(handle.el);
@@ -524,24 +526,36 @@ test("mpr-trackball: slider input updates view3DViewer camera in 3D mode", () =>
   handle.pitchInput.value = "20";
   handle.pitchInput.dispatchEvent(new Event("input", { bubbles: true }));
 
-  const { pitch } = view3DViewer.getPitchYawDegrees();
-  assert.ok(Math.abs(pitch - 20) < 1, `expected pitch ~20, got ${pitch}`);
+  assert.equal(view3DViewer.camera.theta, initTheta);
+  const { pitch } = mprCoordinator.getPitchYawDegrees();
+  assert.ok(Math.abs(pitch - 20) < 1, `expected mpr pitch ~20, got ${pitch}`);
 
   handle.destroy();
   state.is3DMode = false;
 });
 
-test("mpr-trackball: reset button resets view3DViewer camera in 3D mode", () => {
+test("mpr-trackball: reset button restores orthogonal axes without mutating view3DViewer in 3D mode", () => {
   state.is3DMode = true;
+  view3DViewer.resetCamera();
   view3DViewer.rotatePitchYaw(0.4, 0.5);
+  const expectedTheta = view3DViewer.camera.theta;
+  const expectedPhi = view3DViewer.camera.phi;
+
+  mprCoordinator.rotatePitchYaw(0.2, 0.3, "axial");
 
   const handle = createMprTrackball();
   document.body.appendChild(handle.el);
 
   handle.resetButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-  assert.equal(view3DViewer.camera.theta, 0.3);
-  assert.equal(view3DViewer.camera.phi, 0.8);
+  // 3D camera remains untouched
+  assert.equal(view3DViewer.camera.theta, expectedTheta);
+  assert.equal(view3DViewer.camera.phi, expectedPhi);
+
+  // MPR coordinator is restored to orthogonal
+  const { pitch, yaw } = mprCoordinator.getPitchYawDegrees();
+  assert.equal(pitch, 0);
+  assert.equal(yaw, 0);
 
   handle.destroy();
   state.is3DMode = false;

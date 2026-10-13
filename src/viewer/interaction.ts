@@ -138,7 +138,10 @@ export function getMprTrackball(): MprTrackballHandle | null {
 }
 
 export function ensureMprTrackballMounted(): MprTrackballHandle | null {
-  const toolbar = $("viewer-toolbar") || $("tool-mpr")?.parentElement;
+  const toolbar =
+    $("viewer-toolbar") ||
+    $("tool-crosshair")?.parentElement ||
+    $("tool-mpr")?.parentElement;
   if (!toolbar) return null;
 
   if (!mprTrackballInstance || !mprTrackballInstance.el.isConnected) {
@@ -151,11 +154,12 @@ export function ensureMprTrackballMounted(): MprTrackballHandle | null {
       mprTrackballInstance = null;
     }
     mprTrackballInstance = createMprTrackball();
-    const mprBtn = $("tool-mpr");
-    if (mprBtn && mprBtn.parentElement) {
-      mprBtn.parentElement.insertBefore(
+    const anchorBtn =
+      $("tool-crosshair") || $("tool-pan") || $("tool-zoom") || $("tool-mpr");
+    if (anchorBtn && anchorBtn.parentElement) {
+      anchorBtn.parentElement.insertBefore(
         mprTrackballInstance.el,
-        mprBtn.nextSibling,
+        anchorBtn.nextSibling,
       );
     } else {
       toolbar.appendChild(mprTrackballInstance.el);
@@ -1025,6 +1029,8 @@ export async function toggle3DMode(): Promise<boolean> {
   if (state.isMprMode) {
     state.isMprMode = false;
     $("viewport-container")?.classList.remove("mode-mpr");
+    const manager = getViewportManager();
+    manager?.setLayout("1x1");
   }
 
   showLoading(true);

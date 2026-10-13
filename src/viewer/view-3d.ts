@@ -904,6 +904,16 @@ export class View3DViewer {
       return false;
     }
 
+    if (typeof gl.isContextLost === "function" && gl.isContextLost()) {
+      const loseExt =
+        typeof gl.getExtension === "function"
+          ? gl.getExtension("WEBGL_lose_context")
+          : null;
+      if (loseExt && typeof loseExt.restoreContext === "function") {
+        loseExt.restoreContext();
+      }
+    }
+
     // getContext() on the same canvas hands back the same context, and the
     // shader program and unit-cube geometry are volume-independent — so build
     // them once and reuse them. Re-running the whole init on every 3D entry

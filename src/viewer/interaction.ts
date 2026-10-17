@@ -1137,12 +1137,32 @@ export async function toggleMprMode(): Promise<boolean> {
       t("viewer.mpr.needTwoSlices") ||
         "Se requieren al menos 2 cortes para MPR",
     );
-    return false;
-  }
 
   // Force close/hide trackball popover during transition to avoid stale camera reads
+    return false;
+  }
   const trackball = getMprTrackball();
   trackball?.closePopover();
+  // Deactivate 3D mode if active
+  if (state.is3DMode) {
+    state.is3DMode = false;
+    view3DViewer.isActive = false;
+    view3DViewer.stopRenderLoop();
+    $("view-3d-container")?.classList.add("hidden");
+    $("viewport-container")?.classList.remove("mode-3d");
+    hide3DControls();
+  }
+
+  const manager = getViewportManager();
+  if (state.isMprMode) {
+    state.isMprMode = false;
+    $("viewport-container")?.classList.remove("mode-mpr");
+    manager?.setLayout("1x1");
+    hide3DControls();
+    updateToolbarUI();
+    render();
+    return false;
+  }
 
   state.isLayoutTransitioning = true;
   try {
@@ -1520,6 +1540,27 @@ export function initViewportInteraction(): void {
         return;
       }
       const plane = activeVp?.plane || "axial";
+      const [cx, cy] = mprEngine.getCrosshairScreenCoords(plane, viewW, viewH);
+      const distToCenter = Math.hypot(clickX - cx, clickY - cy);
+
+      // Check if clicking on crosshair arm/handle to rotate oblique slice
+      if (distToCenter > 30) {
+        const { line1, line2 } = mprEngine.getCrosshairLineDirections(plane);
+        const distToLine1 = Math.abs(
+          (clickX - cx) * line1.dirY - (clickY - cy) * line1.dirX,
+        );
+        const distToLine2 = Math.abs(
+          (clickX - cx) * line2.dirY - (clickY - cy) * line2.dirX,
+        );
+        if (distToLine1 <= 18 || distToLine2 <= 18) {
+          isRotatingMprCrosshair = true;
+          mprRotationPlane = plane;
+          mprCrosshairScreenCenter = [cx, cy];
+          return;
+        }
+      }
+
+      isRotatingMprCrosshair = false;
       mprEngine.setCrosshairFromScreen(plane, clickX, clickY, viewW, viewH);
       const [nx, ny, nz] = mprEngine.crosshairNormalized;
       mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
@@ -2501,6 +2542,7 @@ export function initViewportInteraction(): void {
     state.isDragging = false;
     activeMouseButton = 0;
     dragOriginViewportId = null;
+    isRotatingMprCrosshair = false;
   });
 
   container.addEventListener("dblclick", (e: MouseEvent) => {
@@ -2631,7 +2673,7 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      console.warn("[DEBUG-SLIDERS] Slider movido a:", idx, { axis: "axial" });
+      console.warn("[DEBUG] Slider movido a:", idx, { axis: "axial" });
       mprCoordinator.updateCrosshairAxis("axial", idx);
       syncAndRenderAfterSlider();
     }
@@ -2641,7 +2683,7 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      console.warn("[DEBUG-SLIDERS] Slider movido a:", idx, {
+      console.warn("[DEBUG] Slider movido a:", idx, {
         axis: "coronal",
       });
       mprCoordinator.updateCrosshairAxis("coronal", idx);
@@ -2653,7 +2695,7 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
-      console.warn("[DEBUG-SLIDERS] Slider movido a:", idx, {
+      console.warn("[DEBUG] Slider movido a:", idx, {
         axis: "sagittal",
       });
       mprCoordinator.updateCrosshairAxis("sagittal", idx);

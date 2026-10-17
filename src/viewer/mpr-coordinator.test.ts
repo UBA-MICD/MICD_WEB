@@ -511,6 +511,8 @@ test("MPRGridCoordinator.resetToOrthogonal: restores identity, keeps crosshair, 
 
   let rotationEvents = 0;
   coordinator.onRotationChange(() => rotationEvents++);
+  const crosshairBefore = { ...coordinator.crosshair };
+  const dimensionsBefore = { ...coordinator.dimensions };
   coordinator.resetToOrthogonal();
 
   assert.equal(rotationEvents, 1);

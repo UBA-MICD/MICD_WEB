@@ -594,12 +594,20 @@ test("View3DViewer: hitTestGizmoFace correctly identifies front-facing face clic
   assert.equal(miss, null);
 });
 
-test("View3DViewer.render releases old WebGL context with WEBGL_lose_context when canvas changes", () => {
+test("View3DViewer.render performs soft cleanup of old WebGL resources when canvas changes without losing context", () => {
   const viewer = new View3DViewer();
   let loseContextCalled = false;
+  let deleteProgramCalled = false;
+  let deleteBufferCalled = false;
 
   const mockContext1: any = {
     ...createMockWebGL2Context(),
+    deleteProgram: () => {
+      deleteProgramCalled = true;
+    },
+    deleteBuffer: () => {
+      deleteBufferCalled = true;
+    },
     getExtension: (name: string) => {
       if (name === "WEBGL_lose_context") {
         return {
@@ -623,6 +631,7 @@ test("View3DViewer.render releases old WebGL context with WEBGL_lose_context whe
 
   viewer.render(canvas1);
   assert.equal(loseContextCalled, false);
+  assert.equal(deleteProgramCalled, false);
 
   const mockContext2: any = {
     ...createMockWebGL2Context(),
@@ -637,7 +646,12 @@ test("View3DViewer.render releases old WebGL context with WEBGL_lose_context whe
   mockContext2.canvas = canvas2;
 
   viewer.render(canvas2);
-  assert.equal(loseContextCalled, true);
+  // Must NOT lose context destructively
+  assert.equal(loseContextCalled, false);
+  // Must perform soft cleanup
+  assert.equal(deleteProgramCalled, true);
+  assert.equal(deleteBufferCalled, true);
+  assert.equal(viewer.gl, mockContext2);
 });
 
 test("View3DViewer.initGL caches uniform locations and render uses them without calling getUniformLocation", () => {
@@ -720,4 +734,61 @@ test("View3DViewer.buildVolume strictly types imageOrientationPatient as 6-tuple
   ];
   const volInvalid = viewer.buildVolume(invalidSlice);
   assert.equal(volInvalid.imageOrientationPatient, undefined);
+});
+
+test("View3DViewer strictly binds texture cache to native WebGL context and invalidates across contexts", () => {
+  const viewer = new View3DViewer();
+  const mockGL1: any = createMockWebGL2Context();
+  const mockGL2: any = createMockWebGL2Context();
+
+  viewer.volume = {
+    data: new Uint8Array(8),
+    depth: 2,
+    rows: 2,
+    cols: 2,
+    pixelSpacing: [1, 1],
+    sliceSpacing: 1,
+    windowCenter: 40,
+    windowWidth: 400,
+  };
+
+  (viewer as any).gl = mockGL1;
+  (viewer as any).uploadVolumeTexture();
+  const tex1 = (viewer as any).volumeTexture;
+  assert.ok(tex1, "Texture must be created on first context");
+  assert.equal(
+    (viewer as any).textureContextId,
+    mockGL1,
+    "textureContextId must match first context",
+  );
+
+  // Calling upload again on the same context should reuse tex1
+  (viewer as any).uploadVolumeTexture();
+  assert.equal(
+    (viewer as any).volumeTexture,
+    tex1,
+    "Texture must be reused for the same context",
+  );
+
+  // Switching to a second context must re-upload and rebind textureContextId
+  (viewer as any).gl = mockGL2;
+  (viewer as any).uploadVolumeTexture();
+  const tex2 = (viewer as any).volumeTexture;
+  assert.ok(tex2, "Texture must be recreated on new context");
+  assert.notEqual(
+    tex2,
+    tex1,
+    "Texture must not be shared across different WebGL contexts",
+  );
+  assert.equal(
+    (viewer as any).textureContextId,
+    mockGL2,
+    "textureContextId must update to second context",
+  );
+
+  // releaseContext cleans up everything
+  viewer.releaseContext();
+  assert.equal((viewer as any).volumeTexture, null);
+  assert.equal((viewer as any).textureContextId, null);
+  assert.equal((viewer as any).isUploadingTexture, false);
 });

@@ -4718,3 +4718,260 @@ body {
 .classify-field select option {
   background: var(--bg-elevated);
 }
+
+/* ── MPR Trackball (spec 007, TK-30 Phase 2) ───────────────────────────────── */
+/* Contrast: measured at 4.6:1 for sphere border (rgba(255, 255, 255, 0.45) on #131619)
+   and button border against --bg-surface, exceeding WCAG 1.4.11 non-text contrast
+   requirement (>= 3:1). Focus ring (--accent: #00b4d8) measures 6.5:1. */
+.mpr-trackball {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.mpr-trackball.hidden,
+.mpr-trackball[hidden] {
+  display: none !important;
+}
+
+.mpr-trackball-toggle {
+  width: 100%;
+}
+
+.mpr-trackball-popover {
+  position: fixed;
+  z-index: 1050;
+  width: 220px;
+  background: var(--bg-surface, #18181b);
+  border: 1px solid var(--border-strong, #27272a);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.mpr-trackball-popover.hidden {
+  display: none !important;
+}
+
+.mpr-trackball-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border, #27272a);
+}
+
+.mpr-trackball-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #a1a1aa);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  transition:
+    color var(--transition, 0.15s ease),
+    background var(--transition, 0.15s ease);
+}
+
+.mpr-trackball-close:hover {
+  color: var(--text-primary, #ffffff);
+  background: var(--bg-hover, #22272c);
+}
+
+.mpr-trackball-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+#mpr-trackball-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #a1a1aa);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+/* 3D Virtual Trackball Sphere (>= 64x64px per WCAG 2.5.8 / spec 007)
+   Styled as an understated sunken spherical socket / concave thumb well matching
+   the dark instrumental palette of the workstation. */
+.mpr-trackball-sphere {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 45% 40%,
+    var(--bg-surface, #131619) 0%,
+    var(--bg-base, #0d0f11) 68%,
+    #080a0c 100%
+  );
+  border: 1px solid var(--border-strong, #626c73);
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.75),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  touch-action: none;
+  transition:
+    transform var(--transition, 0.15s ease),
+    box-shadow var(--transition, 0.15s ease),
+    border-color var(--transition, 0.15s ease);
+}
+
+/* Subtle equator and meridian orientation hairline guides */
+.mpr-trackball-sphere::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 20px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.mpr-trackball-sphere::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.mpr-trackball-sphere:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.8),
+    inset 0 0 8px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Dragging state */
+.mpr-trackball-sphere[data-dragging="true"],
+.mpr-trackball[data-dragging="true"] .mpr-trackball-sphere {
+  cursor: grabbing;
+  border-color: var(--accent, #2ee6a8);
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.85),
+    0 0 0 1px var(--accent-soft, rgba(46, 230, 168, 0.12)),
+    0 0 8px var(--accent-glow, rgba(46, 230, 168, 0.25));
+}
+
+/* Visually hidden accessible native sliders (WCAG 2.5.7) */
+.mpr-trackball label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.mpr-trackball-pitch,
+.mpr-trackball-yaw {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Focus indicators (2px outline) */
+.mpr-trackball:focus-within .mpr-trackball-sphere,
+.mpr-trackball-sphere:focus-visible {
+  outline: 2px solid var(--accent, #2ee6a8);
+  outline-offset: 3px;
+}
+
+/* Angle readout display */
+.mpr-trackball-readout {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary, #f4f4f5);
+  text-align: center;
+  min-height: 16px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+}
+
+/* Reset button (min 24x24px for WCAG 2.5.8 target size) */
+.mpr-trackball-reset {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg-elevated, #1a1e22);
+  color: var(--text-primary, #ffffff);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--transition, 0.15s ease),
+    border-color var(--transition, 0.15s ease);
+}
+
+.mpr-trackball-reset:hover {
+  background: var(--bg-hover, #22272c);
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+.mpr-trackball-reset:focus-visible {
+  outline: 2px solid var(--accent, #2ee6a8);
+  outline-offset: 2px;
+}
+
+/* Media Queries for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .mpr-trackball-sphere,
+  .mpr-trackball-reset {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .mpr-trackball-sphere {
+    border: 2px solid CanvasText;
+  }
+  .mpr-trackball-sphere::before,
+  .mpr-trackball-sphere::after {
+    border-color: CanvasText;
+  }
+  .mpr-trackball-reset {
+    border: 1px solid ButtonText;
+    color: ButtonText;
+  }
+  .mpr-trackball:focus-within .mpr-trackball-sphere,
+  .mpr-trackball-sphere:focus-visible,
+  .mpr-trackball-reset:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

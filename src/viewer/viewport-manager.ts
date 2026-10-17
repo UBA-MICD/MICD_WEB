@@ -335,7 +335,14 @@ export class Viewport {
       }
 
       if (this.id === "vp-3") {
-        if (this.glCanvasElement) {
+        if (state.is3DMode || state.isLayoutTransitioning) {
+          return;
+        }
+        if (
+          this.glCanvasElement &&
+          (typeof this.cellElement.isConnected !== "boolean" ||
+            this.cellElement.isConnected)
+        ) {
           this.glCanvasElement.style.display = "block";
           view3DViewer.render(this.glCanvasElement);
         }
@@ -528,6 +535,12 @@ export class Viewport {
 
   public destroy(): void {
     this.resizeObserver?.disconnect();
+    if (this.id === "vp-3") {
+      view3DViewer.stopRenderLoop();
+      if ((view3DViewer as any).gl?.canvas === this.glCanvasElement) {
+        view3DViewer.releaseContext();
+      }
+    }
     this.glCanvasElement.remove();
     this.cellElement.remove();
   }

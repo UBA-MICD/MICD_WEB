@@ -9,6 +9,14 @@
  */
 
 import { Matrix3, mprEngine, type MPRPlane } from "./mpr-engine.js";
+import {
+  applyPitchYawDeltaQuat,
+  matrix3ToQuat,
+  matrixToPitchYaw,
+  orthonormalize,
+  quatToMatrix3,
+  type Quat,
+} from "./mpr-rotation.js";
 import { view3DViewer } from "./view-3d.js";
 import { getViewportManager } from "./viewport-registry.js";
 
@@ -31,6 +39,11 @@ export class MPRGridCoordinator {
   public maximizedQuadrant: string | null = null;
   private listeners: Array<(c: Crosshair3D) => void> = [];
   private rotationListeners: Array<(r: Float32Array) => void> = [];
+  /**
+   * Unit-quaternion mirror of `rotation` (spec 007). The trackball accumulates
+   * here to avoid Float32 matrix drift; every other writer of `rotation` re-syncs it.
+   */
+  private rotationQuat: Quat = [1, 0, 0, 0];
 
   /**
    * Initializes the crosshair at the geometric center of the volume.
@@ -139,6 +152,7 @@ export class MPRGridCoordinator {
    */
   public setRotation(r: Float32Array): void {
     this.rotation = new Float32Array(r);
+    this.rotationQuat = matrix3ToQuat(this.rotation);
     mprEngine.setRotation(this.rotation);
     this.syncEngines();
     this.notifyRotationListeners();
@@ -151,6 +165,7 @@ export class MPRGridCoordinator {
   public rotateAroundAxis(axis: [number, number, number], rad: number): void {
     const rot = Matrix3.fromRotationAxis(axis, rad);
     this.rotation = Matrix3.multiply(rot, this.rotation);
+    this.rotationQuat = matrix3ToQuat(this.rotation);
     mprEngine.setRotation(this.rotation);
     this.syncEngines();
     this.notifyRotationListeners();
@@ -162,10 +177,75 @@ export class MPRGridCoordinator {
    */
   public resetRotation(): void {
     this.rotation = Matrix3.identity();
+    this.rotationQuat = [1, 0, 0, 0];
     mprEngine.resetRotation();
     this.syncEngines();
     this.notifyRotationListeners();
     this.notifyListeners();
+  }
+
+  /**
+   * Trackball rotation (spec 007): turns the whole orthogonal triad by `dPitch`
+   * around the horizontal screen axis and `dYaw` around the vertical screen axis
+   * of `activePlane`, both in radians and in volume space. A zero or non-finite
+   * delta is a no-op (no listener churn).
+   */
+  public rotatePitchYaw(
+    dPitch: number,
+    dYaw: number,
+    activePlane: MPRPlane,
+  ): void {
+    if (!Number.isFinite(dPitch) || !Number.isFinite(dYaw)) return;
+    if (dPitch === 0 && dYaw === 0) return;
+
+    const camera = mprEngine.getCamera(activePlane);
+    // Right-handed vertical axis for screen yaw: turns normal towards uAxis (screen right).
+    const yawAxis: [number, number, number] = [
+      camera.normal[1] * camera.uAxis[2] - camera.normal[2] * camera.uAxis[1],
+      camera.normal[2] * camera.uAxis[0] - camera.normal[0] * camera.uAxis[2],
+      camera.normal[0] * camera.uAxis[1] - camera.normal[1] * camera.uAxis[0],
+    ];
+
+    this.rotationQuat = applyPitchYawDeltaQuat(
+      this.rotationQuat,
+      camera.uAxis,
+      yawAxis,
+      dPitch,
+      dYaw,
+    );
+
+    let next = quatToMatrix3(this.rotationQuat);
+    if (!Matrix3.isOrthonormal(next, 1e-4)) {
+      next = orthonormalize(next);
+      this.rotationQuat = matrix3ToQuat(next);
+    }
+
+    // A fresh array each time: listeners may hold the previous rotation.
+    this.rotation = next;
+    mprEngine.setRotation(this.rotation);
+    this.syncEngines();
+    this.notifyRotationListeners();
+    this.notifyListeners();
+  }
+
+  /**
+   * Pitch/Yaw read-out of the accumulated rotation, in degrees rounded to 0.1.
+   * Derived from the matrix (display only), so it never drifts out of sync.
+   */
+  public getPitchYawDegrees(): { pitch: number; yaw: number } {
+    const { pitch, yaw } = matrixToPitchYaw(this.rotation);
+    const toDegrees = (rad: number): number =>
+      Math.round(((rad * 180) / Math.PI) * 10) / 10 || 0; // `|| 0` folds −0 into 0
+    return { pitch: toDegrees(pitch), yaw: toDegrees(yaw) };
+  }
+
+  /**
+   * Back to the orthogonal anatomical planes (Axial/Coronal/Sagittal). Only the
+   * rotation changes: crosshair position, zoom and pan are kept, and rotation
+   * listeners fire once.
+   */
+  public resetToOrthogonal(): void {
+    this.resetRotation();
   }
 
   /**

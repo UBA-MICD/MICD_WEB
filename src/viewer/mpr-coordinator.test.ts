@@ -1,8 +1,9 @@
-import { test, beforeEach } from "node:test";
+import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import { MPRGridCoordinator, mprCoordinator } from "./mpr-coordinator.js";
 import { Matrix3, mprEngine } from "./mpr-engine.js";
+import { applyPitchYawDelta, matrixToPitchYaw } from "./mpr-rotation.js";
 
 const dom = new JSDOM(
   `<!DOCTYPE html>
@@ -267,4 +268,284 @@ test("MPREngine: getCrosshairLineDirections calculates dynamic 2D oblique direct
   );
 
   mprCoordinator.resetRotation();
+});
+
+// ── Trackball wiring (spec 007, TK-30) ───────────────────────────────────────
+
+const DEG = Math.PI / 180;
+
+function assertVecClose(
+  actual: ArrayLike<number>,
+  expected: ArrayLike<number>,
+  eps = 1e-4,
+): void {
+  for (let i = 0; i < expected.length; i++) {
+    assert.ok(
+      Math.abs(actual[i] - expected[i]) <= eps,
+      `component ${i}: expected ${actual[i]} ≈ ${expected[i]}`,
+    );
+  }
+}
+
+// mprEngine is a process-wide singleton: leave it orthogonal for the next test.
+afterEach(() => {
+  mprEngine.resetRotation();
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: 90° yaw on Axial sends the axial normal to Sagital and reads Yaw 90°", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  coordinator.rotatePitchYaw(0, 90 * DEG, "axial");
+
+  assertVecClose(mprEngine.axialCamera.normal, [1, 0, 0]);
+  assert.deepEqual(coordinator.getPitchYawDegrees(), { pitch: 0, yaw: 90 });
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: positive pitch reads back as positive pitch", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  coordinator.rotatePitchYaw(25 * DEG, 0, "axial");
+
+  assert.deepEqual(coordinator.getPitchYawDegrees(), { pitch: 25, yaw: 0 });
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: the active plane picks the rotation axes", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  // Coronal's vertical screen axis is Z, so a yaw there leaves the axial normal on Z.
+  coordinator.rotatePitchYaw(0, 90 * DEG, "coronal");
+
+  assertVecClose(mprEngine.axialCamera.normal, [0, 0, 1]);
+  assertVecClose(mprEngine.coronalCamera.normal, [1, 0, 0]);
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: rotates the whole triad rigidly and keeps the normals orthogonal", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  coordinator.rotatePitchYaw(33 * DEG, -71 * DEG, "axial");
+
+  const dot = (a: ArrayLike<number>, b: ArrayLike<number>) =>
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const axial = mprEngine.axialCamera.normal;
+  const coronal = mprEngine.coronalCamera.normal;
+  const sagittal = mprEngine.sagittalCamera.normal;
+  assert.ok(Math.abs(dot(axial, coronal)) < 1e-4);
+  assert.ok(Math.abs(dot(axial, sagittal)) < 1e-4);
+  assert.ok(Math.abs(dot(coronal, sagittal)) < 1e-4);
+  assert.equal(Matrix3.isOrthonormal(coordinator.rotation), true);
+  assert.ok(Math.abs(Matrix3.determinant(coordinator.rotation) - 1) < 1e-4);
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: accumulates from the current rotation (rotated axes of the active plane)", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  coordinator.rotatePitchYaw(0, 40 * DEG, "axial");
+  const before = new Float32Array(coordinator.rotation);
+  const cam = mprEngine.axialCamera;
+  const yawAxis: [number, number, number] = [
+    cam.normal[1] * cam.uAxis[2] - cam.normal[2] * cam.uAxis[1],
+    cam.normal[2] * cam.uAxis[0] - cam.normal[0] * cam.uAxis[2],
+    cam.normal[0] * cam.uAxis[1] - cam.normal[1] * cam.uAxis[0],
+  ];
+  const expected = applyPitchYawDelta(
+    before,
+    [...cam.uAxis] as [number, number, number],
+    yawAxis,
+    15 * DEG,
+    -10 * DEG,
+  );
+
+  coordinator.rotatePitchYaw(15 * DEG, -10 * DEG, "axial");
+
+  assertVecClose(coordinator.rotation, expected);
+});
+
+test("MPRGridCoordinator: the quaternion mirror follows setRotation and rotateAroundAxis", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  // 1) setRotation replaces the base the trackball continues from.
+  const base = Matrix3.fromRotationAxis([0, 0, 1], 50 * DEG);
+  coordinator.setRotation(base);
+  const cam = mprEngine.axialCamera;
+  const getYawAxis = (): [number, number, number] => [
+    cam.normal[1] * cam.uAxis[2] - cam.normal[2] * cam.uAxis[1],
+    cam.normal[2] * cam.uAxis[0] - cam.normal[0] * cam.uAxis[2],
+    cam.normal[0] * cam.uAxis[1] - cam.normal[1] * cam.uAxis[0],
+  ];
+  let expected = applyPitchYawDelta(
+    new Float32Array(base),
+    [...cam.uAxis] as [number, number, number],
+    getYawAxis(),
+    0,
+    20 * DEG,
+  );
+  coordinator.rotatePitchYaw(0, 20 * DEG, "axial");
+  assertVecClose(coordinator.rotation, expected);
+
+  // 2) The legacy axis rotation also re-syncs the mirror.
+  coordinator.rotateAroundAxis([1, 0, 0], 30 * DEG);
+  const afterLegacy = new Float32Array(coordinator.rotation);
+  expected = applyPitchYawDelta(
+    afterLegacy,
+    [...cam.uAxis] as [number, number, number],
+    getYawAxis(),
+    -12 * DEG,
+    0,
+  );
+  coordinator.rotatePitchYaw(-12 * DEG, 0, "axial");
+  assertVecClose(coordinator.rotation, expected);
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: notifies rotation and crosshair listeners once per call", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  let rotationEvents = 0;
+  let crosshairEvents = 0;
+  coordinator.onRotationChange(() => rotationEvents++);
+  coordinator.onCrosshairChange(() => crosshairEvents++);
+
+  coordinator.rotatePitchYaw(5 * DEG, 5 * DEG, "axial");
+
+  assert.equal(rotationEvents, 1);
+  assert.equal(crosshairEvents, 1);
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: zero and non-finite deltas are no-ops", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  let rotationEvents = 0;
+  coordinator.onRotationChange(() => rotationEvents++);
+  const before = coordinator.rotation;
+
+  coordinator.rotatePitchYaw(0, 0, "axial");
+  coordinator.rotatePitchYaw(Number.NaN, 0.1, "axial");
+  coordinator.rotatePitchYaw(0.1, Number.POSITIVE_INFINITY, "axial");
+
+  assert.equal(rotationEvents, 0);
+  assert.equal(coordinator.rotation, before);
+  assert.deepEqual(coordinator.rotation, Matrix3.identity());
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: never mutates a rotation reference handed to listeners", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  const received: Float32Array[] = [];
+  coordinator.onRotationChange((r) => received.push(r));
+
+  coordinator.rotatePitchYaw(0, 30 * DEG, "axial");
+  const first = received[0];
+  const snapshot = new Float32Array(first);
+  coordinator.rotatePitchYaw(0, 30 * DEG, "axial");
+
+  assert.notEqual(received[1], first, "each call yields a new array");
+  assert.deepEqual(first, snapshot, "the earlier reference keeps its values");
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: setRotation input is copied, not aliased", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  const input = Matrix3.fromRotationAxis([0, 1, 0], 10 * DEG);
+  const snapshot = new Float32Array(input);
+  coordinator.setRotation(input);
+  coordinator.rotatePitchYaw(10 * DEG, 10 * DEG, "axial");
+
+  assert.deepEqual(input, snapshot);
+});
+
+test("MPRGridCoordinator.rotatePitchYaw: stays orthonormal after 5 000 deltas", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  let state = 1234;
+  const random = () => {
+    state = (state * 1664525 + 1013904223) % 4294967296;
+    return state / 4294967296;
+  };
+  const planes = ["axial", "coronal", "sagittal"] as const;
+  for (let i = 0; i < 5_000; i++) {
+    coordinator.rotatePitchYaw(
+      (random() - 0.5) * 0.1,
+      (random() - 0.5) * 0.1,
+      planes[i % 3],
+    );
+  }
+
+  assert.equal(Matrix3.isOrthonormal(coordinator.rotation, 1e-4), true);
+  assert.ok(Math.abs(Matrix3.determinant(coordinator.rotation) - 1) < 1e-4);
+});
+
+test("MPRGridCoordinator.getPitchYawDegrees: identity reads 0/0 without negative zero", () => {
+  const coordinator = new MPRGridCoordinator();
+  const { pitch, yaw } = coordinator.getPitchYawDegrees();
+  assert.ok(Object.is(pitch, 0));
+  assert.ok(Object.is(yaw, 0));
+});
+
+test("MPRGridCoordinator.getPitchYawDegrees: rounds to one decimal and matches matrixToPitchYaw", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  coordinator.rotatePitchYaw(12.34 * DEG, 0, "axial");
+  const { pitch } = coordinator.getPitchYawDegrees();
+  assert.equal(pitch, 12.3);
+
+  const exact = matrixToPitchYaw(coordinator.rotation).pitch / DEG;
+  assert.ok(Math.abs(pitch - exact) <= 0.05);
+});
+
+test("MPRGridCoordinator.resetToOrthogonal: restores identity, keeps crosshair, notifies rotation listeners once", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 120, 80);
+  coordinator.setCrosshair(10, 20, 30);
+  coordinator.rotatePitchYaw(45 * DEG, 30 * DEG, "axial");
+
+  let rotationEvents = 0;
+  coordinator.onRotationChange(() => rotationEvents++);
+  const crosshairBefore = { ...coordinator.crosshair };
+  const dimensionsBefore = { ...coordinator.dimensions };
+
+  coordinator.resetToOrthogonal();
+
+  assert.equal(rotationEvents, 1);
+  assert.deepEqual(coordinator.rotation, Matrix3.identity());
+  assert.deepEqual(coordinator.crosshair, crosshairBefore);
+  assert.deepEqual(coordinator.dimensions, dimensionsBefore);
+  assert.deepEqual(coordinator.getPitchYawDegrees(), { pitch: 0, yaw: 0 });
+  assertVecClose(mprEngine.axialCamera.normal, [0, 0, 1]);
+  assertVecClose(mprEngine.coronalCamera.normal, [0, 1, 0]);
+  assertVecClose(mprEngine.sagittalCamera.normal, [1, 0, 0]);
+});
+
+test("MPRGridCoordinator.resetToOrthogonal: the next trackball turn starts from identity", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+
+  coordinator.rotatePitchYaw(60 * DEG, 60 * DEG, "axial");
+  coordinator.resetToOrthogonal();
+  coordinator.rotatePitchYaw(0, 15 * DEG, "axial");
+
+  assert.deepEqual(coordinator.getPitchYawDegrees(), { pitch: 0, yaw: 15 });
+});
+
+test("MPRGridCoordinator.resetToOrthogonal: does not alias the previous rotation array", () => {
+  const coordinator = new MPRGridCoordinator();
+  coordinator.initFromVolume(100, 100, 100);
+  coordinator.rotatePitchYaw(0, 30 * DEG, "axial");
+  const rotated = coordinator.rotation;
+  const snapshot = new Float32Array(rotated);
+
+  coordinator.resetToOrthogonal();
+
+  assert.notEqual(coordinator.rotation, rotated);
+  assert.deepEqual(rotated, snapshot);
 });

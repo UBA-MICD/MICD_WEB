@@ -1138,7 +1138,7 @@ export async function toggleMprMode(): Promise<boolean> {
         "Se requieren al menos 2 cortes para MPR",
     );
 
-  // Force close/hide trackball popover during transition to avoid stale camera reads
+    // Force close/hide trackball popover during transition to avoid stale camera reads
     return false;
   }
   const trackball = getMprTrackball();
@@ -1473,6 +1473,9 @@ export function initViewportInteraction(): void {
 
   let dragOriginViewportId: string | null = null;
   let activeMouseButton = 0;
+  let isRotatingMprCrosshair = false;
+  let mprRotationPlane: "axial" | "coronal" | "sagittal" = "axial";
+  let mprCrosshairScreenCenter: [number, number] = [0, 0];
 
   if (container) {
     container.addEventListener("contextmenu", (e: MouseEvent) => {

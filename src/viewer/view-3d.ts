@@ -1137,35 +1137,6 @@ export class View3DViewer {
         return;
       }
 
-      // Diagnostic statistical audit across volume voxels
-      let minVal = Infinity;
-      let maxVal = -Infinity;
-      let nonZeroCount = 0;
-      const sampleStep = Math.max(1, Math.floor(data.length / 500));
-      let sampledCount = 0;
-      for (let i = 0; i < data.length; i += sampleStep) {
-        const v = data[i];
-        sampledCount++;
-        if (v !== 0) nonZeroCount++;
-        if (v < minVal) minVal = v;
-        if (v > maxVal) maxVal = v;
-      }
-
-      console.log("[View3D] Uploading 3D Texture Audit:", {
-        dimensions: `${cols}x${rows}x${depth}`,
-        totalVoxels,
-        dataLength: data.length,
-        dataType: data.constructor?.name,
-        sampleMin: minVal,
-        sampleMax: maxVal,
-        nonZeroRatio:
-          sampledCount > 0 ? (nonZeroCount / sampledCount).toFixed(3) : "0",
-        rescaleSlope: rescaleSlope ?? 1,
-        rescaleIntercept: rescaleIntercept ?? 0,
-        windowCenter: this.windowCenter,
-        windowWidth: this.windowWidth,
-      });
-
       const normalizedData = new Uint8Array(totalVoxels);
       const slope = rescaleSlope ?? 1;
       const intercept = rescaleIntercept ?? 0;

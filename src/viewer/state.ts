@@ -40,6 +40,8 @@ export interface AppState {
   measurementLineWidth: number;
   is3DMode: boolean;
   isMprMode?: boolean;
+  /** Guard flag indicating a layout / WebGL transition is currently running. */
+  isLayoutTransitioning?: boolean;
   /** Validation record for the currently loaded server study, or null if none. */
   serverValidation: {
     validationId: number;
@@ -105,6 +107,7 @@ export const state: AppState = {
   measurementLineWidth: 2,
   is3DMode: false,
   isMprMode: false,
+  isLayoutTransitioning: false,
   annotations: {},
   areAnnotationsVisible: true,
   areLabelsVisible: true,

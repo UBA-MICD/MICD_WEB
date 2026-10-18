@@ -7,6 +7,7 @@
     "prebuild": "node scripts/build-html.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "find src -name '*.test.ts' | NODE_OPTIONS='--require=./src/test-preload.cjs' xargs tsx --test",
+    "test:unit": "find src/viewer -name '*.test.ts' | NODE_OPTIONS='--require=./src/test-preload.cjs' xargs tsx --test",
     "test:coverage": "mkdir -p coverage && find src -name '*.test.ts' | NODE_OPTIONS='--require=./src/test-preload.cjs' xargs tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info",
     "check:anon-coverage": "node scripts/check-anon-coverage.mjs"
   },

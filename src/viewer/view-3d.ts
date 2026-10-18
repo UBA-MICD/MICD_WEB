@@ -173,357 +173,9 @@ export class Matrix4 {
   }
 }
 
-// ── WebGL2 3D View Viewer Class ──────────────────────────────────────────────
+// ── WebGL2 3D View Static Shader Sources ─────────────────────────────────────
 
-export class View3DViewer {
-  public volume: VoxelVolume | null = null;
-  public camera: Camera3D = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
-  public crosshair: Crosshair3D = { x: 0, y: 0, z: 0 };
-  public activeView: "axial" | "coronal" | "sagittal" | "3d" = "3d";
-  public isActive = false;
-  public windowCenter = 0;
-  public windowWidth = 0;
-  public debugAABB = false;
-  public presetMode = 0; // 0: Linear W/L, 1: Bone, 2: Soft Tissue, 3: MIP
-
-  public setPresetMode(mode: number): void {
-    this.presetMode = Math.max(0, Math.min(3, Math.round(mode)));
-  }
-
-  public resetCamera(): void {
-    this.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
-  }
-
-  public setVolume(vol: VoxelVolume): void {
-    this.volume = vol;
-    this.renderEpoch++;
-    this.windowCenter =
-      vol.windowCenter ||
-      (state.viewport?.windowCenter ? state.viewport.windowCenter : 40);
-    this.windowWidth =
-      vol.windowWidth > 0
-        ? vol.windowWidth
-        : state.viewport?.windowWidth > 0
-          ? state.viewport.windowWidth
-          : 400;
-    this.crosshair = {
-      x: Math.floor(vol.cols / 2),
-      y: Math.floor(vol.rows / 2),
-      z: Math.floor(vol.depth / 2),
-    };
-    if (this.gl) {
-      this.uploadVolumeTexture();
-    }
-  }
-
-  public setWindowLevel(center: number, width: number): void {
-    this.windowCenter = center;
-    this.windowWidth = width;
-  }
-
-  private gl: WebGL2RenderingContext | null = null;
-  private program: WebGLProgram | null = null;
-  private volumeTexture: WebGLTexture | null = null;
-  private vao: WebGLVertexArrayObject | null = null;
-  private vbo: WebGLBuffer | null = null;
-  private animationFrameId: number | null = null;
-  private uniformLocations: Record<string, WebGLUniformLocation | null> = {};
-  // Render-on-demand: the loop only draws when the scene actually changed since
-  // the last frame. `lastRenderSig` is the signature of everything render()
-  // depends on; `renderEpoch` is bumped for changes that aren't captured by
-  // that signature (a new volume), so loading a different study still repaints.
-  private lastRenderSig = "";
-  private renderEpoch = 0;
-
-  /** Signature of everything render() reads, so the loop can skip redundant
-   *  frames. Any change — camera, window/level, preset, active view, crosshair,
-   *  canvas size, or a new volume (renderEpoch) — flips it and triggers exactly
-   *  one redraw, no matter which call site made the change. */
-  private renderSignature(canvas: HTMLCanvasElement): string {
-    const c = this.camera;
-    const x = this.crosshair;
-    const w = canvas.clientWidth || canvas.width || 0;
-    const h = canvas.clientHeight || canvas.height || 0;
-    return [
-      this.renderEpoch,
-      c.theta,
-      c.phi,
-      c.zoom,
-      c.panX,
-      c.panY,
-      this.windowCenter,
-      this.windowWidth,
-      this.presetMode,
-      this.activeView,
-      x.x,
-      x.y,
-      x.z,
-      this.debugAABB ? 1 : 0,
-      w,
-      h,
-    ].join("|");
-  }
-
-  public startRenderLoop(canvas?: HTMLCanvasElement): void {
-    this.stopRenderLoop();
-    // Force the first frame after (re)starting to draw, whatever the scene is.
-    this.lastRenderSig = "";
-    const getTargetCanvas = (): HTMLCanvasElement | null =>
-      canvas ||
-      (typeof document !== "undefined"
-        ? ((document.getElementById("view-3d-canvas") ||
-            document.getElementById(
-              "dicom-canvas",
-            )) as HTMLCanvasElement | null)
-        : null);
-
-    // Render on demand. The volume ray-marcher is expensive and the context
-    // uses preserveDrawingBuffer:true (so PNG export can read the canvas), which
-    // makes every drawn frame cost a GPU readback/stall. Redrawing 60×/s while
-    // the scene sits still stalled the whole page; instead the loop keeps
-    // spinning but only calls render() when the signature changed, so an idle 3D
-    // view does no GPU work while a drag or the camera animation (which mutate
-    // the signature every frame) still animate smoothly.
-    const loop = () => {
-      if (!this.isActive) {
-        this.animationFrameId = null;
-        return;
-      }
-      const target = getTargetCanvas();
-      if (target) {
-        const sig = this.renderSignature(target);
-        if (sig !== this.lastRenderSig) {
-          this.render(target);
-          this.lastRenderSig = sig;
-        }
-      }
-      if (typeof requestAnimationFrame !== "undefined") {
-        this.animationFrameId = requestAnimationFrame(loop);
-      }
-    };
-
-    if (typeof requestAnimationFrame !== "undefined") {
-      this.animationFrameId = requestAnimationFrame(loop);
-    }
-  }
-
-  public stopRenderLoop(): void {
-    if (this.animationFrameId !== null) {
-      if (typeof cancelAnimationFrame !== "undefined") {
-        cancelAnimationFrame(this.animationFrameId);
-      }
-      this.animationFrameId = null;
-    }
-  }
-
-  public async toggle3DMode(): Promise<boolean> {
-    if (this.isActive) {
-      this.isActive = false;
-      this.stopRenderLoop();
-      state.is3DMode = false;
-      return false;
-    }
-
-    const totalSlices = itemCount();
-    if (totalSlices <= 1 && !this.volume) {
-      showError(
-        t("viewer.view3d.needTwoSlices") || t("viewer.mpr.needTwoSlices"),
-      );
-      return false;
-    }
-
-    showLoading(true);
-    try {
-      if (!this.volume) {
-        const parsedSlices: ParsedDicom[] = [];
-        for (let i = 0; i < totalSlices; i++) {
-          const parsed = await dicomCache.getOrFetch(i);
-          if (!parsed || !parsed.pixelData) {
-            throw new Error(`Failed to get pixel data for slice ${i + 1}`);
-          }
-          parsedSlices.push(parsed);
-        }
-
-        // Sort slices by Z coordinate (imagePositionPatient[2]) or instanceNumber
-        parsedSlices.sort((a, b) => {
-          const posA = a.metadata.imagePositionPatient;
-          const posB = b.metadata.imagePositionPatient;
-          if (posA && posB && posA.length >= 3 && posB.length >= 3) {
-            return posA[2] - posB[2];
-          }
-          // Fallback if imagePositionPatient is absent
-          const instA = Number(a.metadata.instanceNumber) || 0;
-          const instB = Number(b.metadata.instanceNumber) || 0;
-          return instA - instB;
-        });
-
-        this.setVolume(this.buildVolume(parsedSlices));
-      }
-
-      if (this.volume) {
-        this.windowCenter = this.volume.windowCenter;
-        this.windowWidth = this.volume.windowWidth;
-      }
-
-      const container =
-        document.getElementById("view-3d-container") ||
-        document.getElementById("viewport-container");
-      let fitZoom = 1;
-      if (
-        this.volume &&
-        container &&
-        container.clientWidth > 0 &&
-        container.clientHeight > 0
-      ) {
-        fitZoom =
-          Math.min(
-            container.clientWidth / this.volume.cols,
-            container.clientHeight / this.volume.rows,
-          ) * 0.9;
-      }
-
-      this.camera = {
-        theta: 0.3,
-        phi: 0.8,
-        zoom: fitZoom > 0 ? fitZoom : 1,
-        panX: 0,
-        panY: 0,
-      };
-      this.activeView = "3d";
-      this.isActive = true;
-      state.is3DMode = true;
-
-      const canvas =
-        (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
-        (document.getElementById("dicom-canvas") as HTMLCanvasElement);
-      if (canvas) {
-        this.initGL(canvas);
-        if (this.volume) {
-          this.uploadVolumeTexture();
-        }
-        this.render(canvas);
-        this.startRenderLoop(canvas);
-      }
-
-      return true;
-    } catch (err: any) {
-      showError(
-        t("viewer.view3d.volumeLoadError", { message: err.message || err }) ||
-          t("viewer.mpr.volumeLoadError", { message: err.message || err }),
-      );
-      return false;
-    } finally {
-      showLoading(false);
-    }
-  }
-
-  public buildVolume(slices: ParsedDicom[]): VoxelVolume {
-    const depth = slices.length;
-    const refMeta = slices[0].metadata;
-    const rows = refMeta.rows;
-    const cols = refMeta.columns;
-
-    const rowSpacing = refMeta.pixelSpacing ? refMeta.pixelSpacing[0] : 1;
-    const colSpacing = refMeta.pixelSpacing ? refMeta.pixelSpacing[1] : 1;
-
-    let sliceSpacing =
-      refMeta.spacingBetweenSlices || refMeta.sliceThickness || 1;
-    const ipp0 = slices[0].metadata.imagePositionPatient;
-    const ippN = slices[depth - 1].metadata.imagePositionPatient;
-    if (depth > 1 && ipp0 && ippN) {
-      const z0 = ipp0[2];
-      const zN = ippN[2];
-      const calcZ = Math.abs(zN - z0) / (depth - 1);
-      if (calcZ > 0) sliceSpacing = calcZ;
-    }
-
-    const isSigned = refMeta.pixelRepresentation === 1;
-    const slicePixels = rows * cols;
-    const totalVoxels = depth * slicePixels;
-
-    const data = isSigned
-      ? new Int16Array(totalVoxels)
-      : new Uint16Array(totalVoxels);
-
-    for (let z = 0; z < depth; z++) {
-      const p = slices[z].pixelData;
-      if (p) data.set(p, z * slicePixels);
-    }
-
-    let windowCenter = refMeta.windowCenter ?? 40;
-    let windowWidth = refMeta.windowWidth ?? 400;
-    if (
-      (windowWidth <= 0 || isNaN(windowWidth)) &&
-      state.viewport.windowWidth > 0
-    ) {
-      windowCenter = state.viewport.windowCenter;
-      windowWidth = state.viewport.windowWidth;
-    }
-    if (windowWidth <= 0 || isNaN(windowWidth)) {
-      windowCenter = 40;
-      windowWidth = 400;
-    }
-
-    const rawIop = refMeta.imageOrientationPatient;
-    const imageOrientationPatient:
-      [number, number, number, number, number, number] | undefined =
-      rawIop && rawIop.length >= 6
-        ? [rawIop[0], rawIop[1], rawIop[2], rawIop[3], rawIop[4], rawIop[5]]
-        : undefined;
-    const { flipX, flipY } = getCanonicalFlip(imageOrientationPatient);
-
-    return {
-      depth,
-      rows,
-      cols,
-      data,
-      pixelSpacing: [rowSpacing, colSpacing],
-      sliceSpacing,
-      rescaleSlope: refMeta.rescaleSlope,
-      rescaleIntercept: refMeta.rescaleIntercept,
-      windowCenter,
-      windowWidth,
-      imageOrientationPatient,
-      flipX,
-      flipY,
-    };
-  }
-
-  /** Initialize WebGL2 context, Shaders and 3D Bounding Box Geometry. */
-  public initGL(canvas: HTMLCanvasElement): boolean {
-    // preserveDrawingBuffer:false — nothing in the app reads this canvas back
-    // (no toBlob/toDataURL/drawImage/texImage2D/readPixels over view-3d-canvas
-    // or the grid's glCanvasElement; PNG export captures the 2D dicom-canvas),
-    // so preserving the buffer bought nothing and forced a GPU readback on every
-    // drawn frame — the "GPU stall due to ReadPixels" that made entering and
-    // dragging the 3D view jank even after the render loop became on-demand.
-    let gl = canvas.getContext("webgl2", {
-      alpha: true,
-      antialias: true,
-      preserveDrawingBuffer: false,
-    }) as WebGL2RenderingContext | null;
-
-    if (!gl) {
-      console.warn("WebGL2 context unavailable.");
-      return false;
-    }
-
-    // getContext() on the same canvas hands back the same context, and the
-    // shader program and unit-cube geometry are volume-independent — so build
-    // them once and reuse them. Re-running the whole init on every 3D entry
-    // recompiled the shaders and allocated a fresh program/VAO/VBO each time
-    // while orphaning the previous ones on the GPU; entering and leaving 3D
-    // repeatedly then piled up leaked GPU resources until the whole page
-    // degraded. (The context itself is not recreated here — only these were
-    // leaking. The volume texture is uploaded separately, in
-    // uploadVolumeTexture(), so loading a different study still refreshes it.)
-    if (this.gl === gl && this.program) {
-      return true;
-    }
-    this.gl = gl;
-
-    // GLSL ES 3.00 Vertex Shader — 3D Cube Bounding Box Proxy Geometry
-    const vsSource = `#version 300 es
+export const VIEW_3D_VERTEX_SHADER = `#version 300 es
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_texCoord;
 
@@ -542,8 +194,7 @@ void main() {
 }
 `;
 
-    // GLSL ES 3.00 Fragment Shader — Volume Ray Marching, Phong Lighting & Presets
-    const fsSource = `#version 300 es
+export const VIEW_3D_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 precision highp sampler3D;
 
@@ -849,7 +500,445 @@ void main() {
 }
 `;
 
-    const program = this.createProgram(gl, vsSource, fsSource);
+// ── WebGL2 3D View Viewer Class ──────────────────────────────────────────────
+
+export class View3DViewer {
+  public volume: VoxelVolume | null = null;
+  public camera: Camera3D = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
+  public crosshair: Crosshair3D = { x: 0, y: 0, z: 0 };
+  public activeView: "axial" | "coronal" | "sagittal" | "3d" = "3d";
+  public isActive = false;
+  public windowCenter = 0;
+  public windowWidth = 0;
+  public debugAABB = false;
+  public presetMode = 0; // 0: Linear W/L, 1: Bone, 2: Soft Tissue, 3: MIP
+
+  public setPresetMode(mode: number): void {
+    this.presetMode = Math.max(0, Math.min(3, Math.round(mode)));
+  }
+
+  public resetCamera(): void {
+    this.camera = { theta: 0.3, phi: 0.8, zoom: 1, panX: 0, panY: 0 };
+    this.renderEpoch++;
+  }
+
+  public rotatePitchYaw(deltaTheta: number, deltaPhi: number): void {
+    this.camera.phi += deltaPhi;
+    this.camera.theta = Math.max(
+      -Math.PI / 2 + 0.1,
+      Math.min(Math.PI / 2 - 0.1, this.camera.theta + deltaTheta),
+    );
+    this.renderEpoch++;
+  }
+
+  public getPitchYawDegrees(): { pitch: number; yaw: number } {
+    const pitch = this.camera.theta * (180 / Math.PI);
+    let yaw = (this.camera.phi * (180 / Math.PI)) % 360;
+    if (yaw > 180) yaw -= 360;
+    if (yaw < -180) yaw += 360;
+    return { pitch, yaw };
+  }
+
+  public setVolume(vol: VoxelVolume): void {
+    if (this.volume !== vol) {
+      if (this.volumeTexture && this.gl && this.textureContextId === this.gl) {
+        this.gl.deleteTexture(this.volumeTexture);
+      }
+      this.volumeTexture = null;
+      this.textureContextId = null;
+    }
+    this.volume = vol;
+    this.renderEpoch++;
+    this.windowCenter =
+      vol.windowCenter ||
+      (state.viewport?.windowCenter ? state.viewport.windowCenter : 40);
+    this.windowWidth =
+      vol.windowWidth > 0
+        ? vol.windowWidth
+        : state.viewport?.windowWidth > 0
+          ? state.viewport.windowWidth
+          : 400;
+    this.crosshair = {
+      x: Math.floor(vol.cols / 2),
+      y: Math.floor(vol.rows / 2),
+      z: Math.floor(vol.depth / 2),
+    };
+    if (this.gl) {
+      this.uploadVolumeTexture();
+    }
+  }
+
+  public setWindowLevel(center: number, width: number): void {
+    this.windowCenter = center;
+    this.windowWidth = width;
+  }
+
+  private gl: WebGL2RenderingContext | null = null;
+  private program: WebGLProgram | null = null;
+  private volumeTexture: WebGLTexture | null = null;
+  private textureContextId: WebGL2RenderingContext | null = null;
+  private isUploadingTexture: boolean = false;
+  private vao: WebGLVertexArrayObject | null = null;
+  private vbo: WebGLBuffer | null = null;
+  private animationFrameId: number | null = null;
+  private uniformLocations: Record<string, WebGLUniformLocation | null> = {};
+  // Render-on-demand: the loop only draws when the scene actually changed since
+  // the last frame. `lastRenderSig` is the signature of everything render()
+  // depends on; `renderEpoch` is bumped for changes that aren't captured by
+  // that signature (a new volume), so loading a different study still repaints.
+  private lastRenderSig = "";
+  private renderEpoch = 0;
+
+  /** Signature of everything render() reads, so the loop can skip redundant
+   *  frames. Any change — camera, window/level, preset, active view, crosshair,
+   *  canvas size, or a new volume (renderEpoch) — flips it and triggers exactly
+   *  one redraw, no matter which call site made the change. */
+  private renderSignature(canvas: HTMLCanvasElement): string {
+    const c = this.camera;
+    const x = this.crosshair;
+    const w = canvas.clientWidth || canvas.width || 0;
+    const h = canvas.clientHeight || canvas.height || 0;
+    return [
+      this.renderEpoch,
+      c.theta,
+      c.phi,
+      c.zoom,
+      c.panX,
+      c.panY,
+      this.windowCenter,
+      this.windowWidth,
+      this.presetMode,
+      this.activeView,
+      x.x,
+      x.y,
+      x.z,
+      this.debugAABB ? 1 : 0,
+      w,
+      h,
+    ].join("|");
+  }
+
+  public startRenderLoop(canvas?: HTMLCanvasElement): void {
+    this.stopRenderLoop();
+    this.isActive = true;
+    // Force the first frame after (re)starting to draw, whatever the scene is.
+    this.lastRenderSig = "";
+    const getTargetCanvas = (): HTMLCanvasElement | null =>
+      canvas ||
+      (typeof document !== "undefined"
+        ? ((document.getElementById("view-3d-canvas") ||
+            document.getElementById(
+              "dicom-canvas",
+            )) as HTMLCanvasElement | null)
+        : null);
+
+    // Render on demand. The volume ray-marcher is expensive and the context
+    // uses preserveDrawingBuffer:true (so PNG export can read the canvas), which
+    // makes every drawn frame cost a GPU readback/stall. Redrawing 60×/s while
+    // the scene sits still stalled the whole page; instead the loop keeps
+    // spinning but only calls render() when the signature changed, so an idle 3D
+    // view does no GPU work while a drag or the camera animation (which mutate
+    // the signature every frame) still animate smoothly.
+    const loop = () => {
+      if (!this.isActive) {
+        this.animationFrameId = null;
+        return;
+      }
+      if (state.isLayoutTransitioning) {
+        // Keep the loop active across transitions, deferring draw until layout stabilizes
+        if (typeof requestAnimationFrame !== "undefined") {
+          this.animationFrameId = requestAnimationFrame(loop);
+        }
+        return;
+      }
+      const target = getTargetCanvas();
+      if (
+        target &&
+        (typeof target.isConnected !== "boolean" || target.isConnected)
+      ) {
+        const sig = this.renderSignature(target);
+        if (sig !== this.lastRenderSig) {
+          const drawn = this.render(target);
+          if (drawn !== false) {
+            this.lastRenderSig = sig;
+          }
+        }
+      }
+      if (typeof requestAnimationFrame !== "undefined") {
+        this.animationFrameId = requestAnimationFrame(loop);
+      }
+    };
+
+    if (typeof requestAnimationFrame !== "undefined") {
+      this.animationFrameId = requestAnimationFrame(loop);
+    }
+  }
+
+  public stopRenderLoop(): void {
+    if (this.animationFrameId !== null) {
+      if (typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(this.animationFrameId);
+      }
+      this.animationFrameId = null;
+    }
+    if (this.cameraAnimFrameId !== null) {
+      if (typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(this.cameraAnimFrameId);
+      }
+      this.cameraAnimFrameId = null;
+    }
+  }
+
+  public releaseContext(): void {
+    this.stopRenderLoop();
+    if (this.gl) {
+      const gl = this.gl;
+      try {
+        if (this.volumeTexture && typeof gl.deleteTexture === "function") {
+          gl.deleteTexture(this.volumeTexture);
+        }
+        if (this.vbo && typeof gl.deleteBuffer === "function") {
+          gl.deleteBuffer(this.vbo);
+        }
+        if (this.vao && typeof gl.deleteVertexArray === "function") {
+          gl.deleteVertexArray(this.vao);
+        }
+        if (this.program && typeof gl.deleteProgram === "function") {
+          gl.deleteProgram(this.program);
+        }
+      } catch {
+        // Safe context resource cleanup
+      }
+      this.gl = null;
+      this.program = null;
+      this.volumeTexture = null;
+      this.textureContextId = null;
+      this.isUploadingTexture = false;
+      this.vao = null;
+      this.vbo = null;
+      this.uniformLocations = {};
+      this.lastRenderSig = "";
+    }
+  }
+
+  public async toggle3DMode(): Promise<boolean> {
+    if (this.isActive) {
+      this.isActive = false;
+      this.stopRenderLoop();
+      state.is3DMode = false;
+      return false;
+    }
+
+    const totalSlices = itemCount();
+    if (totalSlices <= 1 && !this.volume) {
+      showError(
+        t("viewer.view3d.needTwoSlices") || t("viewer.mpr.needTwoSlices"),
+      );
+      return false;
+    }
+
+    showLoading(true);
+    try {
+      if (!this.volume) {
+        const parsedSlices: ParsedDicom[] = [];
+        for (let i = 0; i < totalSlices; i++) {
+          const parsed = await dicomCache.getOrFetch(i);
+          if (!parsed || !parsed.pixelData) {
+            throw new Error(`Failed to get pixel data for slice ${i + 1}`);
+          }
+          parsedSlices.push(parsed);
+        }
+
+        // Sort slices by Z coordinate (imagePositionPatient[2]) or instanceNumber
+        parsedSlices.sort((a, b) => {
+          const posA = a.metadata.imagePositionPatient;
+          const posB = b.metadata.imagePositionPatient;
+          if (posA && posB && posA.length >= 3 && posB.length >= 3) {
+            return posA[2] - posB[2];
+          }
+          // Fallback if imagePositionPatient is absent
+          const instA = Number(a.metadata.instanceNumber) || 0;
+          const instB = Number(b.metadata.instanceNumber) || 0;
+          return instA - instB;
+        });
+
+        this.setVolume(this.buildVolume(parsedSlices));
+      }
+
+      if (this.volume) {
+        this.windowCenter = this.volume.windowCenter;
+        this.windowWidth = this.volume.windowWidth;
+      }
+
+      const container =
+        document.getElementById("view-3d-container") ||
+        document.getElementById("viewport-container");
+      let fitZoom = 1;
+      if (
+        this.volume &&
+        container &&
+        container.clientWidth > 0 &&
+        container.clientHeight > 0
+      ) {
+        fitZoom =
+          Math.min(
+            container.clientWidth / this.volume.cols,
+            container.clientHeight / this.volume.rows,
+          ) * 0.9;
+      }
+
+      this.camera = {
+        theta: 0.3,
+        phi: 0.8,
+        zoom: fitZoom > 0 ? fitZoom : 1,
+        panX: 0,
+        panY: 0,
+      };
+      this.activeView = "3d";
+      this.isActive = true;
+      state.is3DMode = true;
+
+      const canvas =
+        (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
+        (document.getElementById("dicom-canvas") as HTMLCanvasElement);
+      if (canvas) {
+        this.initGL(canvas);
+        if (this.volume) {
+          this.uploadVolumeTexture();
+        }
+        this.render(canvas);
+        this.startRenderLoop(canvas);
+      }
+
+      return true;
+    } catch (err: any) {
+      showError(
+        t("viewer.view3d.volumeLoadError", { message: err.message || err }) ||
+          t("viewer.mpr.volumeLoadError", { message: err.message || err }),
+      );
+      return false;
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  public buildVolume(slices: ParsedDicom[]): VoxelVolume {
+    const depth = slices.length;
+    const refMeta = slices[0].metadata;
+    const rows = refMeta.rows;
+    const cols = refMeta.columns;
+
+    const rowSpacing = refMeta.pixelSpacing ? refMeta.pixelSpacing[0] : 1;
+    const colSpacing = refMeta.pixelSpacing ? refMeta.pixelSpacing[1] : 1;
+
+    let sliceSpacing =
+      refMeta.spacingBetweenSlices || refMeta.sliceThickness || 1;
+    const ipp0 = slices[0].metadata.imagePositionPatient;
+    const ippN = slices[depth - 1].metadata.imagePositionPatient;
+    if (depth > 1 && ipp0 && ippN) {
+      const z0 = ipp0[2];
+      const zN = ippN[2];
+      const calcZ = Math.abs(zN - z0) / (depth - 1);
+      if (calcZ > 0) sliceSpacing = calcZ;
+    }
+
+    const isSigned = refMeta.pixelRepresentation === 1;
+    const slicePixels = rows * cols;
+    const totalVoxels = depth * slicePixels;
+
+    const data = isSigned
+      ? new Int16Array(totalVoxels)
+      : new Uint16Array(totalVoxels);
+
+    for (let z = 0; z < depth; z++) {
+      const p = slices[z].pixelData;
+      if (p) data.set(p, z * slicePixels);
+    }
+
+    let windowCenter = refMeta.windowCenter ?? 40;
+    let windowWidth = refMeta.windowWidth ?? 400;
+    if (
+      (windowWidth <= 0 || isNaN(windowWidth)) &&
+      state.viewport.windowWidth > 0
+    ) {
+      windowCenter = state.viewport.windowCenter;
+      windowWidth = state.viewport.windowWidth;
+    }
+    if (windowWidth <= 0 || isNaN(windowWidth)) {
+      windowCenter = 40;
+      windowWidth = 400;
+    }
+
+    const rawIop = refMeta.imageOrientationPatient;
+    const imageOrientationPatient:
+      [number, number, number, number, number, number] | undefined =
+      rawIop && rawIop.length >= 6
+        ? [rawIop[0], rawIop[1], rawIop[2], rawIop[3], rawIop[4], rawIop[5]]
+        : undefined;
+    const { flipX, flipY } = getCanonicalFlip(imageOrientationPatient);
+
+    return {
+      depth,
+      rows,
+      cols,
+      data,
+      pixelSpacing: [rowSpacing, colSpacing],
+      sliceSpacing,
+      rescaleSlope: refMeta.rescaleSlope,
+      rescaleIntercept: refMeta.rescaleIntercept,
+      windowCenter,
+      windowWidth,
+      imageOrientationPatient,
+      flipX,
+      flipY,
+    };
+  }
+
+  /** Initialize WebGL2 context, Shaders and 3D Bounding Box Geometry. */
+  public initGL(canvas: HTMLCanvasElement): boolean {
+    // Context attributes configured for stability during rapid transitions and buffer retention:
+    // alpha: false, premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true
+    let gl = canvas.getContext("webgl2", {
+      alpha: false,
+      premultipliedAlpha: false,
+      antialias: false,
+      preserveDrawingBuffer: true,
+    }) as WebGL2RenderingContext | null;
+
+    if (!gl) {
+      console.warn("WebGL2 context unavailable.");
+      return false;
+    }
+
+    if (typeof gl.isContextLost === "function" && gl.isContextLost()) {
+      const loseExt =
+        typeof gl.getExtension === "function"
+          ? gl.getExtension("WEBGL_lose_context")
+          : null;
+      if (loseExt && typeof loseExt.restoreContext === "function") {
+        loseExt.restoreContext();
+      }
+    }
+
+    // getContext() on the same canvas hands back the same context, and the
+    // shader program and unit-cube geometry are volume-independent — so build
+    // them once and reuse them. Re-running the whole init on every 3D entry
+    // recompiled the shaders and allocated a fresh program/VAO/VBO each time
+    // while orphaning the previous ones on the GPU; entering and leaving 3D
+    // repeatedly then piled up leaked GPU resources until the whole page
+    // degraded. (The context itself is not recreated here — only these were
+    // leaking. The volume texture is uploaded separately, in
+    // uploadVolumeTexture(), so loading a different study still refreshes it.)
+    if (this.gl === gl && this.program) {
+      return true;
+    }
+    this.gl = gl;
+
+    const program = this.createProgram(
+      gl,
+      VIEW_3D_VERTEX_SHADER,
+      VIEW_3D_FRAGMENT_SHADER,
+    );
     if (!program) return false;
     this.program = program;
 
@@ -879,13 +968,27 @@ void main() {
     return true;
   }
 
-  private createProgram(
+  public createProgram(
     gl: WebGL2RenderingContext,
-    vsSource: string,
-    fsSource: string,
+    vsSource: string = VIEW_3D_VERTEX_SHADER,
+    fsSource: string = VIEW_3D_FRAGMENT_SHADER,
   ): WebGLProgram | null {
-    const vs = gl.createShader(gl.VERTEX_SHADER)!;
-    gl.shaderSource(vs, vsSource);
+    if (typeof gl.isContextLost === "function" && gl.isContextLost()) {
+      console.warn(
+        "[View3D] WebGL context is lost; aborting shader compilation.",
+      );
+      return null;
+    }
+
+    const sourceVS = vsSource || VIEW_3D_VERTEX_SHADER;
+    const sourceFS = fsSource || VIEW_3D_FRAGMENT_SHADER;
+
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    if (!vs) {
+      console.error("[View3D] gl.createShader(VERTEX_SHADER) failed.");
+      return null;
+    }
+    gl.shaderSource(vs, sourceVS);
     gl.compileShader(vs);
     if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
       const vsLog = gl.getShaderInfoLog(vs);
@@ -894,8 +997,13 @@ void main() {
       return null;
     }
 
-    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
-    gl.shaderSource(fs, fsSource);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    if (!fs) {
+      console.error("[View3D] gl.createShader(FRAGMENT_SHADER) failed.");
+      gl.deleteShader(vs);
+      return null;
+    }
+    gl.shaderSource(fs, sourceFS);
     gl.compileShader(fs);
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
       const fsLog = gl.getShaderInfoLog(fs);
@@ -905,7 +1013,13 @@ void main() {
       return null;
     }
 
-    const prog = gl.createProgram()!;
+    const prog = gl.createProgram();
+    if (!prog) {
+      console.error("[View3D] gl.createProgram() failed.");
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      return null;
+    }
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
@@ -983,116 +1097,118 @@ void main() {
       );
       return;
     }
+
+    if (this.isUploadingTexture) {
+      return;
+    }
+
+    // Invalidate and force re-upload if context changed across viewports/canvases
+    if (this.volumeTexture && this.textureContextId !== this.gl) {
+      this.volumeTexture = null;
+    }
+
+    // Reuse existing 3D texture only if already uploaded for this exact native context
+    if (this.volumeTexture !== null && this.textureContextId === this.gl) {
+      return;
+    }
+
     const gl = this.gl;
-    const { depth, rows, cols, data, rescaleSlope, rescaleIntercept } =
-      this.volume;
-
-    const totalVoxels = depth * rows * cols;
-    if (!data || data.length === 0) {
-      console.error(
-        "[View3D] uploadVolumeTexture error: volume data is null or empty!",
-        {
-          depth,
-          rows,
-          cols,
-          totalVoxels,
-          dataLength: data ? data.length : 0,
-        },
-      );
+    if (typeof gl.isContextLost === "function" && gl.isContextLost()) {
       return;
     }
 
-    // Diagnostic statistical audit across volume voxels
-    let minVal = Infinity;
-    let maxVal = -Infinity;
-    let nonZeroCount = 0;
-    const sampleStep = Math.max(1, Math.floor(data.length / 500));
-    let sampledCount = 0;
-    for (let i = 0; i < data.length; i += sampleStep) {
-      const v = data[i];
-      sampledCount++;
-      if (v !== 0) nonZeroCount++;
-      if (v < minVal) minVal = v;
-      if (v > maxVal) maxVal = v;
-    }
+    this.isUploadingTexture = true;
+    try {
+      const { depth, rows, cols, data, rescaleSlope, rescaleIntercept } =
+        this.volume;
 
-    console.log("[View3D] Uploading 3D Texture Audit:", {
-      dimensions: `${cols}x${rows}x${depth}`,
-      totalVoxels,
-      dataLength: data.length,
-      dataType: data.constructor?.name,
-      sampleMin: minVal,
-      sampleMax: maxVal,
-      nonZeroRatio:
-        sampledCount > 0 ? (nonZeroCount / sampledCount).toFixed(3) : "0",
-      rescaleSlope: rescaleSlope ?? 1,
-      rescaleIntercept: rescaleIntercept ?? 0,
-      windowCenter: this.windowCenter,
-      windowWidth: this.windowWidth,
-    });
+      const totalVoxels = depth * rows * cols;
+      if (!data || data.length === 0) {
+        console.error(
+          "[View3D] uploadVolumeTexture error: volume data is null or empty!",
+          {
+            depth,
+            rows,
+            cols,
+            totalVoxels,
+            dataLength: data ? data.length : 0,
+          },
+        );
+        return;
+      }
 
-    const normalizedData = new Uint8Array(totalVoxels);
-    const slope = rescaleSlope ?? 1;
-    const intercept = rescaleIntercept ?? 0;
-    const limit = Math.min(totalVoxels, data.length);
+      const normalizedData = new Uint8Array(totalVoxels);
+      const slope = rescaleSlope ?? 1;
+      const intercept = rescaleIntercept ?? 0;
+      const limit = Math.min(totalVoxels, data.length);
 
-    for (let i = 0; i < limit; i++) {
-      const raw = data[i];
-      const hu = raw * slope + intercept;
-      // Map HU [-1024..3071] into [0..255]
-      const norm = Math.max(
+      for (let i = 0; i < limit; i++) {
+        const raw = data[i];
+        const hu = raw * slope + intercept;
+        // Map HU [-1024..3071] into [0..255]
+        const norm = Math.max(
+          0,
+          Math.min(255, Math.round(((hu + 1024) / 4095) * 255)),
+        );
+        normalizedData[i] = norm;
+      }
+
+      if (typeof gl.getError === "function") {
+        const errBefore = gl.getError();
+        if (errBefore !== 0) {
+          console.warn(
+            "[View3D] WebGL error before texture upload:",
+            errBefore,
+          );
+        }
+      }
+
+      // If an old texture existed on THIS context, release it before allocating a new one
+      if (this.volumeTexture && this.textureContextId === gl) {
+        gl.deleteTexture(this.volumeTexture);
+      }
+      this.volumeTexture = null;
+      this.textureContextId = null;
+
+      const tex = gl.createTexture();
+      if (!tex) {
+        console.error("[View3D] Failed to create WebGL3D texture");
+        return;
+      }
+
+      gl.bindTexture(gl.TEXTURE_3D, tex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage3D(
+        gl.TEXTURE_3D,
         0,
-        Math.min(255, Math.round(((hu + 1024) / 4095) * 255)),
+        gl.R8,
+        cols,
+        rows,
+        depth,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        normalizedData,
       );
-      normalizedData[i] = norm;
-    }
 
-    if (typeof gl.getError === "function") {
-      const errBefore = gl.getError();
-      if (errBefore !== 0) {
-        console.warn("[View3D] WebGL error before texture upload:", errBefore);
+      if (typeof gl.getError === "function") {
+        const errAfter = gl.getError();
+        if (errAfter !== 0) {
+          console.error("[View3D] WebGL error during texImage3D:", errAfter);
+        }
       }
+
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+
+      this.volumeTexture = tex;
+      this.textureContextId = gl;
+    } finally {
+      this.isUploadingTexture = false;
     }
-
-    if (this.volumeTexture) {
-      gl.deleteTexture(this.volumeTexture);
-    }
-
-    const tex = gl.createTexture();
-    if (!tex) {
-      console.error("[View3D] Failed to create WebGL3D texture");
-      return;
-    }
-
-    gl.bindTexture(gl.TEXTURE_3D, tex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage3D(
-      gl.TEXTURE_3D,
-      0,
-      gl.R8,
-      cols,
-      rows,
-      depth,
-      0,
-      gl.RED,
-      gl.UNSIGNED_BYTE,
-      normalizedData,
-    );
-
-    if (typeof gl.getError === "function") {
-      const errAfter = gl.getError();
-      if (errAfter !== 0) {
-        console.error("[View3D] WebGL error during texImage3D:", errAfter);
-      }
-    }
-
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-
-    this.volumeTexture = tex;
   }
 
   /** Set quick view orientation: Axial, Coronal, Sagittal, 3D. */
@@ -1186,20 +1302,15 @@ void main() {
     }
   }
 
-  /** Render WebGL2 3D Volume Ray Marching. */
-  public render(canvas: HTMLCanvasElement): void {
-    if (!canvas) return;
+  /** Render WebGL2 3D Volume Ray Marching. Returns true if frame was drawn. */
+  public render(canvas: HTMLCanvasElement): boolean {
+    if (!canvas) return false;
+    if (typeof canvas.isConnected === "boolean" && !canvas.isConnected)
+      return false;
 
     if (!this.gl || this.gl.canvas !== canvas) {
       if (this.gl) {
-        const loseContext =
-          typeof this.gl.getExtension === "function"
-            ? this.gl.getExtension("WEBGL_lose_context")
-            : null;
-        if (loseContext) {
-          loseContext.loseContext();
-        }
-        this.volumeTexture = null;
+        this.releaseContext();
       }
       this.initGL(canvas);
       if (this.volume) {
@@ -1207,11 +1318,27 @@ void main() {
       }
     }
     const gl = this.gl;
-    if (!gl) return;
+    if (!gl) return false;
+
+    const isJsdom =
+      typeof navigator !== "undefined" &&
+      Boolean(navigator.userAgent && navigator.userAgent.includes("jsdom"));
+
+    // In a real browser, if connected canvas has not completed DOM reflow, wait for layout
+    if (
+      !isJsdom &&
+      typeof canvas.isConnected === "boolean" &&
+      canvas.isConnected &&
+      (canvas.clientWidth <= 0 || canvas.clientHeight <= 0)
+    ) {
+      return false;
+    }
 
     const width = canvas.clientWidth || canvas.width || 512;
     const height = canvas.clientHeight || canvas.height || 512;
-    if (width <= 0 || height <= 0) return;
+    if (width <= 0 || height <= 0) {
+      return false;
+    }
 
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
@@ -1234,12 +1361,22 @@ void main() {
       this.renderGizmo(gizmoCanvas);
     }
 
-    if (this.volume && !this.volumeTexture) {
+    if (
+      this.volume &&
+      (!this.volumeTexture ||
+        (this.textureContextId !== null && this.textureContextId !== this.gl))
+    ) {
       this.uploadVolumeTexture();
     }
 
-    if (!this.volume || !this.program || !this.volumeTexture || !this.vao)
-      return;
+    if (
+      !this.volume ||
+      !this.program ||
+      !this.volumeTexture ||
+      (this.textureContextId !== null && this.textureContextId !== this.gl) ||
+      !this.vao
+    )
+      return false;
 
     // WebGL pipeline state: Disable culling so orbiting close or inside proxy geometry
     // never discards back-face fragments; disable depth test for alpha blending pass.
@@ -1434,6 +1571,7 @@ void main() {
     // Draw Volume Bounding Box Cube Geometry
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 36);
+    return true;
   }
 
   /** Render 3D Anatomical Reference Cube (delegates to renderGizmo). */
@@ -1811,6 +1949,10 @@ void main() {
       typeof performance !== "undefined" ? performance.now() : Date.now();
 
     const step = (now: number) => {
+      if (state.isLayoutTransitioning) {
+        this.cameraAnimFrameId = null;
+        return;
+      }
       const elapsed = now - startTime;
       const progress = Math.min(1.0, elapsed / durationMs);
       const ease = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
@@ -1818,7 +1960,11 @@ void main() {
       this.camera.theta = startTheta + (targetTheta - startTheta) * ease;
       this.camera.phi = startPhi + (finalPhi - startPhi) * ease;
 
-      if (renderCanvas) {
+      if (
+        renderCanvas &&
+        (typeof renderCanvas.isConnected !== "boolean" ||
+          renderCanvas.isConnected)
+      ) {
         this.render(renderCanvas);
       }
 
@@ -1830,7 +1976,11 @@ void main() {
         this.camera.theta = targetTheta;
         this.camera.phi = targetPhi;
         this.cameraAnimFrameId = null;
-        if (renderCanvas) {
+        if (
+          renderCanvas &&
+          (typeof renderCanvas.isConnected !== "boolean" ||
+            renderCanvas.isConnected)
+        ) {
           this.render(renderCanvas);
         }
       }

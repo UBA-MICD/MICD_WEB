@@ -12,18 +12,86 @@ import { getActiveSopInstanceUid } from "./measurements/annotation-state.js";
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
+/**
+ * Centralized, idempotent orchestrator for the 3D rendering pipeline.
+ * Guarantees that the canvas, WebGL context, controls, and on-demand render loop
+ * are properly initialized and rendered across all entry paths.
+ */
+export function ensure3DRendered(
+  canvasElement?: HTMLCanvasElement,
+  retryCount = 0,
+): void {
+  if (!state.is3DMode && !view3DViewer.isActive) return;
+
+  // Unhide view 3D container before measuring canvas dimensions
+  if (typeof document !== "undefined") {
+    const container = document.getElementById("view-3d-container");
+    if (container) {
+      container.classList.remove("hidden");
+      container.style.display = "block";
+    }
+    const vpContainer = document.getElementById("viewport-container");
+    vpContainer?.classList.add("mode-3d");
+  }
+
+  // Force targeting the dedicated 3D canvas (#view-3d-canvas) when present
+  const view3DCanvas =
+    typeof document !== "undefined"
+      ? (document.getElementById("view-3d-canvas") as HTMLCanvasElement | null)
+      : null;
+  const canvas =
+    view3DCanvas ||
+    canvasElement ||
+    (typeof document !== "undefined"
+      ? ($("dicom-canvas") as HTMLCanvasElement | null)
+      : null);
+
+  if (!canvas) return;
+
+  view3DViewer.isActive = true;
+  state.is3DMode = true;
+
+  const isJsdom =
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.userAgent && navigator.userAgent.includes("jsdom"));
+
+  // In a real browser, if canvas has not finished DOM reflow (clientWidth is 0), retry up to 10 frames
+  const MAX_REFLOW_RETRIES = 10;
+  if (
+    !isJsdom &&
+    retryCount < MAX_REFLOW_RETRIES &&
+    (canvas.clientWidth <= 0 ||
+      canvas.clientHeight <= 0 ||
+      (typeof canvas.isConnected === "boolean" && !canvas.isConnected))
+  ) {
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() => {
+        if (state.is3DMode) ensure3DRendered(canvas, retryCount + 1);
+      });
+    } else {
+      setTimeout(() => {
+        if (state.is3DMode) ensure3DRendered(canvas, retryCount + 1);
+      }, 50);
+    }
+    return;
+  }
+
+  view3DViewer.resize(canvas);
+  view3DViewer.render(canvas);
+  view3DViewer.startRenderLoop(canvas);
+
+  update3DControls();
+  update3DSlidersUI();
+  updateOrientationLabels();
+  updateWlControlsUI();
+}
+
 export function render(): void {
   const canvas = (document.getElementById("view-3d-canvas") ||
     $("dicom-canvas")) as HTMLCanvasElement;
 
-  if (state.is3DMode && view3DViewer.isActive) {
-    // 3D Unified Viewport rendering
-    view3DViewer.render(canvas);
-
-    // Show and update depth slider and orientation widget
-    update3DControls();
-    updateOrientationLabels();
-    updateWlControlsUI();
+  if (state.is3DMode) {
+    ensure3DRendered(canvas);
     return;
   }
 
@@ -269,7 +337,11 @@ export function hide3DControls(): void {
     "view-3d-reference-cube",
     "mpr-reference-cube",
   ].forEach((id) => {
-    $(id)?.classList.add("hidden");
+    const el = $(id);
+    if (el) {
+      el.classList.add("hidden");
+      el.style.removeProperty("display");
+    }
   });
 }
 

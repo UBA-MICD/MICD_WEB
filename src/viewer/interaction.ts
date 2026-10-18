@@ -21,6 +21,7 @@ import {
 } from "./state.js";
 import {
   render,
+  ensure3DRendered,
   updateSeriesNav,
   updateWlControlsUI,
   hide3DControls,
@@ -40,6 +41,10 @@ import {
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
 import { mprCoordinator } from "./mpr-coordinator.js";
+import {
+  createMprTrackball,
+  type MprTrackballHandle,
+} from "./mpr-trackball.js";
 import { dicomCache } from "./cache.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
 import {
@@ -125,9 +130,88 @@ async function navigateSliceDelta(delta: number): Promise<void> {
   }
 }
 
+// ── MPR Trackball Mounting (spec 007, TK-30) ─────────────────────────────────
+
+let mprTrackballInstance: MprTrackballHandle | null = null;
+
+export function getMprTrackball(): MprTrackballHandle | null {
+  return mprTrackballInstance;
+}
+
+export function ensureMprTrackballMounted(): MprTrackballHandle | null {
+  const toolbar =
+    $("viewer-toolbar") ||
+    $("tool-crosshair")?.parentElement ||
+    $("tool-mpr")?.parentElement;
+  if (!toolbar) return null;
+
+  if (
+    !mprTrackballInstance ||
+    !mprTrackballInstance.el.isConnected ||
+    !document.contains(mprTrackballInstance.el)
+  ) {
+    if (mprTrackballInstance) {
+      try {
+        mprTrackballInstance.destroy();
+      } catch {
+        // Safe cleanup
+      }
+      mprTrackballInstance = null;
+    }
+    mprTrackballInstance = createMprTrackball();
+    const anchorBtn =
+      $("tool-crosshair") || $("tool-pan") || $("tool-zoom") || $("tool-mpr");
+    if (anchorBtn && anchorBtn.parentElement) {
+      anchorBtn.parentElement.insertBefore(
+        mprTrackballInstance.el,
+        anchorBtn.nextSibling,
+      );
+    } else {
+      toolbar.appendChild(mprTrackballInstance.el);
+    }
+  }
+
+  return mprTrackballInstance;
+}
+
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
+/**
+ * Event delegation for view mode toggles (#tool-view-3d and #tool-mpr).
+ * Bound to document.body so buttons survive dynamic DOM re-renders.
+ */
+function initViewModeDelegation(): void {
+  if (typeof document === "undefined" || !document.body) return;
+  const body = document.body as HTMLElement & {
+    __viewModeDelegationInitialized?: boolean;
+  };
+  if (body.__viewModeDelegationInitialized) return;
+  body.__viewModeDelegationInitialized = true;
+
+  document.body.addEventListener("click", (event: MouseEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (!target || typeof target.closest !== "function") return;
+
+    // Delegación para Vista 3D
+    const btn3D = target.closest("#tool-view-3d") as HTMLButtonElement | null;
+    if (btn3D) {
+      if (btn3D.disabled || state.isLayoutTransitioning) return;
+      void toggle3DMode();
+      return;
+    }
+
+    // Delegación para botón MPR
+    const btnMpr = target.closest("#tool-mpr") as HTMLButtonElement | null;
+    if (btnMpr) {
+      if (btnMpr.disabled || state.isLayoutTransitioning) return;
+      void toggleMprMode();
+      return;
+    }
+  });
+}
+
 export function initToolbar(): void {
+  ensureMprTrackballMounted();
   const tools = [
     "wl",
     "zoom",
@@ -267,8 +351,7 @@ export function initToolbar(): void {
     }
   });
 
-  $("tool-view-3d")?.addEventListener("click", () => void toggle3DMode());
-  $("tool-mpr")?.addEventListener("click", () => void toggleMprMode());
+  initViewModeDelegation();
 
   $("btn-open").addEventListener("click", openFiles);
 
@@ -955,7 +1038,21 @@ function onMeasurePathologyChange(): void {
   renderActiveMeasurementOverlays();
 }
 
+function schedulePostReflow(action: () => void): void {
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        action();
+      });
+    });
+  } else {
+    setTimeout(action, 50);
+  }
+}
+
 export async function toggle3DMode(): Promise<boolean> {
+  if (state.isLayoutTransitioning) return false;
+
   const btn = ($("tool-view-3d") || $("tool-mpr")) as HTMLButtonElement | null;
   if (btn?.disabled) return false;
 
@@ -969,25 +1066,34 @@ export async function toggle3DMode(): Promise<boolean> {
     return false;
   }
 
-  if (state.is3DMode) {
-    state.is3DMode = false;
-    view3DViewer.isActive = false;
-    view3DViewer.stopRenderLoop();
-    $("view-3d-container")?.classList.add("hidden");
-    $("viewport-container")?.classList.remove("mode-3d");
-    hide3DControls();
-    updateToolbarUI();
-    render();
-    return false;
-  }
+  // Force close/hide trackball popover during transition to avoid stale camera reads
+  const trackball = getMprTrackball();
+  trackball?.closePopover();
 
-  if (state.isMprMode) {
-    state.isMprMode = false;
-    $("viewport-container")?.classList.remove("mode-mpr");
-  }
-
-  showLoading(true);
+  state.isLayoutTransitioning = true;
   try {
+    if (state.is3DMode) {
+      state.is3DMode = false;
+      view3DViewer.isActive = false;
+      view3DViewer.stopRenderLoop();
+      $("view-3d-container")?.classList.add("hidden");
+      $("viewport-container")?.classList.remove("mode-3d");
+      hide3DControls();
+      render();
+      return false;
+    }
+
+    // Stop any running render loop before switching layout
+    view3DViewer.stopRenderLoop();
+
+    if (state.isMprMode) {
+      state.isMprMode = false;
+      $("viewport-container")?.classList.remove("mode-mpr");
+      const manager = getViewportManager();
+      manager?.setLayout("1x1");
+    }
+
+    showLoading(true);
     if (!view3DViewer.volume) {
       await loadVolumeIntoEngines();
     }
@@ -1003,26 +1109,25 @@ export async function toggle3DMode(): Promise<boolean> {
     $("view-3d-container")?.classList.remove("hidden");
     update3DControls();
     update3DSlidersUI();
-    updateToolbarUI();
 
     const canvas =
       (document.getElementById("view-3d-canvas") as HTMLCanvasElement) ||
       (document.getElementById("dicom-canvas") as HTMLCanvasElement);
-    if (canvas) {
-      view3DViewer.resize(canvas);
-      view3DViewer.render(canvas);
-      view3DViewer.startRenderLoop(canvas);
-    }
+    ensure3DRendered(canvas ?? undefined);
     return true;
   } catch (err: any) {
     showError(err.message || String(err));
     return false;
   } finally {
+    state.isLayoutTransitioning = false;
+    updateToolbarUI();
     showLoading(false);
   }
 }
 
 export async function toggleMprMode(): Promise<boolean> {
+  if (state.isLayoutTransitioning) return false;
+
   const btn = $("tool-mpr") as HTMLButtonElement | null;
   if (btn?.disabled) return false;
 
@@ -1032,9 +1137,12 @@ export async function toggleMprMode(): Promise<boolean> {
       t("viewer.mpr.needTwoSlices") ||
         "Se requieren al menos 2 cortes para MPR",
     );
+
+    // Force close/hide trackball popover during transition to avoid stale camera reads
     return false;
   }
-
+  const trackball = getMprTrackball();
+  trackball?.closePopover();
   // Deactivate 3D mode if active
   if (state.is3DMode) {
     state.is3DMode = false;
@@ -1056,8 +1164,29 @@ export async function toggleMprMode(): Promise<boolean> {
     return false;
   }
 
-  showLoading(true);
+  state.isLayoutTransitioning = true;
   try {
+    // Deactivate 3D mode if active
+    if (state.is3DMode) {
+      state.is3DMode = false;
+      view3DViewer.isActive = false;
+      view3DViewer.stopRenderLoop();
+      $("view-3d-container")?.classList.add("hidden");
+      $("viewport-container")?.classList.remove("mode-3d");
+      hide3DControls();
+    }
+
+    const manager = getViewportManager();
+    if (state.isMprMode) {
+      state.isMprMode = false;
+      $("viewport-container")?.classList.remove("mode-mpr");
+      manager?.setLayout("1x1");
+      hide3DControls();
+      render();
+      return false;
+    }
+
+    showLoading(true);
     if (!mprEngine.volume) {
       await loadVolumeIntoEngines();
     }
@@ -1071,17 +1200,21 @@ export async function toggleMprMode(): Promise<boolean> {
 
     // Set 2x2 triplanar layout
     manager?.setLayout("2x2");
-    manager?.getAllViewports().forEach((vp) => vp.render());
+    schedulePostReflow(() => {
+      if (!state.isMprMode) return;
+      manager?.getAllViewports().forEach((vp) => vp.render());
+    });
 
     $("view-3d-sliders-panel")?.classList.remove("hidden");
     $("mpr-sliders-panel")?.classList.remove("hidden");
     update3DSlidersUI();
-    updateToolbarUI();
     return true;
   } catch (err: any) {
     showError(err.message || String(err));
     return false;
   } finally {
+    state.isLayoutTransitioning = false;
+    updateToolbarUI();
     showLoading(false);
   }
 }
@@ -1149,6 +1282,26 @@ export function updateToolbarUI(): void {
   if (mprBtn) {
     mprBtn.classList.toggle("active", Boolean(state.isMprMode));
     mprBtn.setAttribute("aria-pressed", String(Boolean(state.isMprMode)));
+  }
+
+  try {
+    const trackball = ensureMprTrackballMounted();
+    if (trackball) {
+      const shouldShow = Boolean(state.isMprMode || state.is3DMode);
+      trackball.el.hidden = !shouldShow;
+      trackball.el.classList.toggle("hidden", !shouldShow);
+      if (
+        shouldShow &&
+        !state.isLayoutTransitioning &&
+        typeof trackball.update === "function"
+      ) {
+        trackball.update();
+      } else if (!shouldShow && typeof trackball.closePopover === "function") {
+        trackball.closePopover();
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to update trackball visibility in toolbar:", err);
   }
 
   // Only mode tools are mutually exclusive. Clearing every .toolbar__tool
@@ -1313,6 +1466,7 @@ export function initViewportInteraction(): void {
         state.viewport = { ...activeVp.data.viewport };
         updateZoomControlsUI();
         updateWlControlsUI();
+        updateToolbarUI();
       }
     });
   }
@@ -1465,6 +1619,7 @@ export function initViewportInteraction(): void {
       dragOriginViewportId !== manager.activeViewport?.id
     ) {
       manager.setActiveViewport(dragOriginViewportId);
+      updateToolbarUI();
     }
     const activeVp =
       (manager && dragOriginViewportId
@@ -2115,34 +2270,6 @@ export function initViewportInteraction(): void {
               break;
             }
 
-            if (isRotatingMprCrosshair) {
-              const [cx, cy] = mprCrosshairScreenCenter;
-              const vpRect =
-                activeVp.canvasElement.getBoundingClientRect?.() ?? {
-                  left: 0,
-                  top: 0,
-                };
-              const prevRelX = state.lastMouseX - dx - vpRect.left - cx;
-              const prevRelY = state.lastMouseY - dy - vpRect.top - cy;
-              const currRelX = state.lastMouseX - vpRect.left - cx;
-              const currRelY = state.lastMouseY - vpRect.top - cy;
-
-              const anglePrev = Math.atan2(prevRelY, prevRelX);
-              const angleCurr = Math.atan2(currRelY, currRelX);
-              let dAngle = angleCurr - anglePrev;
-              if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
-              if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
-
-              if (Math.abs(dAngle) > 1e-4) {
-                const cam = mprEngine.getCamera(mprRotationPlane);
-                mprCoordinator.rotateAroundAxis(cam.normal, -dAngle);
-                for (const vp of manager.getAllViewports()) {
-                  vp.render();
-                }
-              }
-              break;
-            }
-
             manager.dispatchMprCrosshair(
               crosshairOriginId,
               dx,
@@ -2199,20 +2326,15 @@ export function initViewportInteraction(): void {
         case "crosshair":
         default:
           if (mprEngine.volume && state.isMprMode) {
-            if (isRotatingMprCrosshair) {
-              const cam = mprEngine.getCamera(mprRotationPlane);
-              mprCoordinator.rotateAroundAxis(cam.normal, -dx * 0.01);
-            } else {
-              mprEngine.applyCrosshairDelta2D(
-                "axial",
-                dx,
-                dy,
-                container.clientWidth || 300,
-                container.clientHeight || 300,
-              );
-              const [nx, ny, nz] = mprEngine.crosshairNormalized;
-              mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
-            }
+            mprEngine.applyCrosshairDelta2D(
+              "axial",
+              dx,
+              dy,
+              container.clientWidth || 300,
+              container.clientHeight || 300,
+            );
+            const [nx, ny, nz] = mprEngine.crosshairNormalized;
+            mprCoordinator.setCrosshairFromNormalized(nx, ny, nz);
           }
           break;
       }
@@ -2554,6 +2676,7 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
+      console.warn("[DEBUG] Slider movido a:", idx, { axis: "axial" });
       mprCoordinator.updateCrosshairAxis("axial", idx);
       syncAndRenderAfterSlider();
     }
@@ -2563,6 +2686,9 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
+      console.warn("[DEBUG] Slider movido a:", idx, {
+        axis: "coronal",
+      });
       mprCoordinator.updateCrosshairAxis("coronal", idx);
       syncAndRenderAfterSlider();
     }
@@ -2572,6 +2698,9 @@ function init3DControlsInteraction(): void {
     setActiveInteractingSlider(slider);
     const idx = parseInt(slider.value, 10);
     if (!isNaN(idx)) {
+      console.warn("[DEBUG] Slider movido a:", idx, {
+        axis: "sagittal",
+      });
       mprCoordinator.updateCrosshairAxis("sagittal", idx);
       syncAndRenderAfterSlider();
     }
@@ -2634,6 +2763,29 @@ function init3DControlsInteraction(): void {
 
   // Quick view orientation buttons
   const setView = (view: "axial" | "coronal" | "sagittal" | "3d") => {
+    const canvas =
+      (document.getElementById("view-3d-canvas") as HTMLCanvasElement | null) ||
+      (document.getElementById("dicom-canvas") as HTMLCanvasElement | null);
+    const btnName =
+      view === "axial"
+        ? "Axial"
+        : view === "coronal"
+          ? "Coronal"
+          : view === "sagittal"
+            ? "Sagital"
+            : "Volumetric View";
+    console.warn(`[DEBUG-CONTROLS] Click en botón ${btnName}`, {
+      camera: { ...view3DViewer.camera },
+      canvasDimensions: {
+        clientWidth: canvas?.clientWidth ?? 0,
+        clientHeight: canvas?.clientHeight ?? 0,
+        width: canvas?.width ?? 0,
+        height: canvas?.height ?? 0,
+        isConnected: canvas?.isConnected ?? false,
+      },
+      windowWidth: view3DViewer.windowWidth,
+      windowCenter: view3DViewer.windowCenter,
+    });
     view3DViewer.setOrientation(view);
     updateOrientationButtonsUI(view);
     render();
@@ -2934,7 +3086,11 @@ export function initKeyboardShortcuts(): void {
 export function initResizeObserver(): void {
   const container = $("viewport-container");
   const observer = new ResizeObserver(() => {
-    if (state.parsed) render();
+    if (state.is3DMode) {
+      ensure3DRendered();
+    } else if (state.parsed) {
+      render();
+    }
   });
   observer.observe(container);
 }
@@ -2949,8 +3105,13 @@ export function initGridLayoutControls(): void {
     if (!btn) return;
 
     btn.addEventListener("click", () => {
+      getMprTrackball()?.closePopover();
       getViewportManager()?.setLayout(layout);
       updateGridLayoutUI(layout);
+      updateToolbarUI();
+      if (state.is3DMode) {
+        ensure3DRendered();
+      }
     });
   });
 

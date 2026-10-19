@@ -1484,7 +1484,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  /* Empty-state del viewport: cubre el canvas y los paneles del viewport (z-index
+     ≤ 100), pero queda POR DEBAJO de los paneles que se deslizan sobre la pantalla
+     (Zenodo, z-index 150). Antes estaba en 200 y, sin estudio abierto, su fondo
+     opaco tapaba el panel de Zenodo. Los diálogos (z-index 200) siguen por encima. */
+  z-index: 120;
   background: var(--bg-base);
   transition: background var(--transition);
   pointer-events: none;

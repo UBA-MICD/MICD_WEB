@@ -39,4 +39,18 @@ jobs:
         run: npm run build
 
       - name: Run unit tests
-        run: npm test
+        run: npm run test:coverage
+
+      - name: Enforce anonymization integration coverage (TK-15)
+        run: npm run check:anon-coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/lcov.info
+          # A Codecov upload/TLS outage must not fail the build — coverage is
+          # still gated by Codecov's status checks and check:anon-coverage above.
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

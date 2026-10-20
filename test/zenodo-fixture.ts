@@ -1,3 +1,4 @@
+// cspell:ignore Torax Publicar Cerrar Importar Producción Buscá Siguiente Seleccioná estudio Abrí configuración Tipo Descargar Publicación Importación Resultado Éxito cargando
 /**
  * Shared fixture for src/zenodo/zenodo-panel.test.ts's split test files: the
  * real zenodo-panel markup (trimmed from src/index.html so selectors stay in
@@ -6,7 +7,8 @@
  */
 
 export function jwt(payload: Record<string, unknown>): string {
-  const enc = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+  const enc = (obj: unknown) =>
+    Buffer.from(JSON.stringify(obj)).toString("base64url");
   return `${enc({ alg: "HS256", typ: "JWT" })}.${enc(payload)}.sig`;
 }
 
@@ -104,7 +106,10 @@ export interface MockResponse {
   blob?: Blob;
 }
 
-export type RouteHandler = (url: string, init?: RequestInit) => MockResponse | Promise<MockResponse>;
+export type RouteHandler = (
+  url: string,
+  init?: RequestInit,
+) => MockResponse | Promise<MockResponse>;
 
 interface Route {
   match: (url: string, init?: RequestInit) => boolean;
@@ -125,7 +130,10 @@ export function createMockFetch() {
     routes.push({ match, handle });
   }
 
-  async function fetchImpl(input: string, init?: RequestInit): Promise<Response> {
+  async function fetchImpl(
+    input: string,
+    init?: RequestInit,
+  ): Promise<Response> {
     const url = String(input);
     calls.push({ url, init });
     const route = [...routes].reverse().find((r) => r.match(url, init));
@@ -139,7 +147,8 @@ export function createMockFetch() {
       status,
       json: async () => result.body,
       text: async () => JSON.stringify(result.body),
-      blob: async () => result.blob ?? new Blob([JSON.stringify(result.body ?? {})]),
+      blob: async () =>
+        result.blob ?? new Blob([JSON.stringify(result.body ?? {})]),
     } as Response;
   }
 

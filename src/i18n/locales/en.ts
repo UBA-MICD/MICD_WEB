@@ -28,6 +28,7 @@ export const en: Record<string, string> = {
   "auth.hidePassword": "Hide password",
   "auth.submitLogin": "Sign in",
   "auth.wereYouInvited": "Were you invited? Activate your account",
+  "auth.forgotPassword": "Forgot your password?",
   "auth.loginRequiredMsg":
     "A session is required to search or upload studies on the server. Local viewing doesn't need one.",
   "auth.sessionActive": "Active session",
@@ -56,12 +57,14 @@ export const en: Record<string, string> = {
   "server.backToViewer": "Back to viewer",
   "server.tabsAriaLabel": "Server actions",
   "server.tabUpload": "Upload",
+  "server.configButton": "Configure server",
   "server.advancedSettings": "Advanced settings",
   "server.apiOriginLabel": "API server",
   "server.apiOriginPlaceholder": "http://localhost:3000",
   "server.apiOriginSave": "Save and restart",
   "server.apiOriginInvalid": "Invalid server address.",
   "dialog.activityTitle": "Activity history",
+  "upload.uploadedBanner": "{{count}} file(s) uploaded successfully",
   "server.studyLoadedBanner": "Study loaded · returning to viewer",
   "server.studiesLoadedBanner":
     "{{count}} studies loaded · returning to viewer",
@@ -83,6 +86,7 @@ export const en: Record<string, string> = {
   "explorer.prevPage": "Previous page",
   "explorer.nextPage": "Next page",
   "explorer.openSelected": "Open selected study",
+  "explorer.downloadSelected": "Download selected study",
   "explorer.loadingStudies": "Loading studies…",
   "explorer.noStudiesFiltered": "No studies match those filters.",
   "explorer.noStudiesLoaded": "No studies loaded.",
@@ -113,10 +117,14 @@ export const en: Record<string, string> = {
   "viewer.tool.zoomTitle": "Zoom (Z)",
   "viewer.tool.panTitle": "Pan (P)",
   "viewer.tool.crosshairTitle": "3D crosshair navigation (C)",
+  "viewer.tool.lengthTitle": "Ruler measurement (L)",
+  "viewer.tool.ellipseTitle": "Area and HU measurement (E)",
+  "viewer.tool.polygonTitle": "Manual region marking (Polygon)",
   "viewer.tool.resetTitle": "Reset (R)",
   "viewer.tool.metadataTitle": "DICOM tags (M)",
   "viewer.tool.zenodoTitle": "Zenodo — open science repository",
   "viewer.tool.mprStaticTitle": "Multiplanar reconstruction (MPR)",
+  "viewer.tool.view3dStaticTitle": "3D View",
   "viewer.dropZone.title": "Open DICOM file",
   "viewer.dropZone.instructions": "Drag and drop .dcm files here, or",
   "viewer.dropZone.note":
@@ -161,6 +169,99 @@ export const en: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error loading the 3D volume: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "viewer.view3d.sliceCounter": "Slice: {{current}}/{{total}}",
+  "viewer.view3d.notCompatibleSlices":
+    "Study not compatible with 3D view: requires a series with more than 1 slice.",
+  "viewer.view3d.loadingMetadata": "Loading study metadata…",
+  "viewer.view3d.notCompatiblePixelSpacing":
+    "Study not compatible with 3D view: missing the PixelSpacing tag (0028,0030).",
+  "viewer.view3d.notCompatibleImagePosition":
+    "Study not compatible with 3D view: missing the ImagePositionPatient tag (0020,0032).",
+  "viewer.view3d.backTo2D": "Back to 2D view",
+  "viewer.view3d.enabledTitle": "3D volumetric view",
+  "viewer.view3d.needTwoSlices":
+    "The study needs at least 2 slices for the 3D volumetric view.",
+  "viewer.view3d.volumeLoadError": "Error loading the 3D volume: {{message}}",
+  "viewer.view3d.webglUnavailable":
+    "WebGL2 is not available in this browser. The 3D view requires WebGL2.",
+  "view.axial": "Axial",
+  "view.coronal": "Coronal",
+  "view.sagittal": "Sagittal",
+  "view.volumetricView": "Volumetric View",
+  "viewer.view3d.axial": "Axial",
+  "viewer.view3d.coronal": "Coronal",
+  "viewer.view3d.sagittal": "Sagittal",
+  "viewer.view3d.volumetricView": "Volumetric View",
+  "viewer.view3d.orientGroupAria": "Anatomical orientation projection",
+  "viewer.view3d.depthControlAria": "Depth control",
+  "viewer.view3d.depthSliderAria": "Slice depth",
+  "viewer.view3d.triplanarSlidersAria": "Triplanar slice controls",
+  "viewer.view3d.axialCutAria": "Axial cut",
+  "viewer.view3d.coronalCutAria": "Coronal cut",
+  "viewer.view3d.sagittalCutAria": "Sagittal cut",
+  "viewer.view3d.resetAnnounce": "3D camera reset",
+  "viewer.mpr.layout2x2": "2x2 Grid",
+  "viewer.mpr.3d": "3D Volume",
+  "viewer.mpr.trackball.label": "Plane rotation (Trackball)",
+  "viewer.mpr.trackball.button": "Rotation",
+  "viewer.mpr.trackball.toggleTitle": "MPR Plane Rotation (Trackball)",
+  "viewer.mpr.trackball.close": "Close",
+  "viewer.mpr.trackball.pitch": "Tilt (Pitch)",
+  "viewer.mpr.trackball.yaw": "Lateral rotation (Yaw)",
+  "viewer.mpr.trackball.readout": "Pitch {{pitch}}° · Yaw {{yaw}}°",
+  "viewer.mpr.trackball.valueText": "{{value}} degrees",
+  "viewer.mpr.trackball.reset": "Reset to orthogonal planes",
+  "viewer.mpr.trackball.resetAnnounce": "Planes reset to orthogonal",
+  "viewer.mpr.trackball.hint": "Drag to rotate · Shift = fine",
+  "viewer.layers.title": "Layer Adjustment",
+  "viewer.layers.loadBtn": "Load Overlay Study",
+  "viewer.layers.opacity": "Opacity",
+  "viewer.layers.ww": "Layer Width (WW)",
+  "viewer.layers.wl": "Layer Center (WL)",
+
+  // ── viewer — AI segmentation (mock SAM3) ────────────────────────────────
+  "viewer.segmentation.buttonTitle": "AI segmentation (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "AI Seg.",
+  "viewer.segmentation.running": "Segmenting…",
+  "viewer.segmentation.simulatedBadge": "Simulated",
+  "viewer.segmentation.layerToggle": "AI segmentation",
+  "viewer.segmentation.showTitle": "Show AI segmentation",
+  "viewer.segmentation.showLabel": "AI Seg.",
+  "viewer.segmentation.none":
+    "No segmentation available. Generate one from Server → Validations.",
+  "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
+  "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
+  "viewer.segmentation.failed": "The segmentation could not be generated.",
+  "viewer.segmentation.tagAi": "AI",
+  "viewer.segmentation.loading": "Loading AI segmentation…",
+  "viewer.segmentation.correct": "Correct",
+  "viewer.segmentation.correctHint":
+    "Drag, add or remove vertices to adjust the outline; then Submit.",
+  "viewer.segmentation.submit": "Submit",
+  "viewer.segmentation.cancel": "Cancel",
+  "viewer.segmentation.transfer": "→ Transfer to original",
+  "viewer.segmentation.transferHint":
+    "Bring this segmentation onto the original DICOM and see it in the common view.",
+  "viewer.segmentation.transferred":
+    "Segmentation transferred to the original.",
+  "viewer.segmentation.transferRevert": "Revert transfer",
+  "viewer.segmentation.discard": "Discard",
+  "viewer.segmentation.discardHint":
+    "Discard the AI segmentation without touching the original.",
+  "viewer.segmentation.discarded": "Segmentation discarded.",
+  "viewer.segmentation.discardRestore": "Restore",
+  "viewer.segmentation.restored": "Segmentation restored.",
+  "viewer.segmentation.pathologyAria": "Segmentation pathology type",
+  "viewer.segmentation.reset": "Discard correction",
+  "viewer.segmentation.resetHint":
+    "Go back to the outline the AI originally proposed.",
+  "viewer.segmentation.resetDone":
+    "Correction discarded; back to the AI outline.",
+  "viewer.segmentation.correctionSaved": "Correction saved.",
+  "viewer.segmentation.notPersisted":
+    "This segmentation is not persisted; it cannot be corrected.",
+  "viewer.segmentation.bySystem": "Segmented by AI",
+  "viewer.segmentation.byPerson": "Corrected by {{who}} · {{when}}",
   "viewer.zoom.panelTitle": "Zoom Adjustment",
   "viewer.zoom.levelLabel": "Zoom Level",
   "viewer.zoom.presetsTitle": "Presets",
@@ -228,7 +329,12 @@ export const en: Record<string, string> = {
 
   // ── upload ───────────────────────────────────────────────────────────────
   "upload.dropHint": "Drag .dcm, .zip files or a folder here",
+  "upload.selectFiles": "Select files or ZIP",
   "upload.selectFolder": "Select folder",
+  "upload.classifyTitle": "Classify this study",
+  "upload.classifyMessage":
+    "{{count}} file(s) ready. Choose a classification for this study (optional), then confirm to upload.",
+  "upload.classifyConfirm": "Upload",
   "upload.finish": "Finish",
   "upload.duplicateTitle": "Duplicate study",
   "upload.replace": "Replace",
@@ -257,9 +363,30 @@ export const en: Record<string, string> = {
   "upload.unauthorizedRetry": "Not authorized. Log in again.",
   "upload.fileTooLarge": "The file exceeds the 2 GB limit.",
   "upload.genericError": "Error uploading the file.",
-  "upload.rowLabel": "Progress for {{name}}",
-  "upload.stateDuplicate": "Duplicate",
-  "upload.stateAborted": "Cancelled",
+  "upload.anonymizerUnavailable":
+    "Can't upload: the study couldn't be anonymized. Contact an administrator.",
+  "upload.anonymizationFailed":
+    "Could not anonymize {{name}}: the upload was cancelled and the file was not sent.",
+  "upload.stateNotAnonymized": "Not anonymized: not sent",
+  "upload.startedStatus": "Uploading {{count}} file(s)…",
+  "upload.progressTitleOne": "Uploading 1 file",
+  "upload.progressTitleMany": "Uploading study · {{count}} files",
+  "upload.progressDone": "Upload complete",
+  "upload.progressDoneWithErrors": "Upload finished with errors",
+  "upload.progressCancelled": "Upload cancelled",
+  "upload.progressLabel": "Upload progress",
+  "upload.phaseAnonymizing": "Anonymizing file {{current}} of {{total}}",
+  "upload.phaseUploading": "Uploading file {{current}} of {{total}}",
+  "upload.bytesProgress": "{{done}} of {{total}}",
+  "upload.etaUnderMinute": "under 1 min left",
+  "upload.etaMinutes": "≈ {{minutes}} min left",
+  "upload.errorsSummary": "Show files with problems ({{count}})",
+  "upload.duplicateAppliesToAll":
+    "Your choice will apply to every repeated file in this upload.",
+  "upload.notAnonymized":
+    "The study still carries identifying data and was not stored. Tags: {{tags}}",
+  "upload.needsReview":
+    "Uploaded, but flagged for review (anonymization check): {{tags}}",
   "upload.explorerUploadingProgress": "Uploading {{count}} file{{plural}}…",
   "upload.explorerSummaryUploaded": "{{ok}} of {{total}} uploaded",
   "upload.explorerSummaryDuplicates": "{{count}} already existed",
@@ -458,6 +585,7 @@ export const en: Record<string, string> = {
   "users.role.admin": "Administrator",
   "users.role.medico": "Physician",
   "users.role.investigador": "Researcher",
+  "users.role.informatico": "Clinic IT",
   "users.status.active": "Active",
   "users.status.invited": "Invited",
   "users.status.blocked": "Blocked",
@@ -501,6 +629,26 @@ export const en: Record<string, string> = {
   "invite.dialog.emailMismatch":
     "That code doesn't match that email. Check both.",
 
+  // ── Password recovery ───────────────────────────────────────────────────────
+  "reset.title": "Reset password",
+  "reset.forEmail": "Choose a new password for {{email}}.",
+  "reset.newPassword": "New password",
+  "reset.submit": "Change password and sign in",
+  "reset.invalid": "This reset code is invalid or has expired.",
+  "reset.error.tooMany": "Too many attempts. Try again in a few minutes.",
+  "reset.dialog.title": "Recover password",
+  "reset.dialog.requestMsg":
+    "Enter your account email and we'll send you a code to choose a new password.",
+  "reset.dialog.sendCode": "Send code",
+  "reset.dialog.haveCode": "I already have a code",
+  "reset.dialog.haveCodeMsg":
+    "Enter the code you received by email and choose a new password.",
+  "reset.dialog.sent":
+    "If there is an active account for {{email}}, we sent it a code. It expires in 1 hour.",
+  "reset.dialog.codeLabel": "Reset code",
+  "reset.dialog.back": "Request a new code",
+  "reset.dialog.missingEmail": "Enter your email.",
+  "reset.dialog.missingCode": "Enter the code you received.",
   // ── System panel (admin) ────────────────────────────────────────────────────
   "system.tab": "System",
   "system.orthancStorage": "Orthanc Storage",
@@ -511,4 +659,239 @@ export const en: Record<string, string> = {
   "system.instances": "Instances",
   "system.used": "used",
   "system.loadError": "Could not load server status.",
+
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Next",
+  "tour.controls.back": "Back",
+  "tour.controls.skip": "Skip tour",
+  "tour.controls.finish": "Finish",
+  "tour.controls.close": "Close tour",
+  "tour.progress": "Step {{n}} of {{total}}",
+  "tour.help.label": "Guided tour",
+  "tour.core.welcome.title": "Welcome to MICD",
+  "tour.core.welcome.body":
+    "A quick tour of the viewer and, if you sign in, your server features. Press Esc or Skip to leave at any time — reopen it later from the ? button.",
+  "tour.core.open.title": "Open a study",
+  "tour.core.open.body":
+    "Open a local DICOM file or folder straight from your computer — no sign-in needed. You can also drag files onto the viewer.",
+  "tour.core.wl.title": "Window / Level",
+  "tour.core.wl.body":
+    "Adjust brightness and contrast by dragging on the image, or apply a preset (bone, brain, lung, soft tissue).",
+  "tour.core.zoompan.title": "Zoom & pan",
+  "tour.core.zoompan.body":
+    "Zoom to inspect detail and pan to move around the image. The scroll wheel zooms too.",
+  "tour.core.mpr.title": "MPR & 3D",
+  "tour.core.mpr.body":
+    "For volume series, reconstruct axial, coronal and sagittal planes, or switch to a 3D view.",
+  "tour.core.metadata.title": "DICOM metadata",
+  "tour.core.metadata.body":
+    "Inspect the study's DICOM tags — patient, series and acquisition details.",
+  "tour.core.reset.title": "Reset the view",
+  "tour.core.reset.body":
+    "Return window/level, zoom and pan to their defaults in one click.",
+  "tour.core.explorer.title": "Study explorer",
+  "tour.core.explorer.body":
+    "Toggle the explorer rail to browse the series and studies you have open.",
+  "tour.core.language.title": "Language",
+  "tour.core.language.body":
+    "Switch the interface between Spanish and English at any time.",
+  "tour.core.signin.title": "Server features",
+  "tour.core.signin.body":
+    "Sign in to reach the server: search shared studies, and — depending on your role — upload, publish and manage users.",
+  "tour.investigador.search.title": "Search studies",
+  "tour.investigador.search.body":
+    "Find studies by patient, modality or date. Start typing to search the shared repository.",
+  "tour.investigador.dates.title": "Filter by date",
+  "tour.investigador.dates.body":
+    "Narrow results to an acquisition date range with the from/to fields.",
+  "tour.investigador.results.title": "Results",
+  "tour.investigador.results.body":
+    "Matching studies appear here. For your role, patient identity is anonymized — you work with de-identified data.",
+  "tour.investigador.open.title": "Open a study",
+  "tour.investigador.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.investigador.export.title": "Export",
+  "tour.investigador.export.body":
+    "Export images or a study package. Downloads for your role are anonymized.",
+  "tour.investigador.zenodo.title": "Zenodo public corpus",
+  "tour.investigador.zenodo.body":
+    "Search Zenodo's public research corpus for openly published datasets.",
+  "tour.investigador.done.title": "You're set",
+  "tour.investigador.done.body":
+    "That's your researcher toolkit — search, review and anonymized export. Uploading, user admin and publishing aren't part of this role. Reopen this tour anytime from the ? button.",
+  "tour.informatico.download.title": "Download studies",
+  "tour.informatico.download.body":
+    "Find the study, select it and download it as a .zip with this button.",
+  "tour.informatico.upload.title": "Upload DICOM",
+  "tour.informatico.upload.body":
+    "Drop DICOM files, a folder or a .zip here to upload them to the server.",
+  "tour.informatico.done.title": "All set",
+  "tour.informatico.done.body":
+    "Your role can upload and download studies. If you need anything else, ask the development team. Reopen this tour anytime from the ? button.",
+  "tour.staff.search.title": "Search studies",
+  "tour.staff.search.body":
+    "Find studies by patient, modality or date. As clinical staff you see full patient details.",
+  "tour.staff.results.title": "Results",
+  "tour.staff.results.body":
+    "Matching studies appear here with full patient information.",
+  "tour.staff.open.title": "Open a study",
+  "tour.staff.open.body":
+    "Select a study and open it in the viewer to review its images.",
+  "tour.staff.export.title": "Export a study",
+  "tour.staff.export.body":
+    "Export images (PNG) or a full study package (ZIP), with complete metadata.",
+  "tour.staff.uploadTab.title": "Upload studies",
+  "tour.staff.uploadTab.body":
+    "Open the Upload tab to add new studies to the server.",
+  "tour.staff.uploadDrop.title": "Drag & drop",
+  "tour.staff.uploadDrop.body":
+    "Drop DICOM files here to upload them. Each file uploads with its own progress row.",
+  "tour.staff.uploadFolder.title": "Upload a folder",
+  "tour.staff.uploadFolder.body":
+    "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
+  "tour.staff.uploadStatus.title": "Progress & status",
+  "tour.staff.uploadStatus.body":
+    "Follow the whole upload here: one percentage, the current step, and the estimated time left.",
+  "tour.staff.zenodoImport.title": "Zenodo datasets",
+  "tour.staff.zenodoImport.body":
+    "Search Zenodo's public corpus and import datasets straight into the server.",
+  "tour.medico.done.title": "You're set",
+  "tour.medico.done.body":
+    "That's your clinical toolkit — search, review, upload, import and export with full metadata. User management, Zenodo publishing/config and the activity log are admin-only. Reopen this tour anytime from the ? button.",
+  "tour.admin.usersTab.title": "User management",
+  "tour.admin.usersTab.body":
+    "Open the Users tab to manage accounts — only administrators see it.",
+  "tour.admin.create.title": "Create a user",
+  "tour.admin.create.body":
+    "Add a user with a name, email and role. An email invitation is sent to them.",
+  "tour.admin.role.title": "Assign roles",
+  "tour.admin.role.body":
+    "Change a user's role here — researcher, clinician or administrator.",
+  "tour.admin.block.title": "Block & enable",
+  "tour.admin.block.body":
+    "Block an account to suspend access, and re-enable it later.",
+  "tour.admin.delete.title": "Delete a user",
+  "tour.admin.delete.body":
+    "Deleting is a soft-delete — the account is removed but the audit history is preserved.",
+  "tour.admin.lastAccess.title": "Last access",
+  "tour.admin.lastAccess.body":
+    "Each user's last login is tracked in this column.",
+  "tour.admin.activity.title": "Activity log",
+  "tour.admin.activity.body":
+    "Open the audit log to review actions across the system, and export it as CSV.",
+  "tour.admin.zenodo.title": "Zenodo administration",
+  "tour.admin.zenodo.body":
+    "Configure Zenodo credentials and sync, review sync logs and quota, and publish studies. Publishing is irreversible and makes data publicly available — check carefully before you publish.",
+  "tour.admin.help.title": "Reopen anytime",
+  "tour.admin.help.body":
+    "That's the full administrator toolkit. Relaunch this tour whenever you like from this ? button.",
+  // ── validation (US-26) ───────────────────────────────────────────────────────
+  "validation.barAriaLabel": "Diagnostic validation",
+  "validation.approve": "Approve",
+  "validation.reject": "Reject",
+  "validation.review": "Flag for review",
+  "validation.correctionNotice":
+    "This will record a correction over the prior validation.",
+  "validation.dialog.title": "Confirm action",
+  "validation.dialog.titleCorrection": "Record correction",
+  "validation.dialog.msg.approved": "Confirm approval of this study?",
+  "validation.dialog.msg.rejected":
+    "Confirm rejection of this study? A comment is required.",
+  "validation.dialog.msg.review": "Flag this study for later review?",
+  "validation.dialog.msg.correctionApproved":
+    "Record a correction approving this study?",
+  "validation.dialog.msg.correctionRejected":
+    "Record a correction rejecting this study? A comment is required.",
+  "validation.dialog.msg.correctionReview":
+    "Record a correction flagging this study for review?",
+  "validation.dialog.commentLabel": "Comment",
+  "validation.dialog.commentRequired":
+    "Leaving a comment when rejecting is recommended.",
+  "validation.dialog.confirm": "Confirm",
+  "validation.status.approved": "Approved",
+  "validation.status.rejected": "Rejected",
+  "validation.status.review": "Flagged for review",
+  "validation.status.none": "Not validated",
+  "classification.label": "Classification",
+  "classification.none": "Unclassified",
+  "classification.acv": "Stroke",
+  "classification.hemorragia": "Hemorrhage",
+  "classification.tumor": "Tumor",
+  "classification.desmielinizante": "Demyelinating",
+  "classification.normales": "Normal",
+  "classification.otros": "Other",
+  "validation.toast.success.approved": "Study approved.",
+  "validation.toast.success.rejected": "Study rejected.",
+  "validation.toast.success.review": "Study flagged for review.",
+  "validation.toast.success.correction": "Correction recorded.",
+  "validation.toast.error": "Could not record validation.",
+  "validation.analysisDone": "Analysis complete.",
+  "validation.analysisFailed": "Analysis failed.",
+  "validation.readonlyNotice":
+    "Only an administrator can correct this validation.",
+
+  // ── Validations panel (US-26) ────────────────────────────────────────────────
+  "validations.tab": "Validations",
+  "validations.filtersLabel": "Filter by status",
+  "validations.filterAll": "All",
+  "validations.filterPending": "Unvalidated", // cspell:ignore Unvalidated
+  "validations.filterApproved": "Approved",
+  "validations.filterRejected": "Rejected",
+  "validations.filterReview": "Flagged for review",
+  "validations.colPatient": "Patient",
+  "validations.colModality": "Modality",
+  "validations.colDate": "Date",
+  "validations.colStatus": "Status",
+  "validations.colValidatedBy": "Validated by",
+  "validations.colActions": "Actions",
+  "validations.segmentWithAI": "Segment with AI",
+  "validations.empty": "No studies match the current filter.",
+  "validations.loadError": "Could not load the study list.",
+  "validations.actionSuccess.approved": "Study approved.",
+  "validations.actionSuccess.rejected": "Study rejected.",
+  "validations.actionSuccess.review": "Study flagged for review.",
+  "validations.rejectDialog.title": "Reject study",
+  "validations.rejectDialog.commentLabel": "Comment (optional)",
+  "validations.rejectDialog.confirm": "Reject",
+  "validations.correctionBadge": "correction",
+
+  // ── Server Configuration (TK-29) ──────────────────────────────────────────
+  "serverConfig.title": "Server Configuration",
+  "serverConfig.description":
+    "Enter the base URL of the PACS/Orthanc server to query studies, metadata, and DICOM volumes.",
+  "serverConfig.urlLabel": "Server URL",
+  "serverConfig.urlPlaceholder": "http://localhost:3000",
+  "serverConfig.saveAndConnect": "Save / Connect",
+  "serverConfig.saveSuccess": "Configuration saved successfully.",
+  "serverConfig.invalidUrl":
+    "Invalid URL format. Use http:// or https:// (e.g. http://localhost:3000)",
+
+  // ── Measurement and annotations (TK-26) ────────────────────────────────────
+  "annotations.length": "Length",
+  "annotations.area": "Area",
+  "annotations.mean": "Mean",
+  "annotations.stdDev": "Std Dev",
+  "annotations.uncalibrated": "No spatial calibration",
+  "annotations.polygon": "Polygon",
+  "annotations.perimeter": "Perimeter",
+  "viewer.measure.panelTitle": "Measurement Settings",
+  "viewer.measure.unitLabel": "Units",
+  "viewer.measure.pathologyLabel": "Pathology",
+  "viewer.measure.pathologyNeedPolygon":
+    "Select a polygon to assign it a pathology.",
+  "viewer.measure.unitMm": "Millimeters (mm)",
+  "viewer.measure.unitCm": "Centimeters (cm)",
+  "viewer.measure.lineWidthLabel": "Line Width",
+  "viewer.measure.clearAnnotations": "Clear Annotations",
+  "viewer.measure.exportSegmentation": "Export Segmentation",
+  "viewer.measure.noSegmentationToExport":
+    "No polygon segmentations to export on this slice.",
+  "viewer.measure.exportSuccess": "Segmentation exported successfully.",
+  "viewer.measure.toggleVisibility": "Hide/Show",
+  "viewer.measure.hideAnnotations": "Hide annotations",
+  "viewer.measure.showAnnotations": "Show annotations",
+  "viewer.info.hide": "Hide info",
+  "viewer.info.show": "Show info",
+  "viewer.measure.saveAnnotations": "Save",
+  "viewer.measure.savedSuccess": "Saved!",
 };

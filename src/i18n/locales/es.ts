@@ -29,6 +29,7 @@ export const es: Record<string, string> = {
   "auth.hidePassword": "Ocultar contraseña",
   "auth.submitLogin": "Ingresar",
   "auth.wereYouInvited": "¿Te invitaron? Activá tu cuenta",
+  "auth.forgotPassword": "¿Olvidaste tu contraseña?",
   "auth.loginRequiredMsg":
     "Se requiere sesión para buscar o subir estudios en el servidor. La visualización local no la necesita.",
   "auth.sessionActive": "Sesión activa",
@@ -58,12 +59,14 @@ export const es: Record<string, string> = {
   "server.backToViewer": "Volver al visualizador",
   "server.tabsAriaLabel": "Acciones del servidor",
   "server.tabUpload": "Cargar",
+  "server.configButton": "Configurar servidor",
   "server.advancedSettings": "Configuración avanzada",
   "server.apiOriginLabel": "Servidor de la API",
   "server.apiOriginPlaceholder": "http://localhost:3000",
   "server.apiOriginSave": "Guardar y reiniciar",
   "server.apiOriginInvalid": "Dirección de servidor inválida.",
   "dialog.activityTitle": "Historial de actividad",
+  "upload.uploadedBanner": "{{count}} archivo(s) subido(s) correctamente",
   "server.studyLoadedBanner": "Estudio cargado · volviendo al visualizador",
   "server.studiesLoadedBanner":
     "{{count}} estudios cargados · volviendo al visualizador",
@@ -85,6 +88,7 @@ export const es: Record<string, string> = {
   "explorer.prevPage": "Página anterior",
   "explorer.nextPage": "Página siguiente",
   "explorer.openSelected": "Abrir estudio seleccionado",
+  "explorer.downloadSelected": "Descargar estudio seleccionado",
   "explorer.loadingStudies": "Cargando estudios…",
   "explorer.noStudiesFiltered": "No hay estudios con esos filtros.",
   "explorer.noStudiesLoaded": "No hay estudios cargados.",
@@ -115,10 +119,14 @@ export const es: Record<string, string> = {
   "viewer.tool.zoomTitle": "Zoom (Z)",
   "viewer.tool.panTitle": "Desplazar (P)",
   "viewer.tool.crosshairTitle": "Navegación Crosshair 3D (C)",
+  "viewer.tool.lengthTitle": "Regla de medición (L)",
+  "viewer.tool.ellipseTitle": "Medición de área y HU (E)",
+  "viewer.tool.polygonTitle": "Marcado manual de región (Polígono)",
   "viewer.tool.resetTitle": "Restablecer (R)",
   "viewer.tool.metadataTitle": "Etiquetas DICOM (M)",
   "viewer.tool.zenodoTitle": "Zenodo — repositorio de ciencia abierta",
   "viewer.tool.mprStaticTitle": "Reconstrucción Multiplanar (MPR)",
+  "viewer.tool.view3dStaticTitle": "Vista 3D",
   "viewer.dropZone.title": "Abrir archivo DICOM",
   "viewer.dropZone.instructions": "Arrastrá y soltá archivos .dcm aquí, o",
   "viewer.dropZone.note":
@@ -164,6 +172,98 @@ export const es: Record<string, string> = {
   "viewer.mpr.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
   "viewer.mpr.webglUnavailable":
     "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "viewer.view3d.sliceCounter": "Corte: {{current}}/{{total}}",
+  "viewer.view3d.notCompatibleSlices":
+    "Estudio no compatible con Vista 3D: requiere una serie con más de 1 corte.",
+  "viewer.view3d.loadingMetadata": "Cargando metadatos del estudio…",
+  "viewer.view3d.notCompatiblePixelSpacing":
+    "Estudio no compatible con Vista 3D: falta el tag PixelSpacing (0028,0030).",
+  "viewer.view3d.notCompatibleImagePosition":
+    "Estudio no compatible con Vista 3D: falta el tag ImagePositionPatient (0020,0032).",
+  "viewer.view3d.backTo2D": "Volver a Vista 2D",
+  "viewer.view3d.enabledTitle": "Vista Volumétrica 3D",
+  "viewer.view3d.needTwoSlices":
+    "El estudio requiere al menos 2 cortes para la vista volumétrica 3D.",
+  "viewer.view3d.volumeLoadError": "Error al cargar el volumen 3D: {{message}}",
+  "viewer.view3d.webglUnavailable":
+    "WebGL2 no está disponible en este navegador. La vista 3D requiere WebGL2.",
+  "view.axial": "Axial",
+  "view.coronal": "Coronal",
+  "view.sagittal": "Sagital",
+  "view.volumetricView": "Vista Volumétrica",
+  "viewer.view3d.axial": "Axial",
+  "viewer.view3d.coronal": "Coronal",
+  "viewer.view3d.sagittal": "Sagital",
+  "viewer.view3d.volumetricView": "Vista Volumétrica",
+  "viewer.view3d.orientGroupAria": "Proyección de orientación anatómica",
+  "viewer.view3d.depthControlAria": "Control de profundidad",
+  "viewer.view3d.depthSliderAria": "Profundidad de corte",
+  "viewer.view3d.triplanarSlidersAria": "Controles de cortes triplanares",
+  "viewer.view3d.axialCutAria": "Corte Axial",
+  "viewer.view3d.coronalCutAria": "Corte Coronal",
+  "viewer.view3d.sagittalCutAria": "Corte Sagital",
+  "viewer.view3d.resetAnnounce": "Cámara 3D restablecida",
+  "viewer.mpr.layout2x2": "Grilla 2x2",
+  "viewer.mpr.3d": "3D Volumen",
+  "viewer.mpr.trackball.label": "Rotación de planos (Trackball)",
+  "viewer.mpr.trackball.button": "Rotación",
+  "viewer.mpr.trackball.toggleTitle": "Rotación de planos MPR (Trackball)",
+  "viewer.mpr.trackball.close": "Cerrar",
+  "viewer.mpr.trackball.pitch": "Inclinación (Pitch)",
+  "viewer.mpr.trackball.yaw": "Rotación lateral (Yaw)",
+  "viewer.mpr.trackball.readout": "Pitch {{pitch}}° · Yaw {{yaw}}°",
+  "viewer.mpr.trackball.valueText": "{{value}} grados",
+  "viewer.mpr.trackball.reset": "Restablecer a planos ortogonales",
+  "viewer.mpr.trackball.resetAnnounce": "Planos restablecidos a ortogonales",
+  "viewer.mpr.trackball.hint": "Arrastrá para rotar · Shift = fino",
+  "viewer.layers.title": "Ajuste de Capas",
+  "viewer.layers.loadBtn": "Cargar Estudio Superpuesto",
+  "viewer.layers.opacity": "Opacidad",
+  "viewer.layers.ww": "Ancho de Capa (WW)",
+  "viewer.layers.wl": "Centro de Capa (WL)",
+
+  // ── viewer — segmentación con IA (mock SAM3) ────────────────────────────
+  "viewer.segmentation.buttonTitle": "Segmentación con IA (mock SAM3)",
+  "viewer.segmentation.buttonLabel": "IA Segm.",
+  "viewer.segmentation.running": "Segmentando…",
+  "viewer.segmentation.simulatedBadge": "Simulado",
+  "viewer.segmentation.layerToggle": "Segmentación IA",
+  "viewer.segmentation.showTitle": "Mostrar segmentación de IA",
+  "viewer.segmentation.showLabel": "Segm. IA",
+  "viewer.segmentation.none":
+    "No hay segmentación disponible. Generala desde Servidor → Validaciones.",
+  "viewer.segmentation.hudLabel": "Segmentación IA (simulada)",
+  "viewer.segmentation.noImage": "Abrí una imagen DICOM antes de segmentar.",
+  "viewer.segmentation.failed": "No se pudo generar la segmentación.",
+  "viewer.segmentation.tagAi": "IA",
+  "viewer.segmentation.loading": "Cargando segmentación IA…",
+  "viewer.segmentation.correct": "Corregir",
+  "viewer.segmentation.correctHint":
+    "Arrastrá, agregá o quitá vértices para ajustar el contorno; luego Enviar.",
+  "viewer.segmentation.submit": "Enviar",
+  "viewer.segmentation.cancel": "Cancelar",
+  "viewer.segmentation.transfer": "→ Transferir al original",
+  "viewer.segmentation.transferHint":
+    "Llevar esta segmentación al DICOM original y verla en la vista común.",
+  "viewer.segmentation.transferred": "Segmentación transferida al original.",
+  "viewer.segmentation.transferRevert": "Revertir transferencia",
+  "viewer.segmentation.discard": "Descartar",
+  "viewer.segmentation.discardHint":
+    "Descartar la segmentación de la IA sin tocar el original.",
+  "viewer.segmentation.discarded": "Segmentación descartada.",
+  "viewer.segmentation.discardRestore": "Restaurar",
+  "viewer.segmentation.restored": "Segmentación restaurada.",
+  "viewer.segmentation.pathologyAria": "Tipo de patología de la segmentación",
+  "viewer.segmentation.reset": "Descartar corrección",
+  "viewer.segmentation.resetHint":
+    "Volver al contorno original que propuso la IA.",
+  "viewer.segmentation.resetDone":
+    "Corrección descartada; volviste al contorno de la IA.",
+  "viewer.segmentation.correctionSaved": "Corrección guardada.",
+  "viewer.segmentation.notPersisted":
+    "Esta segmentación no está persistida; no se puede corregir.",
+  "viewer.segmentation.bySystem": "Segmentado por IA",
+  "viewer.segmentation.byPerson": "Corregido por {{who}} · {{when}}",
   "viewer.zoom.panelTitle": "Ajuste de Zoom",
   "viewer.zoom.levelLabel": "Nivel de Zoom",
   "viewer.zoom.presetsTitle": "Accesos Rápidos",
@@ -233,7 +333,12 @@ export const es: Record<string, string> = {
 
   // ── upload ───────────────────────────────────────────────────────────────
   "upload.dropHint": "Arrastrá archivos .dcm, .zip o una carpeta aquí",
+  "upload.selectFiles": "Seleccionar archivos o ZIP",
   "upload.selectFolder": "Seleccionar carpeta",
+  "upload.classifyTitle": "Clasificar estudio",
+  "upload.classifyMessage":
+    "{{count}} archivo(s) listos. Elegí una clasificación para este estudio (opcional) y confirmá para subir.",
+  "upload.classifyConfirm": "Subir",
   "upload.finish": "Finalizar",
   "upload.duplicateTitle": "Estudio duplicado",
   "upload.replace": "Reemplazar",
@@ -262,9 +367,30 @@ export const es: Record<string, string> = {
   "upload.unauthorizedRetry": "No autorizado. Iniciá sesión de nuevo.",
   "upload.fileTooLarge": "El archivo supera el límite de 2 GB.",
   "upload.genericError": "Error al cargar el archivo.",
-  "upload.rowLabel": "Progreso de {{name}}",
-  "upload.stateDuplicate": "Duplicado",
-  "upload.stateAborted": "Cancelado",
+  "upload.anonymizerUnavailable":
+    "No se puede subir: no se pudo anonimizar el estudio. Contactá a un administrador.",
+  "upload.anonymizationFailed":
+    "No se pudo anonimizar {{name}}: la carga se canceló y el archivo no se envió.",
+  "upload.stateNotAnonymized": "No anonimizado: no enviado",
+  "upload.startedStatus": "Subiendo {{count}} archivo(s)…",
+  "upload.progressTitleOne": "Subiendo 1 archivo",
+  "upload.progressTitleMany": "Subiendo estudio · {{count}} archivos",
+  "upload.progressDone": "Carga completa",
+  "upload.progressDoneWithErrors": "Carga terminada con errores",
+  "upload.progressCancelled": "Carga cancelada",
+  "upload.progressLabel": "Progreso de la carga",
+  "upload.phaseAnonymizing": "Anonimizando archivo {{current}} de {{total}}",
+  "upload.phaseUploading": "Subiendo archivo {{current}} de {{total}}",
+  "upload.bytesProgress": "{{done}} de {{total}}",
+  "upload.etaUnderMinute": "menos de 1 min restante",
+  "upload.etaMinutes": "≈ {{minutes}} min restantes",
+  "upload.errorsSummary": "Ver archivos con problemas ({{count}})",
+  "upload.duplicateAppliesToAll":
+    "Tu elección se aplicará a todos los archivos repetidos de esta carga.",
+  "upload.notAnonymized":
+    "El estudio conserva datos identificatorios y no se guardó. Tags: {{tags}}",
+  "upload.needsReview":
+    "Subido, pero marcado para revisión (verificación de anonimización): {{tags}}",
   "upload.explorerUploadingProgress": "Subiendo {{count}} archivo{{plural}}…",
   "upload.explorerSummaryUploaded": "{{ok}} de {{total}} subido{{plural}}",
   "upload.explorerSummaryDuplicates": "{{count}} ya existían",
@@ -465,6 +591,7 @@ export const es: Record<string, string> = {
   "users.role.admin": "Administrador",
   "users.role.medico": "Médico",
   "users.role.investigador": "Investigador",
+  "users.role.informatico": "Informático de clínica",
   "users.status.active": "Activo",
   "users.status.invited": "Invitado",
   "users.status.blocked": "Bloqueado",
@@ -509,6 +636,26 @@ export const es: Record<string, string> = {
   "invite.dialog.emailMismatch":
     "Ese código no corresponde a ese email. Revisá ambos.",
 
+  // ── Password recovery ───────────────────────────────────────────────────────
+  "reset.title": "Restablecer contraseña",
+  "reset.forEmail": "Elegí una contraseña nueva para {{email}}.",
+  "reset.newPassword": "Nueva contraseña",
+  "reset.submit": "Cambiar contraseña e ingresar",
+  "reset.invalid": "Este código de recuperación no es válido o ya venció.",
+  "reset.error.tooMany": "Demasiados intentos. Probá de nuevo en unos minutos.",
+  "reset.dialog.title": "Recuperar contraseña",
+  "reset.dialog.requestMsg":
+    "Ingresá el email de tu cuenta y te enviaremos un código para elegir una contraseña nueva.",
+  "reset.dialog.sendCode": "Enviar código",
+  "reset.dialog.haveCode": "Ya tengo un código",
+  "reset.dialog.haveCodeMsg":
+    "Ingresá el código que recibiste por correo y elegí una contraseña nueva.",
+  "reset.dialog.sent":
+    "Si existe una cuenta activa para {{email}}, te enviamos un código. Vence en 1 hora.",
+  "reset.dialog.codeLabel": "Código de recuperación",
+  "reset.dialog.back": "Pedir un código nuevo",
+  "reset.dialog.missingEmail": "Ingresá tu email.",
+  "reset.dialog.missingCode": "Ingresá el código que recibiste.",
   // ── System panel (admin) ────────────────────────────────────────────────────
   "system.tab": "Sistema",
   "system.orthancStorage": "Almacenamiento Orthanc",
@@ -519,4 +666,240 @@ export const es: Record<string, string> = {
   "system.instances": "Instancias",
   "system.used": "usados",
   "system.loadError": "No se pudo cargar el estado del servidor.",
+
+  // ── Walkthrough / guided tour (TK-27) ───────────────────────────────────────
+  "tour.controls.next": "Siguiente",
+  "tour.controls.back": "Atrás",
+  "tour.controls.skip": "Omitir tutorial",
+  "tour.controls.finish": "Finalizar",
+  "tour.controls.close": "Cerrar tutorial",
+  "tour.progress": "Paso {{n}} de {{total}}",
+  "tour.help.label": "Tutorial guiado",
+  "tour.core.welcome.title": "Bienvenido a MICD",
+  "tour.core.welcome.body":
+    "Un recorrido breve por el visor y, si inicias sesión, por las funciones del servidor. Pulsa Esc u Omitir para salir cuando quieras — puedes reabrirlo desde el botón ?.",
+  "tour.core.open.title": "Abrir un estudio",
+  "tour.core.open.body":
+    "Abre un archivo o carpeta DICOM local desde tu equipo — sin iniciar sesión. También puedes arrastrar archivos al visor.",
+  "tour.core.wl.title": "Ventana / Nivel",
+  "tour.core.wl.body":
+    "Ajusta brillo y contraste arrastrando sobre la imagen, o aplica un preset (hueso, cerebro, pulmón, tejido blando).",
+  "tour.core.zoompan.title": "Zoom y desplazamiento",
+  "tour.core.zoompan.body":
+    "Haz zoom para ver el detalle y desplázate para moverte por la imagen. La rueda del ratón también hace zoom.",
+  "tour.core.mpr.title": "MPR y 3D",
+  "tour.core.mpr.body":
+    "Para series volumétricas, reconstruye los planos axial, coronal y sagital, o cambia a la vista 3D.",
+  "tour.core.metadata.title": "Metadatos DICOM",
+  "tour.core.metadata.body":
+    "Consulta las etiquetas DICOM del estudio — paciente, serie y detalles de adquisición.",
+  "tour.core.reset.title": "Restablecer la vista",
+  "tour.core.reset.body":
+    "Devuelve ventana/nivel, zoom y desplazamiento a sus valores por defecto con un clic.",
+  "tour.core.explorer.title": "Explorador de estudios",
+  "tour.core.explorer.body":
+    "Muestra u oculta el panel del explorador para navegar por las series y estudios que tienes abiertos.",
+  "tour.core.language.title": "Idioma",
+  "tour.core.language.body":
+    "Cambia la interfaz entre español e inglés en cualquier momento.",
+  "tour.core.signin.title": "Funciones del servidor",
+  "tour.core.signin.body":
+    "Inicia sesión para acceder al servidor: busca estudios compartidos y — según tu rol — sube, publica y gestiona usuarios.",
+  "tour.investigador.search.title": "Buscar estudios",
+  "tour.investigador.search.body":
+    "Encuentra estudios por paciente, modalidad o fecha. Empieza a escribir para buscar en el repositorio compartido.",
+  "tour.investigador.dates.title": "Filtrar por fecha",
+  "tour.investigador.dates.body":
+    "Acota los resultados a un rango de fechas de adquisición con los campos desde/hasta.",
+  "tour.investigador.results.title": "Resultados",
+  "tour.investigador.results.body":
+    "Los estudios coincidentes aparecen aquí. Para tu rol, la identidad del paciente está anonimizada — trabajas con datos sin identificar.",
+  "tour.investigador.open.title": "Abrir un estudio",
+  "tour.investigador.open.body":
+    "Selecciona un estudio y ábrelo en el visor para revisar sus imágenes.",
+  "tour.investigador.export.title": "Exportar",
+  "tour.investigador.export.body":
+    "Exporta imágenes o un paquete del estudio. Las descargas para tu rol están anonimizadas.",
+  "tour.investigador.zenodo.title": "Corpus público de Zenodo",
+  "tour.investigador.zenodo.body":
+    "Busca en el corpus público de investigación de Zenodo conjuntos de datos publicados abiertamente.",
+  "tour.investigador.done.title": "Todo listo",
+  "tour.investigador.done.body":
+    "Ese es tu kit de investigador — buscar, revisar y exportar anonimizado. Subir estudios, la administración de usuarios y la publicación no forman parte de este rol. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.informatico.download.title": "Descargar estudios",
+  "tour.informatico.download.body":
+    "Buscá el estudio, seleccionalo y descargalo como .zip con este botón.",
+  "tour.informatico.upload.title": "Subir DICOM",
+  "tour.informatico.upload.body":
+    "Arrastrá aquí archivos DICOM, una carpeta o un .zip para subirlos al servidor.",
+  "tour.informatico.done.title": "Listo",
+  "tour.informatico.done.body":
+    "Tu rol permite subir y descargar estudios. Si necesitás algo más, pedilo al equipo de desarrollo. Reabrí este tutorial cuando quieras desde el botón ?.",
+  "tour.staff.search.title": "Buscar estudios",
+  "tour.staff.search.body":
+    "Encuentra estudios por paciente, modalidad o fecha. Como personal clínico ves los datos completos del paciente.",
+  "tour.staff.results.title": "Resultados",
+  "tour.staff.results.body":
+    "Los estudios coincidentes aparecen aquí con la información completa del paciente.",
+  "tour.staff.open.title": "Abrir un estudio",
+  "tour.staff.open.body":
+    "Selecciona un estudio y ábrelo en el visor para revisar sus imágenes.",
+  "tour.staff.export.title": "Exportar un estudio",
+  "tour.staff.export.body":
+    "Exporta imágenes (PNG) o un paquete completo del estudio (ZIP), con todos los metadatos.",
+  "tour.staff.uploadTab.title": "Subir estudios",
+  "tour.staff.uploadTab.body":
+    "Abre la pestaña Cargar para añadir nuevos estudios al servidor.",
+  "tour.staff.uploadDrop.title": "Arrastrar y soltar",
+  "tour.staff.uploadDrop.body":
+    "Suelta archivos DICOM aquí para subirlos. Cada archivo se sube con su propia fila de progreso.",
+  "tour.staff.uploadFolder.title": "Subir una carpeta",
+  "tour.staff.uploadFolder.body":
+    "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
+  "tour.staff.uploadStatus.title": "Progreso y estado",
+  "tour.staff.uploadStatus.body":
+    "Seguí aquí toda la carga: un solo porcentaje, el paso actual y el tiempo restante estimado.",
+  "tour.staff.zenodoImport.title": "Conjuntos de datos de Zenodo",
+  "tour.staff.zenodoImport.body":
+    "Busca en el corpus público de Zenodo e importa conjuntos de datos directamente al servidor.",
+  "tour.medico.done.title": "Todo listo",
+  "tour.medico.done.body":
+    "Ese es tu kit clínico — buscar, revisar, subir, importar y exportar con todos los metadatos. La gestión de usuarios, la configuración/publicación en Zenodo y el registro de actividad son solo para administradores. Reabre este tutorial cuando quieras desde el botón ?.",
+  "tour.admin.usersTab.title": "Gestión de usuarios",
+  "tour.admin.usersTab.body":
+    "Abre la pestaña Usuarios para gestionar cuentas — solo la ven los administradores.",
+  "tour.admin.create.title": "Crear un usuario",
+  "tour.admin.create.body":
+    "Añade un usuario con nombre, correo y rol. Se le envía una invitación por correo.",
+  "tour.admin.role.title": "Asignar roles",
+  "tour.admin.role.body":
+    "Cambia aquí el rol de un usuario — investigador, médico o administrador.",
+  "tour.admin.block.title": "Bloquear y habilitar",
+  "tour.admin.block.body":
+    "Bloquea una cuenta para suspender el acceso y vuelve a habilitarla más tarde.",
+  "tour.admin.delete.title": "Eliminar un usuario",
+  "tour.admin.delete.body":
+    "La eliminación es un borrado lógico — la cuenta se retira pero se conserva el historial de auditoría.",
+  "tour.admin.lastAccess.title": "Último acceso",
+  "tour.admin.lastAccess.body":
+    "El último inicio de sesión de cada usuario se registra en esta columna.",
+  "tour.admin.activity.title": "Registro de actividad",
+  "tour.admin.activity.body":
+    "Abre el registro de auditoría para revisar las acciones del sistema y expórtalo como CSV.",
+  "tour.admin.zenodo.title": "Administración de Zenodo",
+  "tour.admin.zenodo.body":
+    "Configura las credenciales y la sincronización de Zenodo, revisa los registros de sincronización y la cuota, y publica estudios. La publicación es irreversible y hace los datos públicos — verifica con cuidado antes de publicar.",
+  "tour.admin.help.title": "Reábrelo cuando quieras",
+  "tour.admin.help.body":
+    "Ese es el kit completo de administrador. Relanza este tutorial cuando quieras desde este botón ?.",
+  // ── validation (US-26) ───────────────────────────────────────────────────────
+  "validation.barAriaLabel": "Validación de diagnóstico",
+  "validation.approve": "Aprobar",
+  "validation.reject": "Rechazar",
+  "validation.review": "Marcar para revisión",
+  "validation.correctionNotice":
+    "Se registrará una corrección sobre la validación previa.",
+  "validation.dialog.title": "Confirmar acción",
+  "validation.dialog.titleCorrection": "Registrar corrección",
+  "validation.dialog.msg.approved": "¿Confirmás la aprobación de este estudio?",
+  "validation.dialog.msg.rejected":
+    "¿Confirmás el rechazo de este estudio? El comentario es obligatorio.",
+  "validation.dialog.msg.review":
+    "¿Marcás este estudio para revisión posterior?",
+  "validation.dialog.msg.correctionApproved":
+    "¿Registrás una corrección aprobando este estudio?",
+  "validation.dialog.msg.correctionRejected":
+    "¿Registrás una corrección rechazando este estudio? El comentario es obligatorio.",
+  "validation.dialog.msg.correctionReview":
+    "¿Registrás una corrección marcando este estudio para revisión?",
+  "validation.dialog.commentLabel": "Comentario",
+  "validation.dialog.commentRequired":
+    "Se recomienda dejar un comentario al rechazar.",
+  "validation.dialog.confirm": "Confirmar",
+  "validation.status.approved": "Aprobado",
+  "validation.status.rejected": "Rechazado",
+  "validation.status.review": "Para revisión",
+  "validation.status.none": "Sin validación",
+  "classification.label": "Clasificación",
+  "classification.none": "Sin clasificar",
+  "classification.acv": "ACV",
+  "classification.hemorragia": "Hemorragia",
+  "classification.tumor": "Tumor",
+  "classification.desmielinizante": "Desmielinizante",
+  "classification.normales": "Normales",
+  "classification.otros": "Otros",
+  "validation.toast.success.approved": "Estudio aprobado.",
+  "validation.toast.success.rejected": "Estudio rechazado.",
+  "validation.toast.success.review": "Estudio marcado para revisión.",
+  "validation.toast.success.correction": "Corrección registrada.",
+  "validation.toast.error": "No se pudo registrar la validación.",
+  "validation.analysisDone": "Análisis completado.",
+  "validation.analysisFailed": "Error en el análisis.",
+  "validation.readonlyNotice":
+    "Solo el administrador puede corregir esta validación.",
+
+  // ── Panel de Validaciones (US-26) ────────────────────────────────────────────
+  "validations.tab": "Validaciones",
+  "validations.filtersLabel": "Filtrar por estado",
+  "validations.filterAll": "Todos",
+  "validations.filterPending": "Sin validar",
+  "validations.filterApproved": "Aprobados",
+  "validations.filterRejected": "Rechazados",
+  "validations.filterReview": "Para revisión",
+  "validations.colPatient": "Paciente",
+  "validations.colModality": "Modalidad",
+  "validations.colDate": "Fecha",
+  "validations.colStatus": "Estado",
+  "validations.colValidatedBy": "Validado por",
+  "validations.colActions": "Acciones",
+  "validations.segmentWithAI": "Segmentar con IA",
+  "validations.empty": "No hay estudios que coincidan con el filtro.",
+  "validations.loadError": "No se pudo cargar la lista de estudios.",
+  "validations.actionSuccess.approved": "Estudio aprobado.",
+  "validations.actionSuccess.rejected": "Estudio rechazado.",
+  "validations.actionSuccess.review": "Estudio marcado para revisión.",
+  "validations.rejectDialog.title": "Rechazar estudio",
+  "validations.rejectDialog.commentLabel": "Comentario (opcional)",
+  "validations.rejectDialog.confirm": "Rechazar",
+  "validations.correctionBadge": "corrección",
+
+  // ── Configuración de Servidor (TK-29) ───────────────────────────────────────
+  "serverConfig.title": "Configuración del Servidor",
+  "serverConfig.description":
+    "Ingresá la URL base del servidor PACS/Orthanc para consultar estudios, metadatos y volúmenes DICOM.",
+  "serverConfig.urlLabel": "URL del Servidor",
+  "serverConfig.urlPlaceholder": "http://localhost:3000",
+  "serverConfig.saveAndConnect": "Guardar / Conectar",
+  "serverConfig.saveSuccess": "Configuración guardada exitosamente.",
+  "serverConfig.invalidUrl":
+    "Formato de URL inválido. Usá http:// o https:// (ej. http://localhost:3000)",
+
+  // ── Medición y anotaciones (TK-26) ──────────────────────────────────────────
+  "annotations.length": "Longitud",
+  "annotations.area": "Área",
+  "annotations.mean": "Media",
+  "annotations.stdDev": "Desvío Est.",
+  "annotations.uncalibrated": "Sin calibración espacial",
+  "annotations.polygon": "Polígono",
+  "annotations.perimeter": "Perímetro",
+  "viewer.measure.panelTitle": "Ajuste de Mediciones",
+  "viewer.measure.unitLabel": "Unidades",
+  "viewer.measure.pathologyLabel": "Patología",
+  "viewer.measure.pathologyNeedPolygon":
+    "Seleccioná un polígono para asignarle una patología.",
+  "viewer.measure.unitMm": "Milímetros (mm)",
+  "viewer.measure.unitCm": "Centímetros (cm)",
+  "viewer.measure.lineWidthLabel": "Grosor de línea",
+  "viewer.measure.clearAnnotations": "Borrar mediciones",
+  "viewer.measure.exportSegmentation": "Exportar Segmentación",
+  "viewer.measure.noSegmentationToExport":
+    "No hay segmentaciones poligonales para exportar en este corte.",
+  "viewer.measure.exportSuccess": "Segmentación exportada exitosamente.",
+  "viewer.measure.toggleVisibility": "Esconder/Mostrar",
+  "viewer.measure.hideAnnotations": "Ocultar anotaciones",
+  "viewer.measure.showAnnotations": "Mostrar anotaciones",
+  "viewer.info.hide": "Ocultar info",
+  "viewer.info.show": "Mostrar info",
+  "viewer.measure.saveAnnotations": "Guardar",
+  "viewer.measure.savedSuccess": "¡Guardado!",
 };

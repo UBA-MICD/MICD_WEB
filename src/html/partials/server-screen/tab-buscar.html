@@ -1,0 +1,239 @@
+<!-- Screen 03: this panel's only job is finding and opening a study. -->
+<div
+  class="server-panel hidden"
+  id="panel-buscar"
+  role="tabpanel"
+  aria-labelledby="tab-buscar"
+  tabindex="0"
+>
+  <div class="buscar-layout">
+    <div class="server-panel__body" data-explorer-view="server">
+      <div class="server-filters">
+        <div class="filter-search">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            class="filter-search__icon"
+          >
+            <circle cx="10" cy="10" r="7" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+          </svg>
+          <label
+            class="sr-only"
+            for="server-search-studies"
+            data-i18n="explorer.searchLabel"
+            >Buscar paciente o ID</label
+          >
+          <input
+            type="text"
+            id="server-search-studies"
+            class="filter-search__input"
+            data-explorer-search
+            data-i18n-attr="placeholder:explorer.searchLabel"
+            placeholder="Buscar paciente o ID"
+            autocomplete="off"
+          />
+          <button
+            class="filter-search__clear hidden"
+            data-explorer-search-clear
+            data-i18n-attr="aria-label:explorer.clearSearch"
+            aria-label="Limpiar búsqueda"
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <label
+          class="sr-only"
+          for="server-date-from"
+          data-i18n="explorer.dateFromLabel"
+          >Desde</label
+        >
+        <input
+          type="date"
+          id="server-date-from"
+          class="filter-date"
+          data-explorer-date-from
+          data-i18n-attr="title:explorer.dateFromLabel"
+          title="Desde"
+        />
+        <label
+          class="sr-only"
+          for="server-date-to"
+          data-i18n="explorer.dateToLabel"
+          >Hasta</label
+        >
+        <input
+          type="date"
+          id="server-date-to"
+          class="filter-date"
+          data-explorer-date-to
+          data-i18n-attr="title:explorer.dateToLabel"
+          title="Hasta"
+        />
+      </div>
+
+      <div class="filter-search">
+        <label
+          class="sr-only"
+          for="server-filter-description"
+          data-i18n="explorer.descriptionLabel"
+          >Descripción</label
+        >
+        <input
+          type="text"
+          id="server-filter-description"
+          class="filter-search__input"
+          data-explorer-description
+          data-i18n-attr="placeholder:explorer.descriptionPlaceholder"
+          placeholder="Filtrar por descripción"
+          autocomplete="off"
+        />
+      </div>
+
+      <div
+        class="filter-chips"
+        data-explorer-chips
+        role="group"
+        data-i18n-attr="aria-label:explorer.modalityLabel"
+        aria-label="Modalidad"
+      >
+        <button
+          class="filter-chip filter-chip--active"
+          data-modality=""
+          aria-pressed="true"
+          data-i18n="explorer.modalityAll"
+        >
+          Todas
+        </button>
+        <button class="filter-chip" data-modality="CT" aria-pressed="false">
+          CT
+        </button>
+        <button class="filter-chip" data-modality="MR" aria-pressed="false">
+          MR
+        </button>
+        <button class="filter-chip" data-modality="DX" aria-pressed="false">
+          RX
+        </button>
+        <button class="filter-chip" data-modality="CR" aria-pressed="false">
+          CR
+        </button>
+        <button class="filter-chip" data-modality="US" aria-pressed="false">
+          US
+        </button>
+        <button class="filter-chip" data-modality="NM" aria-pressed="false">
+          NM
+        </button>
+        <button class="filter-chip" data-modality="PT" aria-pressed="false">
+          PET
+        </button>
+        <button class="filter-chip" data-modality="MG" aria-pressed="false">
+          MG
+        </button>
+        <button class="filter-chip" data-modality="XA" aria-pressed="false">
+          XA
+        </button>
+        <button
+          class="filter-chip filter-chip--zenodo"
+          data-zenodo-linked
+          aria-pressed="false"
+          data-i18n="zenodo.linkedFilter"
+        >
+          Vinculado a Zenodo
+        </button>
+      </div>
+
+      <!-- A listbox, not a list of buttons: one study is chosen, then
+               confirmed with the primary action below. -->
+      <ul
+        class="study-grid"
+        data-explorer-list
+        role="listbox"
+        data-i18n-attr="aria-label:explorer.panelTitle"
+        aria-label="Estudios en servidor"
+        tabindex="0"
+      ></ul>
+
+      <div class="explorer-pagination">
+        <button
+          class="icon-btn"
+          data-explorer-prev
+          data-i18n-attr="title:explorer.prevPage; aria-label:explorer.prevPage"
+          title="Página anterior"
+          aria-label="Página anterior"
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span class="pagination-info" data-explorer-pagination-info>—</span>
+        <button
+          class="icon-btn"
+          data-explorer-next
+          data-i18n-attr="title:explorer.nextPage; aria-label:explorer.nextPage"
+          title="Página siguiente"
+          aria-label="Página siguiente"
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+            <polyline points="9 6 15 12 9 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <aside
+      class="study-detail-panel hidden"
+      id="study-detail-panel"
+      data-i18n-attr="aria-label:studyDetail.ariaLabel"
+      aria-label="Detalle del estudio en Zenodo"
+    >
+      <div id="study-detail-content" class="study-detail-panel__content"></div>
+    </aside>
+  </div>
+  <!-- /.buscar-layout -->
+
+  <footer class="server-panel__actions">
+    <button
+      class="btn btn--secondary"
+      id="btn-buscar-cancel"
+      data-i18n="common.cancel"
+    >
+      Cancelar
+    </button>
+    <button
+      class="btn btn--accent"
+      id="btn-open-selected"
+      disabled
+      data-i18n="explorer.openSelected"
+    >
+      Abrir estudio seleccionado
+    </button>
+  </footer>
+</div>

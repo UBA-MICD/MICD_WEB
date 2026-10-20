@@ -71,6 +71,7 @@ const baseMeta = {
   rescaleSlope: 1,
   windowCenter: 40,
   windowWidth: 400,
+  imageOrientationPatient: [1, 0, 0, 0, 1, 0],
   transferSyntaxUid: "1.2.840.10008.1.2.1",
 };
 
@@ -232,7 +233,8 @@ test("updateMprButtonState disables with a reason for <=1 items, missing metadat
 });
 
 test("updateMprButtonState enables the button and reflects is3DMode in title/active class", () => {
-  const btn = document.getElementById("tool-mpr") as HTMLButtonElement;
+  const btn3D = document.getElementById("tool-view-3d") as HTMLButtonElement;
+  const btnMpr = document.getElementById("tool-mpr") as HTMLButtonElement;
   state.files = [new File(["a"], "a.dcm"), new File(["b"], "b.dcm")];
   state.parsed = {
     metadata: {
@@ -245,16 +247,24 @@ test("updateMprButtonState enables the button and reflects is3DMode in title/act
   } as any;
 
   updateMprButtonState();
-  assert.equal(btn.disabled, false);
-  assert.equal(btn.classList.contains("active"), false);
+  assert.equal(btn3D.disabled, false);
+  assert.equal(btn3D.classList.contains("active"), false);
+  assert.equal(btnMpr.disabled, false);
+  assert.equal(btnMpr.classList.contains("active"), false);
 
   state.is3DMode = true;
   updateMprButtonState();
-  assert.equal(btn.classList.contains("active"), true);
+  assert.equal(btn3D.classList.contains("active"), true);
+
+  state.is3DMode = false;
+  state.isMprMode = true;
+  updateMprButtonState();
+  assert.equal(btnMpr.classList.contains("active"), true);
 });
 
 test("updateMprButtonState is a no-op when the button doesn't exist", () => {
-  document.getElementById("tool-mpr")!.remove();
+  document.getElementById("tool-view-3d")?.remove();
+  document.getElementById("tool-mpr")?.remove();
   assert.doesNotThrow(() => updateMprButtonState());
 });
 
@@ -404,6 +414,42 @@ test("updateOrientationLabels shows A/P/R/L in 2D mode with pixel data", () => {
   assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "P");
   assert.equal(document.getElementById("mpr-orient-left")!.textContent, "R");
   assert.equal(document.getElementById("mpr-orient-right")!.textContent, "L");
+});
+
+test("updateOrientationLabels shows S/I/R/L for coronal orientation", () => {
+  state.parsed = {
+    metadata: {
+      ...baseMeta,
+      imageOrientationPatient: [1, 0, 0, 0, 0, -1],
+    },
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
+  state.is3DMode = false;
+
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "S");
+  assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "I");
+  assert.equal(document.getElementById("mpr-orient-left")!.textContent, "R");
+  assert.equal(document.getElementById("mpr-orient-right")!.textContent, "L");
+});
+
+test("updateOrientationLabels clears labels when IOP is missing or degenerate (AC-5)", () => {
+  state.parsed = {
+    metadata: {
+      ...baseMeta,
+      imageOrientationPatient: undefined,
+    },
+    pixelData: new Uint16Array([0, 1, 2, 3]),
+    rawDataSet: {},
+  } as any;
+  state.is3DMode = false;
+
+  updateOrientationLabels();
+  assert.equal(document.getElementById("mpr-orient-top")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-bottom")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-left")!.textContent, "");
+  assert.equal(document.getElementById("mpr-orient-right")!.textContent, "");
 });
 
 test("a locale change re-renders the metadata panel, series nav, and info overlay", async () => {

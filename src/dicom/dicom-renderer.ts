@@ -5,6 +5,7 @@
  */
 
 import type { DicomMetadata } from "./dicom-parser-util.js";
+import { getCanonicalFlip } from "./spatial-math.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,9 @@ export interface ViewportState {
   zoom: number;
   panX: number;
   panY: number;
+  layerOpacity?: number;
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 export interface RenderParams {
@@ -21,6 +25,9 @@ export interface RenderParams {
   pixelData: Int16Array | Uint16Array | Uint8Array;
   metadata: DicomMetadata;
   viewport: ViewportState;
+  overlayPixelData?: Int16Array | Uint16Array | Uint8Array | null;
+  overlayMetadata?: DicomMetadata | null;
+  overlayViewport?: ViewportState | null;
 }
 
 // ── Renderer ─────────────────────────────────────────────────────────────────
@@ -54,8 +61,11 @@ export function renderDicom(params: RenderParams): void {
   const isMonochrome1 = photometricInterpretation === "MONOCHROME1";
   const isRgb = photometricInterpretation === "RGB" && samplesPerPixel === 3;
 
+  const flipX = viewport.flipX ?? false;
+  const flipY = viewport.flipY ?? false;
+
   if (isRgb) {
-    renderRgb(pixelData, output, columns, rows);
+    renderRgb(pixelData, output, columns, rows, flipX, flipY);
   } else {
     renderMonochrome(
       pixelData,
@@ -67,18 +77,67 @@ export function renderDicom(params: RenderParams): void {
       rescaleSlope,
       rescaleIntercept,
       isMonochrome1,
+      flipX,
+      flipY,
     );
   }
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // Clear and apply transforms
-  const displayCanvas = canvas;
-  const displayCtx = ctx;
+  // Render base image
+  ctx.putImageData(imageData, 0, 0);
 
-  // We render to the canvas at native resolution, then CSS handles display scaling
-  displayCtx.putImageData(imageData, 0, 0);
+  // Render secondary overlay layer if present
+  if (params.overlayPixelData && params.overlayMetadata) {
+    const ovMeta = params.overlayMetadata;
+    const ovCanvas = document.createElement("canvas");
+    ovCanvas.width = ovMeta.columns;
+    ovCanvas.height = ovMeta.rows;
+    const ovCtx = ovCanvas.getContext("2d");
+    if (ovCtx) {
+      const ovImageData = ovCtx.createImageData(ovMeta.columns, ovMeta.rows);
+      const isOvMonochrome1 =
+        ovMeta.photometricInterpretation === "MONOCHROME1";
+      const isOvRgb =
+        ovMeta.photometricInterpretation === "RGB" &&
+        ovMeta.samplesPerPixel === 3;
+      const ovFlipX = params.overlayViewport?.flipX ?? flipX;
+      const ovFlipY = params.overlayViewport?.flipY ?? flipY;
+
+      if (isOvRgb) {
+        renderRgb(
+          params.overlayPixelData,
+          ovImageData.data,
+          ovMeta.columns,
+          ovMeta.rows,
+          ovFlipX,
+          ovFlipY,
+        );
+      } else {
+        renderMonochrome(
+          params.overlayPixelData,
+          ovImageData.data,
+          ovMeta.columns,
+          ovMeta.rows,
+          params.overlayViewport?.windowCenter ?? windowCenter,
+          params.overlayViewport?.windowWidth ?? windowWidth,
+          ovMeta.rescaleSlope,
+          ovMeta.rescaleIntercept,
+          isOvMonochrome1,
+          ovFlipX,
+          ovFlipY,
+        );
+      }
+      ovCtx.putImageData(ovImageData, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha =
+        typeof viewport.layerOpacity === "number" ? viewport.layerOpacity : 0.5;
+      ctx.drawImage(ovCanvas, 0, 0, columns, rows);
+      ctx.restore();
+    }
+  }
 }
 
 // ── Monochrome Rendering ─────────────────────────────────────────────────────
@@ -93,37 +152,44 @@ function renderMonochrome(
   rescaleSlope: number,
   rescaleIntercept: number,
   invert: boolean,
+  flipX: boolean = false,
+  flipY: boolean = false,
 ): void {
-  const totalPixels = rows * columns;
   const halfWindow = windowWidth / 2;
   const minValue = windowCenter - halfWindow;
   const range = windowWidth || 1;
 
-  for (let i = 0; i < totalPixels; i++) {
-    // Apply modality LUT (rescale)
-    const rawValue = pixelData[i];
-    const modalityValue = rawValue * rescaleSlope + rescaleIntercept;
+  for (let r = 0; r < rows; r++) {
+    const dstR = flipY ? rows - 1 - r : r;
+    const srcRowOffset = r * columns;
+    const dstRowOffset = dstR * columns;
 
-    // Apply VOI LUT (window/level)
-    let intensity: number;
-    if (modalityValue <= minValue) {
-      intensity = 0;
-    } else if (modalityValue >= minValue + range) {
-      intensity = 255;
-    } else {
-      intensity = ((modalityValue - minValue) / range) * 255;
+    for (let c = 0; c < columns; c++) {
+      const dstC = flipX ? columns - 1 - c : c;
+      const rawValue = pixelData[srcRowOffset + c];
+      const modalityValue = rawValue * rescaleSlope + rescaleIntercept;
+
+      // Apply VOI LUT (window/level)
+      let intensity: number;
+      if (modalityValue <= minValue) {
+        intensity = 0;
+      } else if (modalityValue >= minValue + range) {
+        intensity = 255;
+      } else {
+        intensity = ((modalityValue - minValue) / range) * 255;
+      }
+
+      // Invert for MONOCHROME1
+      if (invert) {
+        intensity = 255 - intensity;
+      }
+
+      const dstIdx = (dstRowOffset + dstC) * 4;
+      output[dstIdx] = intensity; // R
+      output[dstIdx + 1] = intensity; // G
+      output[dstIdx + 2] = intensity; // B
+      output[dstIdx + 3] = 255; // A
     }
-
-    // Invert for MONOCHROME1
-    if (invert) {
-      intensity = 255 - intensity;
-    }
-
-    const idx = i * 4;
-    output[idx] = intensity; // R
-    output[idx + 1] = intensity; // G
-    output[idx + 2] = intensity; // B
-    output[idx + 3] = 255; // A
   }
 }
 
@@ -134,28 +200,40 @@ function renderRgb(
   output: Uint8ClampedArray,
   columns: number,
   rows: number,
+  flipX: boolean = false,
+  flipY: boolean = false,
 ): void {
-  const totalPixels = rows * columns;
-  for (let i = 0; i < totalPixels; i++) {
-    const srcIdx = i * 3;
-    const dstIdx = i * 4;
-    output[dstIdx] = pixelData[srcIdx]; // R
-    output[dstIdx + 1] = pixelData[srcIdx + 1]; // G
-    output[dstIdx + 2] = pixelData[srcIdx + 2]; // B
-    output[dstIdx + 3] = 255; // A
+  for (let r = 0; r < rows; r++) {
+    const dstR = flipY ? rows - 1 - r : r;
+    const srcRowOffset = r * columns;
+    const dstRowOffset = dstR * columns;
+
+    for (let c = 0; c < columns; c++) {
+      const dstC = flipX ? columns - 1 - c : c;
+      const srcIdx = (srcRowOffset + c) * 3;
+      const dstIdx = (dstRowOffset + dstC) * 4;
+      output[dstIdx] = pixelData[srcIdx]; // R
+      output[dstIdx + 1] = pixelData[srcIdx + 1]; // G
+      output[dstIdx + 2] = pixelData[srcIdx + 2]; // B
+      output[dstIdx + 3] = 255; // A
+    }
   }
 }
 
 // ── Viewport Helpers ─────────────────────────────────────────────────────────
 
 export function createDefaultViewport(metadata: DicomMetadata): ViewportState {
-  return {
+  const { flipX, flipY } = getCanonicalFlip(metadata.imageOrientationPatient);
+  const vp: ViewportState = {
     windowCenter: metadata.windowCenter,
     windowWidth: metadata.windowWidth,
     zoom: 1.0,
     panX: 0,
     panY: 0,
   };
+  if (flipX) vp.flipX = true;
+  if (flipY) vp.flipY = true;
+  return vp;
 }
 
 export function applyCanvasTransform(
@@ -163,8 +241,7 @@ export function applyCanvasTransform(
   imageCanvas: HTMLCanvasElement,
   viewport: ViewportState,
 ): void {
-  // Apply zoom, pan, and vertical inversion (scaleY(-1)) so Anterior is at top and Posterior at bottom in 2D views
-  const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom}) scaleY(-1)`;
+  const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`;
   imageCanvas.style.transform = transform;
 }
 

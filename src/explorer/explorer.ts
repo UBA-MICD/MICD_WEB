@@ -2,8 +2,10 @@ import {
   authFetch,
   ensureAuthenticated,
   isAuthenticated,
-  API_BASE,
+  isInformatico,
 } from "../auth/auth.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
+import { fetchStudies, serverFetch } from "../services/api.js";
 import { escapeHtml, escapeAttr, formatDate } from "../shared/dom.js";
 import { loadStudyFromServer } from "../viewer/loading.js";
 import { t, onLocaleChange } from "../i18n/i18n.js";
@@ -34,6 +36,11 @@ interface StudyRecord {
   num_instances: number;
   zenodo_doi: string | null;
   zenodo_source_doi: string | null;
+  validation_status?: string | null;
+  validated_by?: string | null;
+  validated_at?: string | null;
+  classification_id?: number | null;
+  classification_key?: string | null;
 }
 
 interface StudiesResponse {
@@ -170,10 +177,26 @@ function wireView(view: ExplorerView): void {
 
     if (view.mode === "select") {
       setSelected(studyId);
+    } else if (isInformatico()) {
+      void exportStudyByIdAsZip(studyId, undefined, { anonymize: false });
     } else {
       void openStudy(studyId);
     }
   });
+
+  // Double-click is a shortcut for "select + confirm" on the Buscar surface, so
+  // a study opens without a separate trip to the "Abrir estudio seleccionado"
+  // button. Goes through activateListener (like Enter) so the owning screen
+  // opens it and navigates away.
+  if (view.mode === "select") {
+    view.list.addEventListener("dblclick", (e) => {
+      const item = (e.target as HTMLElement).closest<HTMLElement>("[data-id]");
+      const studyId = item?.dataset.id;
+      if (!studyId) return;
+      setSelected(studyId);
+      activateListener?.(studyId);
+    });
+  }
 
   if (view.mode === "select") wireListboxKeys(view);
 
@@ -394,7 +417,7 @@ export async function loadStudyExplorer(): Promise<void> {
   if (explorerState.zenodoLinked) params.set("zenodo_linked", "true");
 
   try {
-    const res = await authFetch(`${API_BASE}/v1/studies?${params}`);
+    const res = await fetchStudies(params);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data: StudiesResponse = await res.json();
 
@@ -507,6 +530,8 @@ function renderStudy(s: StudyRecord, mode: ExplorerMode): string {
       <span class="study-item__meta">
         <span class="study-item__badge">${modality}</span>
         ${imgLabel}
+        ${s.validation_status ? `<span class="study-item__validation-badge study-item__validation-badge--${escapeAttr(s.validation_status)}">${escapeHtml(t(`validation.status.${s.validation_status}`))}</span>` : ""}
+        ${s.classification_key ? `<span class="study-item__classification-badge study-item__classification-badge--${escapeAttr(s.classification_key)}">${escapeHtml(t(`classification.${s.classification_key}`))}</span>` : `<span class="study-item__classification-badge study-item__classification-badge--none">${escapeHtml(t("classification.none"))}</span>`}
       </span>
       ${zenodoBadges ? `<span class="study-item__zenodo-badges">${zenodoBadges}</span>` : ""}
     </span>`;
@@ -567,8 +592,8 @@ function loadThumbnails(list: HTMLElement): void {
     .forEach(async (img) => {
       const studyId = img.dataset.thumbId!;
       try {
-        const res = await authFetch(
-          `${API_BASE}/v1/studies/${encodeURIComponent(studyId)}/thumbnail`,
+        const res = await serverFetch(
+          `/v1/studies/${encodeURIComponent(studyId)}/thumbnail`,
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();

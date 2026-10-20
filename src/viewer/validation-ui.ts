@@ -1,0 +1,300 @@
+// ── Validation UI (US-26) ─────────────────────────────────────────────────────
+//
+// DOM wiring for the diagnostic validation feature. Shows Aprobar / Rechazar /
+// Marcar para revisión buttons in the viewer when a server study is open and
+// the user has the medico or admin role.
+//
+// When an admin opens a study that already has a validation, the same action
+// buttons submit a correction (POST /validation-correction) instead of a new
+// validation. A banner inside the bar makes this mode explicit.
+//
+// Call initValidation() once from main.ts. Call notifyStudyLoaded(id) from
+// loading.ts whenever a server study opens (or null when the viewer resets).
+
+import { isStaff, isAdmin } from "../auth/auth.js";
+import { $, escapeHtml } from "../shared/dom.js";
+import { openDialog, closeDialog } from "../shared/dialog.js";
+import { showToast } from "../shared/banner.js";
+import { t, onLocaleChange, currentLocale } from "../i18n/i18n.js";
+import { state } from "./state.js";
+import {
+  submitValidation,
+  submitCorrection,
+  type ValidationAction,
+  type ValidationRecord,
+} from "./validation-api.js";
+
+// ── Internal state ────────────────────────────────────────────────────────────
+
+let currentStudyId: string | null = null;
+// The validation bar only appears when a study is opened via "Ver estudio"
+// (the validations panel), which calls requestValidationMode() first. Normal
+// browsing — Buscar, the explorer panel, a fresh upload — shows the plain
+// viewer with no Aprobar/Rechazar controls. pendingValidationBar is the
+// one-shot request flag; notifyStudyLoaded() consumes it into validationBarActive.
+let pendingValidationBar = false;
+let validationBarActive = false;
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/** Returns true when the validation bar is currently shown (opened via "Ver estudio"). */
+export function isValidationBarActive(): boolean {
+  return validationBarActive;
+}
+
+/** Called from main.ts once during bootstrap. */
+export function initValidation(): void {
+  wireButtons();
+  onLocaleChange(refreshBar);
+}
+
+/**
+ * Signal that the next study load should show the validation bar.
+ * Call this immediately before openStudy() / loadStudyFromServer().
+ * The flag is consumed (cleared) by notifyStudyLoaded().
+ */
+export function requestValidationMode(): void {
+  pendingValidationBar = true;
+}
+
+/**
+ * Called from loading.ts after loadStudyFromServer resolves (pass the studyId),
+ * and from resetViewerToDropZone (pass null).
+ */
+export function notifyStudyLoaded(
+  studyId: string | null,
+  validation: ValidationRecord | null = null,
+): void {
+  currentStudyId = studyId;
+  state.serverValidation = validation
+    ? {
+        validationId: validation.validationId,
+        status: validation.status,
+        validatedBy: validation.validatedBy,
+        validatedAt: validation.validatedAt,
+      }
+    : null;
+  if (studyId === null) {
+    validationBarActive = false;
+  } else {
+    validationBarActive = pendingValidationBar;
+    pendingValidationBar = false;
+  }
+  refreshBar();
+}
+
+// ── Bar visibility & badge ────────────────────────────────────────────────────
+
+function refreshBar(): void {
+  const bar = document.getElementById("validation-bar");
+  if (!bar) return;
+
+  const shouldShow =
+    currentStudyId !== null &&
+    state.source === "server" &&
+    isStaff() &&
+    validationBarActive;
+
+  bar.classList.toggle("hidden", !shouldShow);
+
+  if (!shouldShow) return;
+
+  renderBadge();
+  renderCorrectionNotice();
+  renderReadonlyNotice();
+  renderActionButtons();
+}
+
+function renderBadge(): void {
+  const badge = document.getElementById("validation-status-badge");
+  if (!badge) return;
+
+  const v = state.serverValidation;
+  const known = ["approved", "rejected", "review"];
+  if (!v || !known.includes(v.status)) {
+    badge.textContent = t("validation.status.none");
+    badge.className = "validation-bar__status validation-bar__status--none";
+    return;
+  }
+
+  const date = formatValidationDate(v.validatedAt);
+  badge.textContent = `${t(`validation.status.${v.status}`)} · ${v.validatedBy} · ${date}`;
+  badge.className = `validation-bar__status validation-bar__status--${v.status}`;
+}
+
+/** Shows the correction-mode notice when admin + prior validation exists. */
+function renderCorrectionNotice(): void {
+  const notice = document.getElementById("validation-correction-notice");
+  if (!notice) return;
+  const inCorrectionMode = isAdmin() && state.serverValidation !== null;
+  notice.classList.toggle("hidden", !inCorrectionMode);
+}
+
+/** Shows readonly notice when medico opens an already-validated study. */
+function renderReadonlyNotice(): void {
+  const notice = document.getElementById("validation-readonly-notice");
+  if (!notice) return;
+  const isReadonly = !isAdmin() && state.serverValidation !== null;
+  notice.classList.toggle("hidden", !isReadonly);
+}
+
+/** Hides action buttons for medico on already-validated studies (admin corrects instead). */
+function renderActionButtons(): void {
+  const canAct = isAdmin() || state.serverValidation === null;
+  for (const id of [
+    "btn-validate-approve",
+    "btn-validate-reject",
+    "btn-validate-review",
+  ]) {
+    document.getElementById(id)?.classList.toggle("hidden", !canAct);
+  }
+}
+
+function isCorrectionMode(): boolean {
+  return isAdmin() && state.serverValidation !== null;
+}
+
+function formatValidationDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(currentLocale() === "en" ? "en-US" : "es-AR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ── Button wiring ─────────────────────────────────────────────────────────────
+
+function wireButtons(): void {
+  document
+    .getElementById("btn-validate-approve")
+    ?.addEventListener("click", () => handleAction("approved"));
+  document
+    .getElementById("btn-validate-reject")
+    ?.addEventListener("click", () => handleAction("rejected"));
+  document
+    .getElementById("btn-validate-review")
+    ?.addEventListener("click", () => handleAction("review"));
+}
+
+async function handleAction(action: ValidationAction): Promise<void> {
+  const studyId = currentStudyId;
+  if (!studyId) return;
+
+  const isCorrection = isCorrectionMode();
+  const result = await openValidationDialog(action, isCorrection);
+  if (!result.confirmed) return;
+
+  const res = isCorrection
+    ? await submitCorrection(studyId, action, result.comment || undefined)
+    : await submitValidation(studyId, action, result.comment || undefined);
+
+  if (!res.ok) {
+    showToast(res.error, "error");
+    return;
+  }
+
+  state.serverValidation = res.data;
+
+  const toastKey = isCorrection
+    ? "validation.toast.success.correction"
+    : `validation.toast.success.${action}`;
+  showToast(t(toastKey), "success");
+
+  renderBadge();
+  renderCorrectionNotice();
+}
+
+// ── Dialog ────────────────────────────────────────────────────────────────────
+
+interface DialogResult {
+  confirmed: boolean;
+  comment: string;
+}
+
+function openValidationDialog(
+  action: ValidationAction,
+  isCorrection: boolean,
+): Promise<DialogResult> {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById("validation-dialog") as HTMLElement;
+    const titleEl = document.getElementById("validation-dialog-title");
+    const msgEl = document.getElementById("validation-dialog-msg");
+    const commentEl = document.getElementById(
+      "validation-comment",
+    ) as HTMLTextAreaElement;
+    const requiredNote = document.getElementById("validation-comment-required");
+    const confirmBtn = document.getElementById("validation-dialog-confirm");
+    const cancelBtn = document.getElementById("validation-dialog-cancel");
+
+    if (
+      !overlay ||
+      !titleEl ||
+      !msgEl ||
+      !commentEl ||
+      !requiredNote ||
+      !confirmBtn ||
+      !cancelBtn
+    ) {
+      resolve({ confirmed: false, comment: "" });
+      return;
+    }
+
+    const titleKey = isCorrection
+      ? "validation.dialog.titleCorrection"
+      : "validation.dialog.title";
+    const msgKey = isCorrection
+      ? `validation.dialog.msg.correction${capitalize(action)}`
+      : `validation.dialog.msg.${action}`;
+
+    titleEl.textContent = t(titleKey);
+    msgEl.textContent = t(msgKey);
+    commentEl.value = "";
+    // El comentario es opcional en toda acción, rechazo incluido: la nota
+    // sólo recuerda que conviene dejarlo al rechazar, no bloquea el envío.
+    requiredNote.classList.toggle("hidden", action !== "rejected");
+
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    openDialog(overlay, opener);
+
+    function finish(confirmed: boolean): void {
+      cleanup();
+      closeDialog(overlay);
+      resolve({ confirmed, comment: commentEl.value.trim() });
+    }
+
+    function onConfirm(): void {
+      finish(true);
+    }
+
+    function onCancel(): void {
+      finish(false);
+    }
+
+    function onDialogClose(): void {
+      cleanup();
+      resolve({ confirmed: false, comment: "" });
+    }
+
+    function cleanup(): void {
+      confirmBtn!.removeEventListener("click", onConfirm);
+      cancelBtn!.removeEventListener("click", onCancel);
+      overlay.removeEventListener("dialog:close", onDialogClose);
+    }
+
+    confirmBtn.addEventListener("click", onConfirm);
+    cancelBtn.addEventListener("click", onCancel);
+    overlay.addEventListener("dialog:close", onDialogClose, { once: true });
+  });
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

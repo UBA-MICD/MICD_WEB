@@ -1,0 +1,64 @@
+<!-- Layers Popover Panel -->
+<div
+  id="popover-layers"
+  class="toolbar-popover hidden"
+  role="dialog"
+  aria-label="Ajuste de Capas"
+>
+  <div class="popover-header" data-i18n="viewer.layers.title"></div>
+  <div class="popover-body">
+    <button
+      id="btn-load-layer"
+      class="toolbar-btn"
+      style="width: 100%; margin-bottom: 8px"
+      data-i18n="viewer.layers.loadBtn"
+    >
+      Cargar Estudio Superpuesto
+    </button>
+    <input type="file" id="input-layer-file" multiple accept=".dcm" hidden />
+    <hr style="border-color: var(--border-color); margin: 8px 0" />
+    <label
+      class="popover-label"
+      for="slider-opacity"
+      data-i18n="viewer.layers.opacity"
+      >Opacidad</label
+    >
+    <input
+      type="range"
+      id="slider-opacity"
+      class="wl-slider styled-slider"
+      min="0"
+      max="1"
+      step="0.05"
+      value="0.5"
+    />
+    <label
+      class="popover-label"
+      for="slider-layer-ww"
+      data-i18n="viewer.layers.ww"
+      >Ancho de Capa (WW)</label
+    >
+    <input
+      type="range"
+      id="slider-layer-ww"
+      class="wl-slider styled-slider"
+      min="1"
+      max="4000"
+      value="400"
+    />
+    <label
+      class="popover-label"
+      for="slider-layer-wl"
+      data-i18n="viewer.layers.wl"
+      >Centro de Capa (WL)</label
+    >
+    <input
+      type="range"
+      id="slider-layer-wl"
+      class="wl-slider styled-slider"
+      min="-1000"
+      max="1000"
+      value="40"
+    />
+  </div>
+</div>

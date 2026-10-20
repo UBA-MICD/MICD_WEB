@@ -1,0 +1,48 @@
+<!-- Public accept-invite screen (US-H04), entered from ?invite=<code>. -->
+<section
+  id="invite-screen"
+  class="screen server-screen hidden"
+  aria-labelledby="invite-heading"
+>
+  <div class="server-auth">
+    <div class="auth-card">
+      <h2
+        class="auth-card__title"
+        id="invite-heading"
+        data-screen-heading
+        tabindex="-1"
+        data-i18n="invite.title"
+      >
+        Crear tu cuenta
+      </h2>
+      <p class="auth-card__msg" data-invite-email></p>
+
+      <form data-invite-form class="hidden">
+        <label class="auth-field">
+          <span data-i18n="invite.password">Contraseña</span>
+          <input
+            type="password"
+            data-invite-password
+            autocomplete="new-password"
+          />
+        </label>
+        <p class="form-error hidden" data-invite-error role="alert"></p>
+        <button
+          class="btn btn--accent"
+          type="submit"
+          data-invite-submit
+          data-i18n="invite.submit"
+        >
+          Crear cuenta e ingresar
+        </button>
+      </form>
+
+      <p
+        class="form-error hidden"
+        data-invite-invalid
+        role="alert"
+        data-i18n="invite.invalid"
+      ></p>
+    </div>
+  </div>
+</section>

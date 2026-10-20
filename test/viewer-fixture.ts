@@ -19,8 +19,13 @@ export function viewerFixtureHtml(): string {
     <button id="tool-zoom" aria-pressed="false"></button>
     <button id="tool-pan" aria-pressed="false"></button>
     <button id="tool-crosshair" aria-pressed="false"></button>
+    <button id="tool-length" aria-pressed="false"></button>
+    <button id="tool-ellipse" aria-pressed="false"></button>
+    <button id="tool-polygon" aria-pressed="false"></button>
+    <div id="measure-announce" class="sr-only"></div>
     <button id="tool-reset"></button>
     <button id="tool-metadata" aria-expanded="false"></button>
+    <button id="tool-view-3d" disabled></button>
     <button id="tool-mpr" disabled></button>
 
     <input type="file" id="open-files-input" multiple class="hidden" />
@@ -30,19 +35,46 @@ export function viewerFixtureHtml(): string {
 
     <button id="btn-export-menu" disabled></button>
 
+    <div id="view-3d-container" class="hidden">
+      <canvas id="view-3d-canvas" class="view-3d-canvas"></canvas>
+      <div class="view-3d-depth-slider-wrap hidden" id="view-3d-depth-slider-wrap">
+        <span id="view-3d-depth-counter">Slice: 1/1</span>
+        <input type="range" id="view-3d-depth-slider" min="0" max="0" value="0" />
+      </div>
+      <div class="view-3d-orientation-widget hidden" id="view-3d-orientation-widget">
+        <button class="btn-orient active" id="btn-view-3d-axial" data-i18n="viewer.view3d.axial">Axial</button>
+        <button class="btn-orient" id="btn-view-3d-sagittal" data-i18n="viewer.view3d.sagittal">Sagittal</button>
+        <button class="btn-orient" id="btn-view-3d-coronal" data-i18n="viewer.view3d.coronal">Coronal</button>
+        <button class="btn-orient" id="btn-view-3d-3d" data-i18n="viewer.view3d.volumetricView">3D</button>
+      </div>
+      <canvas id="view-3d-reference-cube"></canvas>
+      <div class="view-3d-sliders-panel" id="view-3d-sliders-panel">
+        <label for="view-3d-scroll-axial" data-i18n="viewer.view3d.axial">Axial</label>
+        <input type="range" id="view-3d-scroll-axial" min="0" max="0" value="0" />
+        <span id="view-3d-val-axial">0</span>
+        <label for="view-3d-scroll-sagittal" data-i18n="viewer.view3d.sagittal">Sagittal</label>
+        <input type="range" id="view-3d-scroll-sagittal" min="0" max="0" value="0" />
+        <span id="view-3d-val-sagittal">0</span>
+        <label for="view-3d-scroll-coronal" data-i18n="viewer.view3d.coronal">Coronal</label>
+        <input type="range" id="view-3d-scroll-coronal" min="0" max="0" value="0" />
+        <span id="view-3d-val-coronal">0</span>
+      </div>
+    </div>
+
     <div class="mpr-depth-slider-wrap hidden" id="mpr-depth-slider-wrap">
       <span id="mpr-depth-counter">Slice: 1/1</span>
       <input type="range" id="mpr-depth-slider" min="0" max="0" value="0" />
     </div>
     <div class="mpr-orientation-widget hidden" id="mpr-orientation-widget">
-      <button class="btn-orient active" id="btn-view-axial">Axial</button>
-      <button class="btn-orient" id="btn-view-sagittal">Sagittal</button>
-      <button class="btn-orient" id="btn-view-coronal">Coronal</button>
-      <button class="btn-orient" id="btn-view-3d">3D</button>
+      <button class="btn-orient active" id="btn-view-axial" data-i18n="viewer.view3d.axial">Axial</button>
+      <button class="btn-orient" id="btn-view-sagittal" data-i18n="viewer.view3d.sagittal">Sagittal</button>
+      <button class="btn-orient" id="btn-view-coronal" data-i18n="viewer.view3d.coronal">Coronal</button>
+      <button class="btn-orient" id="btn-view-3d" data-i18n="viewer.view3d.volumetricView">3D</button>
     </div>
 
     <div class="viewport-container cursor-wl" id="viewport-container">
       <canvas id="dicom-canvas"></canvas>
+      <canvas id="annotation-overlay" class="annotation-overlay"></canvas>
       <div class="overlay overlay--tl" id="overlay-tl"></div>
       <div class="overlay overlay--tr" id="overlay-tr"></div>
       <div class="overlay overlay--bl" id="overlay-bl"></div>
@@ -72,6 +104,21 @@ export function viewerFixtureHtml(): string {
       <button id="btn-zoom-fit"></button>
       <button id="btn-zoom-100"></button>
       <button id="btn-zoom-200"></button>
+    </aside>
+
+    <aside class="wl-panel" id="measure-panel">
+      <button id="btn-unit-mm" data-unit="mm"></button>
+      <button id="btn-unit-cm" data-unit="cm"></button>
+      <select id="select-measure-unit">
+        <option value="mm" selected>mm</option>
+        <option value="cm">cm</option>
+      </select>
+      <input type="range" id="slider-measure-width" min="1" max="5" step="1" value="2" />
+      <span id="val-measure-width">2px</span>
+      <button id="btn-toggle-annotations"></button>
+      <button id="btn-save-annotations"></button>
+      <button id="btn-export-segmentation"></button>
+      <button id="btn-clear-measurements"></button>
     </aside>
 
     <div id="mpr-orient-top" class="mpr-orient"></div>
@@ -108,10 +155,45 @@ export function stubCanvas2DContext(): void {
       canvas: this,
       imageSmoothingEnabled: true,
       imageSmoothingQuality: "high",
+      font: "10px sans-serif",
+      fillStyle: "#000",
+      strokeStyle: "#000",
+      lineWidth: 1,
+      lineCap: "butt",
+      textAlign: "left",
+      textBaseline: "alphabetic",
+      shadowColor: "transparent",
+      shadowBlur: 0,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
       createImageData(w: number, h: number) {
         return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h };
       },
       putImageData() {},
+      clearRect() {},
+      beginPath() {},
+      closePath() {},
+      moveTo() {},
+      lineTo() {},
+      stroke() {},
+      fill() {},
+      arc() {},
+      ellipse() {},
+      translate() {},
+      scale() {},
+      rotate() {},
+      setTransform() {},
+      save() {},
+      restore() {},
+      fillRect() {},
+      strokeRect() {},
+      fillText() {},
+      strokeText() {},
+      setLineDash() {},
+      measureText(text: string) {
+        return { width: (text || "").length * 7 };
+      },
+      roundRect() {},
     };
   };
 }

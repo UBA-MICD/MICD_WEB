@@ -12,18 +12,40 @@ import {
 // module loads to use that same-origin path (any absolute origin also works).
 function resolveApiOrigin(): string {
   const override = (globalThis as { MICD_API_ORIGIN?: string }).MICD_API_ORIGIN;
-  const raw = typeof override === "string" ? override : "http://localhost:3000";
-  return raw.replace(/\/+$/, ""); // strip trailing slash — callers add their own
+  if (typeof override === "string" && override.trim().length > 0) {
+    return override.trim().replace(/\/+$/, "");
+  }
+  if (typeof window !== "undefined" && window.localStorage) {
+    const stored =
+      window.localStorage.getItem("micd_server_url") ||
+      window.localStorage.getItem("micd_api_origin");
+    if (stored && typeof stored === "string" && stored.trim().length > 0) {
+      return stored.trim().replace(/\/+$/, "");
+    }
+  }
+  return typeof override === "string" ? override : "http://localhost:3000";
 }
 
-export const API_ORIGIN = resolveApiOrigin();
+export let API_ORIGIN = resolveApiOrigin();
+export let API_BASE = `${API_ORIGIN}/api`;
 
-const API_BASE = `${API_ORIGIN}/api`;
+export function updateApiOrigin(newOrigin: string): void {
+  API_ORIGIN = newOrigin.trim().replace(/\/+$/, "");
+  API_BASE = `${API_ORIGIN}/api`;
+}
 
-/** The three RBAC roles (mirrors the backend's shared/roles.ts). */
-export type Role = "admin" | "medico" | "investigador";
+export function getApiOrigin(): string {
+  return API_ORIGIN;
+}
 
-const ROLES: readonly Role[] = ["admin", "medico", "investigador"];
+export function getApiBase(): string {
+  return API_BASE;
+}
+
+/** The RBAC roles (mirrors the backend's shared/roles.ts). */
+export type Role = "admin" | "medico" | "investigador" | "informatico";
+
+const ROLES: readonly Role[] = ["admin", "medico", "investigador", "informatico"];
 
 function isRole(x: unknown): x is Role {
   return typeof x === "string" && (ROLES as readonly string[]).includes(x);
@@ -78,6 +100,9 @@ export function getCurrentRole(): Role | null {
  *  - `isStaff`  — clinical staff (admin + medico): may write — upload, import,
  *                 and the study Zenodo publish-check.
  *  - researcher — `investigador`: read-only, neither of the above.
+ *  - `isUploader`    — may upload DICOM: admin, medico and `informatico`.
+ *  - `isInformatico` — clinic IT: only uploads and downloads studies, so the
+ *                      explorer downloads a study instead of opening the viewer.
  */
 export function isAdmin(): boolean {
   return getCurrentRole() === "admin";
@@ -86,6 +111,14 @@ export function isAdmin(): boolean {
 export function isStaff(): boolean {
   const role = getCurrentRole();
   return role === "admin" || role === "medico";
+}
+
+export function isUploader(): boolean {
+  return isStaff() || isInformatico();
+}
+
+export function isInformatico(): boolean {
+  return getCurrentRole() === "informatico";
 }
 
 export function isAuthenticated(): boolean {
@@ -323,5 +356,3 @@ export async function authFetch(
   if (!(await refreshAccessToken()) && !(await promptLoginOnce())) return res;
   return fetch(input, withAuth(accessToken));
 }
-
-export { API_BASE };

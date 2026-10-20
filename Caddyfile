@@ -5,7 +5,6 @@
 # HTTP:80 -> HTTPS is automatic in Caddy. See docs/staging-deployment/plan.md §1.
 #
 # $STAGING_DOMAIN and $ACME_EMAIL are provided from .env.staging at run time.
-
 {
 	email {$ACME_EMAIL}
 }
@@ -14,7 +13,14 @@
 	encode zstd gzip
 
 	# API and auth calls -> backend (reached by service name over the `micd` network).
-	@api path /api/* /auth/*
+	# Static assets under /auth/* (e.g. /auth/session-ui.js, built from src/auth/)
+	# must NOT be proxied to the backend — they are served by the SPA. nginx handles
+	# this implicitly (regex .js/.css location outranks the /auth/ prefix); Caddy
+	# needs it spelled out, else the frontend's /auth/*.js 404s from the backend.
+	@api {
+		path /api/* /auth/*
+		not path *.js *.css *.map *.woff *.woff2 *.ttf *.svg *.png *.jpg *.jpeg *.gif *.ico
+	}
 	handle @api {
 		reverse_proxy backend:3000
 	}

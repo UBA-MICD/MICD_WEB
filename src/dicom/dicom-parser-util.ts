@@ -25,11 +25,13 @@ export interface DicomMetadata {
   // Series
   seriesDescription: string;
   seriesNumber: string;
+  seriesInstanceUid?: string;
   modality: string;
 
   // Instance
   instanceNumber: string;
   sopClassUid: string;
+  sopInstanceUid?: string;
 
   // Image
   rows: number;
@@ -56,6 +58,21 @@ export interface DicomMetadata {
   imageOrientationPatient?: number[]; // [Rx, Ry, Rz, Cx, Cy, Cz] (0020,0037)
   sliceThickness?: number; // (0028,0050)
   spacingBetweenSlices?: number; // (0018,0088)
+
+  // Derivation — only set on images this app derives from another instance
+  // (e.g. the AI segmentation result). Never read from a parsed file.
+  /** ReferencedImageSequence (0008,1140). */
+  referencedImageSequence?: ReferencedImage[];
+  /** DerivationDescription (0008,2111). */
+  derivationDescription?: string;
+}
+
+/** One item of ReferencedImageSequence (0008,1140). */
+export interface ReferencedImage {
+  /** ReferencedSOPClassUID (0008,1150). */
+  referencedSopClassUid: string;
+  /** ReferencedSOPInstanceUID (0008,1155). */
+  referencedSopInstanceUid: string;
 }
 
 export interface ParsedDicom {
@@ -170,11 +187,13 @@ function extractMetadata(dataSet: any): DicomMetadata {
     // Series
     seriesDescription: safeString(dataSet, "x0008103e"),
     seriesNumber: safeString(dataSet, "x00200011"),
+    seriesInstanceUid: safeString(dataSet, "x0020000e") || undefined,
     modality: safeString(dataSet, "x00080060"),
 
     // Instance
     instanceNumber: safeString(dataSet, "x00200013"),
     sopClassUid: safeString(dataSet, "x00080016"),
+    sopInstanceUid: safeString(dataSet, "x00080018") || undefined,
 
     // Image
     rows: safeUint16(dataSet, "x00280010"),

@@ -1,0 +1,127 @@
+<!-- Measurement Settings Panel (TK-26) -->
+<aside
+  class="wl-panel"
+  id="measure-panel"
+  data-i18n-attr="aria-label:viewer.measure.panelTitle"
+  aria-label="Ajuste de Mediciones"
+>
+  <div class="wl-header">
+    <h2 data-i18n="viewer.measure.panelTitle">Ajuste de Mediciones</h2>
+  </div>
+  <div class="wl-body">
+    <!-- Unit Selector Section -->
+    <div class="wl-section">
+      <span class="wl-section-title" data-i18n="viewer.measure.unitLabel"
+        >Unidades</span
+      >
+      <div
+        class="presets preset-grid"
+        role="group"
+        aria-label="Unidades de medida"
+      >
+        <button
+          type="button"
+          class="btn btn--outline preset-btn active"
+          id="btn-unit-mm"
+          data-unit="mm"
+          aria-pressed="true"
+        >
+          mm
+        </button>
+        <button
+          type="button"
+          class="btn btn--outline preset-btn"
+          id="btn-unit-cm"
+          data-unit="cm"
+          aria-pressed="false"
+        >
+          cm
+        </button>
+      </div>
+      <select
+        id="select-measure-unit"
+        class="sr-only"
+        aria-label="Unidad de medida"
+      >
+        <option value="mm" selected>Milímetros (mm)</option>
+        <option value="cm">Centímetros (cm)</option>
+      </select>
+    </div>
+
+    <!-- Pathology of the selected polygon (US-45). Same catalog as upload
+         (GET /v1/pathologies); applies to the currently selected polygon. -->
+    <div class="wl-section">
+      <label
+        class="wl-section-title"
+        for="measure-pathology"
+        data-i18n="viewer.measure.pathologyLabel"
+        >Patología</label
+      >
+      <select id="measure-pathology" class="measure-select">
+        <option value="" data-key="none" data-i18n="classification.none">
+          Sin clasificar
+        </option>
+      </select>
+    </div>
+
+    <!-- Line Width Slider Section -->
+    <div class="wl-section">
+      <div class="slider-control">
+        <div class="slider-header">
+          <label
+            for="slider-measure-width"
+            data-i18n="viewer.measure.lineWidthLabel"
+            >Grosor de línea</label
+          >
+          <span class="slider-val" id="val-measure-width">2px</span>
+        </div>
+        <input
+          type="range"
+          id="slider-measure-width"
+          class="wl-slider"
+          min="1"
+          max="5"
+          step="1"
+          value="2"
+        />
+      </div>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="wl-section">
+      <button
+        type="button"
+        class="measure-toggle-btn"
+        id="btn-toggle-annotations"
+        data-i18n="viewer.measure.toggleVisibility"
+        aria-pressed="true"
+      >
+        Ocultar anotaciones
+      </button>
+      <button
+        type="button"
+        class="measure-save-btn"
+        id="btn-save-annotations"
+        data-i18n="viewer.measure.saveAnnotations"
+      >
+        Guardar
+      </button>
+      <button
+        type="button"
+        class="measure-export-btn"
+        id="btn-export-segmentation"
+        data-i18n="viewer.measure.exportSegmentation"
+      >
+        Exportar Segmentación
+      </button>
+      <button
+        type="button"
+        class="btn btn--danger measure-clear-btn"
+        id="btn-clear-measurements"
+        data-i18n="viewer.measure.clearAnnotations"
+      >
+        Borrar mediciones
+      </button>
+    </div>
+  </div>
+</aside>

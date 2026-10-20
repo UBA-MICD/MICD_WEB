@@ -13,11 +13,18 @@ import {
   isAuthenticated,
   isAdmin,
   isStaff,
+  isUploader,
+  isInformatico,
+  getCurrentUser,
   onAuthChange,
 } from "../auth/auth.js";
+import { exportStudyByIdAsZip } from "../services/export-service.js";
 import { mountLoginForm } from "../auth/login-form.js";
 import { mountUsersPanel } from "../admin/users-panel.js";
 import { mountSystemPanel } from "../admin/system-panel.js";
+import { mountValidationsPanel } from "./validations-panel.js";
+import { requestValidationMode } from "../viewer/validation-ui.js";
+import { runSegmentation } from "../viewer/segmentation/segmentation-ui.js";
 import {
   loadStudyExplorer,
   getSelectedStudyId,
@@ -37,22 +44,32 @@ import { registerScreen, showScreen, currentScreen } from "../shared/screen.js";
 import { initRovingTabindex, nextRovingIndex } from "../shared/roving.js";
 import { t } from "../i18n/i18n.js";
 
-export type ServerTab = "buscar" | "cargar" | "usuarios" | "sistema";
+export type ServerTab =
+  "buscar" | "cargar" | "validaciones" | "usuarios" | "sistema";
 
 let activeTab: ServerTab = "buscar";
 let loginForm: ReturnType<typeof mountLoginForm> | null = null;
 let usersPanel: ReturnType<typeof mountUsersPanel> | null = null;
 let systemPanel: ReturnType<typeof mountSystemPanel> | null = null;
+let validationsPanel: ReturnType<typeof mountValidationsPanel> | null = null;
 /** Resolves the pending ensureAuthenticated() gate, if one sent us here. */
 let pendingGate: ((ok: boolean) => void) | null = null;
 
-const TABS: ServerTab[] = ["buscar", "cargar", "usuarios", "sistema"];
+const TABS: ServerTab[] = [
+  "buscar",
+  "cargar",
+  "validaciones",
+  "usuarios",
+  "sistema",
+];
 
 /** Can the current session use a tab? "usuarios" and "sistema" are admin-only;
- *  "cargar" (upload) is a write, so clinical staff only. */
+ *  "validaciones" is staff-only (medico + admin); "cargar" (upload) also admits
+ *  informatico. */
 function canUseTab(tab: ServerTab): boolean {
   if (tab === "usuarios" || tab === "sistema") return isAdmin();
-  if (tab === "cargar") return isStaff();
+  if (tab === "validaciones") return isStaff();
+  if (tab === "cargar") return isUploader();
   return true;
 }
 
@@ -83,6 +100,7 @@ function showTab(tab: ServerTab): void {
   });
 
   if (tab === "buscar") void loadStudyExplorer();
+  if (tab === "validaciones") void validationsPanel?.reload();
   if (tab === "usuarios") void usersPanel?.reload();
   if (tab === "sistema") void systemPanel?.reload();
 }
@@ -97,6 +115,30 @@ function renderForSession(): void {
   $("server-auth").classList.toggle("hidden", authed);
   $("server-tabs").classList.toggle("hidden", !authed);
 
+  // Re-pointing the server is an admin-only action (TK-29, spec 001): the settings
+  // gear is shown only to an admin, and hidden for guests and every non-admin role.
+  // `?.` guards partial test DOMs; isAdmin() is false for guests, so one line covers
+  // all branches (including the guest early-return below).
+  document
+    .getElementById("btn-server-settings")
+    ?.classList.toggle("hidden", !isAdmin());
+
+  // informatico has no viewer: this screen is the whole app, so there is no
+  // way back, no "cancel" that would leave it, and the session lives here.
+  const serverOnly = authed && isInformatico();
+  $("btn-server-back").classList.toggle("hidden", serverOnly);
+  document
+    .getElementById("btn-buscar-cancel")
+    ?.classList.toggle("hidden", serverOnly);
+  document
+    .getElementById("btn-upload-finish")
+    ?.classList.toggle("hidden", serverOnly);
+  document
+    .getElementById("server-session")
+    ?.classList.toggle("hidden", !serverOnly);
+  const emailEl = document.getElementById("server-session-email");
+  if (emailEl) emailEl.textContent = serverOnly ? getCurrentUser()!.email : "";
+
   if (!authed) {
     TABS.forEach((name) => tabPanel(name).classList.add("hidden"));
     loginForm?.reset();
@@ -109,6 +151,15 @@ function renderForSession(): void {
   TABS.forEach((tab) =>
     tabButton(tab).classList.toggle("hidden", !canUseTab(tab)),
   );
+  // informatico has no viewer access: the Buscar primary action downloads.
+  const primaryKey = isInformatico()
+    ? "explorer.downloadSelected"
+    : "explorer.openSelected";
+  const openSelected = document.getElementById("btn-open-selected");
+  if (openSelected) {
+    openSelected.dataset.i18n = primaryKey;
+    openSelected.textContent = t(primaryKey);
+  }
   if (!canUseTab(activeTab)) activeTab = "buscar";
   showTab(activeTab);
 }
@@ -138,6 +189,8 @@ export function closeServerScreen(): void {
   // A gate that sent us here and is still waiting gets its answer: the user
   // backed out, so the caller sees a plain "not authenticated".
   settleGate(isAuthenticated());
+  // informatico never leaves: the viewer is not part of its app.
+  if (isAuthenticated() && isInformatico()) return;
   clearSelection();
   showScreen("viewer");
 }
@@ -175,11 +228,30 @@ export function initServerScreen(): void {
   });
   usersPanel = mountUsersPanel($("panel-usuarios"));
   systemPanel = mountSystemPanel($("system-panel-body"));
+  validationsPanel = mountValidationsPanel(
+    $("panel-validaciones"),
+    async (studyId: string, options?: { segment?: boolean }) => {
+      requestValidationMode();
+      await openStudy(studyId);
+      closeServerScreen();
+      // La segmentación corre recién con el estudio ya cargado en el visor:
+      // necesita los píxeles y el tamaño de la imagen abierta.
+      if (options?.segment) {
+        await runSegmentation();
+      }
+    },
+  );
 
   // A role change (e.g. surfaced on the next token refresh) must re-evaluate the
-  // admin tab's visibility while the screen is already open.
+  // admin tab's visibility while the screen is already open. An informatico
+  // session is moved here from anywhere, since this screen is its whole app;
+  // a logout repaints the screen back to its login card.
   onAuthChange(() => {
-    if (isAuthenticated()) renderForSession();
+    if (isAuthenticated() && isInformatico() && currentScreen() !== "server") {
+      openServerScreen("buscar");
+    } else if (currentScreen() === "server") {
+      renderForSession();
+    }
   });
 
   $("btn-server-back").addEventListener("click", () => closeServerScreen());
@@ -218,6 +290,11 @@ export function initServerScreen(): void {
 
   const openSelectedStudy = async (studyId: string): Promise<void> => {
     openSelected.disabled = true;
+    if (isInformatico()) {
+      await exportStudyByIdAsZip(studyId, undefined, { anonymize: false });
+      openSelected.disabled = false;
+      return;
+    }
     await openStudy(studyId);
     closeServerScreen();
     showBanner(t("server.studyLoadedBanner"));
@@ -252,6 +329,11 @@ export function initServerScreen(): void {
       summary.duplicates === 0 &&
       summary.ok > 0;
     if (!clean) return;
+    // informatico stays on the upload screen: it has no viewer access.
+    if (isInformatico()) {
+      showBanner(t("upload.uploadedBanner", { count: summary.ok }), "success");
+      return;
+    }
     if (summary.studyId) await openStudy(summary.studyId);
     closeServerScreen();
     showBanner(

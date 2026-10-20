@@ -1,0 +1,106 @@
+<!-- Screen 04: upload on its own tab. -->
+<div
+  class="server-panel hidden"
+  id="panel-cargar"
+  role="tabpanel"
+  aria-labelledby="tab-cargar"
+  tabindex="0"
+>
+  <div class="server-panel__body">
+    <input type="file" id="upload-input" accept=".dcm,.zip" class="hidden" />
+    <input type="file" id="upload-folder-input" class="hidden" />
+
+    <div class="upload-drop" id="upload-drop">
+      <p data-i18n="upload.dropHint">
+        Arrastrá archivos .dcm, .zip o una carpeta aquí
+      </p>
+      <div class="upload-drop__actions">
+        <button
+          class="btn btn--accent"
+          id="btn-upload-server"
+          data-i18n="upload.selectFiles"
+        >
+          Seleccionar archivos o ZIP
+        </button>
+        <!-- Desktop only: in a browser, <input webkitdirectory> triggers Chrome's
+             own "Upload N files to this site?" prompt, which no page can
+             suppress. Browsers drop a folder onto this zone instead. -->
+        <button
+          class="btn btn--outline hidden"
+          id="btn-upload-folder"
+          data-desktop-only
+          data-i18n="upload.selectFolder"
+        >
+          Seleccionar carpeta
+        </button>
+      </div>
+    </div>
+
+    <!-- One panel for the whole upload, however many files (slices) it has.
+         Not a live region: per-byte updates would flood a screen reader. The
+         start and the final summary are announced via #upload-status, and
+         the bar carries aria-valuenow for on-demand reading. -->
+    <section
+      class="upload-progress hidden"
+      id="upload-progress"
+      aria-labelledby="upload-progress-title"
+    >
+      <div class="upload-progress__head">
+        <h3 class="upload-progress__title" id="upload-progress-title"></h3>
+        <span
+          class="upload-progress__pct"
+          id="upload-percent"
+          aria-hidden="true"
+        ></span>
+      </div>
+      <div
+        class="upload-progress__track"
+        id="upload-track"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        data-i18n-attr="aria-label:upload.progressLabel"
+        aria-label="Progreso de la carga"
+      >
+        <span class="upload-progress__bar" id="upload-bar"></span>
+      </div>
+      <p class="upload-progress__meta">
+        <span id="upload-phase"></span>
+        <span class="upload-progress__bytes" id="upload-bytes"></span>
+      </p>
+      <details class="upload-errors hidden" id="upload-errors">
+        <summary id="upload-errors-summary"></summary>
+        <ul class="upload-errors__list" id="upload-error-list"></ul>
+      </details>
+    </section>
+
+    <p class="upload-summary">
+      <span
+        id="upload-status"
+        class="upload-status"
+        role="status"
+        aria-live="polite"
+      ></span>
+    </p>
+
+    <p class="upload-note" id="upload-note"></p>
+  </div>
+
+  <footer class="server-panel__actions">
+    <button
+      class="btn btn--secondary"
+      id="btn-upload-cancel"
+      data-i18n="common.cancel"
+    >
+      Cancelar
+    </button>
+    <button
+      class="btn btn--accent"
+      id="btn-upload-finish"
+      data-i18n="upload.finish"
+    >
+      Finalizar
+    </button>
+  </footer>
+</div>

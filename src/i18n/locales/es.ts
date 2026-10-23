@@ -752,7 +752,7 @@ export const es: Record<string, string> = {
     "Abre la pestaña Cargar para añadir nuevos estudios al servidor.",
   "tour.staff.uploadDrop.title": "Arrastrar y soltar",
   "tour.staff.uploadDrop.body":
-    "Suelta archivos DICOM aquí para subirlos. Cada archivo se sube con su propia fila de progreso.",
+    "Suelta archivos DICOM aquí para subirlos. Antes de enviar se te pide clasificar el estudio; nada se sube hasta que confirmás. Cada archivo se sube con su propia fila de progreso.",
   "tour.staff.uploadFolder.title": "Subir una carpeta",
   "tour.staff.uploadFolder.body":
     "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
@@ -805,6 +805,48 @@ export const es: Record<string, string> = {
   "tour.admin.system.title": "Estado del sistema",
   "tour.admin.system.body":
     "Revisá el estado de los servicios y la información del servidor desde la pestaña Sistema.",
+  "tour.core.crosshair.title": "Crosshair 3D",
+  "tour.core.crosshair.body":
+    "Sincronizá la posición entre planos: al mover el cursor en un plano, los demás siguen el mismo punto en 3D.",
+  "tour.core.area.title": "Área y densidad (HU)",
+  "tour.core.area.body":
+    "Medí el área de una región y su densidad media en unidades Hounsfield con la herramienta de elipse.",
+  "tour.core.view3d.title": "Vista 3D",
+  "tour.core.view3d.body":
+    "Cambiá a una reconstrucción tridimensional del volumen para explorarlo en 3D.",
+  "tour.core.layers.title": "Capas de superposición",
+  "tour.core.layers.body":
+    "Mostrá u ocultá las capas superpuestas (segmentaciones, anotaciones) sobre la imagen.",
+  "tour.core.measurePanel.title": "Panel de mediciones",
+  "tour.core.measurePanel.body":
+    "Acá elegís la unidad (mm/cm), asignás una patología, ajustás el grosor, y podés guardar, exportar o borrar tus mediciones.",
+  "tour.core.series.title": "Navegar la serie",
+  "tour.core.series.body":
+    "Recorré los cortes de la serie con las flechas o el deslizador; también con AvPág/RePág.",
+  "tour.core.grid.title": "Vistas en grilla",
+  "tour.core.grid.body":
+    "Mostrá uno, dos o cuatro visores a la vez (1x1, 1x2, 2x2) para comparar estudios o series.",
+  "tour.core.sync.title": "Sincronizar visores",
+  "tour.core.sync.body":
+    "Con la grilla activa, sincronizá zoom, desplazamiento y corte entre los visores.",
+  "tour.core.toggleInfo.title": "Información sobre la imagen",
+  "tour.core.toggleInfo.body":
+    "Mostrá u ocultá los datos superpuestos (mediciones, HU, etiquetas de IA) sin quitar los contornos.",
+  "tour.core.faq.title": "Preguntas frecuentes",
+  "tour.core.faq.body":
+    "¿Dudas? Abrí la pantalla de preguntas frecuentes desde este botón en cualquier momento.",
+  "tour.staff.validationBar.title": "Validar diagnósticos",
+  "tour.staff.validationBar.body":
+    "Sobre la imagen podés aprobar, rechazar o marcar para revisión un diagnóstico; queda registrado.",
+  "tour.staff.segmentation.title": "Segmentación asistida",
+  "tour.staff.segmentation.body":
+    "Generá una segmentación con IA y corregila: enviá, transferí a mediciones o descartá el resultado.",
+  "tour.staff.studyDetail.title": "Detalle del estudio",
+  "tour.staff.studyDetail.body":
+    "Al seleccionar un estudio ves su detalle: series, metadatos y acciones como abrir o exportar.",
+  "tour.admin.serverConfig.title": "Configuración del servidor",
+  "tour.admin.serverConfig.body":
+    "Como administrador, configurá el servidor (origen de la API y ajustes) desde este engranaje.",
   "tour.resources.userGuide": "Guía de usuario",
   "tour.resources.videos": "Videos explicativos",
   "tour.resources.documentation": "Documentación",

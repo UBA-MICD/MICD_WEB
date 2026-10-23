@@ -745,7 +745,7 @@ export const en: Record<string, string> = {
     "Open the Upload tab to add new studies to the server.",
   "tour.staff.uploadDrop.title": "Drag & drop",
   "tour.staff.uploadDrop.body":
-    "Drop DICOM files here to upload them. Each file uploads with its own progress row.",
+    "Drop DICOM files here to upload them. You're asked to classify the study before sending; nothing is uploaded until you confirm. Each file uploads with its own progress row.",
   "tour.staff.uploadFolder.title": "Upload a folder",
   "tour.staff.uploadFolder.body":
     "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
@@ -798,6 +798,48 @@ export const en: Record<string, string> = {
   "tour.admin.system.title": "System status",
   "tour.admin.system.body":
     "Check service health and server information from the System tab.",
+  "tour.core.crosshair.title": "3D crosshair",
+  "tour.core.crosshair.body":
+    "Keep position in sync across planes: moving the cursor in one plane makes the others follow the same 3D point.",
+  "tour.core.area.title": "Area & density (HU)",
+  "tour.core.area.body":
+    "Measure a region's area and its mean density in Hounsfield units with the ellipse tool.",
+  "tour.core.view3d.title": "3D view",
+  "tour.core.view3d.body":
+    "Switch to a three-dimensional reconstruction of the volume to explore it in 3D.",
+  "tour.core.layers.title": "Overlay layers",
+  "tour.core.layers.body":
+    "Show or hide the overlaid layers (segmentations, annotations) on top of the image.",
+  "tour.core.measurePanel.title": "Measurements panel",
+  "tour.core.measurePanel.body":
+    "Here you pick the unit (mm/cm), assign a pathology, adjust line width, and save, export or clear your measurements.",
+  "tour.core.series.title": "Navigate the series",
+  "tour.core.series.body":
+    "Move through the slices with the arrows or the slider; PageUp/PageDown work too.",
+  "tour.core.grid.title": "Grid layouts",
+  "tour.core.grid.body":
+    "Show one, two or four viewports at once (1x1, 1x2, 2x2) to compare studies or series.",
+  "tour.core.sync.title": "Sync viewports",
+  "tour.core.sync.body":
+    "With a grid active, sync zoom, pan and slice across the viewports.",
+  "tour.core.toggleInfo.title": "On-image info",
+  "tour.core.toggleInfo.body":
+    "Show or hide the overlaid info (measurements, HU, AI tags) without removing the contours.",
+  "tour.core.faq.title": "Frequently asked questions",
+  "tour.core.faq.body":
+    "Questions? Open the FAQ screen from this button anytime.",
+  "tour.staff.validationBar.title": "Validate diagnoses",
+  "tour.staff.validationBar.body":
+    "On the image you can approve, reject or flag a diagnosis for review; it's recorded.",
+  "tour.staff.segmentation.title": "Assisted segmentation",
+  "tour.staff.segmentation.body":
+    "Generate an AI segmentation and correct it: submit, transfer to measurements, or discard the result.",
+  "tour.staff.studyDetail.title": "Study detail",
+  "tour.staff.studyDetail.body":
+    "Selecting a study shows its detail: series, metadata and actions like open or export.",
+  "tour.admin.serverConfig.title": "Server configuration",
+  "tour.admin.serverConfig.body":
+    "As an administrator, configure the server (API origin and settings) from this gear.",
   "tour.resources.userGuide": "User guide",
   "tour.resources.videos": "Explainer videos",
   "tour.resources.documentation": "Documentation",

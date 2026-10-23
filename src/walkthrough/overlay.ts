@@ -38,6 +38,14 @@ export interface OverlayLabels {
   close: string;
 }
 
+/** A help-hub link rendered in the popover: an external URL (`href`) opens in a
+ *  new tab; an in-app `action` (e.g. open the FAQ) is a button. */
+export interface OverlayResourceLink {
+  label: string;
+  href?: string;
+  action?: () => void;
+}
+
 export interface OverlayStepView {
   /** The element to spotlight, or null for a centered, spotlight-free step. */
   target: HTMLElement | null;
@@ -50,6 +58,8 @@ export interface OverlayStepView {
   /** "Next" or "Finish" — the primary button is always present (Next fallback). */
   nextLabel: string;
   labels: OverlayLabels;
+  /** Help-hub links shown above the controls (TK-45); omit/empty for none. */
+  links?: OverlayResourceLink[];
   reducedMotion: boolean;
 }
 
@@ -260,6 +270,10 @@ export function createOverlay(cb: OverlayCallbacks): Overlay {
   const body = document.createElement("p");
   body.className = "walkthrough__body";
 
+  // Help-hub links (TK-45): rebuilt on each render from the step's `links`.
+  const links = document.createElement("nav");
+  links.className = "walkthrough__links hidden";
+
   const closeBtn = button("walkthrough__close", () => cb.onSkip());
   closeBtn.dataset.tourClose = "";
   closeBtn.innerHTML = "&times;";
@@ -280,7 +294,7 @@ export function createOverlay(cb: OverlayCallbacks): Overlay {
   nextBtn.dataset.tourNext = "";
   controls.append(skipBtn, spacer, backBtn, nextBtn);
 
-  popover.append(closeBtn, progress, title, body, controls);
+  popover.append(closeBtn, progress, title, body, links, controls);
   root.append(
     scrims.top,
     scrims.bottom,
@@ -335,6 +349,28 @@ export function createOverlay(cb: OverlayCallbacks): Overlay {
     );
   }
 
+  function renderLinks(items?: OverlayResourceLink[]): void {
+    links.replaceChildren();
+    const list = items ?? [];
+    links.classList.toggle("hidden", list.length === 0);
+    for (const item of list) {
+      if (item.href) {
+        const a = document.createElement("a");
+        a.className = "walkthrough__link";
+        a.href = item.href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = item.label;
+        links.append(a);
+      } else if (item.action) {
+        const act = item.action;
+        const b = button("walkthrough__link", () => act());
+        b.textContent = item.label;
+        links.append(b);
+      }
+    }
+  }
+
   function render(view: OverlayStepView): void {
     root.classList.toggle("walkthrough--reduced", view.reducedMotion);
     progress.textContent = view.progress;
@@ -345,6 +381,8 @@ export function createOverlay(cb: OverlayCallbacks): Overlay {
     backBtn.textContent = view.labels.back;
     backBtn.classList.toggle("hidden", !view.showBack);
     nextBtn.textContent = view.nextLabel;
+
+    renderLinks(view.links);
 
     if (view.target) {
       if (!view.reducedMotion) scrollIntoViewIfNeeded(view.target);

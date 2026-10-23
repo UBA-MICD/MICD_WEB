@@ -11,10 +11,24 @@
 // after this core in later steps.
 
 import type { Role } from "../auth/auth.js";
-import type { TourStep } from "./walkthrough.js";
+import type { TourStep, TourResourceLink } from "./walkthrough.js";
+import { HELP_RESOURCES } from "../shared/help-resources.js";
 
 /** Shown to every signed-in role, and to a guest (see `isCommonStep`). */
 const ALL: Role[] = ["admin", "medico", "investigador"];
+
+// The "help hub" links surfaced on the welcome and each role's closing step
+// (TK-45): the user guide, videos and documentation (external, HELP_RESOURCES)
+// plus the in-app FAQ. One shared list so every entry point stays in sync.
+const helpLinks: TourResourceLink[] = [
+  { labelKey: "tour.resources.userGuide", href: HELP_RESOURCES.userGuide },
+  { labelKey: "tour.resources.videos", href: HELP_RESOURCES.videos },
+  {
+    labelKey: "tour.resources.documentation",
+    href: HELP_RESOURCES.documentation,
+  },
+  { labelKey: "tour.resources.faq", faq: true },
+];
 
 // ── A. Common core — viewer basics ─────────────────────────────────────────────
 
@@ -26,6 +40,7 @@ const coreSteps: TourStep[] = [
     titleKey: "tour.core.welcome.title",
     bodyKey: "tour.core.welcome.body",
     placement: "center",
+    links: helpLinks,
     advance: { on: "next" },
   },
   {
@@ -88,6 +103,28 @@ const coreSteps: TourStep[] = [
     titleKey: "tour.core.reset.title",
     bodyKey: "tour.core.reset.body",
     placement: "right",
+    advance: { on: "next" },
+  },
+  {
+    id: "core.measure",
+    roles: ALL,
+    target: "#tool-length",
+    screen: "viewer",
+    titleKey: "tour.core.measure.title",
+    bodyKey: "tour.core.measure.body",
+    placement: "right",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
+    id: "core.marking",
+    roles: ALL,
+    target: "#tool-polygon",
+    screen: "viewer",
+    titleKey: "tour.core.marking.title",
+    bodyKey: "tour.core.marking.body",
+    placement: "right",
+    optional: true,
     advance: { on: "next" },
   },
   {
@@ -205,6 +242,7 @@ const investigadorSteps: TourStep[] = [
     titleKey: "tour.investigador.done.title",
     bodyKey: "tour.investigador.done.body",
     placement: "center",
+    links: helpLinks,
     advance: { on: "next" },
   },
 ];
@@ -246,6 +284,7 @@ const informaticoSteps: TourStep[] = [
     titleKey: "tour.informatico.done.title",
     bodyKey: "tour.informatico.done.body",
     placement: "center",
+    links: helpLinks,
     advance: { on: "next" },
   },
 ];
@@ -366,12 +405,25 @@ const staffSteps: TourStep[] = [
     advance: { on: "next" },
   },
   {
+    id: "staff.validations",
+    roles: ["medico", "admin"],
+    target: "#tab-validaciones",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.staff.validations.title",
+    bodyKey: "tour.staff.validations.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
     id: "medico.done",
     roles: ["medico"],
     target: "center",
     titleKey: "tour.medico.done.title",
     bodyKey: "tour.medico.done.body",
     placement: "center",
+    links: helpLinks,
     advance: { on: "next" },
   },
 ];
@@ -476,12 +528,25 @@ const adminSteps: TourStep[] = [
     advance: { on: "next" },
   },
   {
+    id: "admin.system",
+    roles: ["admin"],
+    target: "#tab-sistema",
+    screen: "server",
+    tab: "buscar",
+    titleKey: "tour.admin.system.title",
+    bodyKey: "tour.admin.system.body",
+    placement: "bottom",
+    optional: true,
+    advance: { on: "next" },
+  },
+  {
     id: "admin.help",
     roles: ["admin"],
     target: "#btn-help",
     titleKey: "tour.admin.help.title",
     bodyKey: "tour.admin.help.body",
     placement: "bottom",
+    links: helpLinks,
     advance: { on: "next" },
   },
 ];

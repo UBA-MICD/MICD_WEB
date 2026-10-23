@@ -4287,6 +4287,26 @@ body {
   color: var(--text-secondary);
   margin: 0 0 14px;
 }
+.walkthrough__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 14px;
+}
+.walkthrough__link {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.walkthrough__link:hover {
+  text-decoration: underline;
+}
 .walkthrough__controls {
   display: flex;
   align-items: center;

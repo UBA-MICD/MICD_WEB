@@ -30,6 +30,24 @@ const helpLinks: TourResourceLink[] = [
   { labelKey: "tour.resources.faq", faq: true },
 ];
 
+// The measurement settings panel (#measure-panel) is a `.wl-panel`: present in
+// the DOM but invisible (visibility:hidden, opacity:0) until it gets the `.open`
+// class, which the app adds while a measurement tool is active. So the tour has
+// to reveal it itself to spotlight it — otherwise it highlights an empty area.
+// We only touch the class (no viewer-module import, keeping the catalog pure)
+// and restore the prior state on exit so we never leave it open behind the user.
+let measurePanelWasOpen = false;
+function openMeasurePanel(): void {
+  const panel = document.getElementById("measure-panel");
+  measurePanelWasOpen = panel?.classList.contains("open") ?? false;
+  panel?.classList.add("open");
+}
+function restoreMeasurePanel(): void {
+  if (!measurePanelWasOpen) {
+    document.getElementById("measure-panel")?.classList.remove("open");
+  }
+}
+
 // ── A. Common core — viewer basics ─────────────────────────────────────────────
 
 const coreSteps: TourStep[] = [
@@ -178,8 +196,10 @@ const coreSteps: TourStep[] = [
     screen: "viewer",
     titleKey: "tour.core.measurePanel.title",
     bodyKey: "tour.core.measurePanel.body",
-    placement: "left",
+    placement: "right",
     optional: true,
+    onEnter: openMeasurePanel,
+    onExit: restoreMeasurePanel,
     advance: { on: "next" },
   },
   {

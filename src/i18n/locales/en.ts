@@ -745,7 +745,7 @@ export const en: Record<string, string> = {
     "Open the Upload tab to add new studies to the server.",
   "tour.staff.uploadDrop.title": "Drag & drop",
   "tour.staff.uploadDrop.body":
-    "Drop DICOM files here to upload them. Each file uploads with its own progress row.",
+    "Drop DICOM files here to upload them. You're asked to classify the study before sending; nothing is uploaded until you confirm. Each file uploads with its own progress row.",
   "tour.staff.uploadFolder.title": "Upload a folder",
   "tour.staff.uploadFolder.body":
     "Or upload a whole folder at once — subfolders are scanned for DICOM files.",
@@ -785,6 +785,134 @@ export const en: Record<string, string> = {
   "tour.admin.help.title": "Reopen anytime",
   "tour.admin.help.body":
     "That's the full administrator toolkit. Relaunch this tour whenever you like from this ? button.",
+  // ── Walkthrough: additional flow steps + help-hub resource links (TK-45) ─────
+  "tour.core.measure.title": "Measurements",
+  "tour.core.measure.body":
+    "Activate the measurement tool to draw distances on the image; the value shows in the configured unit.",
+  "tour.core.marking.title": "Manual marking",
+  "tour.core.marking.body":
+    "Outline regions with the polygon tool and, where applicable, assign them a pathology.",
+  "tour.staff.validations.title": "Validations",
+  "tour.staff.validations.body":
+    "As clinical staff you can review and validate diagnoses from the Validations tab.",
+  "tour.admin.system.title": "System status",
+  "tour.admin.system.body":
+    "Check service health and server information from the System tab.",
+  "tour.core.crosshair.title": "3D crosshair",
+  "tour.core.crosshair.body":
+    "Keep position in sync across planes: moving the cursor in one plane makes the others follow the same 3D point.",
+  "tour.core.area.title": "Area & density (HU)",
+  "tour.core.area.body":
+    "Measure a region's area and its mean density in Hounsfield units with the ellipse tool.",
+  "tour.core.view3d.title": "3D view",
+  "tour.core.view3d.body":
+    "Switch to a three-dimensional reconstruction of the volume to explore it in 3D.",
+  "tour.core.layers.title": "Overlay layers",
+  "tour.core.layers.body":
+    "Show or hide the overlaid layers (segmentations, annotations) on top of the image.",
+  "tour.core.series.title": "Navigate the series",
+  "tour.core.series.body":
+    "Move through the slices with the arrows or the slider; PageUp/PageDown work too.",
+  "tour.core.grid.title": "Grid layouts",
+  "tour.core.grid.body":
+    "Show one, two or four viewports at once (1x1, 1x2, 2x2) to compare studies or series.",
+  "tour.core.sync.title": "Sync viewports",
+  "tour.core.sync.body":
+    "With a grid active, sync zoom, pan and slice across the viewports.",
+  "tour.core.toggleInfo.title": "On-image info",
+  "tour.core.toggleInfo.body":
+    "Show or hide the overlaid info (measurements, HU, AI tags) without removing the contours.",
+  "tour.core.faq.title": "Frequently asked questions",
+  "tour.core.faq.body":
+    "Questions? Open the FAQ screen from this button anytime.",
+  "tour.staff.validationBar.title": "Validate diagnoses",
+  "tour.staff.validationBar.body":
+    "On the image you can approve, reject or flag a diagnosis for review; it's recorded.",
+  "tour.staff.segmentation.title": "Assisted segmentation",
+  "tour.staff.segmentation.body":
+    "Generate an AI segmentation and correct it: submit, transfer to measurements, or discard the result.",
+  "tour.staff.studyDetail.title": "Study detail",
+  "tour.staff.studyDetail.body":
+    "Selecting a study shows its detail: series, metadata and actions like open or export.",
+  "tour.admin.serverConfig.title": "Server configuration",
+  "tour.admin.serverConfig.body":
+    "As an administrator, configure the server (API origin and settings) from this gear.",
+  "tour.resources.userGuide": "User guide",
+  "tour.resources.videos": "Explainer videos",
+  "tour.resources.documentation": "Documentation",
+  "tour.resources.faq": "FAQ",
+  // ── FAQ screen (US-44) ───────────────────────────────────────────────────────
+  "faq.title": "Frequently asked questions",
+  "faq.search.label": "Search the FAQ",
+  "faq.search.placeholder": "Search a question…",
+  "faq.search.clear": "Clear search",
+  "faq.empty": "No questions match your search.",
+  "faq.resource.video": "Watch the explainer video",
+  "faq.resource.guide": "Open the user guide",
+  "faq.resource.docs": "Open the documentation",
+  "faq.topic.viewer.title": "Viewer",
+  "faq.topic.server.title": "Server & search",
+  "faq.topic.upload.title": "Uploading studies",
+  "faq.topic.zenodo.title": "Zenodo",
+  "faq.topic.account.title": "Account & language",
+  "faq.topic.admin.title": "Administration",
+  "faq.q.viewer-open.question": "How do I open a DICOM study?",
+  "faq.q.viewer-open.answer":
+    "Use the viewer's Open button to pick a DICOM file or folder from your computer, or drag files onto the viewer. Viewing local studies needs no sign-in.",
+  "faq.q.viewer-wl.question": "How do I adjust brightness and contrast?",
+  "faq.q.viewer-wl.answer":
+    "Activate the Window/Level tool and drag over the image, or apply a preset (bone, brain, lung or soft tissue).",
+  "faq.q.viewer-zoompan.question": "How do I zoom and pan the image?",
+  "faq.q.viewer-zoompan.answer":
+    "Pick the Zoom tool to inspect detail and Pan to move around the image. The mouse wheel zooms at any time.",
+  "faq.q.viewer-mpr.question": "How do I view MPR planes and 3D?",
+  "faq.q.viewer-mpr.answer":
+    "For volumetric series, enable MPR to reconstruct the axial, coronal and sagittal planes, or switch to the 3D view from the toolbar.",
+  "faq.q.viewer-metadata.question": "Where do I see the DICOM metadata?",
+  "faq.q.viewer-metadata.answer":
+    "Open the Metadata panel to read the study's tags: patient, series and acquisition details.",
+  "faq.q.viewer-measure.question": "How do I measure distances on the image?",
+  "faq.q.viewer-measure.answer":
+    "Activate the length measurement tool and draw on the image; the value shows in the configured unit. You can clear or hide measurements anytime.",
+  "faq.q.viewer-marking.question": "How do I mark a region manually?",
+  "faq.q.viewer-marking.answer":
+    "Use the polygon marking tool to outline a region and, where applicable, assign it a pathology.",
+  "faq.q.server-search.question": "How do I search for studies on the server?",
+  "faq.q.server-search.answer":
+    "Go to Server and sign in; the Search tab lets you filter by patient, modality or date range. What you see depends on your role.",
+  "faq.q.server-open.question": "How do I open a server study in the viewer?",
+  "faq.q.server-open.answer":
+    "Select the study in the results and use Open selected study to load it into the viewer.",
+  "faq.q.server-export.question": "How do I export a study?",
+  "faq.q.server-export.answer":
+    "From the results or the study detail you can export images (PNG) or a full package (ZIP). For the researcher role, downloads are anonymized.",
+  "faq.q.upload-how.question": "How do I upload studies to the server?",
+  "faq.q.upload-how.answer":
+    "In Server, Upload tab, drag the DICOM files onto the drop zone. You're asked to classify the study before sending; nothing is uploaded until you confirm.",
+  "faq.q.upload-formats.question": "What files can I upload?",
+  "faq.q.upload-formats.answer":
+    "Individual DICOM files or a .zip. The desktop app also lets you pick a whole folder; in the browser you upload a folder by dropping it.",
+  "faq.q.zenodo-search.question": "How do I search public datasets on Zenodo?",
+  "faq.q.zenodo-search.answer":
+    "Open the Zenodo panel and use the public-corpus search to find openly published datasets.",
+  "faq.q.zenodo-publish.question": "How do I publish a study to Zenodo?",
+  "faq.q.zenodo-publish.answer":
+    "Publishing to Zenodo is an admin action and is irreversible: it makes the data public. It's configured and run from the Zenodo panel.",
+  "faq.q.account-signin.question": "How do I sign in?",
+  "faq.q.account-signin.answer":
+    "Open Server from the top bar; the sign-in card appears there. Viewing local studies needs no account.",
+  "faq.q.account-language.question": "How do I change the language?",
+  "faq.q.account-language.answer":
+    "Use the language selector in the top bar to switch between Spanish and English at any time.",
+  "faq.q.account-session.question": "Why does my session expire?",
+  "faq.q.account-session.answer":
+    "For security the session expires after a period of inactivity; you'll see a countdown and, once it expires, you'll be asked to sign in again.",
+  "faq.q.admin-users.question": "How do I manage users?",
+  "faq.q.admin-users.answer":
+    "As an administrator, the Users tab lets you create accounts (an email invite is sent), change roles, and block or delete (soft-delete) them.",
+  "faq.q.admin-activity.question": "Where do I see the activity log?",
+  "faq.q.admin-activity.answer":
+    "Administrators can open the activity log to review system actions and export it as CSV.",
   // ── validation (US-26) ───────────────────────────────────────────────────────
   "validation.barAriaLabel": "Diagnostic validation",
   "validation.approve": "Approve",

@@ -752,7 +752,7 @@ export const es: Record<string, string> = {
     "Abre la pestaña Cargar para añadir nuevos estudios al servidor.",
   "tour.staff.uploadDrop.title": "Arrastrar y soltar",
   "tour.staff.uploadDrop.body":
-    "Suelta archivos DICOM aquí para subirlos. Cada archivo se sube con su propia fila de progreso.",
+    "Suelta archivos DICOM aquí para subirlos. Antes de enviar se te pide clasificar el estudio; nada se sube hasta que confirmás. Cada archivo se sube con su propia fila de progreso.",
   "tour.staff.uploadFolder.title": "Subir una carpeta",
   "tour.staff.uploadFolder.body":
     "O sube una carpeta entera de una vez — se buscan archivos DICOM en las subcarpetas.",
@@ -792,6 +792,136 @@ export const es: Record<string, string> = {
   "tour.admin.help.title": "Reábrelo cuando quieras",
   "tour.admin.help.body":
     "Ese es el kit completo de administrador. Relanza este tutorial cuando quieras desde este botón ?.",
+  // ── Walkthrough: pasos de flujos adicionales + enlaces de ayuda (TK-45) ──────
+  "tour.core.measure.title": "Mediciones",
+  "tour.core.measure.body":
+    "Activá la herramienta de medición para trazar distancias sobre la imagen; el valor aparece en la unidad configurada.",
+  "tour.core.marking.title": "Marcado manual",
+  "tour.core.marking.body":
+    "Delineá regiones con la herramienta de polígono y, si corresponde, asignales una patología.",
+  "tour.staff.validations.title": "Validaciones",
+  "tour.staff.validations.body":
+    "Como personal clínico podés revisar y validar diagnósticos desde la pestaña Validaciones.",
+  "tour.admin.system.title": "Estado del sistema",
+  "tour.admin.system.body":
+    "Revisá el estado de los servicios y la información del servidor desde la pestaña Sistema.",
+  "tour.core.crosshair.title": "Crosshair 3D",
+  "tour.core.crosshair.body":
+    "Sincronizá la posición entre planos: al mover el cursor en un plano, los demás siguen el mismo punto en 3D.",
+  "tour.core.area.title": "Área y densidad (HU)",
+  "tour.core.area.body":
+    "Medí el área de una región y su densidad media en unidades Hounsfield con la herramienta de elipse.",
+  "tour.core.view3d.title": "Vista 3D",
+  "tour.core.view3d.body":
+    "Cambiá a una reconstrucción tridimensional del volumen para explorarlo en 3D.",
+  "tour.core.layers.title": "Capas de superposición",
+  "tour.core.layers.body":
+    "Mostrá u ocultá las capas superpuestas (segmentaciones, anotaciones) sobre la imagen.",
+  "tour.core.series.title": "Navegar la serie",
+  "tour.core.series.body":
+    "Recorré los cortes de la serie con las flechas o el deslizador; también con AvPág/RePág.",
+  "tour.core.grid.title": "Vistas en grilla",
+  "tour.core.grid.body":
+    "Mostrá uno, dos o cuatro visores a la vez (1x1, 1x2, 2x2) para comparar estudios o series.",
+  "tour.core.sync.title": "Sincronizar visores",
+  "tour.core.sync.body":
+    "Con la grilla activa, sincronizá zoom, desplazamiento y corte entre los visores.",
+  "tour.core.toggleInfo.title": "Información sobre la imagen",
+  "tour.core.toggleInfo.body":
+    "Mostrá u ocultá los datos superpuestos (mediciones, HU, etiquetas de IA) sin quitar los contornos.",
+  "tour.core.faq.title": "Preguntas frecuentes",
+  "tour.core.faq.body":
+    "¿Dudas? Abrí la pantalla de preguntas frecuentes desde este botón en cualquier momento.",
+  "tour.staff.validationBar.title": "Validar diagnósticos",
+  "tour.staff.validationBar.body":
+    "Sobre la imagen podés aprobar, rechazar o marcar para revisión un diagnóstico; queda registrado.",
+  "tour.staff.segmentation.title": "Segmentación asistida",
+  "tour.staff.segmentation.body":
+    "Generá una segmentación con IA y corregila: enviá, transferí a mediciones o descartá el resultado.",
+  "tour.staff.studyDetail.title": "Detalle del estudio",
+  "tour.staff.studyDetail.body":
+    "Al seleccionar un estudio ves su detalle: series, metadatos y acciones como abrir o exportar.",
+  "tour.admin.serverConfig.title": "Configuración del servidor",
+  "tour.admin.serverConfig.body":
+    "Como administrador, configurá el servidor (origen de la API y ajustes) desde este engranaje.",
+  "tour.resources.userGuide": "Guía de usuario",
+  "tour.resources.videos": "Videos explicativos",
+  "tour.resources.documentation": "Documentación",
+  "tour.resources.faq": "Preguntas frecuentes",
+  // ── FAQ screen (US-44) ───────────────────────────────────────────────────────
+  "faq.title": "Preguntas frecuentes",
+  "faq.search.label": "Buscar en preguntas frecuentes",
+  "faq.search.placeholder": "Buscar una pregunta…",
+  "faq.search.clear": "Limpiar búsqueda",
+  "faq.empty": "No encontramos preguntas que coincidan con tu búsqueda.",
+  "faq.resource.video": "Ver video explicativo",
+  "faq.resource.guide": "Abrir la guía de usuario",
+  "faq.resource.docs": "Abrir la documentación",
+  "faq.topic.viewer.title": "Visor",
+  "faq.topic.server.title": "Servidor y búsqueda",
+  "faq.topic.upload.title": "Carga de estudios",
+  "faq.topic.zenodo.title": "Zenodo",
+  "faq.topic.account.title": "Cuenta e idioma",
+  "faq.topic.admin.title": "Administración",
+  "faq.q.viewer-open.question": "¿Cómo abro un estudio DICOM?",
+  "faq.q.viewer-open.answer":
+    "Usá el botón Abrir del visor para elegir un archivo o carpeta DICOM de tu equipo, o arrastrá los archivos sobre el visor. Ver estudios locales no requiere iniciar sesión.",
+  "faq.q.viewer-wl.question": "¿Cómo ajusto el brillo y el contraste?",
+  "faq.q.viewer-wl.answer":
+    "Activá la herramienta Ventana/Nivel y arrastrá sobre la imagen, o aplicá un preset (hueso, cerebro, pulmón o tejido blando).",
+  "faq.q.viewer-zoompan.question": "¿Cómo hago zoom y desplazo la imagen?",
+  "faq.q.viewer-zoompan.answer":
+    "Elegí la herramienta Zoom para acercar el detalle y Desplazar para moverte por la imagen. La rueda del ratón hace zoom en cualquier momento.",
+  "faq.q.viewer-mpr.question": "¿Cómo veo los planos MPR y la vista 3D?",
+  "faq.q.viewer-mpr.answer":
+    "Para series volumétricas, activá MPR para reconstruir los planos axial, coronal y sagital, o cambiá a la vista 3D desde la barra de herramientas.",
+  "faq.q.viewer-metadata.question": "¿Dónde veo los metadatos DICOM?",
+  "faq.q.viewer-metadata.answer":
+    "Abrí el panel de Metadatos para consultar las etiquetas del estudio: datos del paciente, serie y parámetros de adquisición.",
+  "faq.q.viewer-measure.question": "¿Cómo mido distancias en la imagen?",
+  "faq.q.viewer-measure.answer":
+    "Activá la herramienta de medición (longitud) y trazá sobre la imagen; el valor se muestra en la unidad configurada. Podés borrar u ocultar las mediciones cuando quieras.",
+  "faq.q.viewer-marking.question": "¿Cómo marco una región manualmente?",
+  "faq.q.viewer-marking.answer":
+    "Usá la herramienta de marcado con polígono para delinear una región y, si corresponde, asignarle una patología.",
+  "faq.q.server-search.question": "¿Cómo busco estudios en el servidor?",
+  "faq.q.server-search.answer":
+    "Entrá a Servidor e iniciá sesión; en la pestaña Buscar podés filtrar por paciente, modalidad o rango de fechas. Lo que ves depende de tu rol.",
+  "faq.q.server-open.question":
+    "¿Cómo abro en el visor un estudio del servidor?",
+  "faq.q.server-open.answer":
+    "Seleccioná el estudio en los resultados y usá Abrir estudio seleccionado para cargarlo en el visor.",
+  "faq.q.server-export.question": "¿Cómo exporto un estudio?",
+  "faq.q.server-export.answer":
+    "Desde los resultados o el detalle del estudio podés exportar imágenes (PNG) o un paquete completo (ZIP). Para el rol investigador las descargas van anonimizadas.",
+  "faq.q.upload-how.question": "¿Cómo subo estudios al servidor?",
+  "faq.q.upload-how.answer":
+    "En Servidor, pestaña Cargar, arrastrá los archivos DICOM a la zona de carga. Antes de enviar se te pide clasificar el estudio; nada se sube hasta que confirmás.",
+  "faq.q.upload-formats.question": "¿Qué archivos puedo subir?",
+  "faq.q.upload-formats.answer":
+    "Archivos DICOM individuales o un .zip. En la versión de escritorio también podés seleccionar una carpeta entera; en el navegador se suben arrastrando la carpeta.",
+  "faq.q.zenodo-search.question":
+    "¿Cómo busco conjuntos de datos públicos en Zenodo?",
+  "faq.q.zenodo-search.answer":
+    "Abrí el panel de Zenodo y usá la búsqueda del corpus público para encontrar conjuntos de datos publicados abiertamente.",
+  "faq.q.zenodo-publish.question": "¿Cómo publico un estudio en Zenodo?",
+  "faq.q.zenodo-publish.answer":
+    "La publicación en Zenodo es una acción de administrador y es irreversible: hace los datos públicos. Se configura y ejecuta desde el panel de Zenodo.",
+  "faq.q.account-signin.question": "¿Cómo inicio sesión?",
+  "faq.q.account-signin.answer":
+    "Entrá a Servidor desde la barra superior; ahí aparece la tarjeta de inicio de sesión. Ver estudios locales no requiere cuenta.",
+  "faq.q.account-language.question": "¿Cómo cambio el idioma?",
+  "faq.q.account-language.answer":
+    "Usá el selector de idioma en la barra superior para alternar entre español e inglés en cualquier momento.",
+  "faq.q.account-session.question": "¿Por qué expira mi sesión?",
+  "faq.q.account-session.answer":
+    "Por seguridad la sesión caduca tras un período de inactividad; vas a ver una cuenta regresiva y, al expirar, se te pedirá iniciar sesión de nuevo.",
+  "faq.q.admin-users.question": "¿Cómo gestiono usuarios?",
+  "faq.q.admin-users.answer":
+    "Con rol de administrador, la pestaña Usuarios permite crear cuentas (se envía una invitación por correo), cambiar roles, y bloquear o eliminar (borrado lógico).",
+  "faq.q.admin-activity.question": "¿Dónde veo el registro de actividad?",
+  "faq.q.admin-activity.answer":
+    "Los administradores pueden abrir el registro de actividad para revisar las acciones del sistema y exportarlo como CSV.",
   // ── validation (US-26) ───────────────────────────────────────────────────────
   "validation.barAriaLabel": "Validación de diagnóstico",
   "validation.approve": "Aprobar",

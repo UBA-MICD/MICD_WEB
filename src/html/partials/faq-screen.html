@@ -1,0 +1,72 @@
+<!-- ── FAQ screen (US-44) ──────────────────────────────────────────────
+         Preguntas frecuentes dentro de la app: pantalla de nivel superior,
+         accesible desde la topbar. Preguntas por tema (acordeón nativo
+         <details>), con buscador, y cada respuesta enlaza a su video o guía. -->
+<section id="faq-screen" class="screen faq-screen hidden">
+  <header class="server-screen__header">
+    <button class="btn-back" id="faq-back" type="button">
+      <span aria-hidden="true">‹</span>
+      <span data-i18n="server.backToViewer">Volver al visualizador</span>
+    </button>
+    <h2
+      class="server-screen__title"
+      id="faq-title"
+      data-screen-heading
+      tabindex="-1"
+      data-i18n="faq.title"
+    >
+      Preguntas frecuentes
+    </h2>
+  </header>
+
+  <div class="faq-screen__body">
+    <div class="filter-search faq-search" role="search">
+      <svg
+        class="filter-search__icon"
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <label class="sr-only" for="faq-search" data-i18n="faq.search.label"
+        >Buscar en preguntas frecuentes</label
+      >
+      <input
+        type="text"
+        id="faq-search"
+        class="filter-search__input"
+        data-i18n-attr="placeholder:faq.search.placeholder"
+        placeholder="Buscar una pregunta…"
+        autocomplete="off"
+      />
+      <button
+        class="filter-search__clear hidden"
+        id="faq-search-clear"
+        type="button"
+        data-i18n-attr="aria-label:faq.search.clear"
+        aria-label="Limpiar búsqueda"
+      >
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          aria-hidden="true"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    <div id="faq-results" class="faq-results"></div>
+  </div>
+</section>

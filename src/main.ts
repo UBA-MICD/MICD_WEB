@@ -52,6 +52,7 @@ import { initZenodoPanel, checkQuotaAlerts } from "./zenodo/zenodo-panel.js";
 import { initStudyDetailPanel } from "./server-screen/study-detail-panel.js";
 import { initExplorerPanel } from "./explorer/explorer-panel.js";
 import { initWalkthrough } from "./walkthrough/init.js";
+import { initFaq } from "./faq/faq.js";
 import { initValidation } from "./viewer/validation-ui.js";
 import { initMLView } from "./viewer/ml-view.js";
 import { initSegmentation } from "./viewer/segmentation/segmentation-ui.js";
@@ -173,6 +174,7 @@ function startApp(): void {
   initStudyDetailPanel();
   initExplorerPanel();
   initWalkthrough();
+  initFaq();
   initValidation();
   initMLView();
   initSegmentation();

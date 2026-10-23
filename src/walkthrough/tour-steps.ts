@@ -13,6 +13,7 @@
 import type { Role } from "../auth/auth.js";
 import type { TourStep, TourResourceLink } from "./walkthrough.js";
 import { HELP_RESOURCES } from "../shared/help-resources.js";
+import { state, setMeasurementPanelOpen } from "../viewer/state.js";
 
 /** Shown to every signed-in role, and to a guest (see `isCommonStep`). */
 const ALL: Role[] = ["admin", "medico", "investigador"];
@@ -32,17 +33,20 @@ const helpLinks: TourResourceLink[] = [
 
 // The measurement settings panel (#measure-panel) is a `.wl-panel`: present in
 // the DOM but invisible (visibility:hidden, opacity:0) until it gets the `.open`
-// class, which the app adds while a measurement tool is active. So the tour has
-// to reveal it itself to spotlight it — otherwise it highlights an empty area.
-// We only touch the class (no viewer-module import, keeping the catalog pure)
-// and restore the prior state on exit so we never leave it open behind the user.
+// class. That class is driven by `state.isMeasurementPanelOpen` via the app's
+// updateToolbarUI(), which re-runs on layout changes (e.g. the ResizeObserver
+// that fires when we switch to the viewer). So toggling the class alone isn't
+// enough — the next updateToolbarUI would revert it. We flip the real state (so
+// the app agrees the panel is open) and also add the class for an immediate
+// paint, then restore the prior state on exit so we never leave it open.
 let measurePanelWasOpen = false;
 function openMeasurePanel(): void {
-  const panel = document.getElementById("measure-panel");
-  measurePanelWasOpen = panel?.classList.contains("open") ?? false;
-  panel?.classList.add("open");
+  measurePanelWasOpen = state.isMeasurementPanelOpen;
+  setMeasurementPanelOpen(true);
+  document.getElementById("measure-panel")?.classList.add("open");
 }
 function restoreMeasurePanel(): void {
+  setMeasurementPanelOpen(measurePanelWasOpen);
   if (!measurePanelWasOpen) {
     document.getElementById("measure-panel")?.classList.remove("open");
   }

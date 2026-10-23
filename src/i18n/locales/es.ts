@@ -817,9 +817,6 @@ export const es: Record<string, string> = {
   "tour.core.layers.title": "Capas de superposición",
   "tour.core.layers.body":
     "Mostrá u ocultá las capas superpuestas (segmentaciones, anotaciones) sobre la imagen.",
-  "tour.core.measurePanel.title": "Panel de mediciones",
-  "tour.core.measurePanel.body":
-    "Acá elegís la unidad (mm/cm), asignás una patología, ajustás el grosor, y podés guardar, exportar o borrar tus mediciones.",
   "tour.core.series.title": "Navegar la serie",
   "tour.core.series.body":
     "Recorré los cortes de la serie con las flechas o el deslizador; también con AvPág/RePág.",

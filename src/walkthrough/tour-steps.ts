@@ -13,7 +13,6 @@
 import type { Role } from "../auth/auth.js";
 import type { TourStep, TourResourceLink } from "./walkthrough.js";
 import { HELP_RESOURCES } from "../shared/help-resources.js";
-import { state, setMeasurementPanelOpen } from "../viewer/state.js";
 
 /** Shown to every signed-in role, and to a guest (see `isCommonStep`). */
 const ALL: Role[] = ["admin", "medico", "investigador"];
@@ -30,39 +29,6 @@ const helpLinks: TourResourceLink[] = [
   },
   { labelKey: "tour.resources.faq", faq: true },
 ];
-
-// The measurement settings panel (#measure-panel) is a `.wl-panel`: present in
-// the DOM but invisible (visibility:hidden, opacity:0) until it gets the `.open`
-// class. That class is driven by `state.isMeasurementPanelOpen` via the app's
-// updateToolbarUI(), which re-runs on layout changes (e.g. the ResizeObserver
-// that fires when we switch to the viewer). So toggling the class alone isn't
-// enough — the next updateToolbarUI would revert it. We flip the real state (so
-// the app agrees the panel is open) and also add the class for an immediate
-// paint, then restore the prior state on exit so we never leave it open.
-let measurePanelWasOpen = false;
-function openMeasurePanel(): void {
-  const panel = document.getElementById("measure-panel");
-  measurePanelWasOpen = state.isMeasurementPanelOpen;
-  setMeasurementPanelOpen(true);
-  if (!panel) return;
-  panel.classList.add("open");
-  // Belt-and-suspenders: inline styles beat the class-based `.wl-panel` rules,
-  // so even if the app's updateToolbarUI() re-runs mid-step it can't hide it.
-  panel.style.visibility = "visible";
-  panel.style.opacity = "1";
-  panel.style.transform = "none";
-  panel.style.pointerEvents = "auto";
-}
-function restoreMeasurePanel(): void {
-  const panel = document.getElementById("measure-panel");
-  setMeasurementPanelOpen(measurePanelWasOpen);
-  if (!panel) return;
-  panel.style.visibility = "";
-  panel.style.opacity = "";
-  panel.style.transform = "";
-  panel.style.pointerEvents = "";
-  if (!measurePanelWasOpen) panel.classList.remove("open");
-}
 
 // ── A. Common core — viewer basics ─────────────────────────────────────────────
 
@@ -203,19 +169,6 @@ const coreSteps: TourStep[] = [
     bodyKey: "tour.core.marking.body",
     placement: "right",
     optional: true,
-    advance: { on: "next" },
-  },
-  {
-    id: "core.measurePanel",
-    roles: ALL,
-    target: "#measure-panel",
-    screen: "viewer",
-    titleKey: "tour.core.measurePanel.title",
-    bodyKey: "tour.core.measurePanel.body",
-    placement: "right",
-    optional: true,
-    onEnter: openMeasurePanel,
-    onExit: restoreMeasurePanel,
     advance: { on: "next" },
   },
   {

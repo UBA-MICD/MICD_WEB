@@ -810,9 +810,6 @@ export const en: Record<string, string> = {
   "tour.core.layers.title": "Overlay layers",
   "tour.core.layers.body":
     "Show or hide the overlaid layers (segmentations, annotations) on top of the image.",
-  "tour.core.measurePanel.title": "Measurements panel",
-  "tour.core.measurePanel.body":
-    "Here you pick the unit (mm/cm), assign a pathology, adjust line width, and save, export or clear your measurements.",
   "tour.core.series.title": "Navigate the series",
   "tour.core.series.body":
     "Move through the slices with the arrows or the slider; PageUp/PageDown work too.",

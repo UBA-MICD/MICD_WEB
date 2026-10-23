@@ -41,15 +41,27 @@ const helpLinks: TourResourceLink[] = [
 // paint, then restore the prior state on exit so we never leave it open.
 let measurePanelWasOpen = false;
 function openMeasurePanel(): void {
+  const panel = document.getElementById("measure-panel");
   measurePanelWasOpen = state.isMeasurementPanelOpen;
   setMeasurementPanelOpen(true);
-  document.getElementById("measure-panel")?.classList.add("open");
+  if (!panel) return;
+  panel.classList.add("open");
+  // Belt-and-suspenders: inline styles beat the class-based `.wl-panel` rules,
+  // so even if the app's updateToolbarUI() re-runs mid-step it can't hide it.
+  panel.style.visibility = "visible";
+  panel.style.opacity = "1";
+  panel.style.transform = "none";
+  panel.style.pointerEvents = "auto";
 }
 function restoreMeasurePanel(): void {
+  const panel = document.getElementById("measure-panel");
   setMeasurementPanelOpen(measurePanelWasOpen);
-  if (!measurePanelWasOpen) {
-    document.getElementById("measure-panel")?.classList.remove("open");
-  }
+  if (!panel) return;
+  panel.style.visibility = "";
+  panel.style.opacity = "";
+  panel.style.transform = "";
+  panel.style.pointerEvents = "";
+  if (!measurePanelWasOpen) panel.classList.remove("open");
 }
 
 // ── A. Common core — viewer basics ─────────────────────────────────────────────

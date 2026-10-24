@@ -231,6 +231,8 @@ export const en: Record<string, string> = {
     "No segmentation available. Generate one from Server → Validations.",
   "viewer.segmentation.hudLabel": "AI segmentation (simulated)",
   "viewer.segmentation.noImage": "Open a DICOM image before segmenting.",
+  "viewer.segmentation.noServerImage":
+    "AI segmentation requires a study from the server; images opened from the local disk can't be segmented.",
   "viewer.segmentation.failed": "The segmentation could not be generated.",
   "viewer.segmentation.tagAi": "AI",
   "viewer.segmentation.loading": "Loading AI segmentation…",

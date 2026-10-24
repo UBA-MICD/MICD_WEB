@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { installDom, setBody, uninstallDom } from "../../../test/dom-setup.ts";
 import { stubCanvas2DContext } from "../../../test/viewer-fixture.ts";
 import { hideBanner } from "../../shared/banner.ts";
+import { t } from "../../i18n/i18n.ts";
 import { adoptSession, logout, type AuthUser } from "../../auth/auth.ts";
 import { initViewportManager } from "../viewport-registry.ts";
 import { state } from "../state.ts";
@@ -182,6 +183,31 @@ test("runSegmentation warns and no-ops when there is no image open", async () =>
   const banner = document.getElementById("app-banner")!;
   assert.ok(!banner.classList.contains("hidden"));
   assert.equal(ui.getLastSegmentation(), null, "no result without an image");
+});
+
+test("runSegmentation warns and no-ops for a local image without a server UID", async () => {
+  // An image open from local disk has pixels but no SOPInstanceUID, so it can't
+  // be located on the server: the guard must warn and return before the network
+  // (fetchImpl throws "unexpected fetch" if anything slips past it).
+  const local = fakeDicom();
+  (local.metadata as any).sopInstanceUid = "";
+  state.parsed = local;
+
+  const ui = await freshUi();
+  await ui.runSegmentation();
+
+  const banner = document.getElementById("app-banner")!;
+  assert.ok(!banner.classList.contains("hidden"));
+  assert.ok(
+    banner.classList.contains("app-banner--warning"),
+    "shown as a warning, not an error",
+  );
+  assert.equal(
+    banner.textContent,
+    t("viewer.segmentation.noServerImage"),
+    "the no-server-image warning is shown",
+  );
+  assert.equal(ui.getLastSegmentation(), null, "no inference is run");
 });
 
 test("runSegmentation surfaces a SegmentationError as an error banner", async () => {

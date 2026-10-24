@@ -234,6 +234,8 @@ export const es: Record<string, string> = {
     "No hay segmentación disponible. Generala desde Servidor → Validaciones.",
   "viewer.segmentation.hudLabel": "Segmentación IA (simulada)",
   "viewer.segmentation.noImage": "Abrí una imagen DICOM antes de segmentar.",
+  "viewer.segmentation.noServerImage":
+    "La segmentación con IA requiere una imagen del servidor; las abiertas desde el disco local no se pueden segmentar.",
   "viewer.segmentation.failed": "No se pudo generar la segmentación.",
   "viewer.segmentation.tagAi": "IA",
   "viewer.segmentation.loading": "Cargando segmentación IA…",

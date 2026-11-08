@@ -12,6 +12,7 @@ import {
   setUserRole,
   setUserStatus,
   deleteUser,
+  resendInvite,
   exportAuditLogCsv,
 } from "./users-admin.ts";
 import { API_BASE } from "../auth/auth.ts";
@@ -154,4 +155,24 @@ test("exportAuditLogCsv surfaces 403 for a non-admin caller", async () => {
   fetchImpl = async () => jsonResponse(403, { error: "forbidden" });
   const result = await exportAuditLogCsv();
   assert.deepEqual(result, { ok: false, status: 403, error: "forbidden" });
+});
+
+test("resendInvite POSTs /:id/invite and returns the user on success", async () => {
+  const user = { id: 7, email: "p@micd.local", status: "invited" };
+  fetchImpl = async (url, init) => {
+    assert.equal(url, `${USERS_URL}/7/invite`);
+    assert.equal(init?.method, "POST");
+    return jsonResponse(200, user);
+  };
+  assert.deepEqual(await resendInvite(7), { ok: true, data: user });
+});
+
+test("resendInvite surfaces a 409 when the user is no longer invited", async () => {
+  fetchImpl = async () =>
+    jsonResponse(409, { error: "Only invited users can be re-invited" });
+  assert.deepEqual(await resendInvite(7), {
+    ok: false,
+    status: 409,
+    error: "Only invited users can be re-invited",
+  });
 });

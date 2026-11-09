@@ -31,6 +31,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY --from=builder /app/src/index.html /usr/share/nginx/html/index.html
 COPY src/styles.css /usr/share/nginx/html/styles.css
 COPY src/favicon.svg /usr/share/nginx/html/favicon.svg
+COPY src/runtime-config.js /usr/share/nginx/html/runtime-config.js
 
 # Vendored, offline-safe assets: fonts are tracked in src/vendor/fonts; the
 # fflate ESM bundle is generated from node_modules so its version always

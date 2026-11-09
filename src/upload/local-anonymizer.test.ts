@@ -36,6 +36,23 @@ test("anonymizerUrl defaults to loopback and honours overrides (storage first)",
   assert.equal(anonymizerUrl(), "http://127.0.0.1:8100");
 });
 
+test("anonymizerUrl resolves a same-origin path (staging) against the page origin", () => {
+  const g = globalThis as any;
+  const hadLocation = "location" in g;
+  const realLocation = g.location;
+  try {
+    g.MICD_ANONYMIZER_URL = "/anonymizer/";
+    g.location = { origin: "https://dicomviewermed.online" };
+    assert.equal(anonymizerUrl(), "https://dicomviewermed.online/anonymizer");
+    // file:// (desktop) has an opaque origin: keep the path as-is.
+    g.location = { origin: "null" };
+    assert.equal(anonymizerUrl(), "/anonymizer");
+  } finally {
+    if (hadLocation) g.location = realLocation;
+    else delete g.location;
+  }
+});
+
 test("anonymizeWithLocalService posts the file and profile, returns the response bytes", async () => {
   let seen: { url: string; form: FormData } | null = null;
   globalThis.fetch = (async (url: string, init: RequestInit) => {

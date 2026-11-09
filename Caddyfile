@@ -1,7 +1,8 @@
 # Caddy edge for staging — the ONLY public entrypoint.
 #
 # Terminates HTTPS (automatic Let's Encrypt for $STAGING_DOMAIN, auto-renew) and
-# routes: API/auth paths to the backend, everything else to the static frontend.
+# routes: API/auth paths to the backend, /anonymizer/* to the staging
+# anonymizer, everything else to the static frontend.
 # HTTP:80 -> HTTPS is automatic in Caddy. See docs/staging-deployment/plan.md §1.
 #
 # $STAGING_DOMAIN and $ACME_EMAIL are provided from .env.staging at run time.
@@ -23,6 +24,20 @@
 	}
 	handle @api {
 		reverse_proxy backend:3000
+	}
+
+	# DICOM anonymizer (UBA-MICD/Anonymizer) — STAGING ONLY, test data only.
+	# In real use it runs on each workstation at 127.0.0.1:8000 (US-16); on
+	# staging the viewer calls it same-origin at /anonymizer (MICD_ANONYMIZER_URL
+	# in .env.staging). handle_path strips the prefix, so the service keeps its
+	# own routes (GET /, POST /anonymize/). Unauthenticated, so cap the body:
+	# the service reads every upload fully into memory.
+	redir /anonymizer /anonymizer/ 308
+	handle_path /anonymizer/* {
+		request_body {
+			max_size {$ANONYMIZER_MAX_BODY:200MB}
+		}
+		reverse_proxy anonymizer:8000
 	}
 
 	# Everything else -> the static SPA (nginx).

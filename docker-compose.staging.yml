@@ -1,11 +1,12 @@
 # Staging edge + frontend. This stack owns the PUBLIC entrypoint.
 #
 #   caddy  — TLS termination (Let's Encrypt) + routing; the only service with
-#            host ports (80/443). Routes /api,/auth -> backend:3000 and / -> web.
+#            host ports (80/443). Routes /api,/auth -> backend:3000,
+#            /anonymizer/* -> anonymizer:8000 and / -> web.
 #   web    — the static SPA (nginx), reached only via caddy (no host ports).
 #
 # Both join the shared external `micd` network so caddy can reach `backend:3000`
-# from the backend repo's stack. See docs/staging-deployment/plan.md §1-2.
+# from the backend repo's stack and `anonymizer:8000` from the anonymizer repo's. See docs/staging-deployment/plan.md §1-2.
 #
 # Prerequisites (one-time on the VPS — plan §6):
 #   docker network create micd
@@ -28,6 +29,7 @@ services:
     environment:
       STAGING_DOMAIN: ${STAGING_DOMAIN:?STAGING_DOMAIN must be set in .env.staging}
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set in .env.staging}
+      ANONYMIZER_MAX_BODY: ${ANONYMIZER_MAX_BODY:-200MB}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data      # certificates — survives redeploys, do not delete
@@ -52,6 +54,11 @@ services:
     image: ${WEB_IMAGE:-ghcr.io/uba-micd/micd_web:staging}
     container_name: micd-frontend
     restart: unless-stopped
+    environment:
+      # Where the viewer sends DICOM to be anonymized before upload. Written
+      # into runtime-config.js when the container starts. Same-origin path
+      # routed by caddy to the anonymizer stack (UBA-MICD/Anonymizer).
+      MICD_ANONYMIZER_URL: ${MICD_ANONYMIZER_URL:-/anonymizer}
     # No host ports — reachable only through caddy on the internal network.
     security_opt:
       - no-new-privileges:true

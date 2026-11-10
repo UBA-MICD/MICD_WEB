@@ -5,7 +5,9 @@
  *
  * US-16: an un-anonymized DICOM must never leave the computer. The service
  * listens on loopback only, so the raw bytes go browser → 127.0.0.1 and only
- * its anonymized output is uploaded to the backend. There is deliberately no
+ * its anonymized output is uploaded to the backend. (Staging is the exception:
+ * it handles test data only and uses a server-side anonymizer, see
+ * anonymizerUrl.) There is deliberately no
  * fallback: if the service is down or rejects a file, the upload fails
  * (fail closed) rather than sending something less anonymized.
  */
@@ -45,6 +47,11 @@ export class AnonymizationRejectedError extends Error {
  * localStorage `micd_anonymizer_url`, then `window.MICD_ANONYMIZER_URL`, then
  * the loopback default. A custom URL must also be allowed by the page's CSP
  * connect-src (index.template.html).
+ *
+ * Staging sets `window.MICD_ANONYMIZER_URL = "/anonymizer"` (runtime-config.js,
+ * written by the staging image): a same-origin path that the Caddy edge routes
+ * to an anonymizer on the VPS, for test data only. A path is resolved against
+ * the page origin so error messages show the full URL.
  */
 export function anonymizerUrl(): string {
   let stored: string | null = null;
@@ -60,7 +67,13 @@ export function anonymizerUrl(): string {
     stored ||
     (globalThis as { MICD_ANONYMIZER_URL?: string }).MICD_ANONYMIZER_URL ||
     DEFAULT_ANONYMIZER_URL;
-  return configured.trim().replace(/\/+$/, "");
+  const url = configured.trim().replace(/\/+$/, "");
+  if (url.startsWith("/")) {
+    const origin = (globalThis as { location?: { origin?: string } }).location
+      ?.origin;
+    if (origin && origin !== "null") return `${origin}${url}`;
+  }
+  return url;
 }
 
 /** True when the service answers its health check (`GET /`). */

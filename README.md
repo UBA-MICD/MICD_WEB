@@ -194,11 +194,27 @@ Nunca hay una vía degradada: si la anonimización no se puede hacer, el archivo
 | ---------------------------- | --------------- | ----------------------- | ---------------------------------------------- |
 | `micd_anonymizer_url`        | `localStorage`  | `http://127.0.0.1:8000` | URL del servicio de anonimización              |
 | `window.MICD_ANONYMIZER_URL` | variable global | —                       | Alternativa a la anterior, con menor prioridad |
+| `MICD_ANONYMIZER_URL`        | env del contenedor de staging | `/anonymizer` | Lo escribe en `runtime-config.js` al arrancar; define la global de arriba |
 
-La **CSP** de `index.html` fija `connect-src` a `http://127.0.0.1:8000` y
-`http://localhost:8000`. Es deliberado: aunque alguien cambie
+La **CSP** de `index.html` fija `connect-src` a `'self'`, `http://127.0.0.1:8000`
+y `http://localhost:8000`. Es deliberado: aunque alguien cambie
 `micd_anonymizer_url`, el navegador no deja mandar los datos del paciente a un
 host remoto. Si necesitás otra URL, hay que cambiar también la CSP.
+
+#### Staging
+
+Staging es la única excepción a «el DICOM original no sale de la máquina»:
+maneja **sólo datos de prueba**, así que el anonimizador corre en el VPS
+(repo `UBA-MICD/Anonymizer`, su propio pipeline) y el borde Caddy lo publica en
+`https://<dominio>/anonymizer/` (`Caddyfile`, quita el prefijo). El contenedor
+del visor recibe `MICD_ANONYMIZER_URL=/anonymizer` desde `.env.staging` y
+[`docker/40-micd-runtime-config.sh`](docker/40-micd-runtime-config.sh) lo
+escribe en `runtime-config.js` antes de levantar nginx. Al ser mismo origen,
+`'self'` en la CSP ya lo permite y no hace falta CORS. Caddy limita el tamaño
+de cada request (`ANONYMIZER_MAX_BODY`, 200 MB por defecto).
+
+> ⚠️ Nunca subas estudios reales a staging: el archivo viaja al VPS antes de
+> anonimizarse.
 
 El servicio debe aceptar el origen del visor en `ANONYMIZER_CORS_ORIGINS` (ver
 el README de `Imagenes-medicas-anonimizacion`).

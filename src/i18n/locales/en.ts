@@ -593,6 +593,7 @@ export const en: Record<string, string> = {
   "users.action.block": "Block",
   "users.action.enable": "Enable",
   "users.action.delete": "Delete",
+  "users.action.resendInvite": "Resend invitation",
   "users.action.create": "Create user",
   "users.action.exportAuditLog": "Download audit log (CSV)",
   "users.form.name": "Name",
@@ -603,6 +604,9 @@ export const en: Record<string, string> = {
   "users.toast.created": "User created.",
   "users.toast.roleChanged": "Role updated.",
   "users.toast.deleted": "User deleted.",
+  "users.confirmResendInvite":
+    "Resend the invitation? The previously sent link will stop working.",
+  "users.toast.inviteResent": "Invitation resent.",
   "users.error.generic": "The operation could not be completed.",
   "users.error.network": "Couldn't connect to the server.",
   "users.error.forbidden": "You don't have permission to manage users.",

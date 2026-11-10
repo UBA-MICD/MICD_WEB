@@ -599,6 +599,7 @@ export const es: Record<string, string> = {
   "users.action.block": "Bloquear",
   "users.action.enable": "Habilitar",
   "users.action.delete": "Eliminar",
+  "users.action.resendInvite": "Reenviar invitación",
   "users.action.create": "Crear usuario",
   "users.action.exportAuditLog": "Descargar log de auditoría (CSV)",
   "users.form.name": "Nombre",
@@ -610,6 +611,9 @@ export const es: Record<string, string> = {
   "users.toast.created": "Usuario creado.",
   "users.toast.roleChanged": "Rol actualizado.",
   "users.toast.deleted": "Usuario eliminado.",
+  "users.confirmResendInvite":
+    "¿Reenviar la invitación? El enlace enviado anteriormente dejará de funcionar.",
+  "users.toast.inviteResent": "Invitación reenviada.",
   "users.error.generic": "No se pudo completar la operación.",
   "users.error.network": "No se pudo conectar al servidor.",
   "users.error.forbidden": "No tenés permiso para gestionar usuarios.",

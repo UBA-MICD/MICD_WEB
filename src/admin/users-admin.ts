@@ -101,6 +101,19 @@ export function deleteUser(id: number): Promise<ApiResult<null>> {
   return request(`${usersUrl()}/${id}`, { method: "DELETE" }, async () => null);
 }
 
+/**
+ * Re-send the invitation to a still-pending (invited) user. The backend mints a
+ * new code, voids any previous unexpired one (only the newest link works) and
+ * emails it. 409 if the user is no longer invited.
+ */
+export function resendInvite(id: number): Promise<ApiResult<AdminUser>> {
+  return request(
+    `${usersUrl()}/${id}/invite`,
+    { method: "POST" },
+    (res) => res.json(),
+  );
+}
+
 /** Audit log CSV export (TK-06) — admin-only server route, gated the same way. */
 export function exportAuditLogCsv(): Promise<ApiResult<Blob>> {
   return request(`${API_BASE}/v1/activity/export`, {}, (res) => res.blob());
@@ -164,6 +177,15 @@ export function userRowHtml(u: AdminUser): string {
   const toggleAction = blocked ? "enable" : "block";
   const toggleLabel = t(`users.action.${toggleAction}`);
 
+  // Only a pending invitee has a link to re-send.
+  const resendButton =
+    u.status === "invited"
+      ? `<button type="button" class="btn btn--outline btn--sm" data-user-resend>${escapeHtml(
+          t("users.action.resendInvite"),
+        )}</button>
+      `
+      : "";
+
   return `<tr data-user-id="${u.id}">
     <td>${escapeHtml(u.name ?? "—")}</td>
     <td>${escapeHtml(u.email)}</td>
@@ -177,7 +199,7 @@ export function userRowHtml(u: AdminUser): string {
     )}</span></td>
     <td data-user-last-access>${escapeHtml(formatLastAccess(u.last_login_at))}</td>
     <td class="user-actions">
-      <button type="button" class="btn btn--outline btn--sm" data-user-toggle="${toggleAction}">${escapeHtml(
+      ${resendButton}<button type="button" class="btn btn--outline btn--sm" data-user-toggle="${toggleAction}">${escapeHtml(
         toggleLabel,
       )}</button>
       <button type="button" class="btn btn--outline btn--sm" data-user-delete>${escapeHtml(

@@ -415,3 +415,98 @@ test("a forbidden export shows a toast and does not throw", async () => {
   const toast = document.getElementById("toast-container")!;
   assert.match(toast.innerHTML, /toast--error/);
 });
+
+// ── Resend invitation ───────────────────────────────────────────────────────
+
+const PANEL_WITH_TOASTS = `
+  <div id="panel-usuarios">
+    <button data-users-export type="button">Export</button>
+    <div data-users-error class="hidden"></div>
+    <table><tbody data-users-tbody></tbody></table>
+    <form data-user-create>
+      <input data-user-new-name /><input data-user-new-email />
+      <select data-user-new-role><option value="medico">M</option></select>
+      <div data-user-new-error class="hidden"></div>
+      <button data-user-new-submit type="submit">Create</button>
+    </form>
+  </div>
+  <div id="app-banner" class="hidden"></div>
+  <div id="toast-container"></div>
+`;
+
+const pendingUser = {
+  ...sampleUser,
+  id: 9,
+  email: "pending@micd.local",
+  status: "invited" as const,
+  has_password: false,
+};
+
+const flush = async (): Promise<void> => {
+  for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+};
+
+test("resend invitation: POSTs /:id/invite for that row, toasts success, reloads", async () => {
+  setBody(PANEL_WITH_TOASTS);
+  fetchImpl = async () => jsonResponse(200, [pendingUser, sampleUser]);
+  const panel = mountUsersPanel(root());
+  await panel.reload();
+
+  // Only the pending row carries the button.
+  const buttons = root().querySelectorAll("[data-user-resend]");
+  assert.equal(buttons.length, 1);
+
+  const calls: string[] = [];
+  let listCalls = 0;
+  fetchImpl = async (url, init) => {
+    if (init?.method === "POST") {
+      calls.push(url);
+      return jsonResponse(200, pendingUser);
+    }
+    listCalls++;
+    return jsonResponse(200, [pendingUser, sampleUser]);
+  };
+  (buttons[0] as HTMLElement).dispatchEvent(new Event("click", { bubbles: true }));
+  await flush();
+
+  assert.deepEqual(calls, [`${USERS_URL}/9/invite`]);
+  assert.equal(listCalls, 1);
+  assert.match(document.getElementById("toast-container")!.innerHTML, /toast--success/);
+});
+
+test("resend invitation: cancelling the confirm sends nothing", async () => {
+  fetchImpl = async () => jsonResponse(200, [pendingUser]);
+  const panel = mountUsersPanel(root());
+  await panel.reload();
+
+  confirmResult = false;
+  let posted = false;
+  fetchImpl = async (_url, init) => {
+    if (init?.method === "POST") posted = true;
+    return jsonResponse(200, [pendingUser]);
+  };
+  (root().querySelector("[data-user-resend]") as HTMLElement).dispatchEvent(
+    new Event("click", { bubbles: true }),
+  );
+  await flush();
+  assert.equal(posted, false);
+});
+
+test("resend invitation: a server error shows an error toast and does not throw", async () => {
+  setBody(PANEL_WITH_TOASTS);
+  fetchImpl = async () => jsonResponse(200, [pendingUser]);
+  const panel = mountUsersPanel(root());
+  await panel.reload();
+
+  fetchImpl = async (_url, init) =>
+    init?.method === "POST"
+      ? jsonResponse(409, { error: "Only invited users can be re-invited" })
+      : jsonResponse(200, []);
+  await assert.doesNotReject(async () => {
+    (root().querySelector("[data-user-resend]") as HTMLElement).dispatchEvent(
+      new Event("click", { bubbles: true }),
+    );
+    await flush();
+  });
+  assert.match(document.getElementById("toast-container")!.innerHTML, /toast--error/);
+});

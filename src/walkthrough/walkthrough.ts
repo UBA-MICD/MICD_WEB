@@ -16,6 +16,14 @@ import { createOverlay, type Overlay, type Placement } from "./overlay.js";
 
 export type { Placement };
 
+/** A help-hub link on a step (TK-45): an external URL (`href`) or the in-app
+ *  FAQ (`faq`). The label is an i18n key so it re-renders on locale change. */
+export interface TourResourceLink {
+  labelKey: string;
+  href?: string;
+  faq?: boolean;
+}
+
 // The roles that share the viewer core. informatico is left out on purpose:
 // its tour is only upload + download, so it never gets the common steps.
 const ALL_ROLES: readonly Role[] = ["admin", "medico", "investigador"];
@@ -35,6 +43,8 @@ export interface TourStep {
   tab?: string;
   placement?: Placement;
   advance: { on: "next" } | { on: "event"; event: string; selector?: string };
+  /** Help-hub links shown in the popover (TK-45) — welcome/closing steps. */
+  links?: TourResourceLink[];
   /** If the target is missing/hidden, skip silently instead of stalling. */
   optional?: boolean;
   onEnter?: () => void | Promise<void>;
@@ -50,6 +60,8 @@ export interface StartTourOptions {
    *  screen-only navigator built on showScreen(); main.ts passes a richer one
    *  that also switches server tabs. */
   navigate?: (step: TourStep) => void | Promise<void>;
+  /** Open the in-app FAQ screen from a help-hub link; ends the tour first. */
+  onOpenFaq?: () => void;
   onEnd?: (reason: TourEndReason) => void;
 }
 
@@ -78,6 +90,7 @@ let overlay: Overlay | null = null;
 let role: Role | null = null;
 let opener: HTMLElement | null = null;
 let navigate: (step: TourStep) => void | Promise<void> = defaultNavigate;
+let onOpenFaq: (() => void) | undefined;
 let onEnd: ((reason: TourEndReason) => void) | undefined;
 let detachAdvance: (() => void) | null = null;
 let onViewportChange: (() => void) | null = null;
@@ -161,6 +174,7 @@ export function startTour(all: TourStep[], opts: StartTourOptions): void {
       ? document.activeElement
       : null);
   navigate = opts.navigate ?? defaultNavigate;
+  onOpenFaq = opts.onOpenFaq;
   onEnd = opts.onEnd;
 
   if (steps.length === 0) {
@@ -253,8 +267,20 @@ function renderCurrent(target?: HTMLElement | null): void {
       skip: t("tour.controls.skip"),
       close: t("tour.controls.close"),
     },
+    links: step.links?.map((l) => ({
+      label: t(l.labelKey),
+      href: l.href,
+      action: l.faq ? openFaq : undefined,
+    })),
     reducedMotion: prefersReducedMotion(),
   });
+}
+
+/** A help-hub FAQ link: leave the tour, then hand off to the app's navigator. */
+function openFaq(): void {
+  const cb = onOpenFaq;
+  stopTour();
+  cb?.();
 }
 
 function setupAdvance(step: TourStep, target: HTMLElement | null): void {

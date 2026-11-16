@@ -111,3 +111,21 @@ test("usersTableHtml renders an empty-state row for no users", () => {
   assert.match(html, /class="user-empty"/);
   assert.match(html, /colspan="6"/);
 });
+
+test("userRowHtml offers 'resend invitation' only for a pending (invited) user", () => {
+  const base = {
+    id: 3,
+    name: "P",
+    email: "p@micd.local",
+    role: "medico" as const,
+    has_password: false,
+    last_login_at: null,
+  };
+  assert.match(userRowHtml({ ...base, status: "invited" }), /data-user-resend/);
+  for (const status of ["active", "blocked"] as const) {
+    assert.doesNotMatch(
+      userRowHtml({ ...base, status, has_password: true }),
+      /data-user-resend/,
+    );
+  }
+});

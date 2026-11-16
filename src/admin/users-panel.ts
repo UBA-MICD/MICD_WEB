@@ -1,8 +1,9 @@
 // ── Admin users panel (DOM wiring) ───────────────────────────────────────────
 //
 // Binds the users-admin.ts core to the #panel-usuarios markup: loads the list,
-// renders the table, and wires the create form, role change, block/enable and
-// delete. All rendering goes through the escaped helpers in users-admin.ts.
+// renders the table, and wires the create form, role change, block/enable,
+// delete and re-sending a pending user's invitation. All rendering goes through
+// the escaped helpers in users-admin.ts.
 // Re-renders on locale change so the (translated) role/status labels follow the
 // language switch.
 
@@ -12,6 +13,7 @@ import {
   setUserRole,
   setUserStatus,
   deleteUser,
+  resendInvite,
   exportAuditLogCsv,
   usersTableHtml,
   validateNewUser,
@@ -153,6 +155,18 @@ export function mountUsersPanel(root: HTMLElement): UsersPanelHandle {
         toggle.dataset.userToggle === "enable" ? "active" : "blocked";
       const result = await setUserStatus(rowId(toggle), status);
       if (!result.ok) showToast(result.error, "error");
+      await reload();
+      return;
+    }
+
+    const resend = target.closest<HTMLButtonElement>("[data-user-resend]");
+    if (resend) {
+      if (!confirm(t("users.confirmResendInvite"))) return;
+      resend.disabled = true; // no double-send while the request is in flight
+      const result = await resendInvite(rowId(resend));
+      resend.disabled = false;
+      if (!result.ok) showToast(result.error, "error");
+      else showToast(t("users.toast.inviteResent"), "success");
       await reload();
       return;
     }

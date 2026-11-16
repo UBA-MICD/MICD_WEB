@@ -54,6 +54,15 @@ export async function runSegmentation(): Promise<void> {
     return;
   }
 
+  // La segmentación con IA corre sobre el DICOM almacenado en el servidor (se
+  // busca por SOPInstanceUID). Una imagen abierta desde el disco local no tiene
+  // forma de ubicarse en el servidor, así que el backend responde 422: avisamos
+  // acá en vez de disparar un pedido condenado al error.
+  if (!dicom.metadata.sopInstanceUid) {
+    showBanner(t("viewer.segmentation.noServerImage"), "warning");
+    return;
+  }
+
   inFlight = true;
   setSegLoading(true);
   try {

@@ -37,6 +37,7 @@ export function launchTour(opener?: HTMLElement | null): void {
     role: getCurrentRole(),
     opener,
     navigate: navigateForStep,
+    onOpenFaq: () => showScreen("faq"),
   });
 }
 

@@ -167,6 +167,28 @@ export function resetViewerToDropZone(): void {
   view3DViewer.volume = null;
   view3DViewer.stopRenderLoop();
   mprEngine.volume = null;
+  // Every grid cell, not just the active one: in 1x2/2x2 the other cells would
+  // otherwise keep their image (and AI overlays) behind the drop zone.
+  for (const vp of getViewportManager()?.getAllViewports() ?? []) {
+    vp.data.source = "local";
+    vp.data.files = [];
+    vp.data.serverStudyId = null;
+    vp.data.serverInstances = [];
+    vp.data.currentIndex = 0;
+    vp.data.parsed = null;
+    vp.data.overlay = null;
+    vp.data.segmentation = null;
+    vp.data.mlLabel = null;
+    vp.data.wlSeriesKey = null;
+    vp.data.viewport = {
+      windowCenter: 0,
+      windowWidth: 0,
+      zoom: 0,
+      panX: 0,
+      panY: 0,
+    };
+  }
+  setViewportSync(false);
   $("series-nav").classList.add("hidden");
   $("topbar-title").textContent = t("viewer.defaultTitle");
   $("topbar-title").title = "";

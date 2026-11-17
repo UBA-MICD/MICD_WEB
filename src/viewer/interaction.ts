@@ -37,6 +37,7 @@ import {
   openFolder,
   sortFilesByInstanceNumber,
   loadVolumeIntoEngines,
+  resetViewerToDropZone,
 } from "./loading.js";
 import { view3DViewer } from "./view-3d.js";
 import { mprEngine } from "./mpr-engine.js";
@@ -901,6 +902,12 @@ export function initMeasurementControlsInteraction(): void {
     // measurement badges.
     for (const vp of getViewportManager()?.getAllViewports() ?? []) vp.render();
     renderActiveMeasurementOverlays();
+  });
+
+  // Top-bar "clear viewer": unload everything and return to the drop zone.
+  $("btn-clear-viewer")?.addEventListener("click", () => {
+    getMprTrackball()?.closePopover();
+    resetViewerToDropZone();
   });
 
   const btnSave = $("btn-save-annotations");

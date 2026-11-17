@@ -84,6 +84,31 @@
         <circle cx="12" cy="12" r="3" />
       </svg>
     </button>
+    <!-- Clear the viewer: unloads every study/file and returns to the drop zone.
+         Files on disk and server studies are untouched. -->
+    <button
+      class="nav-btn"
+      id="btn-clear-viewer"
+      type="button"
+      data-i18n-attr="aria-label:viewer.clear.label; title:viewer.clear.label"
+      aria-label="Limpiar visor"
+      title="Limpiar visor"
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      </svg>
+    </button>
     <div class="locale-switch">
       <label class="sr-only" for="locale-select" data-i18n="app.locale.label"
         >Idioma</label

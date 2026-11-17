@@ -11,7 +11,11 @@ import {
   stubCanvas2DContext,
 } from "../../test/viewer-fixture.ts";
 import { initViewportManager } from "./viewport-registry.ts";
-import { initFileInputs, loadStudyFromServer } from "./loading.ts";
+import {
+  initFileInputs,
+  loadStudyFromServer,
+  resetViewerToDropZone,
+} from "./loading.ts";
 import { state } from "./state.ts";
 import { dicomCache } from "./cache.ts";
 import { adoptSession, logout, type AuthUser } from "../auth/auth.ts";
@@ -116,5 +120,35 @@ test("loading a server study resets and populates the active viewport", async ()
   assert.ok(
     vp.data.viewport.windowWidth > 0,
     "viewport W/L recomputed for the new study",
+  );
+});
+
+test("resetViewerToDropZone empties every grid cell, not just the active one", async () => {
+  const { getViewportManager } = await import("./viewport-registry.ts");
+  const manager = getViewportManager()!;
+  manager.setLayout("2x2");
+  for (const vp of manager.getAllViewports()) {
+    vp.data.source = "server";
+    vp.data.serverStudyId = "study-1";
+    vp.data.files = [new File(["x"], "a.dcm")];
+    vp.data.parsed = { metadata: {} } as any;
+    vp.data.mlLabel = "IA: nodulo";
+  }
+  manager.setSync(true);
+
+  resetViewerToDropZone();
+
+  assert.equal(manager.getAllViewports().length, 4, "layout is kept");
+  for (const vp of manager.getAllViewports()) {
+    assert.equal(vp.data.parsed, null);
+    assert.equal(vp.data.files.length, 0);
+    assert.equal(vp.data.serverStudyId, null);
+    assert.equal(vp.data.source, "local");
+    assert.equal(vp.data.mlLabel, null);
+  }
+  assert.equal(manager.isSynchronized, false);
+  assert.equal(
+    document.getElementById("drop-zone")!.classList.contains("hidden"),
+    false,
   );
 });

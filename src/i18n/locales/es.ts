@@ -1036,6 +1036,7 @@ export const es: Record<string, string> = {
   "viewer.measure.showAnnotations": "Mostrar anotaciones",
   "viewer.info.hide": "Ocultar info",
   "viewer.info.show": "Mostrar info",
+  "viewer.clear.label": "Limpiar visor",
   "viewer.measure.saveAnnotations": "Guardar",
   "viewer.measure.savedSuccess": "¡Guardado!",
 };
